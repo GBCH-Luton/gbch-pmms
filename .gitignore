@@ -14,5 +14,10 @@ client/dist
 # project source (also avoids tracking connection endpoint details).
 supabase/.temp/
 
+# Database data snapshots -- a different kind of backup than code (no
+# meaningful diffs, would bloat the repo over time). Kept as a standalone
+# folder on disk instead, separate from version control.
+backups/
+
 # Editor/OS cruft
 .DS_Store
