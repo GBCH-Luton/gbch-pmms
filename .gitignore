@@ -1,0 +1,14 @@
+# Secrets -- Supabase URL/keys, including the service-role key that
+# bypasses Row-Level Security entirely. Must never be committed.
+.env
+.env.local
+.env.*.local
+
+node_modules
+client/dist
+
+# Claude Code's own local tool state, not project source
+.claude/
+
+# Editor/OS cruft
+.DS_Store

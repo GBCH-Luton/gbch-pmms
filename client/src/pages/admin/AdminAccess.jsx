@@ -1,0 +1,819 @@
+// Admin page: Staff List + Role Management, split out of what used to be
+// the "Staff" page (AdminBuilders.jsx) so it can be gated to true Admins
+// only. Live Field Radar stayed behind on AdminBuilders.jsx/"Staff" and is
+// visible to Maintenance Managers too -- only staff add/edit/deactivate and
+// role assignment moved here, since that's the part with real blast radius
+// (creating accounts, deciding who has what role).
+//
+// Gating happens in two places: the sidebar nav item pointing at this page
+// is hidden entirely for non-admins (see AdminDashboard.jsx), and this
+// component also refuses to render its content if profile.role isn't
+// 'admin' as a defense-in-depth check, in case it's ever reached another way.
+//
+// IMPORTANT DESIGN NOTE: the "Role" managed here (Admin/Builder/Cleaner/
+// Support Worker + custom) is primarily an ORGANIZATIONAL label for this
+// staff directory. Login/access is normally governed by Job Title matching
+// one of the lists in client/src/lib/roles.js (ADMIN_JOB_TITLES/
+// MANAGER_JOB_TITLES/BUILDER_JOB_TITLES), read in App.jsx via
+// roleFromJobTitle() -- but a Role assigned here can ALSO grant login
+// access directly, on top of whatever job_title gives: the built-in Admin
+// and Builder roles always do (admin/builder access respectively), and a
+// custom role does if it's configured with an access level below (see
+// accessLevelForRole in client/src/lib/roles.js, called from App.jsx). This
+// exists so PMMS access doesn't depend on getting someone's company job
+// title to match a hardcoded list -- see the "job_title drift" incident
+// this was built to prevent.
+//
+// Role is stored in pmms.staff_roles (staff_id -> role), NOT on
+// public.staff.role -- see scripts/add_pmms_staff_roles_table.sql.
+// public.staff.role is shared with whatever else in the company reads
+// public.staff, so being "Admin" in some other system sharing this
+// Supabase project doesn't make someone Admin in PMMS, and vice versa.
+//
+// public.staff already has `active boolean default true` (see
+// new_project_schema.sql). It does NOT have `phone` yet -- see
+// scripts/add_staff_phone_column.sql, run it before using the Add/Edit
+// Staff modal's Phone field.
+//
+// Custom roles (the master list of assignable names, plus what login
+// access each one grants) are stored in pmms.settings under key
+// 'custom_roles' as [{ name, accessLevel }], accessLevel being
+// 'none' | 'manager' | 'builder' -- see normalizeCustomRoles in
+// client/src/lib/roles.js, which also accepts the older plain-string-array
+// shape for backward compatibility. NOTE: the live pmms.settings table was
+// found (while testing this) to have columns `key`/`value` instead of the
+// `setting_key`/`setting_value` every caller in this app expects -- see
+// scripts/fix_pmms_settings_column_names.sql, run it or every
+// settings-backed feature (this one included) will error.
+
+import { useState, useEffect, useMemo } from 'react'
+import { normalizeCustomRoles } from '../../lib/roles'
+import { supabase } from '../../lib/supabase'
+import {
+  actionBtnStyle,
+  modalOverlayStyle, modalCardStyle, modalTitleStyle, modalLabelStyle, modalErrorStyle,
+  modalCancelBtnStyle, modalConfirmBtnStyle,
+} from './shared'
+
+const BUILT_IN_ROLES = ['Admin', 'Builder', 'Cleaner', 'Support Worker']
+
+const ROLE_STYLES = {
+  'Admin': { bg: '#dbeafe', color: '#1e3a8a' },
+  'Builder': { bg: '#ccfbf1', color: '#0d9488' },
+  'Cleaner': { bg: '#f3e8ff', color: '#9333ea' },
+  'Support Worker': { bg: '#fef3c7', color: '#d97706' },
+}
+const CUSTOM_ROLE_STYLE = { bg: '#f1f5f9', color: '#64748b' }
+
+function roleStyle(role) {
+  return ROLE_STYLES[role] || CUSTOM_ROLE_STYLE
+}
+
+const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '13px', fontFamily: 'inherit', boxSizing: 'border-box' }
+
+const emptyForm = { name: '', email: '', role: 'Builder', job_title: '', phone: '' }
+
+// supabase-js resolves a non-2xx Edge Function response as `error`, with the
+// JSON body only reachable via error.context (a Response) -- this digs the
+// { error: "..." } message back out, falling back to the SDK's own message.
+async function extractFunctionError(error) {
+  try {
+    const parsed = await error.context?.json()
+    if (parsed?.error) return parsed.error
+  } catch {
+    // fall through to the generic message below
+  }
+  return error.message || 'Something went wrong. Please try again.'
+}
+
+// Shown once, right after a temp password is generated -- by a brand new
+// account (StaffFormModal) or a reset on an existing one (ResetPasswordModal).
+// There is deliberately no way to re-fetch this later; it's never stored in
+// plain text anywhere.
+function TempPasswordDisplay({ name, tempPassword }) {
+  const [copied, setCopied] = useState(false)
+
+  function handleCopy() {
+    navigator.clipboard.writeText(tempPassword)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }
+
+  return (
+    <div>
+      <p style={{ margin: '0 0 12px 0', fontSize: '13px', color: '#64748b', lineHeight: 1.6 }}>
+        Give <strong>{name}</strong> this temporary password directly — in person, by phone, or secure message. It will not be shown again.
+      </p>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '14px 16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', marginBottom: '12px' }}>
+        <span style={{ flex: 1, fontFamily: 'monospace', fontSize: '20px', fontWeight: 800, color: '#0f172a', letterSpacing: '0.04em' }}>{tempPassword}</span>
+        <button
+          onClick={handleCopy}
+          style={{ padding: '8px 14px', background: copied ? '#16a34a' : '#1d4ed8', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
+        >
+          {copied ? '✓ Copied' : 'Copy'}
+        </button>
+      </div>
+      <div style={{ padding: '12px 14px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '10px', fontSize: '12px', color: '#1e3a8a', lineHeight: 1.5 }}>
+        🔒 When {name} logs in with this, they will be taken straight to a "set new password" screen and cannot access anything else until they do.
+      </div>
+    </div>
+  )
+}
+
+// Per-staff-row action: generates a fresh temp password for someone who
+// already has a login. This is the only account-recovery path in this app
+// -- there's no self-service "forgot password" email flow -- so it has to
+// be reachable from here.
+function ResetPasswordModal({ staff, onClose }) {
+  const [step, setStep] = useState('confirm') // 'confirm' | 'done'
+  const [tempPassword, setTempPassword] = useState('')
+  const [resetting, setResetting] = useState(false)
+  const [error, setError] = useState('')
+
+  async function handleGenerate() {
+    setResetting(true)
+    setError('')
+
+    const { data, error: fnError } = await supabase.functions.invoke('reset-staff-password', { body: { staffId: staff.id } })
+
+    setResetting(false)
+
+    if (fnError) { setError(await extractFunctionError(fnError)); return }
+    if (data?.error) { setError(data.error); return }
+
+    setTempPassword(data.tempPassword)
+    setStep('done')
+  }
+
+  return (
+    <div style={modalOverlayStyle}>
+      <div style={modalCardStyle}>
+        {step === 'confirm' ? (
+          <>
+            <p style={modalTitleStyle}>Reset Password — {staff.name}</p>
+            <p style={{ margin: '10px 0 0 0', fontSize: '13px', color: '#64748b', lineHeight: 1.6 }}>
+              This will generate a unique temporary password for <strong>{staff.email}</strong>. It will be shown to you once so you can tell them directly — in person or by phone. They will be forced to set a new password as soon as they log in.
+            </p>
+            {error && <p style={modalErrorStyle}>{error}</p>}
+            <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
+              <button onClick={onClose} disabled={resetting} style={modalCancelBtnStyle}>Cancel</button>
+              <button
+                onClick={handleGenerate}
+                disabled={resetting}
+                style={{ ...modalConfirmBtnStyle, opacity: resetting ? 0.6 : 1, cursor: resetting ? 'not-allowed' : 'pointer' }}
+              >
+                {resetting ? 'Generating...' : 'Generate temp password'}
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <p style={modalTitleStyle}>Temporary Password Generated</p>
+            <p style={{ margin: '2px 0 16px 0', fontSize: '13px', color: '#64748b' }}>{staff.email}</p>
+            <TempPasswordDisplay name={staff.name} tempPassword={tempPassword} />
+            <button onClick={onClose} style={{ ...modalConfirmBtnStyle, width: '100%', marginTop: '16px' }}>Done</button>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function StaffFormModal({ staff, roleOptions, staffDirectory, onClose, onSaved }) {
+  const [form, setForm] = useState(emptyForm)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [createdAccount, setCreatedAccount] = useState(null) // { staff, tempPassword } once a brand-new login is created
+
+  useEffect(() => {
+    if (staff) {
+      setForm({
+        name: staff.name || '',
+        email: staff.email || '',
+        role: staff.role || roleOptions[0] || '',
+        job_title: staff.job_title || '',
+        phone: staff.phone || '',
+      })
+    } else {
+      setForm({ ...emptyForm, role: roleOptions[0] || '' })
+    }
+  }, [staff, roleOptions])
+
+  // Deliberately separate from the effect above, and keyed only on `staff`
+  // (not `roleOptions` too) -- this should reset when the modal is reopened
+  // for a different person, never as a side effect of the role list simply
+  // re-rendering, which would otherwise wipe out the just-created temp
+  // password result out from under the admin.
+  useEffect(() => {
+    setError('')
+    setCreatedAccount(null)
+  }, [staff])
+
+  function set(key, value) {
+    setForm(prev => ({ ...prev, [key]: value }))
+  }
+
+  // Only relevant while adding (not editing): typing/picking an email that
+  // already exists in public.staff means this person is already in the
+  // company directory (e.g. from the bulk HR import) and just needs a role
+  // -- same outcome as finding them under the "Unassigned" tab and clicking
+  // Edit, just reachable directly from Add without hunting for them first.
+  const matchedExisting = !staff && form.email.trim()
+    ? staffDirectory.find(s => s.email?.toLowerCase() === form.email.trim().toLowerCase())
+    : null
+
+  useEffect(() => {
+    if (matchedExisting) {
+      setForm(prev => ({
+        ...prev,
+        name: matchedExisting.name || prev.name,
+        job_title: matchedExisting.job_title || prev.job_title,
+        phone: matchedExisting.phone || prev.phone,
+      }))
+    }
+    // Only react to a new match being found, not every keystroke.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [matchedExisting?.id])
+
+  async function handleSave() {
+    setError('')
+    if (!form.name.trim()) { setError('Full Name is required.'); return }
+    if (!form.email.trim()) { setError('Email is required.'); return }
+
+    setSaving(true)
+
+    // Editing an existing card, or Add matched an existing public.staff row
+    // by email -- either way, update that row + upsert the role, no invite,
+    // no new row.
+    const targetId = staff?.id || matchedExisting?.id
+
+    if (targetId) {
+      const { data, error: updateError } = await supabase
+        .from('staff')
+        .update({
+          name: form.name.trim(),
+          email: form.email.trim(),
+          job_title: form.job_title.trim() || null,
+          phone: form.phone.trim() || null,
+        })
+        .eq('id', targetId)
+        .select()
+        .single()
+
+      if (updateError) { setSaving(false); setError(updateError.message); return }
+
+      const { error: roleError } = await supabase
+        .schema('pmms')
+        .from('staff_roles')
+        .upsert({ staff_id: targetId, role: form.role, updated_at: new Date().toISOString() }, { onConflict: 'staff_id' })
+
+      setSaving(false)
+      if (roleError) { setError(roleError.message); return }
+
+      onSaved({ ...data, role: form.role })
+      return
+    }
+
+    // Genuinely new person: create their login (with a one-time temp
+    // password) via a trusted server-side function. Browser code only ever
+    // holds the anon key, and creating a Supabase Auth user needs the
+    // service-role key, so this can't happen directly from here -- see
+    // supabase/functions/create-staff-account.
+    const { data: fnData, error: fnError } = await supabase.functions.invoke('create-staff-account', {
+      body: {
+        name: form.name.trim(),
+        email: form.email.trim(),
+        job_title: form.job_title.trim() || null,
+        phone: form.phone.trim() || null,
+        role: form.role,
+      },
+    })
+
+    setSaving(false)
+
+    if (fnError) { setError(await extractFunctionError(fnError)); return }
+    if (fnData?.error) { setError(fnData.error); return }
+
+    // Don't close yet -- show the temp password once, first.
+    setCreatedAccount({ staff: fnData.staff, tempPassword: fnData.tempPassword })
+  }
+
+  if (createdAccount) {
+    return (
+      <div style={modalOverlayStyle}>
+        <div style={modalCardStyle}>
+          <p style={modalTitleStyle}>Staff Member Added</p>
+          <p style={{ margin: '2px 0 16px 0', fontSize: '13px', color: '#64748b' }}>{createdAccount.staff.email}</p>
+          <TempPasswordDisplay name={createdAccount.staff.name} tempPassword={createdAccount.tempPassword} />
+          <button
+            onClick={() => onSaved({ ...createdAccount.staff, role: form.role })}
+            style={{ ...modalConfirmBtnStyle, width: '100%', marginTop: '16px' }}
+          >
+            Done
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div style={modalOverlayStyle}>
+      <div style={modalCardStyle}>
+        <p style={modalTitleStyle}>{staff ? 'Edit Staff Member' : 'Add Staff Member'}</p>
+
+        <p style={modalLabelStyle}>Full Name</p>
+        <input type="text" value={form.name} onChange={(e) => set('name', e.target.value)} style={inputStyle} />
+
+        <p style={modalLabelStyle}>Email</p>
+        <input
+          type="text"
+          value={form.email}
+          onChange={(e) => set('email', e.target.value)}
+          list={staff ? undefined : 'staff-email-directory'}
+          placeholder={staff ? undefined : 'Start typing to find an existing staff member...'}
+          style={inputStyle}
+        />
+        {!staff && (
+          <datalist id="staff-email-directory">
+            {staffDirectory.map(s => <option key={s.id} value={s.email}>{s.name}</option>)}
+          </datalist>
+        )}
+        {!staff && matchedExisting && (
+          <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: '#16a34a', fontWeight: 600 }}>
+            ✓ Found {matchedExisting.name} in the staff directory — this will assign the role to their existing account, not create a duplicate.
+          </p>
+        )}
+
+        <p style={modalLabelStyle}>Role</p>
+        <select value={form.role} onChange={(e) => set('role', e.target.value)} style={inputStyle}>
+          {/* Staff pulled in from the wider (unassigned) directory may have a legacy
+              value like 'sw' that isn't one of the managed roles -- show it so the
+              dropdown doesn't just look blank, but picking any real option below replaces it. */}
+          {form.role && !roleOptions.includes(form.role) && (
+            <option value={form.role}>{form.role} (current, not a managed role)</option>
+          )}
+          {roleOptions.map(r => <option key={r} value={r}>{r}</option>)}
+        </select>
+
+        <p style={modalLabelStyle}>Job Title</p>
+        <input type="text" value={form.job_title} onChange={(e) => set('job_title', e.target.value)} style={inputStyle} />
+
+        <p style={modalLabelStyle}>Phone</p>
+        <input type="text" value={form.phone} onChange={(e) => set('phone', e.target.value)} style={inputStyle} />
+
+        {error && <p style={modalErrorStyle}>{error}</p>}
+
+        <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
+          <button onClick={onClose} style={modalCancelBtnStyle}>Cancel</button>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            style={{ ...modalConfirmBtnStyle, opacity: saving ? 0.6 : 1, cursor: saving ? 'not-allowed' : 'pointer' }}
+          >
+            {saving ? 'Saving...' : staff ? 'Save changes' : 'Add Staff Member'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const ACCESS_LEVEL_LABELS = {
+  none: 'No system login',
+  manager: 'Manager access',
+  builder: 'Builder access',
+}
+
+function RolesPanel({ staffList, customRoles, customRolesError, onRolesChanged }) {
+  const [adding, setAdding] = useState(false)
+  const [newRole, setNewRole] = useState('')
+  const [newRoleAccessLevel, setNewRoleAccessLevel] = useState('none')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [deleting, setDeleting] = useState(false)
+
+  async function saveCustomRoles(next) {
+    const { error: saveError } = await supabase
+      .schema('pmms')
+      .from('settings')
+      .upsert({ setting_key: 'custom_roles', setting_value: next, updated_at: new Date().toISOString() }, { onConflict: 'setting_key' })
+
+    if (saveError) return saveError.message
+    onRolesChanged(next)
+    return null
+  }
+
+  async function handleAddRole() {
+    setError('')
+    const name = newRole.trim()
+    if (!name) { setError('Enter a role name.'); return }
+    if ([...BUILT_IN_ROLES, ...customRoles.map(r => r.name)].some(r => r.toLowerCase() === name.toLowerCase())) {
+      setError('That role already exists.')
+      return
+    }
+
+    setSaving(true)
+    const err = await saveCustomRoles([...customRoles, { name, accessLevel: newRoleAccessLevel }])
+    setSaving(false)
+
+    if (err) { setError(err); return }
+    setNewRole('')
+    setNewRoleAccessLevel('none')
+    setAdding(false)
+  }
+
+  async function handleChangeAccessLevel(name, accessLevel) {
+    await saveCustomRoles(customRoles.map(r => r.name === name ? { ...r, accessLevel } : r))
+  }
+
+  async function handleChangeHideSettings(name, hideSettings) {
+    await saveCustomRoles(customRoles.map(r => r.name === name ? { ...r, hideSettings } : r))
+  }
+
+  async function handleDeleteRole() {
+    setDeleting(true)
+    const err = await saveCustomRoles(customRoles.filter(r => r.name !== deleteTarget))
+    setDeleting(false)
+    if (!err) setDeleteTarget(null)
+  }
+
+  const staffCountForRole = (role) => staffList.filter(s => s.role === role).length
+
+  return (
+    <div style={{ background: '#fff', borderRadius: '16px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+      <p style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: 800, color: '#0f172a' }}>Roles</p>
+
+      <p style={{ margin: '0 0 8px 0', fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Built-in</p>
+      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '16px' }}>
+        {BUILT_IN_ROLES.map(r => {
+          const style = roleStyle(r)
+          return (
+            <span key={r} style={{ fontSize: '11px', fontWeight: 700, color: style.color, background: style.bg, padding: '4px 12px', borderRadius: '20px' }}>{r}</span>
+          )
+        })}
+      </div>
+
+      <p style={{ margin: '0 0 8px 0', fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Custom</p>
+
+      {customRolesError && (
+        <p style={{ margin: '0 0 10px 0', fontSize: '12px', color: '#dc2626' }}>{customRolesError}</p>
+      )}
+
+      {customRoles.length === 0 && !customRolesError && (
+        <p style={{ margin: '0 0 10px 0', fontSize: '13px', color: '#94a3b8', fontStyle: 'italic' }}>No custom roles yet.</p>
+      )}
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '12px' }}>
+        {customRoles.map(r => (
+          <div key={r.name} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', padding: '6px 10px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '12px', fontWeight: 700, color: '#0f172a' }}>{r.name}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <select
+                value={r.accessLevel}
+                onChange={(e) => handleChangeAccessLevel(r.name, e.target.value)}
+                title="What logging in with this role grants, on top of Job Title"
+                style={{ fontSize: '11px', fontWeight: 700, padding: '4px 6px', borderRadius: '6px', border: '1px solid #e2e8f0', background: '#fff', color: '#475569', cursor: 'pointer' }}
+              >
+                {Object.entries(ACCESS_LEVEL_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
+              <label
+                title="Removes the Settings tab from the nav for this role. UI-only -- does not restrict database access."
+                style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 700, color: '#64748b', cursor: 'pointer', whiteSpace: 'nowrap' }}
+              >
+                <input
+                  type="checkbox"
+                  checked={!!r.hideSettings}
+                  onChange={(e) => handleChangeHideSettings(r.name, e.target.checked)}
+                />
+                Hide Settings
+              </label>
+              <button
+                onClick={() => setDeleteTarget(r.name)}
+                style={{ background: 'none', border: 'none', color: '#dc2626', fontSize: '14px', fontWeight: 800, cursor: 'pointer', padding: '2px 6px' }}
+                aria-label={`Delete role ${r.name}`}
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {adding ? (
+        <div>
+          <input
+            type="text"
+            value={newRole}
+            onChange={(e) => setNewRole(e.target.value)}
+            placeholder="Role name..."
+            style={{ ...inputStyle, marginBottom: '8px' }}
+          />
+          <select
+            value={newRoleAccessLevel}
+            onChange={(e) => setNewRoleAccessLevel(e.target.value)}
+            style={{ ...inputStyle, marginBottom: '8px' }}
+          >
+            {Object.entries(ACCESS_LEVEL_LABELS).map(([value, label]) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
+          {error && <p style={modalErrorStyle}>{error}</p>}
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button onClick={() => { setAdding(false); setNewRole(''); setError('') }} style={{ flex: 1, padding: '8px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>
+              Cancel
+            </button>
+            <button
+              onClick={handleAddRole}
+              disabled={saving}
+              style={{ flex: 1, padding: '8px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.6 : 1 }}
+            >
+              {saving ? 'Saving...' : 'Save'}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button
+          onClick={() => setAdding(true)}
+          style={{ width: '100%', padding: '10px', background: '#1e3a8a', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}
+        >
+          ＋ Add Role
+        </button>
+      )}
+
+      {deleteTarget && (
+        <div style={modalOverlayStyle}>
+          <div style={{ ...modalCardStyle, maxWidth: '380px' }}>
+            <p style={modalTitleStyle}>Delete Role "{deleteTarget}"</p>
+            {staffCountForRole(deleteTarget) > 0 ? (
+              <p style={{ margin: '10px 0 0 0', fontSize: '13px', color: '#d97706', fontWeight: 600 }}>
+                ⚠ {staffCountForRole(deleteTarget)} staff member{staffCountForRole(deleteTarget) === 1 ? '' : 's'} currently have this role. They will keep the label on their record, but it will no longer appear as a filter tab.
+              </p>
+            ) : (
+              <p style={{ margin: '10px 0 0 0', fontSize: '13px', color: '#64748b' }}>No staff currently use this role.</p>
+            )}
+            <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
+              <button onClick={() => setDeleteTarget(null)} style={modalCancelBtnStyle}>Cancel</button>
+              <button
+                onClick={handleDeleteRole}
+                disabled={deleting}
+                style={{ flex: 2, padding: '10px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: deleting ? 'not-allowed' : 'pointer', opacity: deleting ? 0.6 : 1 }}
+              >
+                {deleting ? 'Deleting...' : 'Delete Role'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+export default function AdminAccess({ profile }) {
+  const [staffList, setStaffList] = useState([])
+  const [tickets, setTickets] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  const [customRoles, setCustomRoles] = useState([])
+  const [customRolesError, setCustomRolesError] = useState('')
+
+  const [roleFilter, setRoleFilter] = useState('All')
+  const [modalStaff, setModalStaff] = useState(undefined) // undefined = closed, null = add, object = edit
+  const [resetPasswordTarget, setResetPasswordTarget] = useState(null)
+  const [toggleActiveErrors, setToggleActiveErrors] = useState({})
+
+  useEffect(() => {
+    fetchData()
+  }, [])
+
+  async function fetchData() {
+    const { data: allStaff, error: staffError } = await supabase
+      .from('staff')
+      .select('*')
+      .order('name')
+
+    const { data: roleRows, error: roleRowsError } = await supabase
+      .schema('pmms')
+      .from('staff_roles')
+      .select('staff_id, role')
+
+    const { data: ticketData, error: ticketError } = await supabase
+      .schema('pmms')
+      .from('tickets')
+      .select('id, status, assigned_builder_id')
+
+    const { data: settingsRow, error: settingsError } = await supabase
+      .schema('pmms')
+      .from('settings')
+      .select('setting_value')
+      .eq('setting_key', 'custom_roles')
+      .maybeSingle()
+
+    if (!staffError) {
+      const roleByStaffId = {}
+      if (!roleRowsError) {
+        (roleRows || []).forEach(r => { roleByStaffId[r.staff_id] = r.role })
+      }
+      setStaffList((allStaff || []).map(s => ({ ...s, role: roleByStaffId[s.id] || null })))
+    }
+    if (!ticketError) setTickets(ticketData || [])
+
+    if (settingsError) {
+      setCustomRoles([])
+      setCustomRolesError(settingsError.message)
+    } else {
+      setCustomRoles(normalizeCustomRoles(settingsRow?.setting_value))
+      setCustomRolesError('')
+    }
+
+    setLoading(false)
+  }
+
+  function isOnDuty(staffId) {
+    return tickets.some(t => t.assigned_builder_id === staffId && t.status === 'In Progress')
+  }
+
+  function handleStaffSaved(saved) {
+    setStaffList(prev => {
+      const exists = prev.some(s => s.id === saved.id)
+      return exists ? prev.map(s => s.id === saved.id ? saved : s) : [...prev, saved].sort((a, b) => a.name.localeCompare(b.name))
+    })
+    setModalStaff(undefined)
+  }
+
+  async function handleToggleActive(staff) {
+    setToggleActiveErrors(prev => ({ ...prev, [staff.id]: '' }))
+
+    const { data, error } = await supabase
+      .from('staff')
+      .update({ active: !staff.active })
+      .eq('id', staff.id)
+      .select()
+      .single()
+
+    if (error) {
+      setToggleActiveErrors(prev => ({ ...prev, [staff.id]: error.message }))
+      return
+    }
+
+    // .update() only returns public.staff columns -- role lives in
+    // pmms.staff_roles, so it has to be carried over manually here or it'd
+    // get wiped from local state.
+    handleStaffSaved({ ...data, role: staff.role })
+  }
+
+  // Memoized so this array's identity is stable across re-renders that
+  // don't actually change the role list -- StaffFormModal's effect depends
+  // on it, and a fresh array every render was making that effect refire far
+  // more than intended (e.g. discarding an in-progress edit, or the
+  // just-created temp password result). Computed before the early returns
+  // below since hooks can't be called conditionally.
+  const roleOptions = useMemo(() => [...BUILT_IN_ROLES, ...customRoles.map(r => r.name)], [customRoles])
+
+  if (profile?.role !== 'admin') {
+    return (
+      <div style={{ background: '#fff', borderRadius: '16px', padding: '32px', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+        <p style={{ margin: 0, fontSize: '14px', color: '#94a3b8', fontStyle: 'italic' }}>This page is only available to Admins.</p>
+      </div>
+    )
+  }
+
+  if (loading) return (
+    <div style={{ minHeight: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <p style={{ color: '#94a3b8', fontWeight: 600, fontFamily: 'system-ui' }}>Loading staff...</p>
+    </div>
+  )
+
+  // Scope the page to staff who've actually been given a role through this
+  // page. public.staff is a company-wide directory (HR, Procurement, etc.
+  // included) -- most of it has nothing to do with property maintenance, so
+  // "relevant" here means "has one of the roles this page manages."
+  const relevantStaff = staffList.filter(s => roleOptions.includes(s.role))
+  const unassignedStaff = staffList.filter(s => !roleOptions.includes(s.role))
+
+  const filterTabs = ['All', ...roleOptions, 'Unassigned']
+
+  const filteredStaff = roleFilter === 'All' ? relevantStaff
+    : roleFilter === 'Unassigned' ? unassignedStaff
+    : staffList.filter(s => s.role === roleFilter)
+
+  return (
+    <div>
+      <div style={{ marginBottom: '16px' }}>
+        <h1 style={{ margin: '0 0 4px 0', fontSize: '18px', fontWeight: 800, color: '#0f172a' }}>Admin</h1>
+        <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>Add, edit, activate/deactivate staff accounts, and manage roles. Use the "Unassigned" tab to bring someone new in from the wider staff list. Day-to-day duty monitoring lives on the Staff page.</p>
+      </div>
+
+      {/* Staff List + Role Management */}
+      <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+        <div style={{ flex: '2 1 480px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '12px', flexWrap: 'wrap' }}>
+            <p style={{ margin: 0, fontSize: '14px', fontWeight: 800, color: '#0f172a' }}>Staff List</p>
+            <button
+              onClick={() => setModalStaff(null)}
+              style={{ padding: '9px 16px', background: '#0f766e', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
+            >
+              ＋ Add Staff Member
+            </button>
+          </div>
+
+          <div style={{ display: 'flex', gap: '4px', marginBottom: '14px', flexWrap: 'wrap', borderBottom: '1px solid #e2e8f0' }}>
+            {filterTabs.map(tab => (
+              <button
+                key={tab}
+                onClick={() => setRoleFilter(tab)}
+                style={{
+                  padding: '8px 14px', background: 'none', border: 'none', borderBottom: roleFilter === tab ? '2px solid #0f766e' : '2px solid transparent',
+                  color: roleFilter === tab ? '#0f766e' : '#64748b', fontSize: '13px', fontWeight: 700, cursor: 'pointer', marginBottom: '-1px', whiteSpace: 'nowrap',
+                }}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
+
+          {filteredStaff.length === 0 ? (
+            <div style={{ background: '#fff', borderRadius: '16px', padding: '32px', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+              <p style={{ margin: 0, fontSize: '14px', color: '#94a3b8', fontStyle: 'italic' }}>No staff found.</p>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {filteredStaff.map(s => {
+                const isActive = s.active !== false
+                const onDuty = isOnDuty(s.id)
+                const rStyle = roleStyle(s.role)
+                return (
+                  <div
+                    key={s.id}
+                    style={{
+                      background: '#fff', borderRadius: '16px', padding: '14px 20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+                      opacity: isActive ? 1 : 0.55,
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
+                      <div style={{ flex: '2 1 220px', minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '4px' }}>
+                          {onDuty && (
+                            <span title="On Duty" style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#16a34a', flexShrink: 0 }} />
+                          )}
+                          <span style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>{s.name}</span>
+                          {s.role && (
+                            <span style={{ fontSize: '10px', fontWeight: 700, color: rStyle.color, background: rStyle.bg, padding: '2px 8px', borderRadius: '20px' }}>{s.role}</span>
+                          )}
+                          <span style={{
+                            fontSize: '10px', fontWeight: 700, padding: '2px 8px', borderRadius: '20px',
+                            color: isActive ? '#16a34a' : '#64748b', background: isActive ? '#dcfce7' : '#f1f5f9',
+                          }}>
+                            {isActive ? 'Active' : 'Inactive'}
+                          </span>
+                        </div>
+                        <span style={{ fontSize: '12px', color: '#64748b' }}>{s.email}</span>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '8px', flexShrink: 0, flexWrap: 'wrap' }}>
+                        <button onClick={() => setModalStaff(s)} style={actionBtnStyle}>Edit</button>
+                        <button onClick={() => setResetPasswordTarget(s)} style={actionBtnStyle}>🔑 Reset password</button>
+                        <button onClick={() => handleToggleActive(s)} style={actionBtnStyle}>{isActive ? 'Deactivate' : 'Activate'}</button>
+                      </div>
+                    </div>
+                    {toggleActiveErrors[s.id] && (
+                      <p style={modalErrorStyle}>⚠ Couldn't {isActive ? 'deactivate' : 'activate'}: {toggleActiveErrors[s.id]}</p>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        <div style={{ flex: '1 1 280px' }}>
+          <RolesPanel
+            staffList={staffList}
+            customRoles={customRoles}
+            customRolesError={customRolesError}
+            onRolesChanged={setCustomRoles}
+          />
+        </div>
+      </div>
+
+      {modalStaff !== undefined && (
+        <StaffFormModal
+          staff={modalStaff}
+          roleOptions={roleOptions}
+          staffDirectory={staffList}
+          onClose={() => setModalStaff(undefined)}
+          onSaved={handleStaffSaved}
+        />
+      )}
+
+      {resetPasswordTarget && (
+        <ResetPasswordModal
+          staff={resetPasswordTarget}
+          onClose={() => setResetPasswordTarget(null)}
+        />
+      )}
+    </div>
+  )
+}

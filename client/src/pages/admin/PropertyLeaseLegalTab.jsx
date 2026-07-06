@@ -1,0 +1,384 @@
+// Lease & Legal tab of the Property Profile. See
+// scripts/add_property_lease_legal_columns.sql for the pmms.properties
+// columns this component depends on -- run it before using this tab.
+// Lease/insurance documents reuse the 'property-docs' bucket already
+// created by add_property_compliance_table.sql.
+//
+// ALTER TABLE pmms.properties ADD COLUMN IF NOT EXISTS lease_start_date date;
+// ALTER TABLE pmms.properties ADD COLUMN IF NOT EXISTS lease_end_date date;
+// ALTER TABLE pmms.properties ADD COLUMN IF NOT EXISTS lease_type text;
+// ALTER TABLE pmms.properties ADD COLUMN IF NOT EXISTS lease_status text;
+// ALTER TABLE pmms.properties ADD COLUMN IF NOT EXISTS landlord_company text;
+// ALTER TABLE pmms.properties ADD COLUMN IF NOT EXISTS landlord_name text;
+// ALTER TABLE pmms.properties ADD COLUMN IF NOT EXISTS landlord_phone text;
+// ALTER TABLE pmms.properties ADD COLUMN IF NOT EXISTS landlord_email text;
+// ALTER TABLE pmms.properties ADD COLUMN IF NOT EXISTS rent_amount numeric;
+// ALTER TABLE pmms.properties ADD COLUMN IF NOT EXISTS rent_payment_day integer;
+// ALTER TABLE pmms.properties ADD COLUMN IF NOT EXISTS deposit_amount numeric;
+// ALTER TABLE pmms.properties ADD COLUMN IF NOT EXISTS deposit_scheme text;
+// ALTER TABLE pmms.properties ADD COLUMN IF NOT EXISTS deposit_scheme_id text;
+// ALTER TABLE pmms.properties ADD COLUMN IF NOT EXISTS special_lease_terms text;
+// ALTER TABLE pmms.properties ADD COLUMN IF NOT EXISTS insurance_expiry date;
+// ALTER TABLE pmms.properties ADD COLUMN IF NOT EXISTS insurance_doc_url text;
+// ALTER TABLE pmms.properties ADD COLUMN IF NOT EXISTS lease_doc_url text;
+
+import { useState } from 'react'
+import { supabase } from '../../lib/supabase'
+import { modalLabelStyle, modalErrorStyle } from './shared'
+
+const LEASE_TYPES = ['Fixed Term', 'Rolling', 'Assured Shorthold', 'Other']
+const LEASE_STATUSES = ['Active', 'Expiring', 'Renewed', 'Terminated']
+const DEPOSIT_SCHEMES = ['DPS', 'TDS', 'MyDeposits', 'None']
+
+const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '13px', fontFamily: 'inherit', boxSizing: 'border-box' }
+const readRowStyle = { display: 'flex', justifyContent: 'space-between', gap: '12px', padding: '8px 0', borderBottom: '1px solid #f1f5f9' }
+const readLabelStyle = { fontSize: '12px', fontWeight: 700, color: '#94a3b8' }
+const readValueStyle = { fontSize: '13px', fontWeight: 600, color: '#0f172a', textAlign: 'right' }
+
+function daysBetween(dateStr) {
+  const target = new Date(dateStr)
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  return Math.floor((target - today) / 86400000)
+}
+
+function filenameFromUrl(url) {
+  if (!url) return ''
+  const last = url.split('/').pop() || url
+  const decoded = decodeURIComponent(last)
+  return decoded.replace(/^\d+-/, '')
+}
+
+function leaseBanner(leaseEndDate) {
+  if (!leaseEndDate) return { tier: 'grey', label: 'No lease end date set' }
+  const daysLeft = daysBetween(leaseEndDate)
+  if (daysLeft <= 30) return { tier: 'red', label: 'Lease Expires Soon / Expired' }
+  if (daysLeft <= 180) return { tier: 'amber', label: `Lease Expiring — ${daysLeft} days remaining` }
+  return { tier: 'green', label: 'Lease Active' }
+}
+
+function insuranceBadge(expiry) {
+  if (!expiry) return null
+  const daysLeft = daysBetween(expiry)
+  if (daysLeft < 0) return { tier: 'red', label: 'Expired' }
+  if (daysLeft <= 90) return { tier: 'amber', label: `Expires in ${daysLeft}d` }
+  return { tier: 'green', label: 'Valid' }
+}
+
+const BADGE_STYLES = {
+  green: { bg: '#dcfce7', color: '#16a34a' },
+  amber: { bg: '#fef3c7', color: '#d97706' },
+  red: { bg: '#fee2e2', color: '#dc2626' },
+  grey: { bg: '#f1f5f9', color: '#64748b' },
+}
+
+function fieldInput(field, value, onChange) {
+  if (field.type === 'select') {
+    return (
+      <select value={value ?? ''} onChange={(e) => onChange(e.target.value)} style={inputStyle}>
+        <option value="">Select...</option>
+        {field.options.map(o => <option key={o} value={o}>{o}</option>)}
+      </select>
+    )
+  }
+  if (field.type === 'textarea') {
+    return (
+      <textarea value={value ?? ''} onChange={(e) => onChange(e.target.value)} rows={3} style={{ ...inputStyle, resize: 'vertical' }} />
+    )
+  }
+  return (
+    <input
+      type={field.type === 'number' ? 'number' : field.type === 'date' ? 'date' : 'text'}
+      value={value ?? ''}
+      onChange={(e) => onChange(field.type === 'number' ? (e.target.value === '' ? null : Number(e.target.value)) : e.target.value)}
+      min={field.min}
+      max={field.max}
+      style={inputStyle}
+    />
+  )
+}
+
+function formatReadValue(field, value) {
+  if (value === null || value === undefined || value === '') return '—'
+  if (field.key === 'landlord_email') {
+    return <a href={`mailto:${value}`} style={{ color: '#1d4ed8', fontWeight: 700 }}>{value}</a>
+  }
+  if (field.key === 'rent_amount' || field.key === 'deposit_amount') {
+    return `£${Number(value).toLocaleString()}`
+  }
+  return String(value)
+}
+
+function EditableSection({ title, fields, property, onSave, extra }) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState({})
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  function startEdit() {
+    const initial = {}
+    fields.forEach(f => { initial[f.key] = property[f.key] })
+    setDraft(initial)
+    setError('')
+    setEditing(true)
+  }
+
+  async function save() {
+    setSaving(true)
+    setError('')
+    const err = await onSave(draft)
+    setSaving(false)
+    if (err) { setError(err); return }
+    setEditing(false)
+  }
+
+  return (
+    <div style={{ background: '#fff', borderRadius: '16px', padding: '20px', marginBottom: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+        <p style={{ margin: 0, fontSize: '14px', fontWeight: 800, color: '#0f172a' }}>{title}</p>
+        {!editing && (
+          <button
+            onClick={startEdit}
+            style={{ padding: '6px 14px', background: '#1d4ed8', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
+          >
+            Edit
+          </button>
+        )}
+      </div>
+
+      {!editing ? (
+        <div>
+          {fields.map(f => (
+            <div key={f.key} style={readRowStyle}>
+              <span style={readLabelStyle}>{f.label}</span>
+              <span style={readValueStyle}>{formatReadValue(f, property[f.key])}</span>
+            </div>
+          ))}
+          {extra}
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+          {fields.map(f => (
+            <div key={f.key}>
+              <p style={modalLabelStyle}>{f.label}</p>
+              {fieldInput(f, draft[f.key], (v) => setDraft(prev => ({ ...prev, [f.key]: v })))}
+            </div>
+          ))}
+
+          {error && <p style={modalErrorStyle}>{error}</p>}
+
+          <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
+            <button onClick={() => setEditing(false)} style={{ flex: 1, padding: '10px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
+              Cancel
+            </button>
+            <button
+              onClick={save}
+              disabled={saving}
+              style={{ flex: 2, padding: '10px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.6 : 1 }}
+            >
+              {saving ? 'Saving...' : 'Save'}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function DocUpload({ label, urlKey, property, onSave, bucketFolder }) {
+  const [uploading, setUploading] = useState(false)
+  const [error, setError] = useState('')
+  const inputId = `doc-upload-${urlKey}`
+
+  async function handlePick(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setUploading(true)
+    setError('')
+    const path = `${property.id}/${bucketFolder}/${Date.now()}-${file.name}`
+    const { error: uploadError } = await supabase.storage.from('property-docs').upload(path, file)
+
+    if (uploadError) {
+      setUploading(false)
+      setError(`Upload failed: ${uploadError.message}`)
+      return
+    }
+
+    const url = supabase.storage.from('property-docs').getPublicUrl(path).data.publicUrl
+    const err = await onSave({ [urlKey]: url })
+    setUploading(false)
+    if (err) setError(err)
+  }
+
+  const existingUrl = property[urlKey]
+
+  return (
+    <div style={{ marginTop: '4px' }}>
+      <p style={modalLabelStyle}>{label}</p>
+      {existingUrl && (
+        <a href={existingUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'block', marginBottom: '8px', fontSize: '13px', fontWeight: 700, color: '#1d4ed8' }}>
+          📄 {filenameFromUrl(existingUrl)} — Download ↗
+        </a>
+      )}
+      <input type="file" accept=".pdf,image/*" id={inputId} onChange={handlePick} style={{ display: 'none' }} />
+      <button
+        onClick={() => document.getElementById(inputId).click()}
+        disabled={uploading}
+        style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '2px dashed #cbd5e1', background: '#fff', color: '#64748b', fontSize: '13px', fontWeight: 600, cursor: uploading ? 'not-allowed' : 'pointer' }}
+      >
+        {uploading ? 'Uploading...' : existingUrl ? 'Replace document' : 'Upload document'}
+      </button>
+      {error && <p style={modalErrorStyle}>{error}</p>}
+    </div>
+  )
+}
+
+export default function PropertyLeaseLegalTab({ property, onFieldsSaved }) {
+  async function saveFields(fields) {
+    const { error } = await supabase
+      .schema('pmms')
+      .from('properties')
+      .update(fields)
+      .eq('id', property.id)
+
+    if (error) return error.message
+
+    onFieldsSaved(fields)
+    return null
+  }
+
+  const banner = leaseBanner(property.lease_end_date)
+  const bannerStyle = BADGE_STYLES[banner.tier]
+
+  const insBadge = insuranceBadge(property.insurance_expiry)
+  const insBadgeStyle = insBadge ? BADGE_STYLES[insBadge.tier] : null
+
+  return (
+    <div>
+      {/* Lease status banner */}
+      <div style={{ background: bannerStyle.bg, border: `1px solid ${bannerStyle.color}33`, borderRadius: '10px', padding: '14px 16px', marginBottom: '16px' }}>
+        <p style={{ margin: 0, fontSize: '14px', fontWeight: 800, color: bannerStyle.color }}>{banner.tier === 'grey' ? '—' : '●'} {banner.label}</p>
+      </div>
+
+      <EditableSection
+        title="Lease Details"
+        property={property}
+        onSave={saveFields}
+        fields={[
+          { key: 'lease_start_date', label: 'Lease Start Date', type: 'date' },
+          { key: 'lease_end_date', label: 'Lease End Date', type: 'date' },
+          { key: 'lease_type', label: 'Lease Type', type: 'select', options: LEASE_TYPES },
+          { key: 'lease_status', label: 'Lease Status', type: 'select', options: LEASE_STATUSES },
+          { key: 'special_lease_terms', label: 'Special Lease Terms', type: 'textarea' },
+        ]}
+        extra={
+          <DocUpload label="Lease Agreement Document" urlKey="lease_doc_url" bucketFolder="lease" property={property} onSave={saveFields} />
+        }
+      />
+
+      <EditableSection
+        title="Landlord Details"
+        property={property}
+        onSave={saveFields}
+        fields={[
+          { key: 'landlord_company', label: 'Landlord Company Name', type: 'text' },
+          { key: 'landlord_name', label: 'Landlord Contact Name', type: 'text' },
+          { key: 'landlord_phone', label: 'Landlord Phone', type: 'text' },
+          { key: 'landlord_email', label: 'Landlord Email', type: 'text' },
+        ]}
+      />
+
+      <EditableSection
+        title="Financials"
+        property={property}
+        onSave={saveFields}
+        fields={[
+          { key: 'rent_amount', label: 'Monthly Rent Amount (£)', type: 'number' },
+          { key: 'rent_payment_day', label: 'Rent Payment Day (1–31)', type: 'number', min: 1, max: 31 },
+          { key: 'deposit_amount', label: 'Deposit Amount (£)', type: 'number' },
+          { key: 'deposit_scheme', label: 'Deposit Protection Scheme', type: 'select', options: DEPOSIT_SCHEMES },
+          { key: 'deposit_scheme_id', label: 'Deposit Scheme Reference ID', type: 'text' },
+        ]}
+      />
+
+      <div style={{ background: '#fff', borderRadius: '16px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+          <p style={{ margin: 0, fontSize: '14px', fontWeight: 800, color: '#0f172a' }}>Insurance</p>
+          {insBadge && (
+            <span style={{ fontSize: '11px', fontWeight: 800, color: insBadgeStyle.color, background: insBadgeStyle.bg, padding: '3px 10px', borderRadius: '20px' }}>
+              {insBadge.label}
+            </span>
+          )}
+        </div>
+        <InsuranceSection property={property} onSave={saveFields} />
+      </div>
+    </div>
+  )
+}
+
+function InsuranceSection({ property, onSave }) {
+  const [editing, setEditing] = useState(false)
+  const [expiry, setExpiry] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  function startEdit() {
+    setExpiry(property.insurance_expiry || '')
+    setError('')
+    setEditing(true)
+  }
+
+  async function save() {
+    setSaving(true)
+    setError('')
+    const err = await onSave({ insurance_expiry: expiry || null })
+    setSaving(false)
+    if (err) { setError(err); return }
+    setEditing(false)
+  }
+
+  return (
+    <div>
+      {!editing ? (
+        <div style={readRowStyle}>
+          <span style={readLabelStyle}>Insurance Expiry Date</span>
+          <span style={readValueStyle}>{property.insurance_expiry || '—'}</span>
+        </div>
+      ) : (
+        <div>
+          <p style={modalLabelStyle}>Insurance Expiry Date</p>
+          <input type="date" value={expiry} onChange={(e) => setExpiry(e.target.value)} style={inputStyle} />
+        </div>
+      )}
+
+      <DocUpload label="Insurance Policy Document" urlKey="insurance_doc_url" bucketFolder="insurance" property={property} onSave={onSave} />
+
+      {error && <p style={modalErrorStyle}>{error}</p>}
+
+      <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
+        {!editing ? (
+          <button
+            onClick={startEdit}
+            style={{ padding: '6px 14px', background: '#1d4ed8', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
+          >
+            Edit
+          </button>
+        ) : (
+          <>
+            <button onClick={() => setEditing(false)} style={{ flex: 1, padding: '10px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
+              Cancel
+            </button>
+            <button
+              onClick={save}
+              disabled={saving}
+              style={{ flex: 2, padding: '10px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.6 : 1 }}
+            >
+              {saving ? 'Saving...' : 'Save'}
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}

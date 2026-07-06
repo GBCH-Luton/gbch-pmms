@@ -1,0 +1,245 @@
+import { useState, useEffect, useCallback } from 'react'
+import { supabase } from '../lib/supabase'
+import gbchLogo from '../assets/gbch-logo.svg'
+import AdminDashboardPage from './admin/AdminDashboard'
+import AdminPipeline from './admin/AdminPipeline'
+import AdminProperties from './admin/AdminProperties'
+import AdminSignOff from './admin/AdminSignOff'
+import AdminBuilders from './admin/AdminBuilders'
+import AdminClocking from './admin/AdminClocking'
+import AdminRaiseTicket from './admin/AdminRaiseTicket'
+import AdminStock from './admin/AdminStock'
+import AdminSettings from './admin/AdminSettings'
+import AdminAccess from './admin/AdminAccess'
+import AdminHelp from './admin/AdminHelp'
+
+const NAV_ITEMS = [
+  { key: 'dashboard', label: 'Dashboard', Component: AdminDashboardPage },
+  { key: 'pipeline', label: 'Pipeline', Component: AdminPipeline },
+  { key: 'properties', label: 'Properties', Component: AdminProperties },
+  { key: 'sign-off', label: 'Sign-Off', Component: AdminSignOff },
+  { key: 'builders', label: 'Staff', Component: AdminBuilders },
+  { key: 'clocking', label: 'Clocking', Component: AdminClocking },
+  { key: 'raise-ticket', label: 'Log a Ticket', Component: AdminRaiseTicket },
+  { key: 'stock', label: 'Stock', Component: AdminStock },
+  { key: 'settings', label: 'Settings', Component: AdminSettings },
+  { key: 'admin', label: 'Admin', Component: AdminAccess, adminOnly: true },
+  { key: 'help', label: 'Help & Guide', Component: AdminHelp, adminOnly: true },
+]
+
+const PENDING_SIGN_OFF_POLL_MS = 20000
+
+// Settings is hidden per-role via profile.hideSettings (a UI-only
+// convenience for e.g. a "Maintenance Assistant" role -- see roles.js),
+// separate from the access-level-based adminOnly flag above.
+function isNavItemVisible(item, profile) {
+  if (item.adminOnly && profile.role !== 'admin') return false
+  if (item.key === 'settings' && profile.hideSettings) return false
+  return true
+}
+
+export default function AdminDashboard({ profile }) {
+  const [currentPage, setCurrentPage] = useState('dashboard')
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [pendingSignOffCount, setPendingSignOffCount] = useState(0)
+  const [totalTicketsCount, setTotalTicketsCount] = useState(0)
+  const [pipelineInitialFilter, setPipelineInitialFilter] = useState(null)
+  const [pipelineInitialPriorityFilter, setPipelineInitialPriorityFilter] = useState(null)
+  const [propertiesInitialFilter, setPropertiesInitialFilter] = useState(null)
+
+  const fetchPendingSignOffCount = useCallback(async () => {
+    const { count } = await supabase
+      .schema('pmms')
+      .from('tickets')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'Completed')
+
+    setPendingSignOffCount(count || 0)
+  }, [])
+
+  const fetchTotalTicketsCount = useCallback(async () => {
+    const { count } = await supabase
+      .schema('pmms')
+      .from('tickets')
+      .select('id', { count: 'exact', head: true })
+
+    setTotalTicketsCount(count || 0)
+  }, [])
+
+  const refreshCounts = useCallback(async () => {
+    await Promise.all([fetchPendingSignOffCount(), fetchTotalTicketsCount()])
+  }, [fetchPendingSignOffCount, fetchTotalTicketsCount])
+
+  useEffect(() => {
+    refreshCounts()
+    const interval = setInterval(refreshCounts, PENDING_SIGN_OFF_POLL_MS)
+    return () => clearInterval(interval)
+  }, [refreshCounts])
+
+  async function handleSignOut() {
+    await supabase.auth.signOut()
+  }
+
+  function goToPage(key, opts = {}) {
+    setCurrentPage(key)
+    setSidebarOpen(false)
+    if (key === 'pipeline' && opts.statusFilter) {
+      setPipelineInitialFilter(opts.statusFilter)
+    }
+    if (key === 'pipeline' && opts.priorityFilter) {
+      setPipelineInitialPriorityFilter(opts.priorityFilter)
+    }
+    if (key === 'properties' && opts.filterMode) {
+      setPropertiesInitialFilter({ mode: opts.filterMode })
+    }
+  }
+
+  const navButtonStyle = (active) => ({
+    display: 'block', width: '100%', textAlign: 'left', padding: '12px 14px', marginBottom: '4px',
+    borderRadius: '10px', border: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: 600,
+    background: active ? '#19562e' : 'transparent', color: '#ffffff',
+  })
+
+  function SidebarContent() {
+    return (
+      <>
+        <button
+          onClick={() => goToPage('dashboard')}
+          style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'none', border: 'none', padding: '20px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.1)', width: '100%', textAlign: 'left' }}
+        >
+          <img src={gbchLogo} alt="GBCH" style={{ height: '32px' }} />
+          <span style={{ fontSize: '15px', fontWeight: 800, color: '#ffffff' }}>PMMS Admin</span>
+        </button>
+
+        <nav style={{ flex: 1, padding: '12px', overflowY: 'auto' }}>
+          {NAV_ITEMS.filter(item => isNavItemVisible(item, profile)).map(item => (
+            <button
+              key={item.key}
+              onClick={() => goToPage(item.key)}
+              style={navButtonStyle(currentPage === item.key)}
+            >
+              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                {item.label}
+                {item.key === 'sign-off' && pendingSignOffCount > 0 && (
+                  <span
+                    style={{
+                      background: '#dc2626', color: '#ffffff', fontSize: '11px', fontWeight: 800,
+                      borderRadius: '999px', padding: '1px 8px', marginLeft: '8px', minWidth: '20px', textAlign: 'center',
+                    }}
+                  >
+                    {pendingSignOffCount}
+                  </span>
+                )}
+                {item.key === 'pipeline' && totalTicketsCount > 0 && (
+                  <span
+                    style={{
+                      background: '#dc2626', color: '#ffffff', fontSize: '11px', fontWeight: 800,
+                      borderRadius: '999px', padding: '1px 8px', marginLeft: '8px', minWidth: '20px', textAlign: 'center',
+                    }}
+                  >
+                    {totalTicketsCount}
+                  </span>
+                )}
+              </span>
+            </button>
+          ))}
+        </nav>
+
+        <div style={{ padding: '16px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+            {profile.photo_url ? (
+              <img src={profile.photo_url} alt="" style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+            ) : (
+              <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'rgba(255,255,255,0.15)', color: '#ffffff', fontSize: '13px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                {(profile.name || '?').split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase()}
+              </div>
+            )}
+            <div style={{ minWidth: 0 }}>
+              <p style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: '#ffffff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{profile.name}</p>
+              <p style={{ margin: 0, fontSize: '12px', color: 'rgba(255,255,255,0.6)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{profile.job_title}</p>
+            </div>
+          </div>
+          <button
+            onClick={handleSignOut}
+            style={{ width: '100%', padding: '10px', borderRadius: '10px', border: 'none', background: 'rgba(255,255,255,0.1)', color: '#ffffff', fontWeight: 700, fontSize: '13px', cursor: 'pointer' }}
+          >
+            Sign out
+          </button>
+        </div>
+      </>
+    )
+  }
+
+  // Defense in depth: even though the nav button for admin-only pages is
+  // hidden for non-admins, this guards against currentPage ever landing on
+  // one some other way (there's no URL-based deep link into these pages
+  // today, but the check is cheap and this is a security-adjacent feature).
+  const activeNavItem = NAV_ITEMS.find(item => item.key === currentPage)
+  const ActivePage = (activeNavItem && isNavItemVisible(activeNavItem, profile))
+    ? activeNavItem.Component
+    : AdminDashboardPage
+
+  return (
+    <div style={{ display: 'flex', minHeight: '100vh', background: '#f1f5f9', fontFamily: 'system-ui, sans-serif' }}>
+
+      {/* Desktop sidebar */}
+      <div
+        className="admin-sidebar-desktop"
+        style={{ width: '240px', minWidth: '240px', background: '#0D1B3E', display: 'flex', flexDirection: 'column', position: 'sticky', top: 0, height: '100vh' }}
+      >
+        <SidebarContent />
+      </div>
+
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+
+        {/* Mobile top bar */}
+        <div
+          className="admin-mobile-topbar"
+          style={{ alignItems: 'center', justifyContent: 'space-between', background: '#0D1B3E', padding: '14px 16px', position: 'sticky', top: 0, zIndex: 20 }}
+        >
+          <button
+            onClick={() => goToPage('dashboard')}
+            style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
+          >
+            <img src={gbchLogo} alt="GBCH" style={{ height: '28px' }} />
+            <span style={{ color: '#ffffff', fontWeight: 800, fontSize: '14px' }}>PMMS Admin</span>
+          </button>
+          <button
+            onClick={() => setSidebarOpen(true)}
+            aria-label="Menu"
+            style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '4px', background: 'none', border: 'none', padding: '8px', cursor: 'pointer' }}
+          >
+            <span style={{ width: '22px', height: '2px', background: '#ffffff', borderRadius: '2px' }} />
+            <span style={{ width: '22px', height: '2px', background: '#ffffff', borderRadius: '2px' }} />
+            <span style={{ width: '22px', height: '2px', background: '#ffffff', borderRadius: '2px' }} />
+          </button>
+        </div>
+
+        {/* Main content */}
+        <div style={{ flex: 1, padding: '20px', width: '100%', maxWidth: '1800px', margin: '0 auto', boxSizing: 'border-box' }}>
+          <ActivePage
+            profile={profile}
+            onTicketsChanged={refreshCounts}
+            onNavigate={goToPage}
+            initialStatusFilter={currentPage === 'pipeline' ? pipelineInitialFilter : null}
+            initialPriorityFilter={currentPage === 'pipeline' ? pipelineInitialPriorityFilter : null}
+            onInitialFilterConsumed={() => { setPipelineInitialFilter(null); setPipelineInitialPriorityFilter(null) }}
+            initialPropertiesFilter={currentPage === 'properties' ? propertiesInitialFilter : null}
+            onPropertiesFilterConsumed={() => setPropertiesInitialFilter(null)}
+          />
+        </div>
+      </div>
+
+      {/* Mobile drawer */}
+      {sidebarOpen && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex' }}>
+          <div style={{ width: '260px', maxWidth: '80vw', background: '#0D1B3E', height: '100%', display: 'flex', flexDirection: 'column' }}>
+            <SidebarContent />
+          </div>
+          <div onClick={() => setSidebarOpen(false)} style={{ flex: 1, background: 'rgba(15,23,42,0.5)' }} />
+        </div>
+      )}
+
+    </div>
+  )
+}

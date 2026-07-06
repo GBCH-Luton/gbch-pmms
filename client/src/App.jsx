@@ -1,0 +1,146 @@
+import { useEffect, useState } from 'react'
+import { Routes, Route, Navigate } from 'react-router-dom'
+import { supabase } from './lib/supabase'
+import { roleFromJobTitle, normalizeCustomRoles, accessLevelForRole, hideSettingsForRole } from './lib/roles'
+import Login from './pages/Login'
+import SetPassword from './pages/SetPassword'
+import AdminDashboard from './pages/AdminDashboard'
+import BuilderDashboard from './pages/BuilderDashboard'
+import SplashScreen from './pages/SplashScreen'
+
+export default function App() {
+  const [session, setSession]   = useState(null)
+  const [profile, setProfile]   = useState(null)
+  const [loading, setLoading]   = useState(true)
+  // Keeps the splash screen up for a minimum stretch even when the session
+  // check resolves instantly, so the animation actually gets seen instead of
+  // flashing past -- but never adds extra wait beyond however long the real
+  // check takes if that's longer.
+  const [minSplashDone, setMinSplashDone] = useState(false)
+
+  useEffect(() => {
+    const timer = setTimeout(() => setMinSplashDone(true), 2600)
+    return () => clearTimeout(timer)
+  }, [])
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session)
+      if (data.session) fetchProfile(data.session.user.email)
+      else setLoading(false)
+    })
+
+    supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session)
+      if (session) fetchProfile(session.user.email)
+      else { setProfile(null); setLoading(false) }
+    })
+  }, [])
+
+  async function fetchProfile(email) {
+    // .limit(2) instead of .single() -- staff is a company-wide table PMMS
+    // doesn't fully control, and has had duplicate-email rows before. A
+    // duplicate here must not hard-crash login; take the first match and
+    // warn so it gets noticed and cleaned up. order('id') makes "the first
+    // match" deterministic -- every other email lookup in this app (Edge
+    // Functions included) orders the same way, so they all resolve to the
+    // same row instead of potentially disagreeing with each other.
+    const { data: rows } = await supabase
+      .from('staff')
+      .select('id, name, job_title, photo_url, must_reset_password, active')
+      .eq('email', email)
+      .order('id')
+      .limit(2)
+
+    if (rows?.length > 1) {
+      console.warn(`Multiple staff rows found for email ${email} -- using the first one. This should be cleaned up.`)
+    }
+    const data = rows?.[0] ?? null
+
+    if (!data) { setProfile(data); setLoading(false); return }
+
+    let role = roleFromJobTitle(data.job_title)
+    let hideSettings = false
+
+    // job_title lives on a company-wide table PMMS doesn't control -- a
+    // rename there (even a legitimate one) can otherwise silently lock
+    // someone out with no recovery but a DB edit or code change. A PMMS
+    // Role assignment (pmms.staff_roles, managed on the Admin page) can
+    // grant login access directly instead -- built-in Admin/Builder always
+    // do, and a custom role (e.g. "Maintenance Manager") does if it was
+    // configured with an access level on the Admin page's Roles panel. This
+    // only ever ADDS access on top of job_title-based routing, never removes it.
+    const { data: roleRow } = await supabase
+      .schema('pmms')
+      .from('staff_roles')
+      .select('role')
+      .eq('staff_id', data.id)
+      .maybeSingle()
+
+    if (roleRow?.role) {
+      const { data: settingsRow } = await supabase
+        .schema('pmms')
+        .from('settings')
+        .select('setting_value')
+        .eq('setting_key', 'custom_roles')
+        .maybeSingle()
+
+      const normalizedCustomRoles = normalizeCustomRoles(settingsRow?.setting_value)
+      const accessLevel = accessLevelForRole(roleRow.role, normalizedCustomRoles)
+      if (accessLevel) role = accessLevel
+      // UI-only convenience, not a database restriction -- see roles.js.
+      hideSettings = hideSettingsForRole(roleRow.role, normalizedCustomRoles)
+    }
+
+    // Deactivating someone (the Admin page's "Deactivate" button) must
+    // actually cut off access, not just hide them from staff lists/KPIs --
+    // this is a remove-only check, applied last, and it overrides every
+    // access grant above (job_title, PMMS Admin/Builder/custom role) with
+    // no exception.
+    if (data.active === false) role = null
+
+    setProfile({ ...data, role, hideSettings })
+    setLoading(false)
+  }
+
+  function homeForRole() {
+    if (!profile) return '/login'
+    if (profile.active === false) return '/deactivated'
+    // Checked before role routing -- an admin-issued temp password must be
+    // replaced before the account can do anything else in the system.
+    if (profile.must_reset_password) return '/set-password'
+    if (profile.role === 'admin' || profile.role === 'manager') return '/admin'
+    if (profile.role === 'builder') return '/builder'
+    return '/no-access'
+  }
+
+  if (loading || !minSplashDone) return <SplashScreen />
+
+  return (
+    <Routes>
+      <Route path="/login" element={!session ? <Login /> : <Navigate to={homeForRole()} replace />} />
+      <Route path="/set-password" element={session ? <SetPassword profile={profile} onDone={() => fetchProfile(session.user.email)} /> : <Navigate to="/login" replace />} />
+      <Route path="/admin" element={
+        session && (profile?.role === 'admin' || profile?.role === 'manager')
+          ? (profile?.must_reset_password ? <Navigate to="/set-password" replace /> : <AdminDashboard profile={profile} />)
+          : <Navigate to="/login" replace />
+      } />
+      <Route path="/builder" element={
+        session && profile?.role === 'builder'
+          ? (profile?.must_reset_password ? <Navigate to="/set-password" replace /> : <BuilderDashboard profile={profile} />)
+          : <Navigate to="/login" replace />
+      } />
+      <Route path="/no-access" element={
+        <div style={{ minHeight: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'system-ui' }}>
+          <p style={{ color: '#64748b', fontWeight: 600 }}>You do not have access to this system.</p>
+        </div>
+      } />
+      <Route path="/deactivated" element={
+        <div style={{ minHeight: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'system-ui' }}>
+          <p style={{ color: '#64748b', fontWeight: 600 }}>Your account has been deactivated. Contact your admin if you believe this is a mistake.</p>
+        </div>
+      } />
+      <Route path="*" element={<Navigate to={session ? homeForRole() : '/login'} replace />} />
+    </Routes>
+  )
+}
