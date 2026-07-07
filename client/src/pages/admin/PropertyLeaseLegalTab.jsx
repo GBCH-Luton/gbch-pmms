@@ -237,7 +237,6 @@ function DocUpload({ label, urlKey, property, onSave, bucketFolder }) {
 export default function PropertyLeaseLegalTab({ property, onFieldsSaved }) {
   async function saveFields(fields) {
     const { error } = await supabase
-      .schema('pmms')
       .from('properties')
       .update(fields)
       .eq('id', property.id)

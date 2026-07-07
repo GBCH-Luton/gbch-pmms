@@ -242,7 +242,6 @@ export default function PropertyCoreTab({ property, onFieldsSaved }) {
 
   async function saveFields(fields) {
     const { error } = await supabase
-      .schema('pmms')
       .from('properties')
       .update(fields)
       .eq('id', property.id)

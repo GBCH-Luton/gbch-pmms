@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { getCurrentPositionSafe } from '../lib/geo'
 import { fetchComplianceCheckTypes } from '../lib/compliance'
 import { fetchMaintenanceCategories, sortedCategoryEntries } from '../lib/maintenanceCategories'
+import { attachProperties } from '../lib/properties'
 import PropertySearchSelect from '../components/PropertySearchSelect'
 import gbchLogo from '../assets/gbch-logo.svg'
 
@@ -190,14 +191,13 @@ export default function BuilderDashboard({ profile }) {
       .schema('pmms')
       .from('tickets')
       .select(`
-        id, status, category, description, room, priority_score, mileage_logged, transit_start, created_at, completed_at, hold_reason, hold_note, photo_url,
-        property:properties(address, safeguards, electrical_shutoff, gas_shutoff, high_vulnerability)
+        id, status, category, description, room, priority_score, mileage_logged, transit_start, created_at, completed_at, hold_reason, hold_note, photo_url, property_id
       `)
       .eq('assigned_builder_id', profile.id)
       .not('status', 'in', '("Archived","Cancelled")')
       .order('priority_score', { ascending: false })
 
-    if (!error) setTickets(data)
+    if (!error) setTickets(await attachProperties(data, 'address, safeguards, electrical_shutoff, gas_shutoff, high_vulnerability'))
     setLoading(false)
   }
 
@@ -524,7 +524,6 @@ export default function BuilderDashboard({ profile }) {
 
   async function fetchTicketProperties() {
     const { data, error } = await supabase
-      .schema('pmms')
       .from('properties')
       .select('id, address, high_vulnerability, layout_type')
       .order('address')
@@ -537,13 +536,12 @@ export default function BuilderDashboard({ profile }) {
       .schema('pmms')
       .from('tickets')
       .select(`
-        id, status, category, description, room, photo_url, created_at,
-        property:properties(address)
+        id, status, category, description, room, photo_url, created_at, property_id
       `)
       .eq('raised_by', profile.id)
       .order('created_at', { ascending: false })
 
-    if (!error) setReportedTickets(data)
+    if (!error) setReportedTickets(await attachProperties(data, 'address'))
   }
 
   function handleTicketPhoto(e) {

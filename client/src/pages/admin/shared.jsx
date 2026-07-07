@@ -5,6 +5,7 @@
 import { supabase } from '../../lib/supabase'
 import { distanceMetres, ensurePropertyCoords } from '../../lib/geo'
 import { normalizeCustomRoles } from '../../lib/roles'
+import { attachProperties } from '../../lib/properties'
 
 const DEFAULT_CLOCK_DISTANCE_THRESHOLD_M = 250
 
@@ -245,18 +246,18 @@ export async function fetchFlaggedClockingCount() {
   const { data: completedTicketsRaw } = await supabase
     .schema('pmms')
     .from('tickets')
-    .select('id, property:properties!property_id(id, address, postcode, latitude, longitude)')
+    .select('id, property_id')
     .in('status', ['Completed', 'Archived'])
-  const completedTickets = completedTicketsRaw || []
+  const completedTickets = await attachProperties(completedTicketsRaw || [], 'address, postcode, latitude, longitude')
 
   let liveTickets = []
   if (openSessions && openSessions.length > 0) {
     const { data } = await supabase
       .schema('pmms')
       .from('tickets')
-      .select('id, property:properties!property_id(id, address, postcode, latitude, longitude)')
+      .select('id, property_id')
       .in('id', openSessions.map(s => s.ticket_id))
-    liveTickets = data || []
+    liveTickets = await attachProperties(data || [], 'address, postcode, latitude, longitude')
   }
 
   const allProperties = [...liveTickets, ...completedTickets].map(t => t.property).filter(Boolean)

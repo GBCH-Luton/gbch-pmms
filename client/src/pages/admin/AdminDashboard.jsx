@@ -53,7 +53,6 @@ export default function AdminDashboard({ onNavigate }) {
     const cutoff = new Date(Date.now() - windowHours * 3600000).toISOString()
 
     const { count } = await supabase
-      .schema('pmms')
       .from('properties')
       .select('id', { count: 'exact', head: true })
       .gte('created_at', cutoff)

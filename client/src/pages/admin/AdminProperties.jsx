@@ -187,7 +187,6 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
     setLoading(true)
     setLoadError('')
     const { data, error } = await supabase
-      .schema('pmms')
       .from('properties')
       .select('*')
       .order('address')
@@ -296,7 +295,6 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
 
     setEditSaving(true)
     const { error } = await supabase
-      .schema('pmms')
       .from('properties')
       .update({
         address: editAddress.trim(),
@@ -331,7 +329,6 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
 
     setAddSaving(true)
     const { error } = await supabase
-      .schema('pmms')
       .from('properties')
       .insert({
         address: addAddress.trim(),

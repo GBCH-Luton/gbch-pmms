@@ -34,7 +34,6 @@ export default function PropertyRestrictionsTab({ property, onFieldsSaved }) {
     setError('')
 
     const { error: updateError } = await supabase
-      .schema('pmms')
       .from('properties')
       .update({ staff_gender_restriction: value || null })
       .eq('id', property.id)

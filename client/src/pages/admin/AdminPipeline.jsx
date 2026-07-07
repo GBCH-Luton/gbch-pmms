@@ -1,5 +1,6 @@
 import { useState, useEffect, Fragment } from 'react'
 import { supabase } from '../../lib/supabase'
+import { attachProperties } from '../../lib/properties'
 import BuilderProfileModal from './BuilderProfileModal'
 import {
   CATEGORIES, priorityTierLabel, priorityBadgeStyle, statusColour, formatUKDate, formatUKDateTime,
@@ -105,8 +106,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
       .select(`
         id, status, category, description, room, priority_score, priority_override, mileage_logged,
         no_access_flag, no_access_note, hold_reason, hold_note, completion_note, photo_url, completion_photo_url,
-        completed_at, created_at, assigned_builder_id, property_id,
-        property:properties!property_id(address)
+        completed_at, created_at, assigned_builder_id, property_id
       `)
       .order('created_at', { ascending: false })
 
@@ -115,7 +115,8 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
       .select('id, name')
 
     if (!ticketsError && !staffError) {
-      const merged = ticketsData.map(t => ({
+      const withProperties = await attachProperties(ticketsData, 'address')
+      const merged = withProperties.map(t => ({
         ...t,
         builderName: staffData.find(s => s.id === t.assigned_builder_id)?.name,
       }))
@@ -131,7 +132,6 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
 
   async function fetchProperties() {
     const { data, error } = await supabase
-      .schema('pmms')
       .from('properties')
       .select('id, address')
       .order('address')

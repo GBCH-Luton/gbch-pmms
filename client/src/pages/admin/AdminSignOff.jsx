@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
+import { attachProperties } from '../../lib/properties'
 import {
   formatDuration, postSystemComment, postAuditEvent, filterSelectStyle,
   modalOverlayStyle, modalCardStyle, modalTitleStyle, modalSubtitleStyle, modalLabelStyle,
@@ -30,7 +31,6 @@ export default function AdminSignOff({ profile, onTicketsChanged }) {
 
   async function fetchProperties() {
     const { data, error } = await supabase
-      .schema('pmms')
       .from('properties')
       .select('id, address')
       .order('address')
@@ -43,8 +43,7 @@ export default function AdminSignOff({ profile, onTicketsChanged }) {
       .schema('pmms')
       .from('tickets')
       .select(`
-        id, category, description, room, issue_tag, completion_note, completion_photo_url, photo_url, assigned_builder_id, property_id,
-        property:properties!property_id(address)
+        id, category, description, room, issue_tag, completion_note, completion_photo_url, photo_url, assigned_builder_id, property_id
       `)
       .eq('status', 'Completed')
       .order('completed_at', { ascending: false })
@@ -54,7 +53,8 @@ export default function AdminSignOff({ profile, onTicketsChanged }) {
       .select('id, name')
 
     if (!ticketsError && !staffError) {
-      const merged = ticketsData.map(t => ({
+      const withProperties = await attachProperties(ticketsData, 'address')
+      const merged = withProperties.map(t => ({
         ...t,
         builderName: staffData.find(s => s.id === t.assigned_builder_id)?.name,
       }))

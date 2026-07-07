@@ -17,6 +17,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { normalizeCustomRoles } from '../../lib/roles'
+import { attachProperties } from '../../lib/properties'
 import BuilderProfileModal from './BuilderProfileModal'
 import { thStyle, tdStyle, actionBtnStyle, STAFF_AVAILABILITY_OPTIONS, STAFF_AVAILABILITY_STYLES, Avatar } from './shared'
 
@@ -54,8 +55,7 @@ export default function AdminBuilders() {
       .schema('pmms')
       .from('tickets')
       .select(`
-        id, status, description, room, assigned_builder_id,
-        property:properties!property_id(address)
+        id, status, description, room, assigned_builder_id, property_id
       `)
 
     const { data: settingsRow, error: settingsError } = await supabase
@@ -81,7 +81,7 @@ export default function AdminBuilders() {
         availabilityNote: availByStaffId[s.id]?.note || '',
       })))
     }
-    if (!ticketError) setTickets(ticketData || [])
+    if (!ticketError) setTickets(await attachProperties(ticketData || [], 'address'))
     if (!settingsError) setCustomRoles(normalizeCustomRoles(settingsRow?.setting_value).map(r => r.name))
 
     setLoading(false)

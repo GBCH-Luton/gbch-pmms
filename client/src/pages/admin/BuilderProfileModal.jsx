@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { modalOverlayStyle, modalCardStyle, modalLabelStyle, modalCancelBtnStyle, formatUKDateTime, Avatar } from './shared'
+import { attachProperties } from '../../lib/properties'
 
 export default function BuilderProfileModal({ builderId, onClose }) {
   const [builder, setBuilder] = useState(null)
@@ -24,15 +25,15 @@ export default function BuilderProfileModal({ builderId, onClose }) {
         .eq('id', builderId)
         .single()
 
-      const { data: ticketData } = await supabase
+      const { data: ticketDataRaw } = await supabase
         .schema('pmms')
         .from('tickets')
         .select(`
-          id, status, description, room, mileage_logged,
-          property:properties!property_id(address)
+          id, status, description, room, mileage_logged, property_id
         `)
         .eq('assigned_builder_id', builderId)
 
+      const ticketData = await attachProperties(ticketDataRaw || [], 'address')
       const ticketIds = (ticketData || []).map(t => t.id)
       let commentData = []
       if (ticketIds.length > 0) {

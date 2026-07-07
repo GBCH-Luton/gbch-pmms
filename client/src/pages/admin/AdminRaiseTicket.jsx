@@ -136,7 +136,6 @@ export default function AdminRaiseTicket({ profile }) {
 
   async function fetchTicketProperties() {
     const { data, error } = await supabase
-      .schema('pmms')
       .from('properties')
       .select('id, address, high_vulnerability, layout_type')
       .order('address')

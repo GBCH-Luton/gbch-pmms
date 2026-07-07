@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { distanceMetres, googleMapsLink, ensurePropertyCoords } from '../../lib/geo'
+import { attachProperties } from '../../lib/properties'
 import {
   thStyle, tdStyle, actionBtnStyle, filterSelectStyle, formatUKDateTime,
   modalOverlayStyle, modalCardStyle, modalTitleStyle, modalLabelStyle,
@@ -110,18 +111,18 @@ export default function AdminClocking({ profile }) {
       const { data } = await supabase
         .schema('pmms')
         .from('tickets')
-        .select('id, category, description, room, property:properties!property_id(id, address, postcode, latitude, longitude)')
+        .select('id, category, description, room, property_id')
         .in('id', ticketIds)
-      liveTicketData = data || []
+      liveTicketData = await attachProperties(data || [], 'address, postcode, latitude, longitude')
     }
 
     // --- Sections 2 & 3: completed tickets with recorded work sessions ---
     const { data: completedTicketsRaw } = await supabase
       .schema('pmms')
       .from('tickets')
-      .select('id, category, description, room, mileage_logged, assigned_builder_id, property:properties!property_id(id, address, postcode, latitude, longitude)')
+      .select('id, category, description, room, mileage_logged, assigned_builder_id, property_id')
       .in('status', ['Completed', 'Archived'])
-    const completedTickets = completedTicketsRaw || []
+    const completedTickets = await attachProperties(completedTicketsRaw || [], 'address, postcode, latitude, longitude')
 
     // Geocode every property involved (live + completed) in one batch,
     // caching results so this only ever hits postcodes.io for properties
