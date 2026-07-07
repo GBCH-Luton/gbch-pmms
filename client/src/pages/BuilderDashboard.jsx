@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { getCurrentPositionSafe } from '../lib/geo'
 import { fetchComplianceCheckTypes } from '../lib/compliance'
-import { fetchMaintenanceCategories } from '../lib/maintenanceCategories'
+import { fetchMaintenanceCategories, sortedCategoryEntries } from '../lib/maintenanceCategories'
+import PropertySearchSelect from '../components/PropertySearchSelect'
 import gbchLogo from '../assets/gbch-logo.svg'
 
 export default function BuilderDashboard({ profile }) {
@@ -55,6 +56,8 @@ export default function BuilderDashboard({ profile }) {
   const [complianceCheckTypes, setComplianceCheckTypes] = useState([])
   const [complianceResults, setComplianceResults] = useState([])
   const [complianceNotes, setComplianceNotes] = useState([])
+  const [complianceMediaFiles, setComplianceMediaFiles] = useState([])
+  const [complianceMediaPreviews, setComplianceMediaPreviews] = useState([])
   const [complianceSubmitting, setComplianceSubmitting] = useState(false)
   const [complianceSuccess, setComplianceSuccess] = useState('')
   const [reportedTickets, setReportedTickets] = useState([])
@@ -513,6 +516,8 @@ export default function BuilderDashboard({ profile }) {
     setComplianceCheckType(null)
     setComplianceResults([])
     setComplianceNotes([])
+    setComplianceMediaFiles([])
+    setComplianceMediaPreviews([])
     setComplianceSubmitting(false)
     setComplianceSuccess('')
   }
@@ -657,10 +662,24 @@ export default function BuilderDashboard({ profile }) {
     const items = complianceCheckTypes.find(t => t.name === checkType)?.items || []
     setComplianceResults(items.map(() => null))
     setComplianceNotes(items.map(() => ''))
+    setComplianceMediaFiles(items.map(() => null))
+    setComplianceMediaPreviews(items.map(() => null))
   }
 
   function setComplianceItemResult(idx, result) {
     setComplianceResults(prev => prev.map((r, i) => i === idx ? result : r))
+  }
+
+  function handleComplianceMediaChange(idx, e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setComplianceMediaFiles(prev => prev.map((f, i) => i === idx ? file : f))
+    setComplianceMediaPreviews(prev => prev.map((p, i) => i === idx ? URL.createObjectURL(file) : p))
+  }
+
+  function removeComplianceMedia(idx) {
+    setComplianceMediaFiles(prev => prev.map((f, i) => i === idx ? null : f))
+    setComplianceMediaPreviews(prev => prev.map((p, i) => i === idx ? null : p))
   }
 
   async function handleSubmitCompliance() {
@@ -673,13 +692,25 @@ export default function BuilderDashboard({ profile }) {
     const items = selectedType?.items || []
     const vulnBonus = selectedTicketProperty?.high_vulnerability ? 30 : 0
     const failedItems = items
-      .map((item, idx) => ({ ...item, result: complianceResults[idx], note: complianceNotes[idx] }))
+      .map((item, idx) => ({ ...item, result: complianceResults[idx], note: complianceNotes[idx], mediaFile: complianceMediaFiles[idx] }))
       .filter(i => i.result === 'Fail')
 
     for (const failedItem of failedItems) {
       const category = selectedType?.category || 'Other / Unlisted Trade'
       const score = failedItem.score + vulnBonus
       const description = `[Compliance Failure: ${complianceCheckType}] ${failedItem.label}${failedItem.note ? ' — ' + failedItem.note : ''}`
+
+      let photoUrl = null
+      if (failedItem.mediaFile) {
+        const path = `${profile.id}/${Date.now()}-${failedItem.mediaFile.name}`
+        const { error: uploadError } = await supabase.storage.from('ticket-photos').upload(path, failedItem.mediaFile)
+        if (uploadError) {
+          setComplianceSubmitting(false)
+          setTicketError(`Media upload failed: ${uploadError.message}`)
+          return
+        }
+        photoUrl = supabase.storage.from('ticket-photos').getPublicUrl(path).data.publicUrl
+      }
 
       const { error } = await supabase
         .schema('pmms')
@@ -691,6 +722,7 @@ export default function BuilderDashboard({ profile }) {
           issue_tag: failedItem.label,
           description,
           priority_score: score,
+          photo_url: photoUrl,
           status: 'Pending',
           raised_by: profile.id,
           raised_by_name: profile.name,
@@ -902,7 +934,7 @@ export default function BuilderDashboard({ profile }) {
                 onClick={() => { setPage('new-ticket'); setMenuOpen(false) }}
                 style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
               >
-                📝 Raise new ticket
+                📝 Log a Ticket
               </button>
               <button
                 onClick={() => { setPage('my-reports'); setMenuOpen(false) }}
@@ -1041,7 +1073,7 @@ export default function BuilderDashboard({ profile }) {
               onClick={() => { setPage('new-ticket'); setMenuOpen(false) }}
               style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
             >
-              📝 Raise new ticket
+              📝 Log a Ticket
             </button>
             <button
               onClick={() => { setPage('my-reports'); setMenuOpen(false) }}
@@ -1483,7 +1515,7 @@ export default function BuilderDashboard({ profile }) {
                     onClick={() => { setPage('new-ticket'); setMenuOpen(false) }}
                     style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
                   >
-                    📝 Raise new ticket
+                    📝 Log a Ticket
                   </button>
                   <button
                     onClick={() => { setPage('my-reports'); setMenuOpen(false) }}
@@ -1598,7 +1630,7 @@ export default function BuilderDashboard({ profile }) {
                     onClick={() => { setPage('new-ticket'); setMenuOpen(false) }}
                     style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
                   >
-                    📝 Raise new ticket
+                    📝 Log a Ticket
                   </button>
                   <button
                     onClick={() => { setPage('my-reports'); setMenuOpen(false) }}
@@ -1737,7 +1769,7 @@ export default function BuilderDashboard({ profile }) {
                     onClick={() => { setPage('new-ticket'); setMenuOpen(false) }}
                     style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
                   >
-                    📝 Raise new ticket
+                    📝 Log a Ticket
                   </button>
                   <button
                     onClick={() => { setPage('my-reports'); setMenuOpen(false) }}
@@ -1814,20 +1846,15 @@ export default function BuilderDashboard({ profile }) {
                 {/* Step 1: Target Property */}
                 <div style={{ background: SECTION_BG[0], padding: '20px', borderBottom: ticketPropertyId ? '1px solid rgba(15,23,42,0.06)' : 'none' }}>
                   <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: '#0f172a' }}>1. Target Property</p>
-                  <select
+                  <PropertySearchSelect
+                    properties={ticketProperties}
                     value={ticketPropertyId}
-                    onChange={(e) => {
-                      setTicketPropertyId(e.target.value)
+                    onChange={(id) => {
+                      setTicketPropertyId(id)
                       setTicketRoom(null); setTicketRoomContext(null); setTicketRoomCode(''); setTicketOtherArea('')
                       setTicketCategory(null); setTicketIssueTag(null); setTicketIssueOther(''); setTicketDuplicateWarning(null)
                     }}
-                    style={{ width: '100%', height: '44px', padding: '0 12px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '13px', fontWeight: 500, boxSizing: 'border-box', background: '#ffffff' }}
-                  >
-                    <option value="">Select a property...</option>
-                    {ticketProperties.map(p => (
-                      <option key={p.id} value={p.id}>{p.address}{p.high_vulnerability ? ' ⚠️ [HIGH VULNERABILITY]' : ''}</option>
-                    ))}
-                  </select>
+                  />
                 </div>
 
                 {/* Step 2: Room / Area */}
@@ -1914,7 +1941,7 @@ export default function BuilderDashboard({ profile }) {
                   <div style={{ background: SECTION_BG[0], padding: '20px', borderBottom: ticketCategory ? '1px solid rgba(15,23,42,0.06)' : 'none' }}>
                     <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: '#0f172a' }}>3. Main Category</p>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                      {Object.keys(maintenanceCategories).map(key => {
+                      {sortedCategoryEntries(maintenanceCategories).map(([key]) => {
                         const active = ticketCategory === key
                         return (
                           <button
@@ -2099,16 +2126,11 @@ export default function BuilderDashboard({ profile }) {
                 {/* Step 1: Target Property */}
                 <div style={{ background: SECTION_BG[0], padding: '20px', borderBottom: '1px solid rgba(15,23,42,0.06)' }}>
                   <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: '#0f172a' }}>1. Target Property</p>
-                  <select
+                  <PropertySearchSelect
+                    properties={ticketProperties}
                     value={ticketPropertyId}
-                    onChange={(e) => setTicketPropertyId(e.target.value)}
-                    style={{ width: '100%', height: '44px', padding: '0 12px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '13px', fontWeight: 500, boxSizing: 'border-box', background: '#ffffff' }}
-                  >
-                    <option value="">Select a property...</option>
-                    {ticketProperties.map(p => (
-                      <option key={p.id} value={p.id}>{p.address}{p.high_vulnerability ? ' ⚠️ [HIGH VULNERABILITY]' : ''}</option>
-                    ))}
-                  </select>
+                    onChange={setTicketPropertyId}
+                  />
                 </div>
 
                 {/* Step 2: Select Check Type */}
@@ -2177,13 +2199,46 @@ export default function BuilderDashboard({ profile }) {
                               </button>
                             </div>
                             {result === 'Fail' && (
-                              <input
-                                type="text"
-                                value={complianceNotes[idx] || ''}
-                                onChange={(e) => setComplianceNotes(prev => prev.map((n, i) => i === idx ? e.target.value : n))}
-                                placeholder="Describe what's wrong (used on the auto-created ticket)..."
-                                style={{ width: '100%', marginTop: '8px', height: '40px', padding: '0 10px', borderRadius: '8px', border: '1px solid #fcd34d', fontSize: '13px', boxSizing: 'border-box' }}
-                              />
+                              <>
+                                <input
+                                  type="text"
+                                  value={complianceNotes[idx] || ''}
+                                  onChange={(e) => setComplianceNotes(prev => prev.map((n, i) => i === idx ? e.target.value : n))}
+                                  placeholder="Describe what's wrong (used on the auto-created ticket)..."
+                                  style={{ width: '100%', marginTop: '8px', height: '40px', padding: '0 10px', borderRadius: '8px', border: '1px solid #fcd34d', fontSize: '13px', boxSizing: 'border-box' }}
+                                />
+
+                                <input
+                                  type="file"
+                                  accept="image/*,video/*"
+                                  capture="environment"
+                                  id={`compliance-media-${idx}`}
+                                  onChange={(e) => handleComplianceMediaChange(idx, e)}
+                                  style={{ display: 'none' }}
+                                />
+                                {complianceMediaPreviews[idx] ? (
+                                  <div style={{ marginTop: '8px' }}>
+                                    {complianceMediaFiles[idx]?.type?.startsWith('video') ? (
+                                      <video src={complianceMediaPreviews[idx]} controls style={{ width: '100%', borderRadius: '8px', display: 'block' }} />
+                                    ) : (
+                                      <img src={complianceMediaPreviews[idx]} alt="Issue evidence" style={{ width: '100%', borderRadius: '8px', display: 'block' }} />
+                                    )}
+                                    <button
+                                      onClick={() => removeComplianceMedia(idx)}
+                                      style={{ marginTop: '6px', padding: '6px 12px', background: '#fff', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
+                                    >
+                                      ✕ Remove media
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <button
+                                    onClick={() => document.getElementById(`compliance-media-${idx}`).click()}
+                                    style={{ width: '100%', marginTop: '8px', height: '40px', borderRadius: '8px', border: '2px dashed #cbd5e1', background: '#ffffff', color: '#64748b', fontSize: '12px', fontWeight: 600, cursor: 'pointer', boxSizing: 'border-box' }}
+                                  >
+                                    📷 Add a photo or video (optional)
+                                  </button>
+                                )}
+                              </>
                             )}
                           </div>
                         )
@@ -2280,7 +2335,7 @@ export default function BuilderDashboard({ profile }) {
                     onClick={() => { setPage('new-ticket'); setMenuOpen(false) }}
                     style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
                   >
-                    📝 Raise new ticket
+                    📝 Log a Ticket
                   </button>
                   <button
                     onClick={() => { setPage('my-reports'); setMenuOpen(false) }}

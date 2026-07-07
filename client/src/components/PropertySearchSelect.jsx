@@ -1,0 +1,126 @@
+import { useState, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
+
+const inputStyle = { width: '100%', height: '44px', padding: '0 36px 0 12px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '13px', fontWeight: 500, boxSizing: 'border-box', background: '#ffffff' }
+const clearBtnStyle = { position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', width: '24px', height: '24px', border: 'none', background: 'none', color: '#94a3b8', fontSize: '15px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }
+const optionStyle = { display: 'block', width: '100%', textAlign: 'left', padding: '10px 12px', border: 'none', borderBottom: '1px solid #f1f5f9', background: 'none', color: '#0f172a', fontSize: '13px', fontWeight: 500, cursor: 'pointer' }
+
+function labelFor(property) {
+  return `${property.address}${property.high_vulnerability ? ' ⚠️ [HIGH VULNERABILITY]' : ''}`
+}
+
+// Type-to-filter replacement for a plain <select> of properties -- a native
+// select's "type a letter to jump" only matches one option at a time and
+// only from the start, which doesn't scale once the property list is long.
+// This filters the whole list by substring as the user types.
+//
+// The dropdown is rendered via a portal into document.body, positioned with
+// `fixed` coordinates read from the input's own bounding rect. It can't just
+// be an absolutely-positioned child here: the ticket form's outer card uses
+// `overflow: hidden` (to get rounded corners on the whole card), which would
+// otherwise clip the dropdown whenever this is the only/last visible step.
+export default function PropertySearchSelect({ properties, value, onChange, placeholder = 'Select a property...' }) {
+  const [query, setQuery] = useState('')
+  const [open, setOpen] = useState(false)
+  const [rect, setRect] = useState(null)
+  const wrapperRef = useRef(null)
+  const inputRef = useRef(null)
+  const dropdownRef = useRef(null)
+  const blurTimeoutRef = useRef(null)
+
+  const selected = properties.find(p => String(p.id) === String(value))
+
+  function updateRect() {
+    if (inputRef.current) setRect(inputRef.current.getBoundingClientRect())
+  }
+
+  useEffect(() => {
+    if (!open) return
+    updateRect()
+    window.addEventListener('scroll', updateRect, true)
+    window.addEventListener('resize', updateRect)
+    return () => {
+      window.removeEventListener('scroll', updateRect, true)
+      window.removeEventListener('resize', updateRect)
+    }
+  }, [open])
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      const clickedWrapper = wrapperRef.current?.contains(e.target)
+      const clickedDropdown = dropdownRef.current?.contains(e.target)
+      if (!clickedWrapper && !clickedDropdown) setOpen(false)
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  useEffect(() => () => clearTimeout(blurTimeoutRef.current), [])
+
+  const filtered = query.trim()
+    ? properties.filter(p => p.address.toLowerCase().includes(query.trim().toLowerCase()))
+    : properties
+
+  function openDropdown() {
+    updateRect()
+    setOpen(true)
+  }
+
+  function selectProperty(property) {
+    onChange(String(property.id))
+    setQuery('')
+    setOpen(false)
+  }
+
+  function clearSelection(e) {
+    e.stopPropagation()
+    onChange('')
+    setQuery('')
+  }
+
+  return (
+    <div ref={wrapperRef} style={{ position: 'relative' }}>
+      <input
+        ref={inputRef}
+        type="text"
+        value={open ? query : (selected ? labelFor(selected) : '')}
+        onChange={(e) => { setQuery(e.target.value); openDropdown() }}
+        onFocus={() => { setQuery(''); openDropdown() }}
+        onClick={openDropdown}
+        onBlur={() => { blurTimeoutRef.current = setTimeout(() => setOpen(false), 150) }}
+        onKeyDown={(e) => { if (e.key === 'Escape') e.target.blur() }}
+        placeholder={placeholder}
+        style={inputStyle}
+      />
+      {selected && !open && (
+        <button type="button" onClick={clearSelection} title="Clear selection" style={clearBtnStyle}>✕</button>
+      )}
+      {open && rect && createPortal(
+        <div
+          ref={dropdownRef}
+          style={{
+            position: 'fixed', top: rect.bottom + 4, left: rect.left, width: rect.width,
+            background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '10px',
+            boxShadow: '0 8px 24px rgba(15,23,42,0.12)', maxHeight: '260px', overflowY: 'auto', zIndex: 1000,
+          }}
+        >
+          {filtered.length === 0 && (
+            <div style={{ padding: '10px 12px', fontSize: '13px', color: '#94a3b8', fontStyle: 'italic' }}>No matching properties</div>
+          )}
+          {filtered.map(property => (
+            <button
+              type="button"
+              key={property.id}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => selectProperty(property)}
+              style={optionStyle}
+            >
+              {labelFor(property)}
+            </button>
+          ))}
+        </div>,
+        document.body
+      )}
+    </div>
+  )
+}

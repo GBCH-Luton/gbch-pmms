@@ -11,6 +11,7 @@ export const DEFAULT_MAINTENANCE_CATEGORIES = {
   'Electricity': {
     enabled: true,
     weight: 35,
+    order: 0,
     subCategories: [
       { label: 'Exposed Live Wires / Sparking', score: 65 },
       { label: 'Complete Property Power Outage', score: 55 },
@@ -22,6 +23,7 @@ export const DEFAULT_MAINTENANCE_CATEGORIES = {
   'Plumbing': {
     enabled: true,
     weight: 20,
+    order: 1,
     subCategories: [
       { label: 'Burst Pipe / Active Flooding', score: 65 },
       { label: 'Total Loss of Cold Drinking Water', score: 55 },
@@ -33,6 +35,7 @@ export const DEFAULT_MAINTENANCE_CATEGORIES = {
   'Doors/Locks': {
     enabled: true,
     weight: 30,
+    order: 2,
     subCategories: [
       { label: 'Main Entrance Gate Jammed Open', score: 55 },
       { label: 'Main Entrance Lockout / Jammed Shut', score: 60 },
@@ -44,6 +47,7 @@ export const DEFAULT_MAINTENANCE_CATEGORIES = {
   'Other / Unlisted Trade': {
     enabled: true,
     weight: 15,
+    order: 3,
     subCategories: [
       { label: 'Pest Vector / Active Rodent Infestation', score: 35 },
       { label: 'Severe Floor Fabric / Carpet Water Damage', score: 30 },
@@ -52,6 +56,14 @@ export const DEFAULT_MAINTENANCE_CATEGORIES = {
       { label: 'General Unlisted Handyman Issue Entry', score: 15 },
     ],
   },
+}
+
+// Postgres jsonb does not preserve object key order, so display order is
+// tracked via this explicit numeric field (see AdminSettings.jsx). Consumers
+// that render the categories object as a list must sort with this, not rely
+// on Object.keys()/Object.entries() order.
+export function sortedCategoryEntries(categories) {
+  return Object.entries(categories).sort((a, b) => (a[1].order ?? 0) - (b[1].order ?? 0))
 }
 
 // Migrates the legacy array shape (an earlier, short-lived implementation

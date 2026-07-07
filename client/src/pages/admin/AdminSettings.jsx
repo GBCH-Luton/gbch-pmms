@@ -1,7 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import { DEFAULT_COMPLIANCE_CHECK_TYPES } from '../../lib/compliance'
-import { DEFAULT_MAINTENANCE_CATEGORIES, migrateLegacyArrayShape } from '../../lib/maintenanceCategories'
+import { DEFAULT_MAINTENANCE_CATEGORIES, migrateLegacyArrayShape, sortedCategoryEntries } from '../../lib/maintenanceCategories'
+import {
+  modalOverlayStyle, modalCardStyle, modalTitleStyle, modalSubtitleStyle,
+  modalCancelBtnStyle, modalConfirmBtnStyle,
+} from './shared'
 
 const CATEGORY_OPTIONS = ['Electricity', 'Plumbing', 'Doors/Locks', 'Other / Unlisted Trade']
 
@@ -12,16 +16,21 @@ const fieldLabelStyle = { display: 'block', margin: '0 0 6px 0', fontSize: '11px
 const inputStyle = { width: '100%', height: '40px', padding: '0 12px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '13px', boxSizing: 'border-box' }
 const saveBtnStyle = { padding: '10px 20px', background: '#1d4ed8', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }
 const savedTagStyle = { marginLeft: '10px', fontSize: '12px', fontWeight: 700, color: '#16a34a' }
+const stickyAddBtnStyle = { padding: '8px 16px', background: '#0d9488', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }
+const countChipStyle = { fontSize: '11px', fontWeight: 700, color: '#64748b', background: '#f1f5f9', padding: '3px 10px', borderRadius: '20px', flexShrink: 0, whiteSpace: 'nowrap' }
+const expandToggleBtnStyle = { width: '32px', height: '32px', borderRadius: '8px', border: '1px solid #e2e8f0', background: '#fff', color: '#475569', fontSize: '13px', fontWeight: 700, cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }
+const orderInputStyle = { width: '40px', height: '32px', padding: 0, borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '13px', fontWeight: 700, color: '#475569', textAlign: 'center', boxSizing: 'border-box', flexShrink: 0 }
+const removeBtnStyle = { padding: '8px 14px', background: '#fff', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', flexShrink: 0, marginLeft: 'auto' }
 
 const SECTION_IDS = ['priority-thresholds', 'issue-scores', 'compliance-types', 'clocking-rules', 'on-call-roster', 'dashboard-metrics']
 
 function SettingsSection({ title, subtitle, headerExtra, open, onToggle, children }) {
   return (
-    <div style={cardStyle}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
+    <div style={{ ...cardStyle, display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
         <button
           onClick={onToggle}
-          style={{ display: 'flex', flex: 1, minWidth: 0, alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left' }}
+          style={{ display: 'flex', width: '100%', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left' }}
         >
           <div>
             <p style={cardHeadingStyle}>{title}</p>
@@ -31,9 +40,18 @@ function SettingsSection({ title, subtitle, headerExtra, open, onToggle, childre
             {open ? '▲ Collapse' : '▼ Expand'}
           </span>
         </button>
-        {headerExtra && <div style={{ flexShrink: 0 }}>{headerExtra}</div>}
+        {open && children}
       </div>
-      {open && children}
+      {/* This column stretches to match the height of the content column
+          above (default flex align-items: stretch), which is what gives
+          the inner sticky button room to actually stick while scrolling
+          through a long, expanded card list -- position: sticky only has
+          effect within its own parent's box height. */}
+      {headerExtra && (
+        <div style={{ flexShrink: 0, alignSelf: 'stretch', position: 'relative' }}>
+          <div style={{ position: 'sticky', top: '16px', zIndex: 10 }}>{headerExtra}</div>
+        </div>
+      )}
     </div>
   )
 }
@@ -61,14 +79,22 @@ export default function AdminSettings() {
 
   const [maintenanceCategories, setMaintenanceCategories] = useState(DEFAULT_MAINTENANCE_CATEGORIES)
   const [categoryRenameDrafts, setCategoryRenameDrafts] = useState({})
+  const [categoryOrderDrafts, setCategoryOrderDrafts] = useState({})
   const [pendingFocusSubKey, setPendingFocusSubKey] = useState(null)
   const subCategoryInputRefs = useRef({})
+  const [expandedCategories, setExpandedCategories] = useState({})
+  const [pendingFocusCategoryKey, setPendingFocusCategoryKey] = useState(null)
+  const categoryNameInputRefs = useRef({})
 
   const [complianceTypes, setComplianceTypes] = useState(DEFAULT_COMPLIANCE_CHECK_TYPES)
+  const [typeOrderDrafts, setTypeOrderDrafts] = useState({})
   const [addingType, setAddingType] = useState(false)
   const [newTypeName, setNewTypeName] = useState('')
   const [pendingFocusItemId, setPendingFocusItemId] = useState(null)
   const itemInputRefs = useRef({})
+  const [expandedTypes, setExpandedTypes] = useState({})
+
+  const [pendingRemoval, setPendingRemoval] = useState(null) // { kind: 'category'|'type', key|id, label }
 
   const [clockOverrunHours, setClockOverrunHours] = useState(8)
   const [doneWindowHours, setDoneWindowHours] = useState(24)
@@ -185,19 +211,52 @@ export default function AdminSettings() {
     persistMaintenanceCategories(maintenanceCategories)
   }
 
-  function removeCategory(key) {
-    if (!window.confirm(`Remove "${key}"? This can't be undone.`)) return
-    const updated = { ...maintenanceCategories }
-    delete updated[key]
-    setMaintenanceCategories(updated)
-    persistMaintenanceCategories(updated)
+  function requestRemoveCategory(key) {
+    setPendingRemoval({ kind: 'category', key, label: key })
   }
 
   function addCategory() {
     let name = 'New Category'
     let n = 2
     while (maintenanceCategories[name]) { name = `New Category ${n}`; n += 1 }
-    const updated = { ...maintenanceCategories, [name]: { enabled: true, weight: 50, subCategories: [] } }
+    const updated = { ...maintenanceCategories, [name]: { enabled: true, weight: 50, subCategories: [], order: Object.keys(maintenanceCategories).length } }
+    setMaintenanceCategories(updated)
+    persistMaintenanceCategories(updated)
+    setExpandedCategories(prev => ({ ...prev, [name]: true }))
+    setPendingFocusCategoryKey(name)
+  }
+
+  function toggleCategoryExpanded(key) {
+    setExpandedCategories(prev => ({ ...prev, [key]: !prev[key] }))
+  }
+
+  function handleCategoryOrderInputChange(key, value) {
+    setCategoryOrderDrafts(prev => ({ ...prev, [key]: value }))
+  }
+
+  function commitCategoryOrder(key) {
+    const draft = categoryOrderDrafts[key]
+    setCategoryOrderDrafts(prev => { const next = { ...prev }; delete next[key]; return next })
+    if (draft == null || draft === '') return
+
+    const entries = sortedCategoryEntries(maintenanceCategories)
+    const keys = entries.map(([k]) => k)
+    const total = keys.length
+    let newPos = parseInt(draft, 10)
+    if (Number.isNaN(newPos)) return
+    newPos = Math.max(1, Math.min(total, newPos))
+
+    const fromIdx = keys.indexOf(key)
+    const toIdx = newPos - 1
+    if (fromIdx === toIdx) return
+
+    const reordered = [...keys]
+    const [moved] = reordered.splice(fromIdx, 1)
+    reordered.splice(toIdx, 0, moved)
+    // Re-number every category's order field to match the new sequence --
+    // this is what actually persists correctly (see sortedCategoryEntries).
+    const updated = {}
+    reordered.forEach((k, i) => { updated[k] = { ...maintenanceCategories[k], order: i } })
     setMaintenanceCategories(updated)
     persistMaintenanceCategories(updated)
   }
@@ -251,6 +310,13 @@ export default function AdminSettings() {
     }
   }, [pendingFocusSubKey, maintenanceCategories])
 
+  useEffect(() => {
+    if (pendingFocusCategoryKey && categoryNameInputRefs.current[pendingFocusCategoryKey]) {
+      categoryNameInputRefs.current[pendingFocusCategoryKey].focus()
+      setPendingFocusCategoryKey(null)
+    }
+  }, [pendingFocusCategoryKey, maintenanceCategories])
+
   function persistComplianceTypes(updated) {
     saveSetting('compliance_check_types', updated)
   }
@@ -275,12 +341,24 @@ export default function AdminSettings() {
     persistComplianceTypes(updated)
   }
 
-  function removeCheckType(typeId) {
+  function requestRemoveType(typeId) {
     const type = complianceTypes.find(t => t.id === typeId)
-    if (!window.confirm(`Remove "${type?.name}"? This can't be undone.`)) return
-    const updated = complianceTypes.filter(t => t.id !== typeId)
-    setComplianceTypes(updated)
-    persistComplianceTypes(updated)
+    setPendingRemoval({ kind: 'type', id: typeId, label: type?.name })
+  }
+
+  function confirmPendingRemoval() {
+    if (!pendingRemoval) return
+    if (pendingRemoval.kind === 'category') {
+      const updated = { ...maintenanceCategories }
+      delete updated[pendingRemoval.key]
+      setMaintenanceCategories(updated)
+      persistMaintenanceCategories(updated)
+    } else if (pendingRemoval.kind === 'type') {
+      const updated = complianceTypes.filter(t => t.id !== pendingRemoval.id)
+      setComplianceTypes(updated)
+      persistComplianceTypes(updated)
+    }
+    setPendingRemoval(null)
   }
 
   function startAddType() {
@@ -300,8 +378,38 @@ export default function AdminSettings() {
     const updated = [...complianceTypes, newType]
     setComplianceTypes(updated)
     persistComplianceTypes(updated)
+    setExpandedTypes(prev => ({ ...prev, [newType.id]: true }))
     setAddingType(false)
     setNewTypeName('')
+  }
+
+  function toggleTypeExpanded(id) {
+    setExpandedTypes(prev => ({ ...prev, [id]: !prev[id] }))
+  }
+
+  function handleTypeOrderInputChange(id, value) {
+    setTypeOrderDrafts(prev => ({ ...prev, [id]: value }))
+  }
+
+  function commitTypeOrder(id) {
+    const draft = typeOrderDrafts[id]
+    setTypeOrderDrafts(prev => { const next = { ...prev }; delete next[id]; return next })
+    if (draft == null || draft === '') return
+
+    const total = complianceTypes.length
+    let newPos = parseInt(draft, 10)
+    if (Number.isNaN(newPos)) return
+    newPos = Math.max(1, Math.min(total, newPos))
+
+    const fromIdx = complianceTypes.findIndex(t => t.id === id)
+    const toIdx = newPos - 1
+    if (fromIdx === toIdx) return
+
+    const updated = [...complianceTypes]
+    const [moved] = updated.splice(fromIdx, 1)
+    updated.splice(toIdx, 0, moved)
+    setComplianceTypes(updated)
+    persistComplianceTypes(updated)
   }
 
   function addChecklistItem(typeId) {
@@ -465,10 +573,7 @@ export default function AdminSettings() {
         open={!!openSections['issue-scores']}
         onToggle={() => toggleSection('issue-scores')}
         headerExtra={
-          <button
-            onClick={(e) => { e.stopPropagation(); addCategory() }}
-            style={{ padding: '8px 16px', background: '#0d9488', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
-          >
+          <button onClick={(e) => { e.stopPropagation(); addCategory() }} style={stickyAddBtnStyle}>
             ＋ Add Category
           </button>
         }
@@ -477,97 +582,165 @@ export default function AdminSettings() {
           <p style={{ margin: 0, fontSize: '13px', color: '#94a3b8', fontStyle: 'italic' }}>No maintenance categories yet.</p>
         )}
 
-        {Object.entries(maintenanceCategories).map(([key, category]) => {
+        {sortedCategoryEntries(maintenanceCategories).map(([key, category], idx) => {
           const weightTier = categoryTierForScore(category.weight)
+          const isExpanded = !!expandedCategories[key]
+          const orderValue = categoryOrderDrafts[key] ?? String(idx + 1)
+          const orderInput = (
+            <input
+              type="number"
+              min={1}
+              max={sortedCategoryEntries(maintenanceCategories).length}
+              value={orderValue}
+              title="Position — type a number to move this category"
+              onClick={(e) => e.stopPropagation()}
+              onChange={(e) => handleCategoryOrderInputChange(key, e.target.value)}
+              onBlur={() => commitCategoryOrder(key)}
+              onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur() }}
+              style={orderInputStyle}
+            />
+          )
           return (
-            <div key={key} style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px', marginBottom: '12px', background: category.enabled ? '#ffffff' : '#f8fafc' }}>
+            <div
+              key={key}
+              style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px', marginBottom: '12px', background: category.enabled ? '#ffffff' : '#f8fafc' }}
+            >
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px', flexWrap: 'wrap' }}>
-                <button
-                  onClick={() => toggleCategoryEnabled(key)}
-                  title={category.enabled ? 'Enabled — click to disable' : 'Disabled — click to enable'}
-                  style={{
-                    width: '36px', height: '36px', borderRadius: '8px', border: 'none', cursor: 'pointer', flexShrink: 0,
-                    background: category.enabled ? '#0d9488' : '#cbd5e1', color: '#ffffff', fontSize: '16px',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}
-                >
-                  👁
-                </button>
-                <input
-                  type="text"
-                  value={categoryRenameDrafts[key] ?? key}
-                  onChange={(e) => handleCategoryNameChange(key, e.target.value)}
-                  onBlur={() => handleCategoryNameBlur(key)}
-                  style={{ flex: '2 1 220px', height: '36px', padding: '0 10px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '13px', fontWeight: 700, color: '#0f172a', boxSizing: 'border-box' }}
-                />
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
+              {isExpanded ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px', flexWrap: 'wrap' }}>
+                  <button
+                    onClick={() => toggleCategoryExpanded(key)}
+                    title="Collapse"
+                    style={expandToggleBtnStyle}
+                  >
+                    ▲
+                  </button>
+                  {orderInput}
+                  <button
+                    onClick={() => toggleCategoryEnabled(key)}
+                    title={category.enabled ? 'Enabled — click to disable' : 'Disabled — click to enable'}
+                    style={{
+                      width: '36px', height: '36px', borderRadius: '8px', border: 'none', cursor: 'pointer', flexShrink: 0,
+                      background: category.enabled ? '#0d9488' : '#cbd5e1', color: '#ffffff', fontSize: '16px',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}
+                  >
+                    👁
+                  </button>
                   <input
-                    type="number"
-                    min={0}
-                    max={150}
-                    value={category.weight}
-                    onChange={(e) => handleCategoryWeightChange(key, e.target.value)}
-                    onBlur={handleCategoryFieldBlur}
-                    style={{ width: '80px', height: '36px', padding: '0 8px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '13px', textAlign: 'center', boxSizing: 'border-box' }}
+                    ref={(el) => { categoryNameInputRefs.current[key] = el }}
+                    type="text"
+                    value={categoryRenameDrafts[key] ?? key}
+                    onChange={(e) => handleCategoryNameChange(key, e.target.value)}
+                    onBlur={() => handleCategoryNameBlur(key)}
+                    style={{ flex: '2 1 220px', height: '36px', padding: '0 10px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '13px', fontWeight: 700, color: '#0f172a', boxSizing: 'border-box' }}
                   />
-                  <span style={{ fontSize: '10px', fontWeight: 700, color: weightTier.color, marginTop: '3px', whiteSpace: 'nowrap' }}>{weightTier.label}</span>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
+                    <input
+                      type="number"
+                      min={0}
+                      max={150}
+                      value={category.weight}
+                      onChange={(e) => handleCategoryWeightChange(key, e.target.value)}
+                      onBlur={handleCategoryFieldBlur}
+                      style={{ width: '80px', height: '36px', padding: '0 8px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '13px', textAlign: 'center', boxSizing: 'border-box' }}
+                    />
+                    <span style={{ fontSize: '10px', fontWeight: 700, color: weightTier.color, marginTop: '3px', whiteSpace: 'nowrap' }}>{weightTier.label}</span>
+                  </div>
+                  <button
+                    onClick={() => requestRemoveCategory(key)}
+                    style={removeBtnStyle}
+                  >
+                    ✕ Remove
+                  </button>
                 </div>
-                <button
-                  onClick={() => removeCategory(key)}
-                  style={{ padding: '8px 14px', background: '#fff', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
+              ) : (
+                <div
+                  onClick={() => toggleCategoryExpanded(key)}
+                  style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', flexWrap: 'wrap' }}
                 >
-                  ✕ Remove
-                </button>
-              </div>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); toggleCategoryExpanded(key) }}
+                    title="Expand"
+                    style={expandToggleBtnStyle}
+                  >
+                    ▼
+                  </button>
+                  {orderInput}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); toggleCategoryEnabled(key) }}
+                    title={category.enabled ? 'Enabled — click to disable' : 'Disabled — click to enable'}
+                    style={{
+                      width: '36px', height: '36px', borderRadius: '8px', border: 'none', cursor: 'pointer', flexShrink: 0,
+                      background: category.enabled ? '#0d9488' : '#cbd5e1', color: '#ffffff', fontSize: '16px',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}
+                  >
+                    👁
+                  </button>
+                  <span style={{ flex: '2 1 220px', fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>{key}</span>
+                  <span style={{ fontSize: '12px', fontWeight: 700, color: weightTier.color, flexShrink: 0 }}>{category.weight} pts · {weightTier.label}</span>
+                  <span style={countChipStyle}>{category.subCategories.length} item{category.subCategories.length === 1 ? '' : 's'}</span>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); requestRemoveCategory(key) }}
+                    style={removeBtnStyle}
+                  >
+                    ✕ Remove
+                  </button>
+                </div>
+              )}
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '10px' }}>
-                {category.subCategories.length === 0 && (
-                  <p style={{ margin: 0, fontSize: '12px', color: '#94a3b8', fontStyle: 'italic' }}>No sub-categories yet.</p>
-                )}
-                {category.subCategories.map((sub, idx) => {
-                  const subKey = `${key}::${idx}`
-                  const tier = categoryTierForScore(sub.score)
-                  return (
-                    <div key={subKey} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                      <span style={{ width: '18px', fontSize: '12px', color: '#94a3b8', flexShrink: 0, marginTop: '10px' }}>{idx + 1}.</span>
-                      <input
-                        ref={(el) => { subCategoryInputRefs.current[subKey] = el }}
-                        type="text"
-                        value={sub.label}
-                        onChange={(e) => updateSubCategoryLabel(key, idx, e.target.value)}
-                        onBlur={handleCategoryFieldBlur}
-                        style={{ flex: 1, height: '36px', padding: '0 10px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '13px', boxSizing: 'border-box' }}
-                      />
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
-                        <input
-                          type="number"
-                          min={0}
-                          max={150}
-                          value={sub.score}
-                          onChange={(e) => updateSubCategoryScore(key, idx, e.target.value)}
-                          onBlur={handleCategoryFieldBlur}
-                          style={{ width: '70px', height: '36px', padding: '0 8px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '13px', textAlign: 'center', boxSizing: 'border-box' }}
-                        />
-                        <span style={{ fontSize: '10px', fontWeight: 700, color: tier.color, marginTop: '3px', whiteSpace: 'nowrap' }}>{tier.label}</span>
-                      </div>
-                      <button
-                        onClick={() => removeSubCategory(key, idx)}
-                        style={{ width: '32px', height: '36px', background: '#fff', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', flexShrink: 0 }}
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  )
-                })}
-              </div>
+              {isExpanded && (
+                <>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '10px' }}>
+                    {category.subCategories.length === 0 && (
+                      <p style={{ margin: 0, fontSize: '12px', color: '#94a3b8', fontStyle: 'italic' }}>No sub-categories yet.</p>
+                    )}
+                    {category.subCategories.map((sub, idx) => {
+                      const subKey = `${key}::${idx}`
+                      const tier = categoryTierForScore(sub.score)
+                      return (
+                        <div key={subKey} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                          <span style={{ width: '18px', fontSize: '12px', color: '#94a3b8', flexShrink: 0, marginTop: '10px' }}>{idx + 1}.</span>
+                          <input
+                            ref={(el) => { subCategoryInputRefs.current[subKey] = el }}
+                            type="text"
+                            value={sub.label}
+                            onChange={(e) => updateSubCategoryLabel(key, idx, e.target.value)}
+                            onBlur={handleCategoryFieldBlur}
+                            style={{ flex: 1, height: '36px', padding: '0 10px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '13px', boxSizing: 'border-box' }}
+                          />
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
+                            <input
+                              type="number"
+                              min={0}
+                              max={150}
+                              value={sub.score}
+                              onChange={(e) => updateSubCategoryScore(key, idx, e.target.value)}
+                              onBlur={handleCategoryFieldBlur}
+                              style={{ width: '70px', height: '36px', padding: '0 8px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '13px', textAlign: 'center', boxSizing: 'border-box' }}
+                            />
+                            <span style={{ fontSize: '10px', fontWeight: 700, color: tier.color, marginTop: '3px', whiteSpace: 'nowrap' }}>{tier.label}</span>
+                          </div>
+                          <button
+                            onClick={() => removeSubCategory(key, idx)}
+                            style={{ width: '32px', height: '36px', background: '#fff', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', flexShrink: 0 }}
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      )
+                    })}
+                  </div>
 
-              <button
-                onClick={() => addSubCategory(key)}
-                style={{ width: '100%', padding: '10px', border: '2px dashed #cbd5e1', background: 'none', color: '#64748b', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}
-              >
-                ＋ Add sub-category
-              </button>
+                  <button
+                    onClick={() => addSubCategory(key)}
+                    style={{ width: '100%', padding: '10px', border: '2px dashed #cbd5e1', background: 'none', color: '#64748b', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}
+                  >
+                    ＋ Add sub-category
+                  </button>
+                </>
+              )}
             </div>
           )
         })}
@@ -580,10 +753,7 @@ export default function AdminSettings() {
         open={!!openSections['compliance-types']}
         onToggle={() => toggleSection('compliance-types')}
         headerExtra={
-          <button
-            onClick={(e) => { e.stopPropagation(); startAddType() }}
-            style={{ padding: '8px 16px', background: '#0d9488', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
-          >
+          <button onClick={(e) => { e.stopPropagation(); startAddType() }} style={stickyAddBtnStyle}>
             ＋ Add Check Type
           </button>
         }
@@ -608,92 +778,161 @@ export default function AdminSettings() {
           <p style={{ margin: 0, fontSize: '13px', color: '#94a3b8', fontStyle: 'italic' }}>No compliance check types yet.</p>
         )}
 
-        {complianceTypes.map(type => (
-          <div key={type.id} style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px', marginBottom: '12px', background: type.enabled ? '#ffffff' : '#f8fafc' }}>
+        {complianceTypes.map((type, idx) => {
+          const isExpanded = !!expandedTypes[type.id]
+          const orderValue = typeOrderDrafts[type.id] ?? String(idx + 1)
+          const orderInput = (
+            <input
+              type="number"
+              min={1}
+              max={complianceTypes.length}
+              value={orderValue}
+              title="Position — type a number to move this check type"
+              onClick={(e) => e.stopPropagation()}
+              onChange={(e) => handleTypeOrderInputChange(type.id, e.target.value)}
+              onBlur={() => commitTypeOrder(type.id)}
+              onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur() }}
+              style={orderInputStyle}
+            />
+          )
+          return (
+          <div
+            key={type.id}
+            style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px', marginBottom: '12px', background: type.enabled ? '#ffffff' : '#f8fafc' }}
+          >
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px', flexWrap: 'wrap' }}>
-              <button
-                onClick={() => toggleCheckTypeEnabled(type.id)}
-                title={type.enabled ? 'Enabled — click to disable' : 'Disabled — click to enable'}
-                style={{
-                  width: '36px', height: '36px', borderRadius: '8px', border: 'none', cursor: 'pointer', flexShrink: 0,
-                  background: type.enabled ? '#0d9488' : '#cbd5e1', color: '#ffffff', fontSize: '16px',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}
+            {isExpanded ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px', flexWrap: 'wrap' }}>
+                <button
+                  onClick={() => toggleTypeExpanded(type.id)}
+                  title="Collapse"
+                  style={expandToggleBtnStyle}
+                >
+                  ▲
+                </button>
+                {orderInput}
+                <button
+                  onClick={() => toggleCheckTypeEnabled(type.id)}
+                  title={type.enabled ? 'Enabled — click to disable' : 'Disabled — click to enable'}
+                  style={{
+                    width: '36px', height: '36px', borderRadius: '8px', border: 'none', cursor: 'pointer', flexShrink: 0,
+                    background: type.enabled ? '#0d9488' : '#cbd5e1', color: '#ffffff', fontSize: '16px',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}
+                >
+                  👁
+                </button>
+                <input
+                  type="text"
+                  value={type.name}
+                  onChange={(e) => updateCheckTypeName(type.id, e.target.value)}
+                  onBlur={handleCheckTypeNameBlur}
+                  style={{ flex: '2 1 220px', height: '36px', padding: '0 10px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '13px', fontWeight: 700, color: '#0f172a', boxSizing: 'border-box' }}
+                />
+                <select
+                  value={type.category}
+                  onChange={(e) => updateCheckTypeCategory(type.id, e.target.value)}
+                  style={{ flex: '1 1 170px', height: '36px', padding: '0 10px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '13px', boxSizing: 'border-box', background: '#fff' }}
+                >
+                  {CATEGORY_OPTIONS.map(c => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+                <button
+                  onClick={() => requestRemoveType(type.id)}
+                  style={removeBtnStyle}
+                >
+                  ✕ Remove
+                </button>
+              </div>
+            ) : (
+              <div
+                onClick={() => toggleTypeExpanded(type.id)}
+                style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', flexWrap: 'wrap' }}
               >
-                👁
-              </button>
-              <input
-                type="text"
-                value={type.name}
-                onChange={(e) => updateCheckTypeName(type.id, e.target.value)}
-                onBlur={handleCheckTypeNameBlur}
-                style={{ flex: '2 1 220px', height: '36px', padding: '0 10px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '13px', fontWeight: 700, color: '#0f172a', boxSizing: 'border-box' }}
-              />
-              <select
-                value={type.category}
-                onChange={(e) => updateCheckTypeCategory(type.id, e.target.value)}
-                style={{ flex: '1 1 170px', height: '36px', padding: '0 10px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '13px', boxSizing: 'border-box', background: '#fff' }}
-              >
-                {CATEGORY_OPTIONS.map(c => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </select>
-              <button
-                onClick={() => removeCheckType(type.id)}
-                style={{ padding: '8px 14px', background: '#fff', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
-              >
-                ✕ Remove
-              </button>
-            </div>
+                <button
+                  onClick={(e) => { e.stopPropagation(); toggleTypeExpanded(type.id) }}
+                  title="Expand"
+                  style={expandToggleBtnStyle}
+                >
+                  ▼
+                </button>
+                {orderInput}
+                <button
+                  onClick={(e) => { e.stopPropagation(); toggleCheckTypeEnabled(type.id) }}
+                  title={type.enabled ? 'Enabled — click to disable' : 'Disabled — click to enable'}
+                  style={{
+                    width: '36px', height: '36px', borderRadius: '8px', border: 'none', cursor: 'pointer', flexShrink: 0,
+                    background: type.enabled ? '#0d9488' : '#cbd5e1', color: '#ffffff', fontSize: '16px',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}
+                >
+                  👁
+                </button>
+                <span style={{ flex: '2 1 220px', fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>{type.name}</span>
+                <span style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', flexShrink: 0 }}>{type.category}</span>
+                <span style={countChipStyle}>{type.items.length} item{type.items.length === 1 ? '' : 's'}</span>
+                <button
+                  onClick={(e) => { e.stopPropagation(); requestRemoveType(type.id) }}
+                  style={removeBtnStyle}
+                >
+                  ✕ Remove
+                </button>
+              </div>
+            )}
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '10px' }}>
-              {type.items.length === 0 && (
-                <p style={{ margin: 0, fontSize: '12px', color: '#94a3b8', fontStyle: 'italic' }}>No checklist items yet.</p>
-              )}
-              {type.items.map((item, idx) => {
-                const tier = tierForScore(item.score)
-                return (
-                  <div key={item.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                    <span style={{ width: '18px', fontSize: '12px', color: '#94a3b8', flexShrink: 0, marginTop: '10px' }}>{idx + 1}.</span>
-                    <input
-                      ref={(el) => { itemInputRefs.current[item.id] = el }}
-                      type="text"
-                      value={item.label}
-                      onChange={(e) => updateItemLabel(type.id, item.id, e.target.value)}
-                      onBlur={handleItemLabelBlur}
-                      style={{ flex: 1, height: '36px', padding: '0 10px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '13px', boxSizing: 'border-box' }}
-                    />
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
-                      <input
-                        type="number"
-                        min={0}
-                        max={150}
-                        value={item.score}
-                        onChange={(e) => updateItemScore(type.id, item.id, e.target.value)}
-                        style={{ width: '70px', height: '36px', padding: '0 8px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '13px', textAlign: 'center', boxSizing: 'border-box' }}
-                      />
-                      <span style={{ fontSize: '10px', fontWeight: 700, color: tier.color, marginTop: '3px', whiteSpace: 'nowrap' }}>{tier.label}</span>
-                    </div>
-                    <button
-                      onClick={() => removeChecklistItem(type.id, item.id)}
-                      style={{ width: '32px', height: '36px', background: '#fff', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', flexShrink: 0 }}
-                    >
-                      ✕
-                    </button>
-                  </div>
-                )
-              })}
-            </div>
+            {isExpanded && (
+              <>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '10px', marginTop: '14px' }}>
+                  {type.items.length === 0 && (
+                    <p style={{ margin: 0, fontSize: '12px', color: '#94a3b8', fontStyle: 'italic' }}>No checklist items yet.</p>
+                  )}
+                  {type.items.map((item, idx) => {
+                    const tier = tierForScore(item.score)
+                    return (
+                      <div key={item.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                        <span style={{ width: '18px', fontSize: '12px', color: '#94a3b8', flexShrink: 0, marginTop: '10px' }}>{idx + 1}.</span>
+                        <input
+                          ref={(el) => { itemInputRefs.current[item.id] = el }}
+                          type="text"
+                          value={item.label}
+                          onChange={(e) => updateItemLabel(type.id, item.id, e.target.value)}
+                          onBlur={handleItemLabelBlur}
+                          style={{ flex: 1, height: '36px', padding: '0 10px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '13px', boxSizing: 'border-box' }}
+                        />
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
+                          <input
+                            type="number"
+                            min={0}
+                            max={150}
+                            value={item.score}
+                            onChange={(e) => updateItemScore(type.id, item.id, e.target.value)}
+                            style={{ width: '70px', height: '36px', padding: '0 8px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '13px', textAlign: 'center', boxSizing: 'border-box' }}
+                          />
+                          <span style={{ fontSize: '10px', fontWeight: 700, color: tier.color, marginTop: '3px', whiteSpace: 'nowrap' }}>{tier.label}</span>
+                        </div>
+                        <button
+                          onClick={() => removeChecklistItem(type.id, item.id)}
+                          style={{ width: '32px', height: '36px', background: '#fff', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', flexShrink: 0 }}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
 
-            <button
-              onClick={() => addChecklistItem(type.id)}
-              style={{ width: '100%', padding: '10px', border: '2px dashed #cbd5e1', background: 'none', color: '#64748b', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}
-            >
-              ＋ Add checklist item
-            </button>
+                <button
+                  onClick={() => addChecklistItem(type.id)}
+                  style={{ width: '100%', padding: '10px', border: '2px dashed #cbd5e1', background: 'none', color: '#64748b', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}
+                >
+                  ＋ Add checklist item
+                </button>
+              </>
+            )}
           </div>
-        ))}
+          )
+        })}
       </SettingsSection>
 
       {/* Section 4: Clocking Rules */}
@@ -828,6 +1067,23 @@ export default function AdminSettings() {
         </button>
         {dashboardMetricsSaved && <span style={savedTagStyle}>✓ Saved</span>}
       </SettingsSection>
+
+      {pendingRemoval && (
+        <div style={modalOverlayStyle} onClick={() => setPendingRemoval(null)}>
+          <div style={modalCardStyle} onClick={(e) => e.stopPropagation()}>
+            <p style={modalTitleStyle}>Remove "{pendingRemoval.label}"?</p>
+            <p style={modalSubtitleStyle}>
+              {pendingRemoval.kind === 'category'
+                ? 'This removes the category and all of its sub-categories. This can\'t be undone.'
+                : 'This removes the check type and all of its checklist items. This can\'t be undone.'}
+            </p>
+            <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+              <button onClick={() => setPendingRemoval(null)} style={modalCancelBtnStyle}>Cancel</button>
+              <button onClick={confirmPendingRemoval} style={{ ...modalConfirmBtnStyle, background: '#dc2626' }}>✕ Remove</button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   )
