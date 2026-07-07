@@ -6,7 +6,7 @@ import {
   filterSelectStyle, thStyle, tdStyle, actionBtnStyle,
   modalOverlayStyle, modalCardStyle, modalTitleStyle, modalSubtitleStyle, modalLabelStyle,
   modalTextareaStyle, modalErrorStyle, modalCancelBtnStyle, modalConfirmBtnStyle, radioRowStyle,
-  roleBadgeStyle, postSystemComment, postAuditEvent, fetchAssignableBuilders, STAFF_AVAILABILITY_STYLES,
+  roleBadgeStyle, postSystemComment, postAuditEvent, fetchAssignableBuilders, fetchAssignableStaffForCategory, STAFF_AVAILABILITY_STYLES,
   createNotification,
 } from './shared'
 
@@ -23,6 +23,11 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
   const [sortDirection, setSortDirection] = useState('asc')
   const [builders, setBuilders] = useState([])
   const [properties, setProperties] = useState([])
+  // Who can be reassigned THIS ticket, scoped to its category's division --
+  // e.g. a Housekeeping ticket offers Housekeepers here, not Builders.
+  // Deliberately separate from `builders` above, which stays the flat
+  // Builder-only list used by the page's own "Builder" filter dropdown.
+  const [reassignOptions, setReassignOptions] = useState([])
 
   const [statusFilter, setStatusFilter] = useState('All')
   const [propertyFilter, setPropertyFilter] = useState('All')
@@ -71,6 +76,8 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
       setReassignBuilderId(reassignModalTicket.assigned_builder_id || '')
       setReassignReason('')
       setReassignError('')
+      setReassignOptions([])
+      fetchAssignableStaffForCategory(reassignModalTicket.category).then(setReassignOptions)
     }
   }, [reassignModalTicket])
 
@@ -142,7 +149,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
     const t = reassignModalTicket
     const promoteToAssigned = t.status === 'Pending'
     const fromName = t.builderName || 'Unassigned'
-    const toName = builders.find(b => b.id === reassignBuilderId)?.name || reassignBuilderId
+    const toName = reassignOptions.find(b => b.id === reassignBuilderId)?.name || reassignBuilderId
 
     const { error } = await supabase
       .schema('pmms')
@@ -588,7 +595,10 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
 
             <label style={modalLabelStyle}>Builder</label>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {builders.map(b => {
+              {reassignOptions.length === 0 && (
+                <p style={{ margin: 0, fontSize: '13px', color: '#94a3b8', fontStyle: 'italic' }}>No one is assignable to this category yet.</p>
+              )}
+              {reassignOptions.map(b => {
                 const isUnavailable = b.availability !== 'Available'
                 return (
                 <label key={b.id} style={{ ...radioRowStyle(reassignBuilderId === b.id), opacity: isUnavailable ? 0.55 : 1 }}>

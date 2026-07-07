@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
-import { modalOverlayStyle, modalCardStyle, modalLabelStyle, modalCancelBtnStyle, formatUKDateTime } from './shared'
+import { modalOverlayStyle, modalCardStyle, modalLabelStyle, modalCancelBtnStyle, formatUKDateTime, Avatar } from './shared'
 
 export default function BuilderProfileModal({ builderId, onClose }) {
   const [builder, setBuilder] = useState(null)
+  const [loadError, setLoadError] = useState(false)
   const [tickets, setTickets] = useState([])
   const [comments, setComments] = useState([])
 
@@ -13,12 +14,13 @@ export default function BuilderProfileModal({ builderId, onClose }) {
 
     async function load() {
       setBuilder(null)
+      setLoadError(false)
       setTickets([])
       setComments([])
 
-      const { data: builderData } = await supabase
+      const { data: builderData, error: builderError } = await supabase
         .from('staff')
-        .select('id, name')
+        .select('id, name, photo_url')
         .eq('id', builderId)
         .single()
 
@@ -44,7 +46,15 @@ export default function BuilderProfileModal({ builderId, onClose }) {
       }
 
       if (!cancelled) {
-        setBuilder(builderData)
+        // .single() errors (RLS turning up zero/multiple rows, a transient
+        // fetch failure) used to leave `builder` null forever with no
+        // indication anything went wrong -- the modal just silently never
+        // opened, which read as "View Profile sometimes does nothing."
+        if (builderError || !builderData) {
+          setLoadError(true)
+        } else {
+          setBuilder(builderData)
+        }
         setTickets(ticketData || [])
         setComments(commentData)
       }
@@ -54,7 +64,31 @@ export default function BuilderProfileModal({ builderId, onClose }) {
     return () => { cancelled = true }
   }, [builderId])
 
-  if (!builderId || !builder) return null
+  if (!builderId) return null
+
+  if (loadError) {
+    return (
+      <div style={modalOverlayStyle}>
+        <div style={{ ...modalCardStyle, maxWidth: '420px' }}>
+          <p style={modalLabelStyle}>Couldn't load this profile</p>
+          <p style={{ margin: '8px 0 16px 0', fontSize: '13px', color: '#64748b' }}>
+            Something went wrong fetching this staff member's details. Try closing and reopening their profile.
+          </p>
+          <button onClick={onClose} style={{ ...modalCancelBtnStyle, width: '100%' }}>Close</button>
+        </div>
+      </div>
+    )
+  }
+
+  if (!builder) {
+    return (
+      <div style={modalOverlayStyle}>
+        <div style={{ ...modalCardStyle, maxWidth: '420px', textAlign: 'center' }}>
+          <p style={{ margin: 0, padding: '20px 0', fontSize: '13px', color: '#94a3b8' }}>Loading profile...</p>
+        </div>
+      </div>
+    )
+  }
 
   const activeJobs = tickets.filter(t => t.status !== 'Completed' && t.status !== 'Archived')
   const completedJobs = tickets.filter(t => t.status === 'Completed' || t.status === 'Archived')
@@ -70,11 +104,14 @@ export default function BuilderProfileModal({ builderId, onClose }) {
       <div style={{ ...modalCardStyle, maxWidth: '640px' }}>
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid #f1f5f9', paddingBottom: '12px', marginBottom: '16px' }}>
-          <div>
-            <p style={{ margin: 0, fontSize: '16px', fontWeight: 800, color: '#0f172a' }}>{builder.name}</p>
-            <span style={{ display: 'inline-block', marginTop: '6px', fontSize: '11px', fontWeight: 800, color: dutyBadge.color, background: dutyBadge.bg, padding: '3px 10px', borderRadius: '20px' }}>
-              {dutyBadge.label}
-            </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <Avatar name={builder.name} photoUrl={builder.photo_url} size={48} />
+            <div>
+              <p style={{ margin: 0, fontSize: '16px', fontWeight: 800, color: '#0f172a' }}>{builder.name}</p>
+              <span style={{ display: 'inline-block', marginTop: '6px', fontSize: '11px', fontWeight: 800, color: dutyBadge.color, background: dutyBadge.bg, padding: '3px 10px', borderRadius: '20px' }}>
+                {dutyBadge.label}
+              </span>
+            </div>
           </div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '20px', color: '#94a3b8', cursor: 'pointer', lineHeight: 1 }}>×</button>
         </div>

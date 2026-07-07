@@ -43,8 +43,8 @@ export function roleFromJobTitle(jobTitle) {
 export function normalizeCustomRoles(raw) {
   if (!Array.isArray(raw)) return []
   return raw.map(r => (typeof r === 'string'
-    ? { name: r, accessLevel: 'none', hideSettings: false }
-    : { name: r.name, accessLevel: r.accessLevel || 'none', hideSettings: !!r.hideSettings }
+    ? { name: r, accessLevel: 'none', hideSettings: false, division: null }
+    : { name: r.name, accessLevel: r.accessLevel || 'none', hideSettings: !!r.hideSettings, division: r.division || null }
   ))
 }
 
@@ -70,4 +70,13 @@ export function accessLevelForRole(roleName, normalizedCustomRoles) {
 // roles (Admin/Builder/Cleaner/Support Worker) never hide it.
 export function hideSettingsForRole(roleName, normalizedCustomRoles) {
   return !!normalizedCustomRoles.find(r => r.name === roleName)?.hideSettings
+}
+
+// Which division (e.g. "Housekeeping") this named role is scoped to, or
+// null for "unscoped" -- every built-in role and every custom role that
+// hasn't been tagged with a division resolves to null, meaning full,
+// unrestricted access exactly like today (see pmms.current_division(),
+// the SQL-side mirror of this same lookup).
+export function divisionForRole(roleName, normalizedCustomRoles) {
+  return normalizedCustomRoles.find(r => r.name === roleName)?.division || null
 }

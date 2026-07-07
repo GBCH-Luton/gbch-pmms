@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
-import { fetchAssignableBuilders, builderOptionLabel, createNotification } from './shared'
+import { fetchAssignableStaffForCategory, builderOptionLabel, createNotification } from './shared'
 import { fetchComplianceCheckTypes } from '../../lib/compliance'
 import { fetchMaintenanceCategories, sortedCategoryEntries } from '../../lib/maintenanceCategories'
 import PropertySearchSelect from '../../components/PropertySearchSelect'
@@ -114,10 +114,25 @@ export default function AdminRaiseTicket({ profile }) {
 
   useEffect(() => {
     fetchTicketProperties()
-    fetchBuilders()
     fetchComplianceTypes()
     fetchMaintenanceCategories().then(setMaintenanceCategories)
   }, [])
+
+  // Which staff can be assigned depends on the selected category's division
+  // (e.g. a Housekeeping category offers Housekeepers, not Builders) -- see
+  // fetchAssignableStaffForCategory in shared.js. Refetches whenever the
+  // relevant category changes in either mode, and clears any previously
+  // picked assignee since they may not be eligible for the new category.
+  useEffect(() => {
+    const category = loggingMode === 'compliance'
+      ? complianceCheckTypes.find(t => t.name === complianceCheckType)?.category
+      : ticketCategory
+
+    setAssignedBuilderId('')
+
+    if (!category) { setBuilders([]); return }
+    fetchAssignableStaffForCategory(category).then(setBuilders)
+  }, [loggingMode, ticketCategory, complianceCheckType, complianceCheckTypes])
 
   async function fetchTicketProperties() {
     const { data, error } = await supabase
@@ -127,10 +142,6 @@ export default function AdminRaiseTicket({ profile }) {
       .order('address')
 
     if (!error) setTicketProperties(data)
-  }
-
-  async function fetchBuilders() {
-    setBuilders(await fetchAssignableBuilders())
   }
 
   async function fetchComplianceTypes() {

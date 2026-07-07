@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import { DEFAULT_COMPLIANCE_CHECK_TYPES } from '../../lib/compliance'
 import { DEFAULT_MAINTENANCE_CATEGORIES, migrateLegacyArrayShape, sortedCategoryEntries } from '../../lib/maintenanceCategories'
+import { DEFAULT_DIVISIONS } from '../../lib/divisions'
 import {
   modalOverlayStyle, modalCardStyle, modalTitleStyle, modalSubtitleStyle,
   modalCancelBtnStyle, modalConfirmBtnStyle,
@@ -96,6 +97,8 @@ export default function AdminSettings() {
 
   const [pendingRemoval, setPendingRemoval] = useState(null) // { kind: 'category'|'type', key|id, label }
 
+  const [divisions, setDivisions] = useState(DEFAULT_DIVISIONS)
+
   const [clockOverrunHours, setClockOverrunHours] = useState(8)
   const [doneWindowHours, setDoneWindowHours] = useState(24)
   const [clockDistanceThresholdM, setClockDistanceThresholdM] = useState(250)
@@ -151,6 +154,7 @@ export default function AdminSettings() {
       if (map.clock_distance_threshold_meters != null) setClockDistanceThresholdM(map.clock_distance_threshold_meters)
       if (map.on_call_roster) setRoster(map.on_call_roster)
       if (map.new_property_window_hours != null) setNewPropertyWindowHours(map.new_property_window_hours)
+      if (Array.isArray(map.divisions) && map.divisions.length > 0) setDivisions(map.divisions)
     }
     setLoading(false)
   }
@@ -180,6 +184,16 @@ export default function AdminSettings() {
 
   function toggleCategoryEnabled(key) {
     const updated = { ...maintenanceCategories, [key]: { ...maintenanceCategories[key], enabled: !maintenanceCategories[key].enabled } }
+    setMaintenanceCategories(updated)
+    persistMaintenanceCategories(updated)
+  }
+
+  // Which division this category belongs to -- read by pmms.category_division()
+  // in RLS to decide whether a division-scoped manager can see/reassign a
+  // ticket in this category. Defaults to 'Maintenance' for any category
+  // that hasn't been explicitly tagged.
+  function handleCategoryDivisionChange(key, division) {
+    const updated = { ...maintenanceCategories, [key]: { ...maintenanceCategories[key], division } }
     setMaintenanceCategories(updated)
     persistMaintenanceCategories(updated)
   }
@@ -647,6 +661,14 @@ export default function AdminSettings() {
                     />
                     <span style={{ fontSize: '10px', fontWeight: 700, color: weightTier.color, marginTop: '3px', whiteSpace: 'nowrap' }}>{weightTier.label}</span>
                   </div>
+                  <select
+                    value={category.division || DEFAULT_DIVISIONS[0]}
+                    onChange={(e) => handleCategoryDivisionChange(key, e.target.value)}
+                    title="Which division this category belongs to -- scopes what a division-tagged manager can see/reassign"
+                    style={{ height: '36px', padding: '0 8px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '12px', fontWeight: 700, color: '#475569', background: '#fff', flexShrink: 0, cursor: 'pointer' }}
+                  >
+                    {divisions.map(d => <option key={d} value={d}>{d}</option>)}
+                  </select>
                   <button
                     onClick={() => requestRemoveCategory(key)}
                     style={removeBtnStyle}
@@ -680,6 +702,7 @@ export default function AdminSettings() {
                   </button>
                   <span style={{ flex: '2 1 220px', fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>{key}</span>
                   <span style={{ fontSize: '12px', fontWeight: 700, color: weightTier.color, flexShrink: 0 }}>{category.weight} pts · {weightTier.label}</span>
+                  <span style={{ fontSize: '11px', fontWeight: 700, color: '#1e3a8a', background: '#dbeafe', padding: '3px 10px', borderRadius: '20px', flexShrink: 0, whiteSpace: 'nowrap' }}>{category.division || DEFAULT_DIVISIONS[0]}</span>
                   <span style={countChipStyle}>{category.subCategories.length} item{category.subCategories.length === 1 ? '' : 's'}</span>
                   <button
                     onClick={(e) => { e.stopPropagation(); requestRemoveCategory(key) }}

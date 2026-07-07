@@ -18,7 +18,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { normalizeCustomRoles } from '../../lib/roles'
 import BuilderProfileModal from './BuilderProfileModal'
-import { thStyle, tdStyle, actionBtnStyle, STAFF_AVAILABILITY_OPTIONS, STAFF_AVAILABILITY_STYLES } from './shared'
+import { thStyle, tdStyle, actionBtnStyle, STAFF_AVAILABILITY_OPTIONS, STAFF_AVAILABILITY_STYLES, Avatar } from './shared'
 
 const BUILT_IN_ROLES = ['Admin', 'Builder', 'Cleaner', 'Support Worker']
 
@@ -37,7 +37,7 @@ export default function AdminBuilders() {
   async function fetchData() {
     const { data: allStaff, error: staffError } = await supabase
       .from('staff')
-      .select('id, name, active')
+      .select('id, name, active, photo_url')
       .order('name')
 
     const { data: roleRows, error: roleRowsError } = await supabase
@@ -222,12 +222,15 @@ export default function AdminBuilders() {
                 return (
                   <tr key={b.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                     <td style={tdStyle}>
-                      <span
+                      <div
                         onClick={() => setBuilderProfileId(b.id)}
-                        style={{ fontWeight: 700, color: '#1d4ed8', cursor: 'pointer' }}
+                        style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}
                       >
-                        {b.name}
-                      </span>
+                        <Avatar name={b.name} photoUrl={b.photo_url} size={28} />
+                        <span style={{ fontWeight: 700, color: '#1d4ed8' }}>
+                          {b.name}
+                        </span>
+                      </div>
                     </td>
                     <td style={tdStyle}>
                       <select

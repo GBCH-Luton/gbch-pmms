@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { supabase } from './lib/supabase'
-import { roleFromJobTitle, normalizeCustomRoles, accessLevelForRole, hideSettingsForRole } from './lib/roles'
+import { roleFromJobTitle, normalizeCustomRoles, accessLevelForRole, hideSettingsForRole, divisionForRole } from './lib/roles'
 import Login from './pages/Login'
 import SetPassword from './pages/SetPassword'
 import AdminDashboard from './pages/AdminDashboard'
@@ -61,6 +61,7 @@ export default function App() {
 
     let role = roleFromJobTitle(data.job_title)
     let hideSettings = false
+    let division = null
 
     // job_title lives on a company-wide table PMMS doesn't control -- a
     // rename there (even a legitimate one) can otherwise silently lock
@@ -90,6 +91,11 @@ export default function App() {
       if (accessLevel) role = accessLevel
       // UI-only convenience, not a database restriction -- see roles.js.
       hideSettings = hideSettingsForRole(roleRow.role, normalizedCustomRoles)
+      // Which division (if any) this role is scoped to -- the real
+      // restriction is enforced by RLS (pmms.current_division()); this is
+      // just so the UI can adapt (e.g. narrowing the Pipeline's category
+      // filter for a division-scoped manager).
+      division = divisionForRole(roleRow.role, normalizedCustomRoles)
     }
 
     // Deactivating someone (the Admin page's "Deactivate" button) must
@@ -99,7 +105,7 @@ export default function App() {
     // no exception.
     if (data.active === false) role = null
 
-    setProfile({ ...data, role, hideSettings })
+    setProfile({ ...data, role, hideSettings, division })
     setLoading(false)
   }
 

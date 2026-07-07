@@ -48,9 +48,10 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { normalizeCustomRoles } from '../../lib/roles'
+import { fetchDivisions, saveDivisions, DEFAULT_DIVISIONS } from '../../lib/divisions'
 import { supabase } from '../../lib/supabase'
 import {
-  actionBtnStyle,
+  actionBtnStyle, Avatar,
   modalOverlayStyle, modalCardStyle, modalTitleStyle, modalLabelStyle, modalErrorStyle,
   modalCancelBtnStyle, modalConfirmBtnStyle,
 } from './shared'
@@ -384,14 +385,20 @@ const ACCESS_LEVEL_LABELS = {
   builder: 'Builder access',
 }
 
-function RolesPanel({ staffList, customRoles, customRolesError, onRolesChanged }) {
+function RolesPanel({ staffList, customRoles, customRolesError, onRolesChanged, divisions, onDivisionsChanged }) {
   const [adding, setAdding] = useState(false)
   const [newRole, setNewRole] = useState('')
   const [newRoleAccessLevel, setNewRoleAccessLevel] = useState('none')
+  const [newRoleDivision, setNewRoleDivision] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [deleting, setDeleting] = useState(false)
+
+  const [addingDivision, setAddingDivision] = useState(false)
+  const [newDivisionName, setNewDivisionName] = useState('')
+  const [divisionError, setDivisionError] = useState('')
+  const [savingDivision, setSavingDivision] = useState(false)
 
   async function saveCustomRoles(next) {
     const { error: saveError } = await supabase
@@ -414,12 +421,13 @@ function RolesPanel({ staffList, customRoles, customRolesError, onRolesChanged }
     }
 
     setSaving(true)
-    const err = await saveCustomRoles([...customRoles, { name, accessLevel: newRoleAccessLevel }])
+    const err = await saveCustomRoles([...customRoles, { name, accessLevel: newRoleAccessLevel, division: newRoleDivision || null }])
     setSaving(false)
 
     if (err) { setError(err); return }
     setNewRole('')
     setNewRoleAccessLevel('none')
+    setNewRoleDivision('')
     setAdding(false)
   }
 
@@ -431,11 +439,40 @@ function RolesPanel({ staffList, customRoles, customRolesError, onRolesChanged }
     await saveCustomRoles(customRoles.map(r => r.name === name ? { ...r, hideSettings } : r))
   }
 
+  // Scopes this role's database access (via RLS, not just the UI) to a
+  // single division -- e.g. a "Housekeeping Manager" role only ever sees
+  // tickets whose category is tagged Housekeeping. Empty/"None" means
+  // unscoped, full access -- exactly like every role today.
+  async function handleChangeDivision(name, division) {
+    await saveCustomRoles(customRoles.map(r => r.name === name ? { ...r, division: division || null } : r))
+  }
+
   async function handleDeleteRole() {
     setDeleting(true)
     const err = await saveCustomRoles(customRoles.filter(r => r.name !== deleteTarget))
     setDeleting(false)
     if (!err) setDeleteTarget(null)
+  }
+
+  async function handleAddDivision() {
+    setDivisionError('')
+    const name = newDivisionName.trim()
+    if (!name) { setDivisionError('Enter a division name.'); return }
+    if (divisions.some(d => d.toLowerCase() === name.toLowerCase())) { setDivisionError('That division already exists.'); return }
+
+    setSavingDivision(true)
+    const next = [...divisions, name]
+    await saveDivisions(next)
+    onDivisionsChanged(next)
+    setSavingDivision(false)
+    setNewDivisionName('')
+    setAddingDivision(false)
+  }
+
+  async function handleDeleteDivision(name) {
+    const next = divisions.filter(d => d !== name)
+    await saveDivisions(next)
+    onDivisionsChanged(next)
   }
 
   const staffCountForRole = (role) => staffList.filter(s => s.role === role).length
@@ -453,6 +490,55 @@ function RolesPanel({ staffList, customRoles, customRolesError, onRolesChanged }
           )
         })}
       </div>
+
+      <p style={{ margin: '0 0 8px 0', fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Divisions</p>
+      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '8px' }}>
+        {divisions.map(d => (
+          <span key={d} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 700, color: '#1e3a8a', background: '#dbeafe', padding: '4px 6px 4px 12px', borderRadius: '20px' }}>
+            {d}
+            {d !== 'Maintenance' && (
+              <button
+                onClick={() => handleDeleteDivision(d)}
+                title="Remove from the picklist -- roles/categories already tagged with this division keep working, they just won't offer it as a choice anymore"
+                style={{ background: 'none', border: 'none', color: '#1e3a8a', fontSize: '12px', fontWeight: 800, cursor: 'pointer', padding: '0 2px' }}
+              >
+                ✕
+              </button>
+            )}
+          </span>
+        ))}
+      </div>
+      {addingDivision ? (
+        <div style={{ marginBottom: '12px' }}>
+          <input
+            type="text"
+            value={newDivisionName}
+            onChange={(e) => setNewDivisionName(e.target.value)}
+            placeholder="Division name..."
+            style={{ ...inputStyle, marginBottom: '8px' }}
+          />
+          {divisionError && <p style={modalErrorStyle}>{divisionError}</p>}
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button onClick={() => { setAddingDivision(false); setNewDivisionName(''); setDivisionError('') }} style={{ flex: 1, padding: '8px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>
+              Cancel
+            </button>
+            <button
+              onClick={handleAddDivision}
+              disabled={savingDivision}
+              style={{ flex: 1, padding: '8px', background: '#1e3a8a', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: savingDivision ? 'not-allowed' : 'pointer', opacity: savingDivision ? 0.6 : 1 }}
+            >
+              {savingDivision ? 'Saving...' : 'Save'}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button
+          onClick={() => setAddingDivision(true)}
+          style={{ width: '100%', padding: '8px', marginBottom: '16px', background: '#fff', color: '#1e3a8a', border: '1px solid #bfdbfe', borderRadius: '10px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
+        >
+          ＋ Add Division
+        </button>
+      )}
 
       <p style={{ margin: '0 0 8px 0', fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Custom</p>
 
@@ -478,6 +564,15 @@ function RolesPanel({ staffList, customRoles, customRolesError, onRolesChanged }
                 {Object.entries(ACCESS_LEVEL_LABELS).map(([value, label]) => (
                   <option key={value} value={value}>{label}</option>
                 ))}
+              </select>
+              <select
+                value={r.division || ''}
+                onChange={(e) => handleChangeDivision(r.name, e.target.value)}
+                title="Scopes this role's database access to one division (e.g. a Housekeeping Manager only ever sees Housekeeping tickets). None = unscoped, full access."
+                style={{ fontSize: '11px', fontWeight: 700, padding: '4px 6px', borderRadius: '6px', border: '1px solid #e2e8f0', background: '#fff', color: '#475569', cursor: 'pointer' }}
+              >
+                <option value="">No division</option>
+                {divisions.map(d => <option key={d} value={d}>{d}</option>)}
               </select>
               <label
                 title="Removes the Settings tab from the nav for this role. UI-only -- does not restrict database access."
@@ -519,6 +614,14 @@ function RolesPanel({ staffList, customRoles, customRolesError, onRolesChanged }
             {Object.entries(ACCESS_LEVEL_LABELS).map(([value, label]) => (
               <option key={value} value={value}>{label}</option>
             ))}
+          </select>
+          <select
+            value={newRoleDivision}
+            onChange={(e) => setNewRoleDivision(e.target.value)}
+            style={{ ...inputStyle, marginBottom: '8px' }}
+          >
+            <option value="">No division (unscoped)</option>
+            {divisions.map(d => <option key={d} value={d}>{d}</option>)}
           </select>
           {error && <p style={modalErrorStyle}>{error}</p>}
           <div style={{ display: 'flex', gap: '8px' }}>
@@ -578,11 +681,13 @@ export default function AdminAccess({ profile }) {
 
   const [customRoles, setCustomRoles] = useState([])
   const [customRolesError, setCustomRolesError] = useState('')
+  const [divisions, setDivisions] = useState(DEFAULT_DIVISIONS)
 
   const [roleFilter, setRoleFilter] = useState('All')
   const [modalStaff, setModalStaff] = useState(undefined) // undefined = closed, null = add, object = edit
   const [resetPasswordTarget, setResetPasswordTarget] = useState(null)
   const [toggleActiveErrors, setToggleActiveErrors] = useState({})
+  const [deactivatedOpen, setDeactivatedOpen] = useState(false)
 
   useEffect(() => {
     fetchData()
@@ -627,6 +732,8 @@ export default function AdminAccess({ profile }) {
       setCustomRoles(normalizeCustomRoles(settingsRow?.setting_value))
       setCustomRolesError('')
     }
+
+    setDivisions(await fetchDivisions())
 
     setLoading(false)
   }
@@ -695,9 +802,62 @@ export default function AdminAccess({ profile }) {
 
   const filterTabs = ['All', ...roleOptions, 'Unassigned']
 
-  const filteredStaff = roleFilter === 'All' ? relevantStaff
+  // The role tabs above are about WHICH staff (by role), not whether
+  // they're active -- deactivated staff never show in this list regardless
+  // of tab, so a long list doesn't end up a mix of active and inactive.
+  // They live in the separate "Deactivated Staff" section below instead.
+  const filteredStaff = (roleFilter === 'All' ? relevantStaff
     : roleFilter === 'Unassigned' ? unassignedStaff
     : staffList.filter(s => s.role === roleFilter)
+  ).filter(s => s.active !== false)
+
+  const deactivatedStaff = staffList.filter(s => s.active === false)
+
+  function renderStaffCard(s) {
+    const isActive = s.active !== false
+    const onDuty = isOnDuty(s.id)
+    const rStyle = roleStyle(s.role)
+    return (
+      <div
+        key={s.id}
+        style={{
+          background: '#fff', borderRadius: '16px', padding: '14px 20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+          opacity: isActive ? 1 : 0.55,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
+          <Avatar name={s.name} photoUrl={s.photo_url} size={36} />
+          <div style={{ flex: '2 1 220px', minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '4px' }}>
+              {onDuty && (
+                <span title="On Duty" style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#16a34a', flexShrink: 0 }} />
+              )}
+              <span style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>{s.name}</span>
+              {s.role && (
+                <span style={{ fontSize: '10px', fontWeight: 700, color: rStyle.color, background: rStyle.bg, padding: '2px 8px', borderRadius: '20px' }}>{s.role}</span>
+              )}
+              <span style={{
+                fontSize: '10px', fontWeight: 700, padding: '2px 8px', borderRadius: '20px',
+                color: isActive ? '#16a34a' : '#64748b', background: isActive ? '#dcfce7' : '#f1f5f9',
+              }}>
+                {isActive ? 'Active' : 'Inactive'}
+              </span>
+            </div>
+            <span style={{ fontSize: '12px', color: '#64748b' }}>{s.email}</span>
+          </div>
+
+          <div style={{ display: 'flex', gap: '8px', flexShrink: 0, flexWrap: 'wrap' }}>
+            <button onClick={() => setModalStaff(s)} style={actionBtnStyle}>Edit</button>
+            <button onClick={() => setResetPasswordTarget(s)} style={actionBtnStyle}>🔑 Reset password</button>
+            <button onClick={() => handleToggleActive(s)} style={actionBtnStyle}>{isActive ? 'Deactivate' : 'Activate'}</button>
+          </div>
+        </div>
+        {toggleActiveErrors[s.id] && (
+          <p style={modalErrorStyle}>⚠ Couldn't {isActive ? 'deactivate' : 'activate'}: {toggleActiveErrors[s.id]}</p>
+        )}
+      </div>
+    )
+  }
 
   return (
     <div>
@@ -740,50 +900,28 @@ export default function AdminAccess({ profile }) {
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {filteredStaff.map(s => {
-                const isActive = s.active !== false
-                const onDuty = isOnDuty(s.id)
-                const rStyle = roleStyle(s.role)
-                return (
-                  <div
-                    key={s.id}
-                    style={{
-                      background: '#fff', borderRadius: '16px', padding: '14px 20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
-                      opacity: isActive ? 1 : 0.55,
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
-                      <div style={{ flex: '2 1 220px', minWidth: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '4px' }}>
-                          {onDuty && (
-                            <span title="On Duty" style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#16a34a', flexShrink: 0 }} />
-                          )}
-                          <span style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>{s.name}</span>
-                          {s.role && (
-                            <span style={{ fontSize: '10px', fontWeight: 700, color: rStyle.color, background: rStyle.bg, padding: '2px 8px', borderRadius: '20px' }}>{s.role}</span>
-                          )}
-                          <span style={{
-                            fontSize: '10px', fontWeight: 700, padding: '2px 8px', borderRadius: '20px',
-                            color: isActive ? '#16a34a' : '#64748b', background: isActive ? '#dcfce7' : '#f1f5f9',
-                          }}>
-                            {isActive ? 'Active' : 'Inactive'}
-                          </span>
-                        </div>
-                        <span style={{ fontSize: '12px', color: '#64748b' }}>{s.email}</span>
-                      </div>
+              {filteredStaff.map(s => renderStaffCard(s))}
+            </div>
+          )}
 
-                      <div style={{ display: 'flex', gap: '8px', flexShrink: 0, flexWrap: 'wrap' }}>
-                        <button onClick={() => setModalStaff(s)} style={actionBtnStyle}>Edit</button>
-                        <button onClick={() => setResetPasswordTarget(s)} style={actionBtnStyle}>🔑 Reset password</button>
-                        <button onClick={() => handleToggleActive(s)} style={actionBtnStyle}>{isActive ? 'Deactivate' : 'Activate'}</button>
-                      </div>
-                    </div>
-                    {toggleActiveErrors[s.id] && (
-                      <p style={modalErrorStyle}>⚠ Couldn't {isActive ? 'deactivate' : 'activate'}: {toggleActiveErrors[s.id]}</p>
-                    )}
-                  </div>
-                )
-              })}
+          {deactivatedStaff.length > 0 && (
+            <div style={{ marginTop: '20px' }}>
+              <button
+                onClick={() => setDeactivatedOpen(prev => !prev)}
+                style={{
+                  display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between', gap: '12px',
+                  padding: '10px 14px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px',
+                  cursor: 'pointer', fontSize: '13px', fontWeight: 700, color: '#64748b',
+                }}
+              >
+                <span>Deactivated Staff ({deactivatedStaff.length})</span>
+                <span>{deactivatedOpen ? '▲ Collapse' : '▼ Expand'}</span>
+              </button>
+              {deactivatedOpen && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '10px' }}>
+                  {deactivatedStaff.map(s => renderStaffCard(s))}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -794,6 +932,8 @@ export default function AdminAccess({ profile }) {
             customRoles={customRoles}
             customRolesError={customRolesError}
             onRolesChanged={setCustomRoles}
+            divisions={divisions}
+            onDivisionsChanged={setDivisions}
           />
         </div>
       </div>

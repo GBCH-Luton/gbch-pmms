@@ -4,6 +4,7 @@
 
 import { supabase } from '../../lib/supabase'
 import { distanceMetres, ensurePropertyCoords } from '../../lib/geo'
+import { normalizeCustomRoles } from '../../lib/roles'
 
 const DEFAULT_CLOCK_DISTANCE_THRESHOLD_M = 250
 
@@ -23,6 +24,25 @@ export const STAFF_AVAILABILITY_STYLES = {
   'Available': { bg: '#dcfce7', color: '#16a34a' },
   'On Leave': { bg: '#fef3c7', color: '#d97706' },
   'Sick': { bg: '#fee2e2', color: '#dc2626' },
+}
+
+// Circular staff photo, falling back to initials-on-a-grey-circle when
+// photo_url is null/empty (nobody has one set yet in the sandbox, but
+// public.staff is the same company-wide table other systems also write to,
+// so this reads whatever's there rather than needing its own upload path).
+export function Avatar({ name, photoUrl, size = 36 }) {
+  if (photoUrl) {
+    return <img src={photoUrl} alt="" style={{ width: `${size}px`, height: `${size}px`, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+  }
+  const initials = (name || '?').split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase()
+  return (
+    <div style={{
+      width: `${size}px`, height: `${size}px`, borderRadius: '50%', background: '#e2e8f0', color: '#64748b',
+      fontSize: `${Math.round(size * 0.4)}px`, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+    }}>
+      {initials}
+    </div>
+  )
 }
 
 // Short label for a builder-picker <option> -- appends the availability
@@ -113,18 +133,18 @@ export function formatDuration(ms) {
   return `${h}h ${m}m`
 }
 
-// Staff eligible to be assigned tickets -- scoped to the PMMS "Builder" role
+// Staff eligible to be assigned tickets under a given PMMS role name
 // (pmms.staff_roles), NOT the company-wide job_title, so this always matches
-// who the Staff page lists as a Builder. Also excludes inactive staff.
-// Each builder carries `availability`/`availabilityNote` (from
+// who the Staff page lists under that role. Also excludes inactive staff.
+// Each person carries `availability`/`availabilityNote` (from
 // pmms.staff_availability) so pickers can flag someone as On Leave/Sick
 // without hiding them -- they may still need reassigning off existing jobs.
-export async function fetchAssignableBuilders() {
+export async function fetchAssignableStaffForRole(roleName) {
   const { data: roleRows, error: roleError } = await supabase
     .schema('pmms')
     .from('staff_roles')
     .select('staff_id')
-    .eq('role', 'Builder')
+    .eq('role', roleName)
 
   if (roleError || !roleRows?.length) return []
 
@@ -151,6 +171,54 @@ export async function fetchAssignableBuilders() {
     availability: availByStaffId[s.id]?.status || 'Available',
     availabilityNote: availByStaffId[s.id]?.note || '',
   }))
+}
+
+// Kept as a thin wrapper -- every existing call site asks for Builders
+// specifically, and this reads better at the call site than the generic
+// name.
+export async function fetchAssignableBuilders() {
+  return fetchAssignableStaffForRole('Builder')
+}
+
+// Staff eligible to be assigned a ticket in a given category, taking the
+// Divisions feature into account: looks up which division the category
+// belongs to (pmms.settings['maintenance_categories'][category].division,
+// defaulting to 'Maintenance'), then finds every role tagged with that same
+// division at 'builder' access level (plus the built-in 'Builder' role when
+// the division is 'Maintenance', matching today's behavior exactly), and
+// returns the union of staff assignable under any of those roles. This is
+// what makes a Housekeeping-category ticket offer Housekeepers instead of
+// Builders, without any of this needing to hardcode "Housekeeper" anywhere
+// -- adding a future division's staff role needs no change here.
+export async function fetchAssignableStaffForCategory(category) {
+  const { data: categoriesRow } = await supabase
+    .schema('pmms')
+    .from('settings')
+    .select('setting_value')
+    .eq('setting_key', 'maintenance_categories')
+    .maybeSingle()
+
+  const categoryDivision = categoriesRow?.setting_value?.[category]?.division || 'Maintenance'
+
+  const { data: rolesRow } = await supabase
+    .schema('pmms')
+    .from('settings')
+    .select('setting_value')
+    .eq('setting_key', 'custom_roles')
+    .maybeSingle()
+
+  const normalizedCustomRoles = normalizeCustomRoles(rolesRow?.setting_value)
+
+  const roleNames = normalizedCustomRoles
+    .filter(r => r.accessLevel === 'builder' && (r.division || 'Maintenance') === categoryDivision)
+    .map(r => r.name)
+
+  if (categoryDivision === 'Maintenance') roleNames.push('Builder')
+
+  const staffLists = await Promise.all(roleNames.map(fetchAssignableStaffForRole))
+  const byId = {}
+  staffLists.flat().forEach(s => { byId[s.id] = s })
+  return Object.values(byId).sort((a, b) => a.name.localeCompare(b.name))
 }
 
 // Counts jobs whose recorded clock-in/out location was further than the
