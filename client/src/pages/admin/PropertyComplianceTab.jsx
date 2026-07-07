@@ -5,7 +5,7 @@
 //
 // CREATE TABLE pmms.property_compliance (
 //   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-//   property_id integer REFERENCES pmms.properties(id) ON DELETE CASCADE, -- integer, not uuid: pmms.properties.id is an integer identity column
+//   property_id uuid REFERENCES public.properties(id) ON DELETE CASCADE,
 //   cert_type text NOT NULL,
 //   expiry_date date,
 //   cert_url text,

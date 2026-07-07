@@ -3,13 +3,13 @@
 // table this component depends on -- run it before using this tab. No SQL
 // was given for this one in the request, so the table follows the same
 // conventions as the other new property-profile tables this session
-// (integer property_id, RLS explicitly disabled). Documents reuse the
+// (RLS explicitly disabled). Documents reuse the
 // 'property-docs' storage bucket already created by
 // add_property_compliance_table.sql.
 //
 // CREATE TABLE pmms.property_documents (
 //   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-//   property_id integer REFERENCES pmms.properties(id) ON DELETE CASCADE,
+//   property_id uuid REFERENCES public.properties(id) ON DELETE CASCADE,
 //   document_name text NOT NULL,
 //   category text,
 //   document_date date,

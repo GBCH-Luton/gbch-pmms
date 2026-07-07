@@ -290,7 +290,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
 
   const filteredTickets = tickets.filter(t => {
     if (statusFilter !== 'All' && t.status !== statusFilter) return false
-    if (propertyFilter !== 'All' && t.property_id !== propertyFilter) return false
+    if (propertyFilter !== 'All' && String(t.property_id) !== String(propertyFilter)) return false
     if (categoryFilter !== 'All' && t.category !== categoryFilter) return false
     if (builderFilter !== 'All' && t.assigned_builder_id !== builderFilter) return false
     if (priorityFilter !== 'All' && effectiveTier(t) !== priorityFilter) return false
