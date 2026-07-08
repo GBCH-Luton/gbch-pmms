@@ -637,7 +637,7 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
             { label: 'Voided This Week', value: voidHistoryCounts.thisWeek },
             { label: 'Voided This Month', value: voidHistoryCounts.thisMonth },
           ].map(m => (
-            <div key={m.label} style={{ flex: '1 1 160px', background: '#d97706', borderRadius: '16px', padding: '16px', textAlign: 'center' }}>
+            <div key={m.label} style={{ flex: '1 1 160px', background: '#dc2626', borderRadius: '16px', padding: '16px', textAlign: 'center' }}>
               <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{m.label}</p>
               <p style={{ margin: 0, fontSize: '26px', fontWeight: 800, color: '#ffffff' }}>{m.value}</p>
             </div>
