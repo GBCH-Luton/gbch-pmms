@@ -31,7 +31,10 @@
 // typed into the Void Since field that same save -- the dedicated Mark as
 // Void/Mark as Occupied buttons are the way to log a transition with a
 // specific historical date. Editing a room without changing its status
-// (e.g. just fixing the room name) never touches history.
+// (e.g. just fixing the room name) never touches history. Creating a
+// brand-new room also logs one starting-state entry ("Moved In" if
+// created Occupied, "Room Added (Void)" if created Void), so history
+// captures a room's full lifecycle from creation, not just later changes.
 
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
@@ -53,11 +56,11 @@ function todayIso() {
   return new Date().toISOString().slice(0, 10)
 }
 
-async function insertHistory(roomId, action, actionDate, tenantName, notes) {
+async function insertHistory(roomId, propertyId, action, actionDate, tenantName, notes) {
   await supabase
     .schema('pmms')
     .from('property_room_history')
-    .insert({ room_id: roomId, action, action_date: actionDate, tenant_name: tenantName || null, notes: notes || null })
+    .insert({ room_id: roomId, property_id: propertyId, action, action_date: actionDate, tenant_name: tenantName || null, notes: notes || null })
 }
 
 const emptyForm = { room_name: '', room_type: 'Bedroom', current_status: 'Occupied', tenant_name: '', void_since: '' }
@@ -116,9 +119,17 @@ function RoomFormModal({ property, room, onClose, onSaved }) {
 
     if (statusChanged) {
       if (form.current_status === 'Void') {
-        await insertHistory(room.id, 'Moved Out', today, room.tenant_name, null)
+        await insertHistory(room.id, property.id, 'Moved Out', today, room.tenant_name, null)
       } else {
-        await insertHistory(room.id, 'Moved In', today, form.tenant_name.trim(), null)
+        await insertHistory(room.id, property.id, 'Moved In', today, form.tenant_name.trim(), null)
+      }
+    } else if (!room) {
+      // Brand-new room -- log its starting state too, not just later status
+      // changes, so history captures the room's full lifecycle from creation.
+      if (form.current_status === 'Occupied') {
+        await insertHistory(result.data.id, property.id, 'Moved In', today, form.tenant_name.trim(), null)
+      } else {
+        await insertHistory(result.data.id, property.id, 'Room Added (Void)', today, null, null)
       }
     }
 
@@ -196,7 +207,7 @@ function MarkVoidModal({ room, onClose, onSaved }) {
 
     if (updateError) { setSaving(false); setError(updateError.message); return }
 
-    await insertHistory(room.id, 'Moved Out', moveOutDate, room.tenant_name, notes)
+    await insertHistory(room.id, room.property_id, 'Moved Out', moveOutDate, room.tenant_name, notes)
 
     setSaving(false)
     onSaved(data)
@@ -253,7 +264,7 @@ function MarkOccupiedModal({ room, onClose, onSaved }) {
 
     if (updateError) { setSaving(false); setError(updateError.message); return }
 
-    await insertHistory(room.id, 'Moved In', moveInDate, tenantName.trim(), notes)
+    await insertHistory(room.id, room.property_id, 'Moved In', moveInDate, tenantName.trim(), notes)
 
     setSaving(false)
     onSaved(data)
