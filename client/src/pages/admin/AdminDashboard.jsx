@@ -208,7 +208,7 @@ export default function AdminDashboard({ onNavigate }) {
         <button
           onClick={() => onNavigate?.('properties', { filterMode: 'voids' })}
           style={{
-            flex: '1 1 220px', background: '#d97706', borderRadius: '16px', padding: '16px',
+            flex: '1 1 220px', background: currentVoidsCount > 0 ? '#dc2626' : '#16a34a', borderRadius: '16px', padding: '16px',
             border: 'none', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', textAlign: 'center',
           }}
         >
