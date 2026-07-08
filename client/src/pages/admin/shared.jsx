@@ -191,6 +191,17 @@ export async function fetchAssignableBuilders() {
 // what makes a Housekeeping-category ticket offer Housekeepers instead of
 // Builders, without any of this needing to hardcode "Housekeeper" anywhere
 // -- adding a future division's staff role needs no change here.
+// Same lookup pmms.category_division() does in SQL (for RLS), pulled out
+// as its own client-side helper so callers that just need "which division
+// is this category in" (e.g. reporting) don't have to go through the
+// heavier fetchAssignableStaffForCategory, which also does an unrelated
+// staff-role join. Takes the already-fetched maintenance_categories
+// settings row so callers that need this for many tickets only fetch it
+// once instead of once per ticket.
+export function resolveCategoryDivision(category, categoriesSettingsRow) {
+  return categoriesSettingsRow?.setting_value?.[category]?.division || 'Maintenance'
+}
+
 export async function fetchAssignableStaffForCategory(category) {
   const { data: categoriesRow } = await supabase
     .schema('pmms')
@@ -199,7 +210,7 @@ export async function fetchAssignableStaffForCategory(category) {
     .eq('setting_key', 'maintenance_categories')
     .maybeSingle()
 
-  const categoryDivision = categoriesRow?.setting_value?.[category]?.division || 'Maintenance'
+  const categoryDivision = resolveCategoryDivision(category, categoriesRow)
 
   const { data: rolesRow } = await supabase
     .schema('pmms')

@@ -9,6 +9,7 @@ import AdminBuilders from './admin/AdminBuilders'
 import AdminClocking from './admin/AdminClocking'
 import AdminRaiseTicket from './admin/AdminRaiseTicket'
 import AdminStock from './admin/AdminStock'
+import AdminReports from './admin/AdminReports'
 import AdminSettings from './admin/AdminSettings'
 import AdminAccess from './admin/AdminAccess'
 import AdminHelp from './admin/AdminHelp'
@@ -22,6 +23,7 @@ const NAV_ITEMS = [
   { key: 'clocking', label: 'Clocking', Component: AdminClocking },
   { key: 'raise-ticket', label: 'Log a Ticket', Component: AdminRaiseTicket },
   { key: 'stock', label: 'Stock', Component: AdminStock },
+  { key: 'reports', label: 'Reports', Component: AdminReports },
   { key: 'settings', label: 'Settings', Component: AdminSettings },
   { key: 'admin', label: 'Admin', Component: AdminAccess, adminOnly: true },
   { key: 'help', label: 'Help & Guide', Component: AdminHelp, adminOnly: true },
