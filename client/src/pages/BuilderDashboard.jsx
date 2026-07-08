@@ -4,6 +4,7 @@ import { getCurrentPositionSafe } from '../lib/geo'
 import { fetchComplianceCheckTypes } from '../lib/compliance'
 import { fetchMaintenanceCategories, sortedCategoryEntries } from '../lib/maintenanceCategories'
 import { attachProperties } from '../lib/properties'
+import { logLoginEvent } from '../lib/loginEvents'
 import PropertySearchSelect from '../components/PropertySearchSelect'
 import gbchLogo from '../assets/gbch-logo.svg'
 
@@ -420,6 +421,10 @@ export default function BuilderDashboard({ profile }) {
   }
 
   async function handleSignOut() {
+    // Logged here, before signOut() -- by the time the auth listener sees
+    // the session go away, the token's already cleared and an insert from
+    // there has no valid credentials (confirmed live: silent 401).
+    await logLoginEvent(profile, profile.email, 'Signed Out')
     await supabase.auth.signOut()
   }
 

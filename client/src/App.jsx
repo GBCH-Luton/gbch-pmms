@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { supabase } from './lib/supabase'
 import { roleFromJobTitle, normalizeCustomRoles, accessLevelForRole, hideSettingsForRole, divisionForRole } from './lib/roles'
+import { logLoginEvent } from './lib/loginEvents'
 import Login from './pages/Login'
 import SetPassword from './pages/SetPassword'
 import AdminDashboard from './pages/AdminDashboard'
@@ -30,11 +31,39 @@ export default function App() {
       else setLoading(false)
     })
 
-    supabase.auth.onAuthStateChange((_event, session) => {
+    // Branches on the real event now (previously discarded as `_event` and
+    // treated every state change identically) -- a genuine sign-in logs a
+    // pmms.login_events row. INITIAL_SESSION (fires once on page load/
+    // refresh when an existing session is restored) and TOKEN_REFRESHED are
+    // deliberately not logged, so refreshing the page doesn't spam the
+    // activity trail.
+    //
+    // Sign-out is deliberately NOT logged here -- by the time SIGNED_OUT
+    // fires, supabase.auth.signOut() has already cleared the session, so an
+    // insert attempted from this listener has no valid credentials and
+    // silently 401s (confirmed live). Each dashboard's handleSignOut logs
+    // the event itself, before calling signOut(), while the session is
+    // still good -- see AdminDashboard.jsx/BuilderDashboard.jsx.
+    //
+    // The subscription is captured and torn down on unmount -- React
+    // StrictMode double-invokes this effect in development, and without
+    // this cleanup the previous (never-removed) listener kept firing
+    // alongside the new one, logging every real sign-in twice.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session)
-      if (session) fetchProfile(session.user.email)
-      else { setProfile(null); setLoading(false) }
+      if (session) {
+        fetchProfile(session.user.email).then(resolvedProfile => {
+          if (event === 'SIGNED_IN' && resolvedProfile) {
+            logLoginEvent(resolvedProfile, session.user.email, 'Signed In')
+          }
+        })
+      } else {
+        setProfile(null)
+        setLoading(false)
+      }
     })
+
+    return () => subscription.unsubscribe()
   }, [])
 
   async function fetchProfile(email) {
@@ -47,7 +76,7 @@ export default function App() {
     // same row instead of potentially disagreeing with each other.
     const { data: rows } = await supabase
       .from('staff')
-      .select('id, name, job_title, photo_url, must_reset_password, active')
+      .select('id, name, email, job_title, photo_url, must_reset_password, active')
       .eq('email', email)
       .order('id')
       .limit(2)
@@ -57,7 +86,7 @@ export default function App() {
     }
     const data = rows?.[0] ?? null
 
-    if (!data) { setProfile(data); setLoading(false); return }
+    if (!data) { setProfile(data); setLoading(false); return null }
 
     let role = roleFromJobTitle(data.job_title)
     let hideSettings = false
@@ -105,8 +134,10 @@ export default function App() {
     // no exception.
     if (data.active === false) role = null
 
-    setProfile({ ...data, role, hideSettings, division })
+    const resolvedProfile = { ...data, role, hideSettings, division }
+    setProfile(resolvedProfile)
     setLoading(false)
+    return resolvedProfile
   }
 
   function homeForRole() {

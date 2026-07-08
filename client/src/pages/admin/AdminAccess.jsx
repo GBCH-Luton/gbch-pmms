@@ -51,10 +51,12 @@ import { normalizeCustomRoles } from '../../lib/roles'
 import { fetchDivisions, saveDivisions, DEFAULT_DIVISIONS } from '../../lib/divisions'
 import { supabase } from '../../lib/supabase'
 import {
-  actionBtnStyle, Avatar,
+  actionBtnStyle, Avatar, thStyle, tdStyle, formatUKDateTime,
   modalOverlayStyle, modalCardStyle, modalTitleStyle, modalLabelStyle, modalErrorStyle,
   modalCancelBtnStyle, modalConfirmBtnStyle,
 } from './shared'
+
+const LOGIN_EVENTS_LIMIT = 50
 
 const BUILT_IN_ROLES = ['Admin', 'Builder', 'Cleaner', 'Support Worker']
 
@@ -674,9 +676,64 @@ function RolesPanel({ staffList, customRoles, customRolesError, onRolesChanged, 
   )
 }
 
+// Most recent sign-in/sign-out activity, newest first -- read-only, no
+// actions here. Device is shown as a short, human label rather than the
+// raw user_agent string (e.g. "Chrome on Windows"), parsed loosely since
+// this is for a quick glance, not a precise device fingerprint.
+function summarizeUserAgent(ua) {
+  if (!ua) return 'Unknown device'
+  const browser = ua.includes('Edg/') ? 'Edge' : ua.includes('Chrome/') ? 'Chrome' : ua.includes('Firefox/') ? 'Firefox' : ua.includes('Safari/') ? 'Safari' : 'Browser'
+  const os = ua.includes('Windows') ? 'Windows' : ua.includes('Mac OS') ? 'Mac' : ua.includes('Android') ? 'Android' : ua.includes('iPhone') || ua.includes('iPad') ? 'iOS' : 'Unknown OS'
+  return `${browser} on ${os}`
+}
+
+function LoginActivityPanel({ events }) {
+  return (
+    <div style={{ background: '#fff', borderRadius: '16px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', marginTop: '16px' }}>
+      <p style={{ margin: '0 0 4px 0', fontSize: '14px', fontWeight: 800, color: '#0f172a' }}>Recent Login Activity</p>
+      <p style={{ margin: '0 0 12px 0', fontSize: '12px', color: '#94a3b8' }}>Most recent {LOGIN_EVENTS_LIMIT} sign-ins/sign-outs, newest first.</p>
+      {events.length === 0 ? (
+        <p style={{ margin: 0, fontSize: '13px', color: '#94a3b8', fontStyle: 'italic' }}>No login activity recorded yet.</p>
+      ) : (
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+                <th style={thStyle}>Staff</th>
+                <th style={thStyle}>Event</th>
+                <th style={thStyle}>Time</th>
+                <th style={thStyle}>Device</th>
+              </tr>
+            </thead>
+            <tbody>
+              {events.map(e => (
+                <tr key={e.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                  <td style={tdStyle}>{e.staff_name || e.email}</td>
+                  <td style={tdStyle}>
+                    <span style={{
+                      fontSize: '11px', fontWeight: 700, padding: '3px 10px', borderRadius: '20px',
+                      color: e.event_type === 'Signed In' ? '#16a34a' : '#64748b',
+                      background: e.event_type === 'Signed In' ? '#dcfce7' : '#f1f5f9',
+                    }}>
+                      {e.event_type}
+                    </span>
+                  </td>
+                  <td style={tdStyle}>{formatUKDateTime(e.created_at)}</td>
+                  <td style={tdStyle}>{summarizeUserAgent(e.user_agent)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function AdminAccess({ profile }) {
   const [staffList, setStaffList] = useState([])
   const [tickets, setTickets] = useState([])
+  const [loginEvents, setLoginEvents] = useState([])
   const [loading, setLoading] = useState(true)
 
   const [customRoles, setCustomRoles] = useState([])
@@ -715,6 +772,15 @@ export default function AdminAccess({ profile }) {
       .select('setting_value')
       .eq('setting_key', 'custom_roles')
       .maybeSingle()
+
+    const { data: loginEventRows, error: loginEventsError } = await supabase
+      .schema('pmms')
+      .from('login_events')
+      .select('id, staff_name, email, event_type, user_agent, created_at')
+      .order('created_at', { ascending: false })
+      .limit(LOGIN_EVENTS_LIMIT)
+
+    if (!loginEventsError) setLoginEvents(loginEventRows || [])
 
     if (!staffError) {
       const roleByStaffId = {}
@@ -937,6 +1003,8 @@ export default function AdminAccess({ profile }) {
           />
         </div>
       </div>
+
+      <LoginActivityPanel events={loginEvents} />
 
       {modalStaff !== undefined && (
         <StaffFormModal

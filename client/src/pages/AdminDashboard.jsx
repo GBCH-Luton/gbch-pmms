@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
+import { logLoginEvent } from '../lib/loginEvents'
 import gbchLogo from '../assets/gbch-logo.svg'
 import AdminDashboardPage from './admin/AdminDashboard'
 import AdminPipeline from './admin/AdminPipeline'
@@ -79,6 +80,10 @@ export default function AdminDashboard({ profile }) {
   }, [refreshCounts])
 
   async function handleSignOut() {
+    // Logged here, before signOut() -- by the time the auth listener sees
+    // the session go away, the token's already cleared and an insert from
+    // there has no valid credentials (confirmed live: silent 401).
+    await logLoginEvent(profile, profile.email, 'Signed Out')
     await supabase.auth.signOut()
   }
 
