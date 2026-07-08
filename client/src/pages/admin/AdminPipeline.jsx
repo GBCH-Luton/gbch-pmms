@@ -41,6 +41,18 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
   const [reassignReason, setReassignReason] = useState('')
   const [reassignError, setReassignError] = useState('')
 
+  // Bulk reassign -- selection persists across filter/sort changes, same
+  // as ordinary multi-select table behaviour, so switching a filter never
+  // silently drops something the manager already picked.
+  const [selectedTicketIds, setSelectedTicketIds] = useState(() => new Set())
+  const [bulkReassignOpen, setBulkReassignOpen] = useState(false)
+  const [bulkReassignOptions, setBulkReassignOptions] = useState([])
+  const [bulkReassignBuilderId, setBulkReassignBuilderId] = useState('')
+  const [bulkReassignReason, setBulkReassignReason] = useState('')
+  const [bulkReassignError, setBulkReassignError] = useState('')
+  const [bulkReassignSubmitting, setBulkReassignSubmitting] = useState(false)
+  const [bulkReassignSummary, setBulkReassignSummary] = useState(null)
+
   const [cancelModalTicket, setCancelModalTicket] = useState(null)
   const [cancelType, setCancelType] = useState('Mistake / not a real fault')
   const [cancelReason, setCancelReason] = useState('')
@@ -81,6 +93,32 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
       fetchAssignableStaffForCategory(reassignModalTicket.category).then(setReassignOptions)
     }
   }, [reassignModalTicket])
+
+  // Eligible builders for a bulk reassign = the intersection across every
+  // distinct category among the selected tickets (a builder must be
+  // assignable for ALL of them, not just one) -- decided this way over
+  // restricting selection to one category at a time, since the real use
+  // case (clearing someone's whole workload before leave) often spans
+  // categories.
+  useEffect(() => {
+    if (bulkReassignOpen) {
+      setBulkReassignBuilderId('')
+      setBulkReassignReason('')
+      setBulkReassignError('')
+      setBulkReassignSummary(null)
+      setBulkReassignOptions([])
+
+      const selected = tickets.filter(t => selectedTicketIds.has(t.id))
+      const distinctCategories = [...new Set(selected.map(t => t.category))]
+
+      Promise.all(distinctCategories.map(cat => fetchAssignableStaffForCategory(cat))).then(lists => {
+        if (lists.length === 0) { setBulkReassignOptions([]); return }
+        const [first, ...rest] = lists
+        const intersected = first.filter(b => rest.every(list => list.some(x => x.id === b.id)))
+        setBulkReassignOptions(intersected)
+      })
+    }
+  }, [bulkReassignOpen])
 
   useEffect(() => {
     if (priorityModalTicket) {
@@ -168,6 +206,66 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
     await createNotification(reassignBuilderId, t.id, `You've been assigned Job #${t.ticket_number} at ${t.property?.address || 'a property'}.`)
     await fetchTickets()
     closeReassignModal()
+  }
+
+  function openBulkReassignModal() { setBulkReassignOpen(true) }
+  function closeBulkReassignModal() { setBulkReassignOpen(false) }
+
+  // Same four steps submitReassign does for one ticket, repeated per
+  // selected ticket. Sequential rather than Promise.all -- bulk batches
+  // are small (a handful to a dozen tickets) so there's no real
+  // performance need, and it keeps failure handling simple to reason
+  // about. Each ticket's update is independent (no shared transaction),
+  // so one failure doesn't abort the rest -- failures are collected and
+  // reported afterward instead of silently swallowed.
+  async function submitBulkReassign() {
+    if (!bulkReassignBuilderId) { setBulkReassignError('Please select a builder.'); return }
+    if (!bulkReassignReason.trim()) { setBulkReassignError('Please enter a reason.'); return }
+
+    setBulkReassignSubmitting(true)
+    setBulkReassignError('')
+
+    const targetTickets = tickets.filter(t => selectedTicketIds.has(t.id))
+    const toName = bulkReassignOptions.find(b => b.id === bulkReassignBuilderId)?.name || bulkReassignBuilderId
+    const reasonText = bulkReassignReason.trim()
+
+    const failures = []
+    let successCount = 0
+
+    for (const t of targetTickets) {
+      const promoteToAssigned = t.status === 'Pending'
+      const fromName = t.builderName || 'Unassigned'
+
+      const { error } = await supabase
+        .schema('pmms')
+        .from('tickets')
+        .update({
+          assigned_builder_id: bulkReassignBuilderId,
+          ...(promoteToAssigned ? { status: 'Assigned' } : {}),
+        })
+        .eq('id', t.id)
+
+      if (error) {
+        failures.push({ ticket: t, message: error.message })
+        continue
+      }
+
+      const statusNote = promoteToAssigned ? ` Status: ${t.status} → Assigned.` : ''
+      await postSystemComment(t.id, profile, `Reassigned from ${fromName} to ${toName}. Reason: ${reasonText}`)
+      await postAuditEvent(t.id, profile, 'Reassigned', `Reassigned from ${fromName} to ${toName}.${statusNote} Reason: ${reasonText}`)
+      await createNotification(bulkReassignBuilderId, t.id, `You've been assigned Job #${t.ticket_number} at ${t.property?.address || 'a property'}.`)
+      successCount += 1
+    }
+
+    setBulkReassignSubmitting(false)
+    await fetchTickets()
+
+    if (failures.length === 0) {
+      setSelectedTicketIds(new Set())
+      closeBulkReassignModal()
+    } else {
+      setBulkReassignSummary({ successCount, failures })
+    }
   }
 
   function openCancelModal(ticket) { setCancelModalTicket(ticket) }
@@ -389,12 +487,43 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
         </button>
       </div>
 
+      {selectedTicketIds.size > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '10px', padding: '10px 16px', marginBottom: '16px', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '13px', fontWeight: 700, color: '#1d4ed8' }}>{selectedTicketIds.size} ticket{selectedTicketIds.size === 1 ? '' : 's'} selected</span>
+          <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
+            <button onClick={openBulkReassignModal} style={{ padding: '8px 16px', background: '#1d4ed8', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
+              Bulk Reassign
+            </button>
+            <button
+              onClick={() => setSelectedTicketIds(new Set())}
+              style={{ background: 'none', border: 'none', color: '#1d4ed8', fontSize: '13px', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}
+            >
+              Clear selection
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Pipeline table */}
       <div style={{ background: '#fff', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', marginBottom: '20px' }}>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                <th style={{ ...thStyle, width: '32px' }}>
+                  <input
+                    type="checkbox"
+                    checked={sortedTickets.length > 0 && sortedTickets.every(t => selectedTicketIds.has(t.id))}
+                    onChange={(e) => {
+                      setSelectedTicketIds(prev => {
+                        const next = new Set(prev)
+                        if (e.target.checked) sortedTickets.forEach(t => next.add(t.id))
+                        else sortedTickets.forEach(t => next.delete(t.id))
+                        return next
+                      })
+                    }}
+                  />
+                </th>
                 <th style={{ ...thStyle, cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('property')}>Property{sortArrow('property')}</th>
                 <th style={{ ...thStyle, cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('room')}>Area{sortArrow('room')}</th>
                 <th style={{ ...thStyle, cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('priority')}>Priority{sortArrow('priority')}</th>
@@ -406,7 +535,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
             <tbody>
               {sortedTickets.length === 0 && (
                 <tr>
-                  <td colSpan={6} style={{ padding: '32px', textAlign: 'center', color: '#94a3b8', fontWeight: 600 }}>
+                  <td colSpan={7} style={{ padding: '32px', textAlign: 'center', color: '#94a3b8', fontWeight: 600 }}>
                     No tickets match these filters.
                   </td>
                 </tr>
@@ -416,16 +545,31 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
                 const tierStyle = priorityBadgeStyle(tier)
                 const isCompliance = (t.description || '').startsWith('[Compliance Failure:')
                 const isExpanded = expandedTicketId === t.id
+                const isSelected = selectedTicketIds.has(t.id)
                 return (
                   <Fragment key={t.id}>
                     <tr
                       onClick={() => setExpandedTicketId(isExpanded ? null : t.id)}
                       style={{
                         borderBottom: isExpanded ? 'none' : '1px solid #f1f5f9', cursor: 'pointer',
-                        background: isExpanded ? '#fef2f2' : undefined,
+                        background: isExpanded ? '#fef2f2' : isSelected ? '#eff6ff' : undefined,
                         boxShadow: isExpanded ? 'inset 4px 0 0 #dc2626' : undefined,
                       }}
                     >
+                      <td style={tdStyle} onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={(e) => {
+                            setSelectedTicketIds(prev => {
+                              const next = new Set(prev)
+                              if (e.target.checked) next.add(t.id)
+                              else next.delete(t.id)
+                              return next
+                            })
+                          }}
+                        />
+                      </td>
                       <td style={tdStyle}>
                         <span style={{ display: 'block', fontWeight: 700, color: '#0f172a' }}>
                           {t.property?.address}
@@ -462,7 +606,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
                     </tr>
                     {isExpanded && (
                       <tr style={{ borderBottom: '2px solid #dc2626' }}>
-                        <td colSpan={6} style={{ padding: 0, background: '#fef2f2', boxShadow: 'inset 4px 0 0 #dc2626' }}>
+                        <td colSpan={7} style={{ padding: 0, background: '#fef2f2', boxShadow: 'inset 4px 0 0 #dc2626' }}>
                           <div style={{ padding: '18px 20px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
 
                             <div style={expandSectionStyle}>
@@ -639,6 +783,103 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
           </div>
         </div>
       )}
+
+      {/* Bulk reassign modal */}
+      {bulkReassignOpen && (() => {
+        const targetTickets = tickets.filter(t => selectedTicketIds.has(t.id))
+        const distinctCategories = [...new Set(targetTickets.map(t => t.category))]
+        return (
+          <div style={modalOverlayStyle}>
+            <div style={modalCardStyle}>
+              <p style={modalTitleStyle}>Reassign {targetTickets.length} Ticket{targetTickets.length === 1 ? '' : 's'}</p>
+              <p style={modalSubtitleStyle}>{distinctCategories.join(', ')}</p>
+
+              {bulkReassignSummary ? (
+                <>
+                  <p style={{ margin: '14px 0 0 0', fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>
+                    Reassigned {bulkReassignSummary.successCount} of {targetTickets.length} ticket{targetTickets.length === 1 ? '' : 's'}.
+                  </p>
+                  <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    {bulkReassignSummary.failures.map(f => (
+                      <p key={f.ticket.id} style={{ margin: 0, fontSize: '12px', color: '#dc2626' }}>
+                        Job #{f.ticket.ticket_number} failed: {f.message}
+                      </p>
+                    ))}
+                  </div>
+                  <div style={{ marginTop: '16px' }}>
+                    <button
+                      onClick={() => {
+                        // Keep only the failures selected -- succeeded
+                        // tickets are done, and this leaves the failed
+                        // ones ready for an easy retry.
+                        setSelectedTicketIds(new Set(bulkReassignSummary.failures.map(f => f.ticket.id)))
+                        closeBulkReassignModal()
+                      }}
+                      style={{ ...modalConfirmBtnStyle, width: '100%' }}
+                    >
+                      Done
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <label style={modalLabelStyle}>Builder</label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {bulkReassignOptions.length === 0 && (
+                      <p style={{ margin: 0, fontSize: '13px', color: '#94a3b8', fontStyle: 'italic' }}>
+                        No one is assignable to every selected ticket's category — try narrowing your selection.
+                      </p>
+                    )}
+                    {bulkReassignOptions.map(b => {
+                      const isUnavailable = b.availability !== 'Available'
+                      return (
+                        <label key={b.id} style={{ ...radioRowStyle(bulkReassignBuilderId === b.id), opacity: isUnavailable ? 0.55 : 1 }}>
+                          <input
+                            type="radio"
+                            name="bulk-reassign-builder"
+                            checked={bulkReassignBuilderId === b.id}
+                            onChange={() => setBulkReassignBuilderId(b.id)}
+                          />
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: 600, color: isUnavailable ? '#64748b' : '#0f172a' }}>
+                            {b.name}
+                            {isUnavailable && (
+                              <span style={{ fontSize: '10px', fontWeight: 800, color: STAFF_AVAILABILITY_STYLES[b.availability]?.color, background: STAFF_AVAILABILITY_STYLES[b.availability]?.bg, padding: '2px 8px', borderRadius: '20px', whiteSpace: 'nowrap' }}>
+                                {b.availability}{b.availabilityNote ? ` — ${b.availabilityNote}` : ''}
+                              </span>
+                            )}
+                          </span>
+                        </label>
+                      )
+                    })}
+                  </div>
+
+                  <label style={modalLabelStyle}>Reason (required)</label>
+                  <textarea
+                    value={bulkReassignReason}
+                    onChange={(e) => setBulkReassignReason(e.target.value)}
+                    rows={2}
+                    placeholder="e.g. Closer to site, has the right skillset..."
+                    style={modalTextareaStyle}
+                  />
+
+                  {bulkReassignError && <p style={modalErrorStyle}>{bulkReassignError}</p>}
+
+                  <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
+                    <button onClick={closeBulkReassignModal} disabled={bulkReassignSubmitting} style={modalCancelBtnStyle}>Cancel</button>
+                    <button
+                      onClick={submitBulkReassign}
+                      disabled={bulkReassignSubmitting}
+                      style={{ ...modalConfirmBtnStyle, opacity: bulkReassignSubmitting ? 0.6 : 1, cursor: bulkReassignSubmitting ? 'not-allowed' : 'pointer' }}
+                    >
+                      {bulkReassignSubmitting ? 'Reassigning...' : `Reassign All ${targetTickets.length}`}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Cancel ticket modal */}
       {cancelModalTicket && (
