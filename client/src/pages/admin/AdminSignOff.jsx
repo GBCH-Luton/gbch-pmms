@@ -43,7 +43,7 @@ export default function AdminSignOff({ profile, onTicketsChanged }) {
       .schema('pmms')
       .from('tickets')
       .select(`
-        id, category, description, room, issue_tag, completion_note, completion_photo_url, photo_url, assigned_builder_id, property_id
+        id, ticket_number, category, description, room, issue_tag, completion_note, completion_photo_url, photo_url, assigned_builder_id, property_id
       `)
       .eq('status', 'Completed')
       .order('completed_at', { ascending: false })
@@ -203,7 +203,7 @@ export default function AdminSignOff({ profile, onTicketsChanged }) {
           {filteredTickets.map(t => (
             <div key={t.id} style={{ border: '1px solid #e9d5ff', background: '#faf5ff', borderRadius: '12px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
               <div style={{ marginBottom: '10px' }}>
-                <span style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#94a3b8' }}>#{t.id}</span>
+                <span style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#94a3b8' }}>#{t.ticket_number}</span>
                 <span style={{ display: 'block', fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>{t.property?.address}</span>
                 <span style={{ display: 'block', fontSize: '13px', color: '#475569' }}>{t.room ? `${t.room} — ` : ''}{t.issue_tag || t.category}</span>
                 <span style={{ display: 'block', fontSize: '13px', color: '#7e22ce', fontWeight: 600, marginTop: '2px' }}>Completed by {t.builderName || 'Unknown'}</span>
@@ -271,7 +271,7 @@ export default function AdminSignOff({ profile, onTicketsChanged }) {
       {reopenModalTicket && (
         <div style={modalOverlayStyle} onClick={closeReopenModal}>
           <div style={modalCardStyle} onClick={(e) => e.stopPropagation()}>
-            <p style={modalTitleStyle}>Reopen Ticket #{reopenModalTicket.id}</p>
+            <p style={modalTitleStyle}>Reopen Ticket #{reopenModalTicket.ticket_number}</p>
             <p style={modalSubtitleStyle}>{reopenModalTicket.property?.address}</p>
 
             <label style={modalLabelStyle}>Reason (required)</label>
@@ -297,7 +297,7 @@ export default function AdminSignOff({ profile, onTicketsChanged }) {
       {archiveConfirmTicket && (
         <div style={modalOverlayStyle} onClick={closeArchiveConfirm}>
           <div style={modalCardStyle} onClick={(e) => e.stopPropagation()}>
-            <p style={modalTitleStyle}>Verify &amp; Archive Ticket #{archiveConfirmTicket.id}?</p>
+            <p style={modalTitleStyle}>Verify &amp; Archive Ticket #{archiveConfirmTicket.ticket_number}?</p>
             <p style={modalSubtitleStyle}>{archiveConfirmTicket.property?.address}</p>
             <p style={{ margin: '10px 0 0 0', fontSize: '13px', color: '#64748b' }}>
               This confirms the work is verified and closes the ticket for good. This can't be undone from here — a closed ticket can only be reopened separately.

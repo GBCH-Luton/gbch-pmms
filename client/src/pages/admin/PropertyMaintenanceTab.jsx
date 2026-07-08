@@ -48,7 +48,7 @@ export default function PropertyMaintenanceTab({ property }) {
     const { data, error } = await supabase
       .schema('pmms')
       .from('tickets')
-      .select('id, status, category, issue_tag, description, priority_score, created_at, completed_at')
+      .select('id, ticket_number, status, category, issue_tag, description, priority_score, created_at, completed_at')
       .eq('property_id', property.id)
       .order('created_at', { ascending: false })
 
@@ -222,7 +222,7 @@ export default function PropertyMaintenanceTab({ property }) {
                   const tierStyle = priorityBadgeStyle(tier)
                   return (
                     <tr key={t.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                      <td style={tdStyle}>#{t.id}</td>
+                      <td style={tdStyle}>#{t.ticket_number}</td>
                       <td style={tdStyle}>{t.issue_tag || t.description || '—'}</td>
                       <td style={tdStyle}>{t.category || '—'}</td>
                       <td style={tdStyle}>

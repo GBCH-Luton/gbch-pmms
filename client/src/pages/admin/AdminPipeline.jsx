@@ -104,7 +104,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
       .schema('pmms')
       .from('tickets')
       .select(`
-        id, status, category, description, room, priority_score, priority_override, mileage_logged,
+        id, ticket_number, status, category, description, room, priority_score, priority_override, mileage_logged,
         no_access_flag, no_access_note, hold_reason, hold_note, completion_note, photo_url, completion_photo_url,
         completed_at, created_at, assigned_builder_id, property_id
       `)
@@ -165,7 +165,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
     const statusNote = promoteToAssigned ? ` Status: ${t.status} → Assigned.` : ''
     await postSystemComment(t.id, profile, `Reassigned from ${fromName} to ${toName}. Reason: ${reassignReason.trim()}`)
     await postAuditEvent(t.id, profile, 'Reassigned', `Reassigned from ${fromName} to ${toName}.${statusNote} Reason: ${reassignReason.trim()}`)
-    await createNotification(reassignBuilderId, t.id, `You've been assigned Job #${t.id} at ${t.property?.address || 'a property'}.`)
+    await createNotification(reassignBuilderId, t.id, `You've been assigned Job #${t.ticket_number} at ${t.property?.address || 'a property'}.`)
     await fetchTickets()
     closeReassignModal()
   }
@@ -468,7 +468,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
                             <div style={expandSectionStyle}>
                               <p style={expandSectionTitleStyle}>Ticket Details</p>
                               <p style={expandLabelStyle}>Ticket</p>
-                              <p style={expandValueStyle}>#{t.id} — {t.category}</p>
+                              <p style={expandValueStyle}>#{t.ticket_number} — {t.category}</p>
 
                               {isCompliance && (
                                 <span style={{ display: 'inline-block', fontSize: '9px', fontWeight: 800, color: '#c2410c', background: '#fff7ed', border: '1px solid #fed7aa', padding: '2px 6px', borderRadius: '20px', marginBottom: '8px' }}>
@@ -590,7 +590,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
       {reassignModalTicket && (
         <div style={modalOverlayStyle}>
           <div style={modalCardStyle}>
-            <p style={modalTitleStyle}>Reassign Ticket #{reassignModalTicket.id}</p>
+            <p style={modalTitleStyle}>Reassign Ticket #{reassignModalTicket.ticket_number}</p>
             <p style={modalSubtitleStyle}>{reassignModalTicket.property?.address}</p>
 
             <label style={modalLabelStyle}>Builder</label>
@@ -644,7 +644,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
       {cancelModalTicket && (
         <div style={modalOverlayStyle}>
           <div style={modalCardStyle}>
-            <p style={modalTitleStyle}>Cancel Ticket #{cancelModalTicket.id}</p>
+            <p style={modalTitleStyle}>Cancel Ticket #{cancelModalTicket.ticket_number}</p>
             <p style={modalSubtitleStyle}>{cancelModalTicket.property?.address}</p>
 
             <label style={modalLabelStyle}>Cancellation Type</label>
@@ -705,7 +705,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
       {priorityModalTicket && (
         <div style={modalOverlayStyle}>
           <div style={modalCardStyle}>
-            <p style={modalTitleStyle}>Set Priority — Ticket #{priorityModalTicket.id}</p>
+            <p style={modalTitleStyle}>Set Priority — Ticket #{priorityModalTicket.ticket_number}</p>
             <p style={modalSubtitleStyle}>{priorityModalTicket.property?.address}</p>
 
             <label style={modalLabelStyle}>Priority Tier</label>
@@ -748,7 +748,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
           <div style={modalCardStyle} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
-                <p style={modalTitleStyle}>History — Ticket #{historyModalTicket.id}</p>
+                <p style={modalTitleStyle}>History — Ticket #{historyModalTicket.ticket_number}</p>
                 <p style={modalSubtitleStyle}>{historyModalTicket.property?.address}</p>
               </div>
               <button onClick={closeHistoryModal} style={{ background: 'none', border: 'none', fontSize: '20px', color: '#94a3b8', cursor: 'pointer', lineHeight: 1 }}>×</button>
@@ -783,7 +783,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
           <div style={modalCardStyle} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
-                <p style={modalTitleStyle}>Comments — Ticket #{commentsModalTicket.id}</p>
+                <p style={modalTitleStyle}>Comments — Ticket #{commentsModalTicket.ticket_number}</p>
                 <p style={modalSubtitleStyle}>{commentsModalTicket.property?.address}</p>
               </div>
               <button onClick={closeCommentsModal} style={{ background: 'none', border: 'none', fontSize: '20px', color: '#94a3b8', cursor: 'pointer', lineHeight: 1 }}>×</button>

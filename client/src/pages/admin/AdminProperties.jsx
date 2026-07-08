@@ -47,7 +47,7 @@ function TicketDetailModal({ ticket, onClose }) {
     <div style={modalOverlayStyle}>
       <div style={{ ...modalCardStyle, maxWidth: '520px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px', marginBottom: '4px' }}>
-          <p style={modalTitleStyle}>Job #{ticket.id}</p>
+          <p style={modalTitleStyle}>Job #{ticket.ticket_number}</p>
           <div style={{ display: 'flex', gap: '8px' }}>
             <span style={{ fontSize: '11px', fontWeight: 700, color: tierStyle.color, background: tierStyle.bg, padding: '3px 10px', borderRadius: '20px' }}>{tier}</span>
             <span style={{ fontSize: '11px', fontWeight: 700, color: statusColour(ticket.status), background: statusColour(ticket.status) + '18', padding: '3px 10px', borderRadius: '20px' }}>{ticket.status}</span>
@@ -255,7 +255,7 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
       .schema('pmms')
       .from('tickets')
       .select(`
-        id, status, category, description, issue_tag, room, priority_score, mileage_logged,
+        id, ticket_number, status, category, description, issue_tag, room, priority_score, mileage_logged,
         no_access_flag, hold_reason, hold_note, completion_note, photo_url, completion_photo_url,
         created_at, completed_at, assigned_builder_id
       `)
@@ -488,7 +488,7 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
                         }}
                       >
                         <div style={{ minWidth: '200px' }}>
-                          <span style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8' }}>#{t.id}</span>{' '}
+                          <span style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8' }}>#{t.ticket_number}</span>{' '}
                           <span style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>{t.issue_tag || t.description || t.category}</span>
                         </div>
                         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>

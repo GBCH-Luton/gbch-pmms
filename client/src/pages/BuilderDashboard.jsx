@@ -191,7 +191,7 @@ export default function BuilderDashboard({ profile }) {
       .schema('pmms')
       .from('tickets')
       .select(`
-        id, status, category, description, room, priority_score, mileage_logged, transit_start, created_at, completed_at, hold_reason, hold_note, photo_url, property_id
+        id, ticket_number, status, category, description, room, priority_score, mileage_logged, transit_start, created_at, completed_at, hold_reason, hold_note, photo_url, property_id
       `)
       .eq('assigned_builder_id', profile.id)
       .not('status', 'in', '("Archived","Cancelled")')
@@ -536,7 +536,7 @@ export default function BuilderDashboard({ profile }) {
       .schema('pmms')
       .from('tickets')
       .select(`
-        id, status, category, description, room, photo_url, created_at, property_id
+        id, ticket_number, status, category, description, room, photo_url, created_at, property_id
       `)
       .eq('raised_by', profile.id)
       .order('created_at', { ascending: false })
@@ -591,7 +591,7 @@ export default function BuilderDashboard({ profile }) {
       const { data: openTickets } = await supabase
         .schema('pmms')
         .from('tickets')
-        .select('id, category, issue_tag, room, status')
+        .select('id, ticket_number, category, issue_tag, room, status')
         .eq('property_id', ticketPropertyId)
         .not('status', 'in', '("Completed","Cancelled")')
 
@@ -1027,7 +1027,7 @@ export default function BuilderDashboard({ profile }) {
             <div style={{ height: '4px', background: statusColour(t.status) }} />
             <div style={{ padding: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <span style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Job #{t.id} · {t.category}</span>
+                <span style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Job #{t.ticket_number} · {t.category}</span>
                 <span style={{ fontSize: '11px', fontWeight: 700, color: statusColour(t.status), background: statusColour(t.status) + '18', padding: '3px 10px', borderRadius: '20px' }}>{t.status}</span>
               </div>
               <p style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: 700, color: '#0f172a' }}>{t.property?.address}</p>
@@ -1576,7 +1576,7 @@ export default function BuilderDashboard({ profile }) {
                   <div>
                     <p style={{ margin: '0 0 4px 0', fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>{t.property?.address}</p>
                     <p style={{ margin: '0 0 2px 0', fontSize: '13px', color: '#64748b' }}>{t.transit_start}</p>
-                    <p style={{ margin: 0, fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Job #{t.id}</p>
+                    <p style={{ margin: 0, fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Job #{t.ticket_number}</p>
                   </div>
                   <p style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: '#3b82f6', flexShrink: 0 }}>{t.mileage_logged}</p>
                 </div>
@@ -2067,7 +2067,7 @@ export default function BuilderDashboard({ profile }) {
                       <div style={{ marginTop: '16px', padding: '16px', borderRadius: '10px', background: '#fffbeb', border: '1px solid #fcd34d' }}>
                         <p style={{ margin: '0 0 8px 0', fontSize: '13px', fontWeight: 700, color: '#92400e' }}>⚠ Possible duplicate</p>
                         <p style={{ margin: '0 0 12px 0', fontSize: '13px', fontWeight: 400, color: '#78350f' }}>
-                          There's already an open ticket at this property for {ticketDuplicateWarning.matchKind}: Job #{ticketDuplicateWarning.ticket.id} — {ticketDuplicateWarning.ticket.issue_tag} ({ticketDuplicateWarning.ticket.status}). Is this a duplicate, or a genuinely separate fault?
+                          There's already an open ticket at this property for {ticketDuplicateWarning.matchKind}: Job #{ticketDuplicateWarning.ticket.ticket_number} — {ticketDuplicateWarning.ticket.issue_tag} ({ticketDuplicateWarning.ticket.status}). Is this a duplicate, or a genuinely separate fault?
                         </p>
                         <button
                           onClick={() => setTicketDuplicateWarning(null)}
@@ -2382,7 +2382,7 @@ export default function BuilderDashboard({ profile }) {
                 <div style={{ height: '4px', background: statusColour(t.status) }} />
                 <div style={{ padding: '16px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                    <span style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Job #{t.id} · {t.category}</span>
+                    <span style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Job #{t.ticket_number} · {t.category}</span>
                     <span style={{ fontSize: '11px', fontWeight: 700, color: statusColour(t.status), background: statusColour(t.status) + '18', padding: '3px 10px', borderRadius: '20px' }}>{t.status}</span>
                   </div>
                   <p style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: 700, color: '#0f172a' }}>{t.property?.address}</p>

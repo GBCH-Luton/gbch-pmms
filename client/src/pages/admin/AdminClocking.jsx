@@ -111,7 +111,7 @@ export default function AdminClocking({ profile }) {
       const { data } = await supabase
         .schema('pmms')
         .from('tickets')
-        .select('id, category, description, room, property_id')
+        .select('id, ticket_number, category, description, room, property_id')
         .in('id', ticketIds)
       liveTicketData = await attachProperties(data || [], 'address, postcode, latitude, longitude')
     }
@@ -120,7 +120,7 @@ export default function AdminClocking({ profile }) {
     const { data: completedTicketsRaw } = await supabase
       .schema('pmms')
       .from('tickets')
-      .select('id, category, description, room, mileage_logged, assigned_builder_id, property_id')
+      .select('id, ticket_number, category, description, room, mileage_logged, assigned_builder_id, property_id')
       .in('status', ['Completed', 'Archived'])
     const completedTickets = await attachProperties(completedTicketsRaw || [], 'address, postcode, latitude, longitude')
 
@@ -307,7 +307,7 @@ export default function AdminClocking({ profile }) {
                 <div>
                   <strong style={{ display: 'block', fontSize: '13px', color: '#0f172a' }}>{row.builderName}</strong>
                   <span style={{ fontSize: '12px', color: '#64748b' }}>
-                    #{row.ticket.id} · {row.ticket.property?.address} — {row.ticket.room || '—'} → {row.ticket.description}
+                    #{row.ticket.ticket_number} · {row.ticket.property?.address} — {row.ticket.room || '—'} → {row.ticket.description}
                   </span>
                   {overrun && (
                     <span style={{ display: 'block', marginTop: '4px', fontSize: '11px', fontWeight: 800, color: '#dc2626' }}>
@@ -393,7 +393,7 @@ export default function AdminClocking({ profile }) {
               {filteredCompletedRows.map(row => (
                 <tr key={row.ticket.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                   <td style={tdStyle}>
-                    <span style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#94a3b8' }}>#{row.ticket.id}</span>
+                    <span style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#94a3b8' }}>#{row.ticket.ticket_number}</span>
                     <span style={{ display: 'block', fontWeight: 700, color: '#0f172a' }}>{row.ticket.property?.address}</span>
                     <span style={{ display: 'block', fontSize: '12px', color: '#64748b' }}>{row.ticket.room || '—'} → {row.ticket.description}</span>
                   </td>
@@ -427,7 +427,7 @@ export default function AdminClocking({ profile }) {
       {editRow && (
         <div style={modalOverlayStyle}>
           <div style={modalCardStyle}>
-            <p style={modalTitleStyle}>Correct Clock Times — Job #{editRow.ticket.id}</p>
+            <p style={modalTitleStyle}>Correct Clock Times — Job #{editRow.ticket.ticket_number}</p>
             <p style={{ margin: '2px 0 0 0', fontSize: '13px', color: '#64748b' }}>{editRow.ticket.property?.address}</p>
 
             <label style={modalLabelStyle}>Clock-In</label>

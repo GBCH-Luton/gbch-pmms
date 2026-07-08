@@ -29,7 +29,7 @@ export default function BuilderProfileModal({ builderId, onClose }) {
         .schema('pmms')
         .from('tickets')
         .select(`
-          id, status, description, room, mileage_logged, property_id
+          id, ticket_number, status, description, room, mileage_logged, property_id
         `)
         .eq('assigned_builder_id', builderId)
 
@@ -139,7 +139,7 @@ export default function BuilderProfileModal({ builderId, onClose }) {
         <p style={modalLabelStyle}>Current Assignment</p>
         {inProgressJob ? (
           <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', padding: '12px' }}>
-            <span style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#16a34a' }}>#{inProgressJob.id}</span>
+            <span style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#16a34a' }}>#{inProgressJob.ticket_number}</span>
             <span style={{ display: 'block', fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>{inProgressJob.property?.address}</span>
             <span style={{ display: 'block', fontSize: '13px', color: '#475569' }}>{inProgressJob.room || '—'} → {inProgressJob.description}</span>
           </div>
@@ -147,7 +147,7 @@ export default function BuilderProfileModal({ builderId, onClose }) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
             {activeJobs.map(j => (
               <div key={j.id} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '10px 12px' }}>
-                <span style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8' }}>#{j.id}</span>{' '}
+                <span style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8' }}>#{j.ticket_number}</span>{' '}
                 <span style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>{j.property?.address}</span>{' '}
                 <span style={{ fontSize: '12px', color: '#64748b' }}>— {j.status}</span>
               </div>
@@ -162,15 +162,18 @@ export default function BuilderProfileModal({ builderId, onClose }) {
           {comments.length === 0 && (
             <p style={{ margin: 0, fontSize: '13px', color: '#94a3b8' }}>No recorded history for this builder yet.</p>
           )}
-          {comments.slice(0, 10).map(c => (
+          {comments.slice(0, 10).map(c => {
+            const commentTicket = tickets.find(t => t.id === c.ticket_id)
+            return (
             <div key={c.id} style={{ padding: '8px 0', borderBottom: '1px solid #f1f5f9' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
-                <span style={{ fontSize: '12px', fontWeight: 700, color: '#0f172a' }}>Job #{c.ticket_id} · {c.author_name}</span>
+                <span style={{ fontSize: '12px', fontWeight: 700, color: '#0f172a' }}>Job #{commentTicket?.ticket_number} · {c.author_name}</span>
                 <span style={{ fontSize: '11px', color: '#94a3b8', whiteSpace: 'nowrap' }}>{formatUKDateTime(c.created_at)}</span>
               </div>
               <p style={{ margin: '2px 0 0 0', fontSize: '13px', color: '#475569' }}>{c.body}</p>
             </div>
-          ))}
+            )
+          })}
         </div>
 
         <div style={{ marginTop: '16px' }}>

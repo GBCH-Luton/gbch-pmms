@@ -204,7 +204,7 @@ export default function AdminRaiseTicket({ profile }) {
       const { data: openTickets } = await supabase
         .schema('pmms')
         .from('tickets')
-        .select('id, category, issue_tag, room, status')
+        .select('id, ticket_number, category, issue_tag, room, status')
         .eq('property_id', ticketPropertyId)
         .not('status', 'in', '("Completed","Cancelled")')
 
@@ -256,7 +256,7 @@ export default function AdminRaiseTicket({ profile }) {
         photo_url: photoUrl,
         created_at: new Date().toISOString(),
       })
-      .select('id')
+      .select('id, ticket_number')
 
     setTicketSubmitting(false)
 
@@ -266,10 +266,10 @@ export default function AdminRaiseTicket({ profile }) {
     }
 
     if (assignedBuilderId) {
-      await createNotification(assignedBuilderId, data[0].id, `You've been assigned Job #${data[0].id} at ${selectedTicketProperty?.address || 'a property'}.`)
+      await createNotification(assignedBuilderId, data[0].id, `You've been assigned Job #${data[0].ticket_number} at ${selectedTicketProperty?.address || 'a property'}.`)
     }
 
-    setTicketSuccess(`✓ Ticket #${data[0].id} created successfully.`)
+    setTicketSuccess(`✓ Ticket #${data[0].ticket_number} created successfully.`)
     setTimeout(() => {
       resetTicketForm()
     }, 2500)
@@ -351,7 +351,7 @@ export default function AdminRaiseTicket({ profile }) {
           raised_by_name: profile.name,
           created_at: new Date().toISOString(),
         })
-        .select('id')
+        .select('id, ticket_number')
 
       if (error) {
         setComplianceSubmitting(false)
@@ -360,7 +360,7 @@ export default function AdminRaiseTicket({ profile }) {
       }
 
       if (assignedBuilderId) {
-        await createNotification(assignedBuilderId, data[0].id, `You've been assigned Job #${data[0].id} at ${selectedTicketProperty?.address || 'a property'}.`)
+        await createNotification(assignedBuilderId, data[0].id, `You've been assigned Job #${data[0].ticket_number} at ${selectedTicketProperty?.address || 'a property'}.`)
       }
 
       createdIds.push(data[0].id)
@@ -682,7 +682,7 @@ export default function AdminRaiseTicket({ profile }) {
                 <div style={{ marginTop: '16px', padding: '16px', borderRadius: '10px', background: '#fffbeb', border: '1px solid #fcd34d' }}>
                   <p style={{ margin: '0 0 8px 0', fontSize: '13px', fontWeight: 700, color: '#92400e' }}>⚠ Possible duplicate</p>
                   <p style={{ margin: '0 0 12px 0', fontSize: '13px', fontWeight: 400, color: '#78350f' }}>
-                    There's already an open ticket at this property for {ticketDuplicateWarning.matchKind}: Job #{ticketDuplicateWarning.ticket.id} — {ticketDuplicateWarning.ticket.issue_tag} ({ticketDuplicateWarning.ticket.status}). Is this a duplicate, or a genuinely separate fault?
+                    There's already an open ticket at this property for {ticketDuplicateWarning.matchKind}: Job #{ticketDuplicateWarning.ticket.ticket_number} — {ticketDuplicateWarning.ticket.issue_tag} ({ticketDuplicateWarning.ticket.status}). Is this a duplicate, or a genuinely separate fault?
                   </p>
                   <button
                     onClick={() => setTicketDuplicateWarning(null)}
