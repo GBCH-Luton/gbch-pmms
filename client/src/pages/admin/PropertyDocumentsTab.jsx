@@ -11,7 +11,7 @@
 //   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
 //   property_id uuid REFERENCES public.properties(id) ON DELETE CASCADE,
 //   document_name text NOT NULL,
-//   category text,
+//   document_category text,
 //   document_date date,
 //   expiry_date date,
 //   notes text,
@@ -57,7 +57,7 @@ function expiryRag(expiryDate) {
   return { tier: 'green', label: 'Valid' }
 }
 
-const emptyForm = { document_name: '', category: '', document_date: '', expiry_date: '', notes: '', file_url: '' }
+const emptyForm = { document_name: '', document_category: '', document_date: '', expiry_date: '', notes: '', file_url: '' }
 
 function DocumentFormModal({ property, profile, doc, onClose, onSaved }) {
   const [form, setForm] = useState(emptyForm)
@@ -69,7 +69,7 @@ function DocumentFormModal({ property, profile, doc, onClose, onSaved }) {
     if (doc) {
       setForm({
         document_name: doc.document_name || '',
-        category: doc.category || '',
+        document_category: doc.document_category || '',
         document_date: doc.document_date || '',
         expiry_date: doc.expiry_date || '',
         notes: doc.notes || '',
@@ -110,7 +110,7 @@ function DocumentFormModal({ property, profile, doc, onClose, onSaved }) {
     const payload = {
       property_id: property.id,
       document_name: form.document_name.trim(),
-      category: form.category || null,
+      document_category: form.document_category || null,
       document_date: form.document_date || null,
       expiry_date: form.expiry_date || null,
       notes: form.notes.trim() || null,
@@ -141,7 +141,7 @@ function DocumentFormModal({ property, profile, doc, onClose, onSaved }) {
         <input type="text" value={form.document_name} onChange={(e) => set('document_name', e.target.value)} style={inputStyle} />
 
         <p style={modalLabelStyle}>Category</p>
-        <select value={form.category} onChange={(e) => set('category', e.target.value)} style={inputStyle}>
+        <select value={form.document_category} onChange={(e) => set('document_category', e.target.value)} style={inputStyle}>
           <option value="">Select...</option>
           {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
@@ -266,7 +266,7 @@ export default function PropertyDocumentsTab({ property, profile }) {
   }
 
   const filteredDocs = documents.filter(d => {
-    if (categoryFilter !== 'All' && d.category !== categoryFilter) return false
+    if (categoryFilter !== 'All' && d.document_category !== categoryFilter) return false
     if (search.trim()) {
       const q = search.trim().toLowerCase()
       const matches = (d.document_name || '').toLowerCase().includes(q) || (d.notes || '').toLowerCase().includes(q)
@@ -328,7 +328,7 @@ export default function PropertyDocumentsTab({ property, profile }) {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {filteredDocs.map(doc => {
-            const catStyle = CATEGORY_STYLES[doc.category] || CATEGORY_STYLES.Other
+            const catStyle = CATEGORY_STYLES[doc.document_category] || CATEGORY_STYLES.Other
             const rag = expiryRag(doc.expiry_date)
             const ragStyle = RAG_STYLES[rag.tier]
             return (
@@ -340,8 +340,8 @@ export default function PropertyDocumentsTab({ property, profile }) {
                     ) : (
                       <span style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>{doc.document_name}</span>
                     )}
-                    {doc.category && (
-                      <span style={{ fontSize: '10px', fontWeight: 700, color: catStyle.color, background: catStyle.bg, padding: '2px 8px', borderRadius: '20px' }}>{doc.category}</span>
+                    {doc.document_category && (
+                      <span style={{ fontSize: '10px', fontWeight: 700, color: catStyle.color, background: catStyle.bg, padding: '2px 8px', borderRadius: '20px' }}>{doc.document_category}</span>
                     )}
                   </div>
                   {doc.notes && (
