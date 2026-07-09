@@ -401,6 +401,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
 
   function sortValue(t, column) {
     switch (column) {
+      case 'ticketNumber': return t.ticket_number || 0
       case 'property': return (t.property?.address || '').toLowerCase()
       case 'room': return (t.room || '').toLowerCase()
       case 'priority': return t.priority_score || 0
@@ -533,6 +534,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
                     }}
                   />
                 </th>
+                <th style={{ ...thStyle, cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('ticketNumber')}>Ticket #{sortArrow('ticketNumber')}</th>
                 <th style={{ ...thStyle, cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('property')}>Property{sortArrow('property')}</th>
                 <th style={{ ...thStyle, cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('room')}>Area{sortArrow('room')}</th>
                 <th style={{ ...thStyle, cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('priority')}>Priority{sortArrow('priority')}</th>
@@ -544,7 +546,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
             <tbody>
               {sortedTickets.length === 0 && (
                 <tr>
-                  <td colSpan={7} style={{ padding: '32px', textAlign: 'center', color: '#94a3b8', fontWeight: 600 }}>
+                  <td colSpan={8} style={{ padding: '32px', textAlign: 'center', color: '#94a3b8', fontWeight: 600 }}>
                     No tickets match these filters.
                   </td>
                 </tr>
@@ -580,9 +582,9 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
                         />
                       </td>
                       <td style={tdStyle}>
-                        <span style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#94a3b8' }}>
-                          #{t.ticket_number}
-                        </span>
+                        <span style={{ color: '#475569', fontWeight: 600 }}>{t.ticket_number}</span>
+                      </td>
+                      <td style={tdStyle}>
                         <span style={{ display: 'block', fontWeight: 700, color: '#0f172a' }}>
                           {t.property?.address}
                         </span>
@@ -618,7 +620,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
                     </tr>
                     {isExpanded && (
                       <tr style={{ borderBottom: '2px solid #dc2626' }}>
-                        <td colSpan={7} style={{ padding: 0, background: '#fef2f2', boxShadow: 'inset 4px 0 0 #dc2626' }}>
+                        <td colSpan={8} style={{ padding: 0, background: '#fef2f2', boxShadow: 'inset 4px 0 0 #dc2626' }}>
                           <div style={{ padding: '18px 20px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
 
                             <div style={expandSectionStyle}>
