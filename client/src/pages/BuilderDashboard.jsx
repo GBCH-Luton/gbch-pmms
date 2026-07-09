@@ -5,6 +5,8 @@ import { fetchComplianceCheckTypes } from '../lib/compliance'
 import { fetchMaintenanceCategories, sortedCategoryEntries } from '../lib/maintenanceCategories'
 import { attachProperties } from '../lib/properties'
 import { logLoginEvent } from '../lib/loginEvents'
+import { pushNotificationsSupported, hasActivePushSubscription, enablePushNotifications } from '../lib/pushNotifications'
+import { pushEmergencyAlert } from './admin/shared'
 import PropertySearchSelect from '../components/PropertySearchSelect'
 import gbchLogo from '../assets/gbch-logo.svg'
 
@@ -68,11 +70,24 @@ export default function BuilderDashboard({ profile }) {
   const [availableJobs, setAvailableJobs] = useState([])
   const [claimError, setClaimError] = useState('')
   const [claimingId, setClaimingId] = useState(null)
+  const [pushEnabled, setPushEnabled] = useState(false)
+  const [pushError, setPushError] = useState('')
+
+  async function handleEnableNotifications() {
+    setPushError('')
+    const result = await enablePushNotifications(profile.id)
+    if (!result.success) { setPushError(result.message); return }
+    setPushEnabled(true)
+  }
 
   useEffect(() => {
     fetchTickets()
     fetchNotifications()
     fetchAvailableJobs()
+    // Permission alone doesn't mean a subscription actually exists (a
+    // browser can report "granted" with nothing ever subscribed) -- this
+    // is the real check for whether the button should offer to enable.
+    hasActivePushSubscription().then(setPushEnabled)
     // Polled rather than pushed -- notifications are created by an admin
     // action elsewhere, so this is the only way this session finds out
     // about a new one without the builder manually refreshing. Available
@@ -696,7 +711,7 @@ export default function BuilderDashboard({ profile }) {
       photoUrl = supabase.storage.from('ticket-photos').getPublicUrl(path).data.publicUrl
     }
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .schema('pmms')
       .from('tickets')
       .insert({
@@ -712,12 +727,21 @@ export default function BuilderDashboard({ profile }) {
         photo_url: photoUrl,
         created_at: new Date().toISOString(),
       })
+      .select('id, ticket_number')
 
     setTicketSubmitting(false)
 
     if (error) {
       setTicketError(error.message)
       return
+    }
+
+    if (priorityTierLabel(priorityScore) === 'P1 Critical') {
+      const division = maintenanceCategories[ticketCategory]?.division || 'Maintenance'
+      await pushEmergencyAlert(
+        { ticket_number: data[0].ticket_number, category: ticketCategory, property: selectedTicketProperty },
+        division
+      )
     }
 
     setTicketSuccess(true)
@@ -782,7 +806,7 @@ export default function BuilderDashboard({ profile }) {
         photoUrl = supabase.storage.from('ticket-photos').getPublicUrl(path).data.publicUrl
       }
 
-      const { error } = await supabase
+      const { data, error } = await supabase
         .schema('pmms')
         .from('tickets')
         .insert({
@@ -798,11 +822,20 @@ export default function BuilderDashboard({ profile }) {
           raised_by_name: profile.name,
           created_at: new Date().toISOString(),
         })
+        .select('id, ticket_number')
 
       if (error) {
         setComplianceSubmitting(false)
         setTicketError(error.message)
         return
+      }
+
+      if (priorityTierLabel(score) === 'P1 Critical') {
+        const division = maintenanceCategories[category]?.division || 'Maintenance'
+        await pushEmergencyAlert(
+          { ticket_number: data[0].ticket_number, category, property: selectedTicketProperty },
+          division
+        )
       }
     }
 
@@ -1038,6 +1071,15 @@ export default function BuilderDashboard({ profile }) {
               >
                 📊 My Metrics
               </button>
+              {pushNotificationsSupported() && (
+                <button
+                  onClick={handleEnableNotifications}
+                  disabled={pushEnabled}
+                  style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: pushEnabled ? 'rgba(255,255,255,0.6)' : '#ffffff', cursor: pushEnabled ? 'default' : 'pointer', textAlign: 'left' }}
+                >
+                  🔔 {pushEnabled ? 'Notifications: On' : 'Enable Notifications'}
+                </button>
+              )}
               <button
                 onClick={handleSignOut}
                 style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
@@ -1045,6 +1087,7 @@ export default function BuilderDashboard({ profile }) {
                 🚪 Sign out
               </button>
             </div>
+            {pushError && <p style={{ margin: '8px 4px 0 4px', fontSize: '12px', color: '#fca5a5' }}>{pushError}</p>}
           </div>
         )}
       </div>

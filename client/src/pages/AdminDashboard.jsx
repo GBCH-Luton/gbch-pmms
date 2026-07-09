@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { logLoginEvent } from '../lib/loginEvents'
+import { pushNotificationsSupported, hasActivePushSubscription, enablePushNotifications } from '../lib/pushNotifications'
 import gbchLogo from '../assets/gbch-logo.svg'
 import AdminDashboardPage from './admin/AdminDashboard'
 import AdminPipeline from './admin/AdminPipeline'
@@ -49,6 +50,22 @@ export default function AdminDashboard({ profile }) {
   const [pipelineInitialFilter, setPipelineInitialFilter] = useState(null)
   const [pipelineInitialPriorityFilter, setPipelineInitialPriorityFilter] = useState(null)
   const [propertiesInitialFilter, setPropertiesInitialFilter] = useState(null)
+  const [pushEnabled, setPushEnabled] = useState(false)
+  const [pushError, setPushError] = useState('')
+
+  useEffect(() => {
+    // Permission alone doesn't mean a subscription actually exists (a
+    // browser can report "granted" with nothing ever subscribed) -- this
+    // is the real check for whether the button should offer to enable.
+    hasActivePushSubscription().then(setPushEnabled)
+  }, [])
+
+  async function handleEnableNotifications() {
+    setPushError('')
+    const result = await enablePushNotifications(profile.id)
+    if (!result.success) { setPushError(result.message); return }
+    setPushEnabled(true)
+  }
 
   const fetchPendingSignOffCount = useCallback(async () => {
     const { count } = await supabase
@@ -166,6 +183,16 @@ export default function AdminDashboard({ profile }) {
               <p style={{ margin: 0, fontSize: '12px', color: 'rgba(255,255,255,0.6)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{profile.job_title}</p>
             </div>
           </div>
+          {pushNotificationsSupported() && (
+            <button
+              onClick={handleEnableNotifications}
+              disabled={pushEnabled}
+              style={{ width: '100%', padding: '10px', borderRadius: '10px', border: 'none', background: 'rgba(255,255,255,0.1)', color: pushEnabled ? 'rgba(255,255,255,0.5)' : '#ffffff', fontWeight: 700, fontSize: '13px', cursor: pushEnabled ? 'default' : 'pointer', marginBottom: '8px' }}
+            >
+              🔔 {pushEnabled ? 'Notifications: On' : 'Enable Notifications'}
+            </button>
+          )}
+          {pushError && <p style={{ margin: '0 0 8px 0', fontSize: '11px', color: '#fca5a5' }}>{pushError}</p>}
           <button
             onClick={handleSignOut}
             style={{ width: '100%', padding: '10px', borderRadius: '10px', border: 'none', background: 'rgba(255,255,255,0.1)', color: '#ffffff', fontWeight: 700, fontSize: '13px', cursor: 'pointer' }}

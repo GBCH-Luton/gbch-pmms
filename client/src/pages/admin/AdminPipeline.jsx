@@ -9,7 +9,7 @@ import {
   modalOverlayStyle, modalCardStyle, modalTitleStyle, modalSubtitleStyle, modalLabelStyle,
   modalTextareaStyle, modalErrorStyle, modalCancelBtnStyle, modalConfirmBtnStyle, radioRowStyle,
   roleBadgeStyle, postSystemComment, postAuditEvent, fetchAssignableBuilders, fetchAssignableStaffForCategory, STAFF_AVAILABILITY_STYLES,
-  createNotification,
+  createNotification, sendPushNotification, pushEmergencyAlert, resolveCategoryDivision,
 } from './shared'
 
 const expandLabelStyle = { margin: '0 0 2px 0', fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em' }
@@ -42,6 +42,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
   const [reassignBuilderId, setReassignBuilderId] = useState('')
   const [reassignReason, setReassignReason] = useState('')
   const [reassignError, setReassignError] = useState('')
+  const [reassignSendPush, setReassignSendPush] = useState(false)
 
   // Bulk reassign -- selection persists across filter/sort changes, same
   // as ordinary multi-select table behaviour, so switching a filter never
@@ -54,6 +55,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
   const [bulkReassignError, setBulkReassignError] = useState('')
   const [bulkReassignSubmitting, setBulkReassignSubmitting] = useState(false)
   const [bulkReassignSummary, setBulkReassignSummary] = useState(null)
+  const [bulkReassignSendPush, setBulkReassignSendPush] = useState(false)
 
   const [cancelModalTicket, setCancelModalTicket] = useState(null)
   const [cancelType, setCancelType] = useState('Mistake / not a real fault')
@@ -181,7 +183,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
   }
 
   function openReassignModal(ticket) { setReassignModalTicket(ticket) }
-  function closeReassignModal() { setReassignModalTicket(null) }
+  function closeReassignModal() { setReassignModalTicket(null); setReassignSendPush(false) }
 
   async function submitReassign() {
     if (!reassignBuilderId) { setReassignError('Please select a builder.'); return }
@@ -207,12 +209,15 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
     await postSystemComment(t.id, profile, `Reassigned from ${fromName} to ${toName}. Reason: ${reassignReason.trim()}`)
     await postAuditEvent(t.id, profile, 'Reassigned', `Reassigned from ${fromName} to ${toName}.${statusNote} Reason: ${reassignReason.trim()}`)
     await createNotification(reassignBuilderId, t.id, `You've been assigned Job #${t.ticket_number} at ${t.property?.address || 'a property'}.`)
+    if (reassignSendPush) {
+      await sendPushNotification([reassignBuilderId], 'New job assigned', `Job #${t.ticket_number} at ${t.property?.address || 'a property'}.`)
+    }
     await fetchTickets()
     closeReassignModal()
   }
 
   function openBulkReassignModal() { setBulkReassignOpen(true) }
-  function closeBulkReassignModal() { setBulkReassignOpen(false) }
+  function closeBulkReassignModal() { setBulkReassignOpen(false); setBulkReassignSendPush(false) }
 
   // Same four steps submitReassign does for one ticket, repeated per
   // selected ticket. Sequential rather than Promise.all -- bulk batches
@@ -258,6 +263,10 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
       await postAuditEvent(t.id, profile, 'Reassigned', `Reassigned from ${fromName} to ${toName}.${statusNote} Reason: ${reasonText}`)
       await createNotification(bulkReassignBuilderId, t.id, `You've been assigned Job #${t.ticket_number} at ${t.property?.address || 'a property'}.`)
       successCount += 1
+    }
+
+    if (bulkReassignSendPush && successCount > 0) {
+      await sendPushNotification([bulkReassignBuilderId], 'New jobs assigned', `You've been assigned ${successCount} job${successCount === 1 ? '' : 's'}.`)
     }
 
     setBulkReassignSubmitting(false)
@@ -316,6 +325,16 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
       .eq('id', t.id)
 
     if (error) { setPriorityError(error.message); return }
+
+    if (priorityTier === 'P1 Critical') {
+      const { data: categoriesRow } = await supabase
+        .schema('pmms')
+        .from('settings')
+        .select('setting_value')
+        .eq('setting_key', 'maintenance_categories')
+        .maybeSingle()
+      await pushEmergencyAlert(t, resolveCategoryDivision(t.category, categoriesRow))
+    }
 
     await postSystemComment(t.id, profile, `Priority manually set to ${priorityTier}. Reason: ${priorityReason.trim()}`)
     await postAuditEvent(t.id, profile, 'Priority Override', `Priority manually set to ${priorityTier}. Reason: ${priorityReason.trim()}`)
@@ -789,6 +808,11 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
               style={modalTextareaStyle}
             />
 
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '10px 0 0 0', fontSize: '13px', fontWeight: 600, color: '#0f172a', cursor: 'pointer' }}>
+              <input type="checkbox" checked={reassignSendPush} onChange={(e) => setReassignSendPush(e.target.checked)} />
+              Also send a push notification
+            </label>
+
             {reassignError && <p style={modalErrorStyle}>{reassignError}</p>}
 
             <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
@@ -876,6 +900,11 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
                     placeholder="e.g. Closer to site, has the right skillset..."
                     style={modalTextareaStyle}
                   />
+
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '10px 0 0 0', fontSize: '13px', fontWeight: 600, color: '#0f172a', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={bulkReassignSendPush} onChange={(e) => setBulkReassignSendPush(e.target.checked)} />
+                    Also send a push notification
+                  </label>
 
                   {bulkReassignError && <p style={modalErrorStyle}>{bulkReassignError}</p>}
 

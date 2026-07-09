@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
-import { fetchAssignableStaffForCategory, builderOptionLabel, createNotification } from './shared'
+import { fetchAssignableStaffForCategory, builderOptionLabel, createNotification, sendPushNotification, pushEmergencyAlert } from './shared'
 import { fetchComplianceCheckTypes } from '../../lib/compliance'
 import { fetchMaintenanceCategories, sortedCategoryEntries } from '../../lib/maintenanceCategories'
 import PropertySearchSelect from '../../components/PropertySearchSelect'
@@ -109,6 +109,7 @@ export default function AdminRaiseTicket({ profile }) {
   // Admin-only additions
   const [builders, setBuilders] = useState([])
   const [assignedBuilderId, setAssignedBuilderId] = useState('')
+  const [sendPushOnAssign, setSendPushOnAssign] = useState(false)
   const [priorityOverride, setPriorityOverride] = useState('')
   const [department, setDepartment] = useState('')
 
@@ -268,6 +269,18 @@ export default function AdminRaiseTicket({ profile }) {
 
     if (assignedBuilderId) {
       await createNotification(assignedBuilderId, data[0].id, `You've been assigned Job #${data[0].ticket_number} at ${selectedTicketProperty?.address || 'a property'}.`)
+      if (sendPushOnAssign) {
+        await sendPushNotification([assignedBuilderId], 'New job assigned', `Job #${data[0].ticket_number} at ${selectedTicketProperty?.address || 'a property'}.`)
+      }
+    }
+
+    const effectiveTier = priorityOverride || priorityTierLabel(priorityScore)
+    if (effectiveTier === 'P1 Critical') {
+      const division = maintenanceCategories[ticketCategory]?.division || 'Maintenance'
+      await pushEmergencyAlert(
+        { ticket_number: data[0].ticket_number, category: ticketCategory, property: selectedTicketProperty },
+        division
+      )
     }
 
     setTicketSuccess(`✓ Ticket #${data[0].ticket_number} created successfully.`)
@@ -362,6 +375,18 @@ export default function AdminRaiseTicket({ profile }) {
 
       if (assignedBuilderId) {
         await createNotification(assignedBuilderId, data[0].id, `You've been assigned Job #${data[0].ticket_number} at ${selectedTicketProperty?.address || 'a property'}.`)
+        if (sendPushOnAssign) {
+          await sendPushNotification([assignedBuilderId], 'New job assigned', `Job #${data[0].ticket_number} at ${selectedTicketProperty?.address || 'a property'}.`)
+        }
+      }
+
+      const effectiveTier = priorityOverride || priorityTierLabel(score)
+      if (effectiveTier === 'P1 Critical') {
+        const division = maintenanceCategories[category]?.division || 'Maintenance'
+        await pushEmergencyAlert(
+          { ticket_number: data[0].ticket_number, category, property: selectedTicketProperty },
+          division
+        )
       }
 
       createdIds.push(data[0].id)
@@ -612,13 +637,19 @@ export default function AdminRaiseTicket({ profile }) {
               <select
                 value={assignedBuilderId}
                 onChange={(e) => setAssignedBuilderId(e.target.value)}
-                style={{ ...fieldSelectStyle, marginBottom: '14px' }}
+                style={{ ...fieldSelectStyle, marginBottom: '10px' }}
               >
                 <option value="">Auto-assign based on skills</option>
                 {builders.map(b => (
                   <option key={b.id} value={b.id} style={b.availability !== 'Available' ? { color: '#94a3b8' } : undefined}>{builderOptionLabel(b)}</option>
                 ))}
               </select>
+              {assignedBuilderId && (
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 14px 0', fontSize: '13px', fontWeight: 600, color: '#0f172a', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={sendPushOnAssign} onChange={(e) => setSendPushOnAssign(e.target.checked)} />
+                  Also send a push notification
+                </label>
+              )}
 
               <p style={fieldLabelStyle}>Priority override</p>
               <select
@@ -882,13 +913,19 @@ export default function AdminRaiseTicket({ profile }) {
               <select
                 value={assignedBuilderId}
                 onChange={(e) => setAssignedBuilderId(e.target.value)}
-                style={{ ...fieldSelectStyle, marginBottom: '14px' }}
+                style={{ ...fieldSelectStyle, marginBottom: '10px' }}
               >
                 <option value="">Auto-assign based on skills</option>
                 {builders.map(b => (
                   <option key={b.id} value={b.id} style={b.availability !== 'Available' ? { color: '#94a3b8' } : undefined}>{builderOptionLabel(b)}</option>
                 ))}
               </select>
+              {assignedBuilderId && (
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 14px 0', fontSize: '13px', fontWeight: 600, color: '#0f172a', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={sendPushOnAssign} onChange={(e) => setSendPushOnAssign(e.target.checked)} />
+                  Also send a push notification
+                </label>
+              )}
 
               <p style={fieldLabelStyle}>Priority override</p>
               <select

@@ -453,3 +453,54 @@ export async function autoReassignDepartingStaffTickets(staffId, staffName, prof
 
   return { reassignedCount, failures }
 }
+
+// Fire-and-forget, matching createNotification's style -- a push failing
+// (no VAPID keys configured yet, a stale subscription, etc.) must never
+// block the underlying assignment/ticket action.
+export async function sendPushNotification(staffIds, title, body) {
+  try {
+    await supabase.functions.invoke('send-push-notifications', { body: { staffIds, title, body } })
+  } catch {
+    // swallow -- see comment above
+  }
+}
+
+// Same pattern as fetchAssignableStaffForCategory, swapped from
+// accessLevel === 'builder' to 'manager' -- there's no built-in
+// 'Manager' role to fall back on the way 'Builder' is for Maintenance,
+// since every manager role is a custom one. Admins are unioned in
+// unconditionally since they're not scoped to any division.
+export async function fetchManagersForDivision(division) {
+  const { data: rolesRow } = await supabase
+    .schema('pmms')
+    .from('settings')
+    .select('setting_value')
+    .eq('setting_key', 'custom_roles')
+    .maybeSingle()
+
+  const normalizedCustomRoles = normalizeCustomRoles(rolesRow?.setting_value)
+  const roleNames = normalizedCustomRoles
+    .filter(r => r.accessLevel === 'manager' && (r.division || 'Maintenance') === division)
+    .map(r => r.name)
+
+  const [managerLists, admins] = await Promise.all([
+    Promise.all(roleNames.map(fetchAssignableStaffForRole)),
+    fetchAssignableStaffForRole('Admin'),
+  ])
+
+  const byId = {}
+  ;[...managerLists.flat(), ...admins].forEach(s => { byId[s.id] = s })
+  return Object.values(byId)
+}
+
+// Called wherever a ticket's effective priority tier becomes P1 Critical
+// -- at creation, or via Pipeline's manual priority override.
+export async function pushEmergencyAlert(ticket, division) {
+  const managers = await fetchManagersForDivision(division)
+  if (managers.length === 0) return
+  await sendPushNotification(
+    managers.map(m => m.id),
+    'Emergency ticket raised',
+    `Job #${ticket.ticket_number}: ${ticket.category} at ${ticket.property?.address || 'a property'}`
+  )
+}
