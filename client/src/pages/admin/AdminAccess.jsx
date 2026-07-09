@@ -46,7 +46,7 @@
 // scripts/fix_pmms_settings_column_names.sql, run it or every
 // settings-backed feature (this one included) will error.
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, Fragment } from 'react'
 import { normalizeCustomRoles } from '../../lib/roles'
 import { fetchDivisions, saveDivisions, DEFAULT_DIVISIONS } from '../../lib/divisions'
 import { supabase } from '../../lib/supabase'
@@ -57,6 +57,14 @@ import {
 } from './shared'
 
 const LOGIN_EVENTS_LIMIT = 50
+const ERROR_LOGS_LIMIT = 50
+
+const ERROR_TYPE_LABELS = {
+  js_error: 'JS Error',
+  unhandled_rejection: 'Unhandled Rejection',
+  react_render: 'Render Error',
+  supabase_query: 'Failed Query',
+}
 
 const BUILT_IN_ROLES = ['Admin', 'Builder', 'Cleaner', 'Support Worker']
 
@@ -687,6 +695,25 @@ function summarizeUserAgent(ua) {
   return `${browser} on ${os}`
 }
 
+// error_logs.staff_id points at public.staff -- a cross-schema FK, so this
+// can't be embedded in one PostgREST select (confirmed elsewhere in this
+// app for the same reason -- see client/src/lib/properties.js). Same fix:
+// fetch the rows, batch-fetch the matching staff names, merge in JS.
+async function attachStaffNames(rows) {
+  const staffIds = [...new Set(rows.map(r => r.staff_id).filter(id => id != null))]
+  if (staffIds.length === 0) return rows.map(r => ({ ...r, staff_name: null }))
+
+  const { data: staffRows } = await supabase
+    .from('staff')
+    .select('id, name')
+    .in('id', staffIds)
+
+  const nameById = {}
+  ;(staffRows || []).forEach(s => { nameById[s.id] = s.name })
+
+  return rows.map(r => ({ ...r, staff_name: nameById[r.staff_id] || null }))
+}
+
 function LoginActivityPanel({ events }) {
   return (
     <div style={{ background: '#fff', borderRadius: '16px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', marginTop: '16px' }}>
@@ -730,10 +757,103 @@ function LoginActivityPanel({ events }) {
   )
 }
 
+const ERROR_TYPE_STYLES = {
+  js_error: { bg: '#fee2e2', color: '#dc2626' },
+  unhandled_rejection: { bg: '#fef3c7', color: '#d97706' },
+  react_render: { bg: '#f3e8ff', color: '#9333ea' },
+  supabase_query: { bg: '#dbeafe', color: '#1e3a8a' },
+}
+
+// Collapsible (unlike LoginActivityPanel, which is always visible) since
+// this is a diagnostics tool checked occasionally, not day-to-day info --
+// same expand/collapse treatment as the "Deactivated Staff" section below.
+// Each row expands further to show the full stack/context JSON, the same
+// click-to-expand interaction AdminPipeline.jsx already uses for tickets.
+function ErrorLogsPanel({ logs }) {
+  const [isOpen, setIsOpen] = useState(false)
+  const [expandedId, setExpandedId] = useState(null)
+
+  return (
+    <div style={{ marginTop: '16px' }}>
+      <button
+        onClick={() => setIsOpen(prev => !prev)}
+        style={{
+          display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between', gap: '12px',
+          padding: '14px 20px', background: '#fff', border: 'none', borderRadius: '16px',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.06)', cursor: 'pointer', fontSize: '14px', fontWeight: 800, color: '#0f172a',
+        }}
+      >
+        <span>Error &amp; Crash Log ({logs.length})</span>
+        <span style={{ fontSize: '13px', fontWeight: 700, color: '#94a3b8' }}>{isOpen ? '▲ Collapse' : '▼ Expand'}</span>
+      </button>
+      {isOpen && (
+        <div style={{ background: '#fff', borderRadius: '16px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', marginTop: '10px' }}>
+          <p style={{ margin: '0 0 12px 0', fontSize: '12px', color: '#94a3b8' }}>
+            Most recent {ERROR_LOGS_LIMIT} JS crashes and failed queries, newest first. Cleared automatically after 30 days. Click a row for details.
+          </p>
+          {logs.length === 0 ? (
+            <p style={{ margin: 0, fontSize: '13px', color: '#94a3b8', fontStyle: 'italic' }}>No errors recorded. Good sign.</p>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+                    <th style={thStyle}>Type</th>
+                    <th style={thStyle}>Message</th>
+                    <th style={thStyle}>Time</th>
+                    <th style={thStyle}>Staff</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {logs.map(log => {
+                    const style = ERROR_TYPE_STYLES[log.error_type] || { bg: '#f1f5f9', color: '#64748b' }
+                    const isExpanded = expandedId === log.id
+                    return (
+                      <Fragment key={log.id}>
+                        <tr
+                          onClick={() => setExpandedId(isExpanded ? null : log.id)}
+                          style={{ borderBottom: '1px solid #f1f5f9', cursor: 'pointer', background: isExpanded ? '#f8fafc' : undefined }}
+                        >
+                          <td style={tdStyle}>
+                            <span style={{ fontSize: '11px', fontWeight: 700, padding: '3px 10px', borderRadius: '20px', color: style.color, background: style.bg }}>
+                              {ERROR_TYPE_LABELS[log.error_type] || log.error_type}
+                            </span>
+                          </td>
+                          <td style={{ ...tdStyle, maxWidth: '360px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{log.message}</td>
+                          <td style={tdStyle}>{formatUKDateTime(log.created_at)}</td>
+                          <td style={tdStyle}>{log.staff_name || log.email || 'Unknown'}</td>
+                        </tr>
+                        {isExpanded && (
+                          <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                            <td colSpan={4} style={{ padding: '12px 8px', background: '#f8fafc' }}>
+                              {log.stack && (
+                                <pre style={{ margin: '0 0 8px 0', fontSize: '11px', color: '#475569', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{log.stack}</pre>
+                              )}
+                              {log.context && (
+                                <pre style={{ margin: 0, fontSize: '11px', color: '#475569', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{JSON.stringify(log.context, null, 2)}</pre>
+                              )}
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function AdminAccess({ profile }) {
   const [staffList, setStaffList] = useState([])
   const [tickets, setTickets] = useState([])
   const [loginEvents, setLoginEvents] = useState([])
+  const [errorLogs, setErrorLogs] = useState([])
+  const [errorLogsOpen, setErrorLogsOpen] = useState(false)
   const [loading, setLoading] = useState(true)
 
   const [customRoles, setCustomRoles] = useState([])
@@ -781,6 +901,15 @@ export default function AdminAccess({ profile }) {
       .limit(LOGIN_EVENTS_LIMIT)
 
     if (!loginEventsError) setLoginEvents(loginEventRows || [])
+
+    const { data: errorLogRows, error: errorLogsError } = await supabase
+      .schema('pmms')
+      .from('error_logs')
+      .select('id, error_type, message, stack, context, staff_id, email, created_at')
+      .order('created_at', { ascending: false })
+      .limit(ERROR_LOGS_LIMIT)
+
+    if (!errorLogsError) setErrorLogs(await attachStaffNames(errorLogRows || []))
 
     if (!staffError) {
       const roleByStaffId = {}
@@ -1005,6 +1134,7 @@ export default function AdminAccess({ profile }) {
       </div>
 
       <LoginActivityPanel events={loginEvents} />
+      <ErrorLogsPanel logs={errorLogs} />
 
       {modalStaff !== undefined && (
         <StaffFormModal
