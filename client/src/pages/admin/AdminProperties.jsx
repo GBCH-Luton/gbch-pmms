@@ -17,7 +17,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import {
-  priorityTierLabel, priorityBadgeStyle, statusColour, GENDER_RESTRICTION_STYLES,
+  priorityTierLabel, priorityBadgeStyle, statusColour, statusLabel, GENDER_RESTRICTION_STYLES,
   modalOverlayStyle, modalCardStyle, modalTitleStyle, modalLabelStyle, modalErrorStyle,
   modalCancelBtnStyle, modalConfirmBtnStyle, formatUKDateTime,
 } from './shared'
@@ -50,7 +50,7 @@ function TicketDetailModal({ ticket, onClose }) {
           <p style={modalTitleStyle}>Job #{ticket.ticket_number}</p>
           <div style={{ display: 'flex', gap: '8px' }}>
             <span style={{ fontSize: '11px', fontWeight: 700, color: tierStyle.color, background: tierStyle.bg, padding: '3px 10px', borderRadius: '20px' }}>{tier}</span>
-            <span style={{ fontSize: '11px', fontWeight: 700, color: statusColour(ticket.status), background: statusColour(ticket.status) + '18', padding: '3px 10px', borderRadius: '20px' }}>{ticket.status}</span>
+            <span style={{ fontSize: '11px', fontWeight: 700, color: statusColour(ticket.status), background: statusColour(ticket.status) + '18', padding: '3px 10px', borderRadius: '20px' }}>{statusLabel(ticket.status)}</span>
           </div>
         </div>
 
@@ -532,7 +532,7 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
                         </div>
                         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                           <span style={{ fontSize: '11px', fontWeight: 700, color: tierStyle.color, background: tierStyle.bg, padding: '3px 10px', borderRadius: '20px' }}>{tier}</span>
-                          <span style={{ fontSize: '11px', fontWeight: 700, color: statusColour(t.status), background: statusColour(t.status) + '18', padding: '3px 10px', borderRadius: '20px' }}>{t.status}</span>
+                          <span style={{ fontSize: '11px', fontWeight: 700, color: statusColour(t.status), background: statusColour(t.status) + '18', padding: '3px 10px', borderRadius: '20px' }}>{statusLabel(t.status)}</span>
                         </div>
                       </button>
                     )

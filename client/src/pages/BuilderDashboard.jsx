@@ -817,11 +817,16 @@ export default function BuilderDashboard({ profile }) {
   }
 
   const statusColour = (status) => {
+    if (status === 'Pending')     return '#dc2626'
     if (status === 'In Progress') return '#0d9488'
     if (status === 'On Hold')     return '#d97706'
     if (status === 'Completed')   return '#16a34a'
     return '#3b82f6'
   }
+
+  // Display-only -- see admin/shared.jsx's statusLabel for why this is
+  // duplicated locally rather than imported (this file's own convention).
+  const statusLabel = (status) => (status === 'Pending' ? 'Unassigned' : status)
 
   const inProgressTickets = tickets.filter(t => t.status === 'In Progress')
   const urgentTickets = tickets.filter(t => t.status === 'Assigned' && t.priority_score >= 70)
@@ -1116,7 +1121,7 @@ export default function BuilderDashboard({ profile }) {
             <div style={{ padding: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
                 <span style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Job #{t.ticket_number} · {t.category}</span>
-                <span style={{ fontSize: '11px', fontWeight: 700, color: statusColour(t.status), background: statusColour(t.status) + '18', padding: '3px 10px', borderRadius: '20px' }}>{t.status}</span>
+                <span style={{ fontSize: '11px', fontWeight: 700, color: statusColour(t.status), background: statusColour(t.status) + '18', padding: '3px 10px', borderRadius: '20px' }}>{statusLabel(t.status)}</span>
               </div>
               <p style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: 700, color: '#0f172a' }}>{t.property?.address}</p>
               <p style={{ margin: '0 0 12px 0', fontSize: '13px', color: '#64748b' }}>{t.description}{t.room ? ` — ${t.room}` : ''}</p>
@@ -2471,7 +2476,7 @@ export default function BuilderDashboard({ profile }) {
                 <div style={{ padding: '16px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
                     <span style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Job #{t.ticket_number} · {t.category}</span>
-                    <span style={{ fontSize: '11px', fontWeight: 700, color: statusColour(t.status), background: statusColour(t.status) + '18', padding: '3px 10px', borderRadius: '20px' }}>{t.status}</span>
+                    <span style={{ fontSize: '11px', fontWeight: 700, color: statusColour(t.status), background: statusColour(t.status) + '18', padding: '3px 10px', borderRadius: '20px' }}>{statusLabel(t.status)}</span>
                   </div>
                   <p style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: 700, color: '#0f172a' }}>{t.property?.address}</p>
                   <p style={{ margin: '0 0 12px 0', fontSize: '13px', color: '#64748b' }}>{t.description}{t.room ? ` — ${t.room}` : ''}</p>

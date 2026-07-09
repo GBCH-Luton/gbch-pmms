@@ -68,6 +68,7 @@ export function priorityBadgeStyle(tier) {
 }
 
 export const statusColour = (status) => {
+  if (status === 'Pending')     return '#dc2626'
   if (status === 'Assigned')    return '#3b82f6'
   if (status === 'In Progress') return '#0d9488'
   if (status === 'On Hold')     return '#d97706'
@@ -75,6 +76,15 @@ export const statusColour = (status) => {
   if (status === 'Archived')    return '#64748b'
   if (status === 'Cancelled')   return '#94a3b8'
   return '#3b82f6'
+}
+
+// Display-only -- the stored value stays 'Pending' everywhere (every
+// comparison, RLS policy, and filter already keys off that literal
+// string), this just changes what a human sees. "Unassigned" is a
+// clearer description of what that status actually means than the
+// original "Pending" label.
+export function statusLabel(status) {
+  return status === 'Pending' ? 'Unassigned' : status
 }
 
 export const formatUKDate = (isoString) => {
@@ -430,7 +440,7 @@ export async function autoReassignDepartingStaffTickets(staffId, staffName, prof
     if (error) { failures.push({ ticket: t, message: error.message }); continue }
 
     const reasonText = `${staffName} left the company (automatic reassignment)`
-    const statusNote = promoteToAssigned ? ` Status: ${t.status} → Assigned.` : ''
+    const statusNote = promoteToAssigned ? ` Status: ${statusLabel(t.status)} → Assigned.` : ''
     await postSystemComment(t.id, profile, `Reassigned from ${staffName} to ${newBuilder.name}. Reason: ${reasonText}`)
     await postAuditEvent(t.id, profile, 'Reassigned', `Reassigned from ${staffName} to ${newBuilder.name}.${statusNote} Reason: ${reasonText}`)
     await createNotification(newBuilder.id, t.id, `You've been assigned Job #${t.ticket_number} at ${t.property?.address || 'a property'}.`)

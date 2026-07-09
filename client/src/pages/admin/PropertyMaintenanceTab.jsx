@@ -23,7 +23,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import {
-  CATEGORIES, priorityTierLabel, priorityBadgeStyle, statusColour, formatUKDate,
+  CATEGORIES, priorityTierLabel, priorityBadgeStyle, statusColour, statusLabel, formatUKDate,
   filterSelectStyle, thStyle, tdStyle,
 } from './shared'
 
@@ -229,7 +229,7 @@ export default function PropertyMaintenanceTab({ property }) {
                         <span style={{ fontSize: '11px', fontWeight: 700, color: tierStyle.color, background: tierStyle.bg, padding: '3px 10px', borderRadius: '20px' }}>{tier}</span>
                       </td>
                       <td style={tdStyle}>
-                        <span style={{ fontSize: '11px', fontWeight: 700, color: statusColour(t.status), background: statusColour(t.status) + '18', padding: '3px 10px', borderRadius: '20px' }}>{t.status}</span>
+                        <span style={{ fontSize: '11px', fontWeight: 700, color: statusColour(t.status), background: statusColour(t.status) + '18', padding: '3px 10px', borderRadius: '20px' }}>{statusLabel(t.status)}</span>
                       </td>
                       <td style={tdStyle}>{formatUKDate(t.created_at)}</td>
                       <td style={tdStyle}>{t.completed_at ? formatUKDate(t.completed_at) : '—'}</td>

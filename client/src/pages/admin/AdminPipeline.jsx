@@ -4,7 +4,7 @@ import { attachProperties } from '../../lib/properties'
 import BuilderProfileModal from './BuilderProfileModal'
 import PropertySearchSelect from '../../components/PropertySearchSelect'
 import {
-  CATEGORIES, priorityTierLabel, priorityBadgeStyle, statusColour, formatUKDate, formatUKDateTime,
+  CATEGORIES, priorityTierLabel, priorityBadgeStyle, statusColour, statusLabel, formatUKDate, formatUKDateTime,
   filterSelectStyle, thStyle, tdStyle, actionBtnStyle,
   modalOverlayStyle, modalCardStyle, modalTitleStyle, modalSubtitleStyle, modalLabelStyle,
   modalTextareaStyle, modalErrorStyle, modalCancelBtnStyle, modalConfirmBtnStyle, radioRowStyle,
@@ -203,7 +203,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
 
     if (error) { setReassignError(error.message); return }
 
-    const statusNote = promoteToAssigned ? ` Status: ${t.status} → Assigned.` : ''
+    const statusNote = promoteToAssigned ? ` Status: ${statusLabel(t.status)} → Assigned.` : ''
     await postSystemComment(t.id, profile, `Reassigned from ${fromName} to ${toName}. Reason: ${reassignReason.trim()}`)
     await postAuditEvent(t.id, profile, 'Reassigned', `Reassigned from ${fromName} to ${toName}.${statusNote} Reason: ${reassignReason.trim()}`)
     await createNotification(reassignBuilderId, t.id, `You've been assigned Job #${t.ticket_number} at ${t.property?.address || 'a property'}.`)
@@ -253,7 +253,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
         continue
       }
 
-      const statusNote = promoteToAssigned ? ` Status: ${t.status} → Assigned.` : ''
+      const statusNote = promoteToAssigned ? ` Status: ${statusLabel(t.status)} → Assigned.` : ''
       await postSystemComment(t.id, profile, `Reassigned from ${fromName} to ${toName}. Reason: ${reasonText}`)
       await postAuditEvent(t.id, profile, 'Reassigned', `Reassigned from ${fromName} to ${toName}.${statusNote} Reason: ${reasonText}`)
       await createNotification(bulkReassignBuilderId, t.id, `You've been assigned Job #${t.ticket_number} at ${t.property?.address || 'a property'}.`)
@@ -295,7 +295,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
 
     const dupNote = (cancelType === 'Duplicate' && dupRef) ? ` (duplicate of #${dupRef})` : ''
     await postSystemComment(t.id, profile, `Ticket cancelled — ${cancelType}${dupNote}. Reason: ${cancelReason.trim()}`)
-    await postAuditEvent(t.id, profile, 'Status Changed', `${t.status} → Cancelled (${cancelType}${dupNote}). Reason: ${cancelReason.trim()}`)
+    await postAuditEvent(t.id, profile, 'Status Changed', `${statusLabel(t.status)} → Cancelled (${cancelType}${dupNote}). Reason: ${cancelReason.trim()}`)
     await fetchTickets()
     closeCancelModal()
   }
@@ -457,6 +457,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
       <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
         <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={filterSelectStyle}>
           <option value="All">All Statuses</option>
+          <option value="Pending">Unassigned</option>
           <option value="Assigned">Assigned</option>
           <option value="In Progress">In Progress</option>
           <option value="On Hold">On Hold</option>
@@ -605,7 +606,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
                             ...(t.status === 'In Progress' ? { animation: 'pulse 1.6s ease-in-out infinite' } : {}),
                           }}
                         >
-                          {t.status}
+                          {statusLabel(t.status)}
                         </span>
                         {t.status === 'On Hold' && t.hold_reason && (
                           <span style={{ display: 'block', fontSize: '10px', color: '#d97706', fontWeight: 700, marginTop: '3px' }}>{t.hold_reason}</span>
