@@ -48,24 +48,32 @@ export async function enablePushNotifications(staffId) {
     return { success: false, message: 'Push notifications are not configured yet.' }
   }
 
-  const registration = await navigator.serviceWorker.register('/sw.js')
-  await navigator.serviceWorker.ready
+  // Real subscribe failures happen (a stale service worker, the push
+  // service being unreachable, a browser that silently refuses in some
+  // contexts) -- these must resolve to a clean { success: false } like
+  // every other failure path here, not escape as an unhandled rejection.
+  try {
+    const registration = await navigator.serviceWorker.register('/sw.js')
+    await navigator.serviceWorker.ready
 
-  const existing = await registration.pushManager.getSubscription()
-  const subscription = existing || await registration.pushManager.subscribe({
-    userVisibleOnly: true,
-    applicationServerKey: urlBase64ToUint8Array(vapidKey),
-  })
+    const existing = await registration.pushManager.getSubscription()
+    const subscription = existing || await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(vapidKey),
+    })
 
-  const json = subscription.toJSON()
-  const { error } = await supabase
-    .schema('pmms')
-    .from('push_subscriptions')
-    .upsert(
-      { staff_id: staffId, endpoint: json.endpoint, p256dh: json.keys.p256dh, auth: json.keys.auth },
-      { onConflict: 'endpoint' }
-    )
+    const json = subscription.toJSON()
+    const { error } = await supabase
+      .schema('pmms')
+      .from('push_subscriptions')
+      .upsert(
+        { staff_id: staffId, endpoint: json.endpoint, p256dh: json.keys.p256dh, auth: json.keys.auth },
+        { onConflict: 'endpoint' }
+      )
 
-  if (error) return { success: false, message: error.message }
-  return { success: true }
+    if (error) return { success: false, message: error.message }
+    return { success: true }
+  } catch (err) {
+    return { success: false, message: err.message || 'Could not enable push notifications.' }
+  }
 }
