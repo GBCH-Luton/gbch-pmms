@@ -1061,6 +1061,13 @@ export default function BuilderDashboard({ profile }) {
           <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Urgent</div>
         </button>
         <button
+          onClick={() => setPage('available-jobs')}
+          style={{ width: '100%', padding: '14px', background: '#8b5cf6', color: '#fff', border: 'none', borderRadius: '12px', cursor: 'pointer', textAlign: 'center' }}
+        >
+          <div style={{ fontSize: '28px', fontWeight: 800 }}>{availableJobs.length}</div>
+          <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Available Jobs</div>
+        </button>
+        <button
           onClick={() => setStatusFilter('TODO')}
           style={{ width: '100%', padding: '14px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '12px', cursor: 'pointer', textAlign: 'center' }}
         >
