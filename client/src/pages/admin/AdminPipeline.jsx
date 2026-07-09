@@ -2,6 +2,7 @@ import { useState, useEffect, Fragment } from 'react'
 import { supabase } from '../../lib/supabase'
 import { attachProperties } from '../../lib/properties'
 import BuilderProfileModal from './BuilderProfileModal'
+import PropertySearchSelect from '../../components/PropertySearchSelect'
 import {
   CATEGORIES, priorityTierLabel, priorityBadgeStyle, statusColour, formatUKDate, formatUKDateTime,
   filterSelectStyle, thStyle, tdStyle, actionBtnStyle,
@@ -31,10 +32,11 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
   const [reassignOptions, setReassignOptions] = useState([])
 
   const [statusFilter, setStatusFilter] = useState('All')
-  const [propertyFilter, setPropertyFilter] = useState('All')
+  const [propertyFilter, setPropertyFilter] = useState('') // '' = All Properties -- PropertySearchSelect's own "cleared" state
   const [categoryFilter, setCategoryFilter] = useState('All')
   const [builderFilter, setBuilderFilter] = useState('All')
   const [priorityFilter, setPriorityFilter] = useState('All')
+  const [ticketNumberSearch, setTicketNumberSearch] = useState('')
 
   const [reassignModalTicket, setReassignModalTicket] = useState(null)
   const [reassignBuilderId, setReassignBuilderId] = useState('')
@@ -389,10 +391,11 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
 
   const filteredTickets = tickets.filter(t => {
     if (statusFilter !== 'All' && t.status !== statusFilter) return false
-    if (propertyFilter !== 'All' && String(t.property_id) !== String(propertyFilter)) return false
+    if (propertyFilter && String(t.property_id) !== String(propertyFilter)) return false
     if (categoryFilter !== 'All' && t.category !== categoryFilter) return false
     if (builderFilter !== 'All' && t.assigned_builder_id !== builderFilter) return false
     if (priorityFilter !== 'All' && effectiveTier(t) !== priorityFilter) return false
+    if (ticketNumberSearch.trim() && !String(t.ticket_number).includes(ticketNumberSearch.trim())) return false
     return true
   })
 
@@ -433,10 +436,11 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
 
   function clearFilters() {
     setStatusFilter('All')
-    setPropertyFilter('All')
+    setPropertyFilter('')
     setCategoryFilter('All')
     setBuilderFilter('All')
     setPriorityFilter('All')
+    setTicketNumberSearch('')
   }
 
   if (loading) return (
@@ -459,12 +463,16 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
           <option value="Archived">Archived</option>
           <option value="Cancelled">Cancelled</option>
         </select>
-        <select value={propertyFilter} onChange={(e) => setPropertyFilter(e.target.value)} style={filterSelectStyle}>
-          <option value="All">All Properties</option>
-          {properties.map(p => (
-            <option key={p.id} value={p.id}>{p.address}</option>
-          ))}
-        </select>
+        <div style={{ width: '220px' }}>
+          <PropertySearchSelect properties={properties} value={propertyFilter} onChange={setPropertyFilter} placeholder="All Properties" />
+        </div>
+        <input
+          type="text"
+          value={ticketNumberSearch}
+          onChange={(e) => setTicketNumberSearch(e.target.value)}
+          placeholder="Search ticket #..."
+          style={{ ...filterSelectStyle, width: '150px' }}
+        />
         <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} style={filterSelectStyle}>
           <option value="All">All Categories</option>
           {CATEGORIES.map(c => (
@@ -572,6 +580,9 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
                         />
                       </td>
                       <td style={tdStyle}>
+                        <span style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#94a3b8' }}>
+                          #{t.ticket_number}
+                        </span>
                         <span style={{ display: 'block', fontWeight: 700, color: '#0f172a' }}>
                           {t.property?.address}
                         </span>
