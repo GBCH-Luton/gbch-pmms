@@ -350,3 +350,85 @@ export async function createNotification(staffId, ticketId, message) {
     .from('notifications')
     .insert({ staff_id: staffId, ticket_id: ticketId, message })
 }
+
+const OPEN_TICKET_STATUS_EXCLUSION = '("Completed","Archived","Cancelled")'
+
+// Runs when a staff member is deactivated (see AdminAccess.jsx's
+// handleToggleActive) -- managers told us a short holiday is fine to
+// handle manually via the Pipeline page's bulk reassign, but someone
+// actually leaving the company should be automatic, no prompt. Picks
+// whichever eligible builder currently has the fewest open tickets
+// overall (their real workload, not just this one category's queue) --
+// the same four update/comment/audit/notification steps
+// submitReassign/submitBulkReassign already use in AdminPipeline.jsx, just
+// system-triggered instead of manager-triggered.
+export async function autoReassignDepartingStaffTickets(staffId, staffName, profile) {
+  const { data: ticketRows } = await supabase
+    .schema('pmms')
+    .from('tickets')
+    .select('id, ticket_number, status, category, assigned_builder_id, property_id')
+    .eq('assigned_builder_id', staffId)
+    .not('status', 'in', OPEN_TICKET_STATUS_EXCLUSION)
+
+  const openTickets = await attachProperties(ticketRows || [])
+  if (openTickets.length === 0) return { reassignedCount: 0, failures: [] }
+
+  const { data: allOpenRows } = await supabase
+    .schema('pmms')
+    .from('tickets')
+    .select('assigned_builder_id')
+    .not('status', 'in', OPEN_TICKET_STATUS_EXCLUSION)
+
+  const openCountByBuilder = {}
+  ;(allOpenRows || []).forEach(t => {
+    if (t.assigned_builder_id) openCountByBuilder[t.assigned_builder_id] = (openCountByBuilder[t.assigned_builder_id] || 0) + 1
+  })
+
+  const candidatesByCategory = {}
+  const failures = []
+  let reassignedCount = 0
+
+  for (const t of openTickets) {
+    if (!(t.category in candidatesByCategory)) {
+      candidatesByCategory[t.category] = await fetchAssignableStaffForCategory(t.category)
+    }
+    const candidates = candidatesByCategory[t.category]
+
+    if (candidates.length === 0) {
+      await supabase.schema('pmms').from('tickets').update({ assigned_builder_id: null }).eq('id', t.id)
+      await postSystemComment(t.id, profile, `Unassigned: ${staffName} was deactivated and no eligible builder was available to auto-reassign this ticket. Needs manual assignment.`)
+      await postAuditEvent(t.id, profile, 'Unassigned', `${staffName} was deactivated; no eligible builder found for auto-reassignment.`)
+      failures.push({ ticket: t, message: `No eligible builder available for "${t.category}"` })
+      continue
+    }
+
+    const newBuilder = candidates.reduce((best, c) =>
+      (openCountByBuilder[c.id] || 0) < (openCountByBuilder[best.id] || 0) ? c : best
+    , candidates[0])
+
+    const promoteToAssigned = t.status === 'Pending'
+    const { error } = await supabase
+      .schema('pmms')
+      .from('tickets')
+      .update({
+        assigned_builder_id: newBuilder.id,
+        ...(promoteToAssigned ? { status: 'Assigned' } : {}),
+      })
+      .eq('id', t.id)
+
+    if (error) { failures.push({ ticket: t, message: error.message }); continue }
+
+    const reasonText = `${staffName} left the company (automatic reassignment)`
+    const statusNote = promoteToAssigned ? ` Status: ${t.status} → Assigned.` : ''
+    await postSystemComment(t.id, profile, `Reassigned from ${staffName} to ${newBuilder.name}. Reason: ${reasonText}`)
+    await postAuditEvent(t.id, profile, 'Reassigned', `Reassigned from ${staffName} to ${newBuilder.name}.${statusNote} Reason: ${reasonText}`)
+    await createNotification(newBuilder.id, t.id, `You've been assigned Job #${t.ticket_number} at ${t.property?.address || 'a property'}.`)
+
+    // Spreads the load across candidates instead of dumping every one of
+    // this person's same-category tickets on whoever was least busy first.
+    openCountByBuilder[newBuilder.id] = (openCountByBuilder[newBuilder.id] || 0) + 1
+    reassignedCount += 1
+  }
+
+  return { reassignedCount, failures }
+}

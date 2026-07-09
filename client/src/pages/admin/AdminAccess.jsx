@@ -53,7 +53,7 @@ import { supabase } from '../../lib/supabase'
 import {
   actionBtnStyle, Avatar, thStyle, tdStyle, formatUKDateTime,
   modalOverlayStyle, modalCardStyle, modalTitleStyle, modalLabelStyle, modalErrorStyle,
-  modalCancelBtnStyle, modalConfirmBtnStyle,
+  modalCancelBtnStyle, modalConfirmBtnStyle, autoReassignDepartingStaffTickets,
 } from './shared'
 
 const LOGIN_EVENTS_LIMIT = 50
@@ -865,6 +865,7 @@ export default function AdminAccess({ profile }) {
   const [resetPasswordTarget, setResetPasswordTarget] = useState(null)
   const [toggleActiveErrors, setToggleActiveErrors] = useState({})
   const [deactivatedOpen, setDeactivatedOpen] = useState(false)
+  const [autoReassignSummary, setAutoReassignSummary] = useState(null)
 
   useEffect(() => {
     fetchData()
@@ -947,6 +948,7 @@ export default function AdminAccess({ profile }) {
 
   async function handleToggleActive(staff) {
     setToggleActiveErrors(prev => ({ ...prev, [staff.id]: '' }))
+    const wasActive = staff.active !== false
 
     const { data, error } = await supabase
       .from('staff')
@@ -964,6 +966,17 @@ export default function AdminAccess({ profile }) {
     // pmms.staff_roles, so it has to be carried over manually here or it'd
     // get wiped from local state.
     handleStaffSaved({ ...data, role: staff.role })
+
+    // Only on deactivation (leaving the company), never on re-activation --
+    // managers said a short holiday is handled manually via Pipeline's bulk
+    // reassign, but someone actually leaving should be automatic, no prompt.
+    if (wasActive) {
+      const result = await autoReassignDepartingStaffTickets(staff.id, staff.name, profile)
+      if (result.reassignedCount > 0 || result.failures.length > 0) {
+        setAutoReassignSummary({ staffName: staff.name, ...result })
+      }
+      await fetchData()
+    }
   }
 
   // Memoized so this array's identity is stable across re-renders that
@@ -1060,6 +1073,28 @@ export default function AdminAccess({ profile }) {
         <h1 style={{ margin: '0 0 4px 0', fontSize: '18px', fontWeight: 800, color: '#0f172a' }}>Admin</h1>
         <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>Add, edit, activate/deactivate staff accounts, and manage roles. Use the "Unassigned" tab to bring someone new in from the wider staff list. Day-to-day duty monitoring lives on the Staff page.</p>
       </div>
+
+      {autoReassignSummary && (
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px',
+          background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '12px',
+          padding: '12px 16px', marginBottom: '16px', fontSize: '13px', color: '#1e3a8a',
+        }}>
+          <span>
+            <strong>{autoReassignSummary.staffName}</strong> was deactivated.{' '}
+            {autoReassignSummary.reassignedCount} open ticket{autoReassignSummary.reassignedCount === 1 ? '' : 's'} automatically reassigned
+            {autoReassignSummary.failures.length > 0
+              ? `, ${autoReassignSummary.failures.length} need manual attention (${autoReassignSummary.failures.map(f => f.message).join('; ')}).`
+              : '.'}
+          </span>
+          <button
+            onClick={() => setAutoReassignSummary(null)}
+            style={{ background: 'none', border: 'none', color: '#1e3a8a', fontWeight: 700, fontSize: '13px', cursor: 'pointer', whiteSpace: 'nowrap' }}
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {/* Staff List + Role Management */}
       <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
