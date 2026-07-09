@@ -65,14 +65,21 @@ export default function BuilderDashboard({ profile }) {
   const [reportedTickets, setReportedTickets] = useState([])
   const [notifications, setNotifications] = useState([])
   const [notifPanelOpen, setNotifPanelOpen] = useState(false)
+  const [availableJobs, setAvailableJobs] = useState([])
+  const [claimError, setClaimError] = useState('')
+  const [claimingId, setClaimingId] = useState(null)
 
   useEffect(() => {
     fetchTickets()
     fetchNotifications()
+    fetchAvailableJobs()
     // Polled rather than pushed -- notifications are created by an admin
     // action elsewhere, so this is the only way this session finds out
-    // about a new one without the builder manually refreshing.
-    const interval = setInterval(fetchNotifications, 45000)
+    // about a new one without the builder manually refreshing. Available
+    // jobs are polled the same way, for the same reason -- no realtime
+    // infrastructure exists anywhere in this app, so this is how a job
+    // someone else claimed disappears from here without a manual refresh.
+    const interval = setInterval(() => { fetchNotifications(); fetchAvailableJobs() }, 45000)
     return () => clearInterval(interval)
   }, [])
 
@@ -200,6 +207,65 @@ export default function BuilderDashboard({ profile }) {
 
     if (!error) setTickets(await attachProperties(data, 'address, safeguards, electrical_shutoff, gas_shutoff, high_vulnerability'))
     setLoading(false)
+  }
+
+  // Unassigned tickets matching this builder's own tagged skills -- an
+  // untagged builder (profile.skills empty) sees every unassigned
+  // Pending ticket, matching the "no tags = eligible for everything"
+  // default used everywhere else this feature touches.
+  async function fetchAvailableJobs() {
+    let query = supabase
+      .schema('pmms')
+      .from('tickets')
+      .select('id, ticket_number, status, category, description, room, priority_score, property_id')
+      .is('assigned_builder_id', null)
+      .eq('status', 'Pending')
+      .order('priority_score', { ascending: false })
+
+    if (profile.skills?.length) query = query.in('category', profile.skills)
+
+    const { data, error } = await query
+    if (!error) setAvailableJobs(await attachProperties(data, 'address'))
+  }
+
+  // The `.is('assigned_builder_id', null)` in the update itself is what
+  // makes this safe if two builders tap Claim on the same job at once --
+  // only the first UPDATE actually matches a row; the second gets back
+  // zero rows and this shows "already claimed" instead of double-assigning.
+  async function handleClaimJob(ticket) {
+    setClaimError('')
+    setClaimingId(ticket.id)
+
+    const { data, error } = await supabase
+      .schema('pmms')
+      .from('tickets')
+      .update({ assigned_builder_id: profile.id, status: 'Assigned' })
+      .eq('id', ticket.id)
+      .is('assigned_builder_id', null)
+      .select()
+
+    if (error) {
+      setClaimError(error.message)
+      setClaimingId(null)
+      return
+    }
+
+    if (!data || data.length === 0) {
+      setClaimError('Someone already claimed this job.')
+      setClaimingId(null)
+      await fetchAvailableJobs()
+      return
+    }
+
+    await supabase
+      .schema('pmms')
+      .from('comments')
+      .insert({ ticket_id: ticket.id, author_id: profile.id, author_name: profile.name, role: profile.role, body: `Claimed by ${profile.name}.` })
+    await postAuditEvent(ticket.id, 'Claimed', `${profile.name} claimed this job from the Available Jobs queue.`)
+
+    setClaimingId(null)
+    await fetchAvailableJobs()
+    await fetchTickets()
   }
 
   async function fetchNotifications() {
@@ -939,6 +1005,15 @@ export default function BuilderDashboard({ profile }) {
                 style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
               >
                 📝 Log a Ticket
+              </button>
+              <button
+                onClick={() => { setPage('available-jobs'); setMenuOpen(false) }}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
+              >
+                <span>🧰 Available Jobs</span>
+                {availableJobs.length > 0 && (
+                  <span style={{ background: '#dc2626', color: '#fff', fontSize: '11px', fontWeight: 800, padding: '2px 8px', borderRadius: '999px' }}>{availableJobs.length}</span>
+                )}
               </button>
               <button
                 onClick={() => { setPage('my-reports'); setMenuOpen(false) }}
@@ -2396,6 +2471,74 @@ export default function BuilderDashboard({ profile }) {
                   {t.photo_url && (
                     <img src={t.photo_url} alt="Ticket attachment" style={{ width: '100%', borderRadius: '10px', display: 'block' }} />
                   )}
+                </div>
+              </div>
+            ))}
+
+          </div>
+        </div>
+      )}
+
+      {/* Available Jobs page */}
+      {page === 'available-jobs' && (
+        <div style={{ position: 'fixed', inset: 0, background: '#f1f5f9', zIndex: 50, overflowY: 'auto', fontFamily: 'system-ui, sans-serif' }}>
+
+          {/* Header */}
+          <div style={{ position: 'sticky', top: 0, zIndex: 10 }}>
+            <div style={{ background: '#ffffff', borderBottom: '1px solid #e2e8f0', padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <button onClick={() => setPage('jobs')} style={{ background: '#f1f5f9', border: 'none', borderRadius: '8px', padding: '8px 14px', fontSize: '13px', fontWeight: 700, color: '#64748b', cursor: 'pointer' }}>
+                  ← Back
+                </button>
+                <button
+                  onClick={goHome}
+                  aria-label="Go to home"
+                  style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
+                >
+                  <img src={gbchLogo} alt="GBCH" style={{ height: '36px' }} />
+                  <span style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a' }}>PMMS</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ padding: '16px', maxWidth: '600px', margin: '0 auto' }}>
+
+            <div style={{ marginBottom: '16px' }}>
+              <h1 style={{ margin: '0 0 4px 0', fontSize: '18px', fontWeight: 700, color: '#0f172a' }}>Available Jobs</h1>
+              <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>
+                Unassigned jobs matching your skills. First to claim gets it.
+              </p>
+            </div>
+
+            {claimError && (
+              <div style={{ background: '#fee2e2', border: '1px solid #fecaca', borderRadius: '10px', padding: '12px 16px', marginBottom: '12px' }}>
+                <p style={{ margin: 0, fontSize: '13px', color: '#dc2626', fontWeight: 600 }}>{claimError}</p>
+              </div>
+            )}
+
+            {availableJobs.length === 0 && (
+              <div style={{ background: '#fff', borderRadius: '16px', padding: '40px', textAlign: 'center' }}>
+                <p style={{ color: '#94a3b8', fontWeight: 600 }}>No unclaimed jobs matching your skills right now.</p>
+              </div>
+            )}
+
+            {availableJobs.map(t => (
+              <div key={t.id} style={{ background: '#ffffff', borderRadius: '16px', marginBottom: '12px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+                <div style={{ height: '4px', background: statusColour(t.status) }} />
+                <div style={{ padding: '16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Job #{t.ticket_number} · {t.category}</span>
+                  </div>
+                  <p style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: 700, color: '#0f172a' }}>{t.property?.address}</p>
+                  <p style={{ margin: '0 0 12px 0', fontSize: '13px', color: '#64748b' }}>{t.description}{t.room ? ` — ${t.room}` : ''}</p>
+                  <button
+                    onClick={() => handleClaimJob(t)}
+                    disabled={claimingId === t.id}
+                    style={{ width: '100%', padding: '12px', background: '#19562e', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: 700, cursor: claimingId === t.id ? 'not-allowed' : 'pointer', opacity: claimingId === t.id ? 0.6 : 1 }}
+                  >
+                    {claimingId === t.id ? 'Claiming...' : 'Claim Job'}
+                  </button>
                 </div>
               </div>
             ))}

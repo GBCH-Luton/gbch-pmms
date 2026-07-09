@@ -151,7 +151,7 @@ export async function fetchAssignableStaffForRole(roleName) {
 
   const { data: staffRows, error: staffError } = await supabase
     .from('staff')
-    .select('id, name')
+    .select('id, name, skills')
     .in('id', roleRows.map(r => r.staff_id))
     .eq('active', true)
     .order('name')
@@ -230,7 +230,18 @@ export async function fetchAssignableStaffForCategory(category) {
   const staffLists = await Promise.all(roleNames.map(fetchAssignableStaffForRole))
   const byId = {}
   staffLists.flat().forEach(s => { byId[s.id] = s })
-  return Object.values(byId).sort((a, b) => a.name.localeCompare(b.name))
+  const eligible = Object.values(byId)
+
+  // Skill-narrowing only applies within Maintenance (the case this was
+  // built for) -- Housekeeping etc. keep routing by role/division alone,
+  // unchanged. A builder with no skills tagged at all is left untouched
+  // (eligible for everything), so tagging is opt-in and nothing existing
+  // breaks for anyone an admin hasn't gone and tagged.
+  const filtered = categoryDivision === 'Maintenance'
+    ? eligible.filter(s => !s.skills?.length || s.skills.includes(category))
+    : eligible
+
+  return filtered.sort((a, b) => a.name.localeCompare(b.name))
 }
 
 // Counts jobs whose recorded clock-in/out location was further than the

@@ -49,6 +49,7 @@
 import { useState, useEffect, useMemo, Fragment } from 'react'
 import { normalizeCustomRoles } from '../../lib/roles'
 import { fetchDivisions, saveDivisions, DEFAULT_DIVISIONS } from '../../lib/divisions'
+import { fetchMaintenanceCategories, sortedCategoryEntries } from '../../lib/maintenanceCategories'
 import { supabase } from '../../lib/supabase'
 import {
   actionBtnStyle, Avatar, thStyle, tdStyle, formatUKDateTime,
@@ -82,7 +83,7 @@ function roleStyle(role) {
 
 const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '13px', fontFamily: 'inherit', boxSizing: 'border-box' }
 
-const emptyForm = { name: '', email: '', role: 'Builder', job_title: '', phone: '' }
+const emptyForm = { name: '', email: '', role: 'Builder', job_title: '', phone: '', skills: [] }
 
 // supabase-js resolves a non-2xx Edge Function response as `error`, with the
 // JSON body only reachable via error.context (a Response) -- this digs the
@@ -195,6 +196,7 @@ function StaffFormModal({ staff, roleOptions, staffDirectory, onClose, onSaved }
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [createdAccount, setCreatedAccount] = useState(null) // { staff, tempPassword } once a brand-new login is created
+  const [skillOptions, setSkillOptions] = useState([])
 
   useEffect(() => {
     if (staff) {
@@ -204,11 +206,30 @@ function StaffFormModal({ staff, roleOptions, staffDirectory, onClose, onSaved }
         role: staff.role || roleOptions[0] || '',
         job_title: staff.job_title || '',
         phone: staff.phone || '',
+        skills: staff.skills || [],
       })
     } else {
       setForm({ ...emptyForm, role: roleOptions[0] || '' })
     }
   }, [staff, roleOptions])
+
+  // Skill tags are just the Maintenance-division category names already
+  // managed on Settings > Issue Scores -- no separate taxonomy to maintain.
+  useEffect(() => {
+    fetchMaintenanceCategories().then(categories => {
+      const names = sortedCategoryEntries(categories)
+        .filter(([, c]) => (c.division || 'Maintenance') === 'Maintenance')
+        .map(([name]) => name)
+      setSkillOptions(names)
+    })
+  }, [])
+
+  function toggleSkill(name) {
+    setForm(prev => ({
+      ...prev,
+      skills: prev.skills.includes(name) ? prev.skills.filter(s => s !== name) : [...prev.skills, name],
+    }))
+  }
 
   // Deliberately separate from the effect above, and keyed only on `staff`
   // (not `roleOptions` too) -- this should reset when the modal is reopened
@@ -266,6 +287,7 @@ function StaffFormModal({ staff, roleOptions, staffDirectory, onClose, onSaved }
           email: form.email.trim(),
           job_title: form.job_title.trim() || null,
           phone: form.phone.trim() || null,
+          skills: form.skills,
         })
         .eq('id', targetId)
         .select()
@@ -297,6 +319,7 @@ function StaffFormModal({ staff, roleOptions, staffDirectory, onClose, onSaved }
         job_title: form.job_title.trim() || null,
         phone: form.phone.trim() || null,
         role: form.role,
+        skills: form.skills,
       },
     })
 
@@ -371,6 +394,27 @@ function StaffFormModal({ staff, roleOptions, staffDirectory, onClose, onSaved }
 
         <p style={modalLabelStyle}>Phone</p>
         <input type="text" value={form.phone} onChange={(e) => set('phone', e.target.value)} style={inputStyle} />
+
+        <p style={modalLabelStyle}>Skills</p>
+        <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: '#94a3b8' }}>
+          Only affects which maintenance tickets get routed to them. Leave all unchecked if they can do any maintenance job.
+        </p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '4px' }}>
+          {skillOptions.map(name => (
+            <label
+              key={name}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '20px',
+                border: `1px solid ${form.skills.includes(name) ? '#0f766e' : '#e2e8f0'}`,
+                background: form.skills.includes(name) ? '#f0fdfa' : '#fff',
+                fontSize: '12px', fontWeight: 600, color: form.skills.includes(name) ? '#0f766e' : '#475569', cursor: 'pointer',
+              }}
+            >
+              <input type="checkbox" checked={form.skills.includes(name)} onChange={() => toggleSkill(name)} />
+              {name}
+            </label>
+          ))}
+        </div>
 
         {error && <p style={modalErrorStyle}>{error}</p>}
 

@@ -76,7 +76,7 @@ export default function App() {
     // same row instead of potentially disagreeing with each other.
     const { data: rows } = await supabase
       .from('staff')
-      .select('id, name, email, job_title, photo_url, must_reset_password, active')
+      .select('id, name, email, job_title, photo_url, must_reset_password, active, skills')
       .eq('email', email)
       .order('id')
       .limit(2)

@@ -24,6 +24,7 @@ Deno.serve(async (req: Request) => {
     const jobTitle = (body.job_title || '').trim() || null
     const phone = (body.phone || '').trim() || null
     const role = (body.role || '').trim()
+    const skills = Array.isArray(body.skills) ? body.skills : null
     if (!name || !email || !role) {
       return new Response(JSON.stringify({ error: 'name, email, and role are required' }), { status: 400, headers: corsHeaders })
     }
@@ -73,7 +74,7 @@ Deno.serve(async (req: Request) => {
     // ── 6. Create the staff row ──────────────────────────────────────────────
     const { data: staffRow, error: staffError } = await adminClient
       .from('staff')
-      .insert({ name, email, job_title: jobTitle, phone, active: true, must_reset_password: true })
+      .insert({ name, email, job_title: jobTitle, phone, skills, active: true, must_reset_password: true })
       .select()
       .single()
 
