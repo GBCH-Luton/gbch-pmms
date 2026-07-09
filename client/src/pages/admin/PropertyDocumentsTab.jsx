@@ -9,7 +9,7 @@
 //
 // CREATE TABLE pmms.property_documents (
 //   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-//   property_id uuid REFERENCES public.properties(id) ON DELETE CASCADE,
+//   property_id uuid REFERENCES pmms.properties(id) ON DELETE CASCADE,
 //   document_name text NOT NULL,
 //   document_category text,
 //   document_date date,

@@ -5,7 +5,7 @@
 //
 // CREATE TABLE pmms.property_rooms (
 //   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-//   property_id uuid NOT NULL REFERENCES public.properties(id) ON DELETE CASCADE,
+//   property_id uuid NOT NULL REFERENCES pmms.properties(id) ON DELETE CASCADE,
 //   room_name text NOT NULL,
 //   room_type text,
 //   current_status text NOT NULL DEFAULT 'Occupied',
@@ -17,7 +17,7 @@
 // CREATE TABLE pmms.property_room_history (
 //   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
 //   room_id uuid NOT NULL REFERENCES pmms.property_rooms(id) ON DELETE CASCADE,
-//   property_id uuid REFERENCES public.properties(id), -- exists on the live table but unused by this component; insertHistory() never sets it
+//   property_id uuid REFERENCES pmms.properties(id), -- exists on the live table but unused by this component; insertHistory() never sets it
 //   action text NOT NULL,
 //   action_date date NOT NULL,
 //   tenant_name text,

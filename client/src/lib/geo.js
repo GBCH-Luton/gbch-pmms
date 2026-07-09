@@ -81,6 +81,7 @@ export async function ensurePropertyCoords(properties) {
     if (!coords) continue
     coordsByPropertyId[p.id] = coords
     await supabase
+      .schema('pmms')
       .from('properties')
       .update({ postcode, latitude: coords.latitude, longitude: coords.longitude })
       .eq('id', p.id)

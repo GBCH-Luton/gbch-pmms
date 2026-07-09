@@ -10,7 +10,7 @@
 //
 // CREATE TABLE pmms.property_notes (
 //   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-//   property_id uuid REFERENCES public.properties(id) ON DELETE CASCADE,
+//   property_id uuid REFERENCES pmms.properties(id) ON DELETE CASCADE,
 //   note_category text,
 //   note_text text NOT NULL,
 //   author text,

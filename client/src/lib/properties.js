@@ -1,11 +1,9 @@
 import { supabase } from './supabase'
 
-// pmms.tickets stays in the pmms schema while public.properties is now
-// shared reference data in a different schema -- PostgREST's embed
-// shorthand (`property:properties!property_id(...)`) can't resolve that
-// relationship across schemas here (confirmed live: "Could not find a
-// relationship between 'tickets' and 'properties' in the schema cache"),
-// so every place that used to embed a ticket's property in one query now
+// pmms.tickets and pmms.properties are both in the pmms schema, but
+// PostgREST's embed shorthand (`property:properties!property_id(...)`) was
+// never restored after properties briefly lived in a different schema --
+// every place that used to embed a ticket's property in one query still
 // fetches properties separately and merges them in JS.
 //
 // `rows` is any array of records carrying a `property_id` column (tickets,
@@ -21,6 +19,7 @@ export async function attachProperties(rows, columns = 'address') {
   }
 
   const { data: properties } = await supabase
+    .schema('pmms')
     .from('properties')
     .select(`id, ${columns}`)
     .in('id', propertyIds)

@@ -5,7 +5,7 @@
 //
 // CREATE TABLE pmms.property_assets (
 //   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-//   property_id uuid REFERENCES public.properties(id) ON DELETE CASCADE,
+//   property_id uuid REFERENCES pmms.properties(id) ON DELETE CASCADE,
 //   asset_name text NOT NULL,
 //   asset_category text,
 //   make text,

@@ -31,6 +31,7 @@ export default function AdminSignOff({ profile, onTicketsChanged }) {
 
   async function fetchProperties() {
     const { data, error } = await supabase
+      .schema('pmms')
       .from('properties')
       .select('id, address')
       .order('address')

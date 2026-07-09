@@ -1,5 +1,5 @@
 // Portfolio-wide historical reporting -- everything here reads from data
-// that already exists (pmms.tickets, public.properties, pmms.settings). No
+// that already exists (pmms.tickets, pmms.properties, pmms.settings). No
 // new tables or columns. The per-property version of most of this already
 // exists in PropertyMaintenanceTab.jsx; this generalizes the same
 // calculations across every property/builder instead of one at a time, and
