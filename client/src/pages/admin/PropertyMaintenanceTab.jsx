@@ -4,7 +4,7 @@
 // created_at, completed_at, property_id. Confirmed against AdminPipeline.jsx's
 // own ticket query before writing this.
 //
-// Three metrics from the spec can't be computed as literally worded because
+// Two metrics from the spec can't be computed as literally worded because
 // the underlying columns don't exist on pmms.tickets, and inventing a
 // substitute would silently misrepresent the number to whoever reads it:
 //   - Overdue: no due_date column -> falls back to the spec's own stated
@@ -13,19 +13,20 @@
 //     priority_score (integer). Reuses the same GLOBAL_TRIAGE_THRESHOLD (70)
 //     cutoff used everywhere else in the app (shared.js, BuilderDashboard,
 //     AdminDashboard) to mean "P1 Critical".
-//   - Average Response/Completion Time: both are defined against an
-//     `assigned_at` timestamp, which pmms.tickets does not have (only
-//     created_at/completed_at). Shown as "N/A" rather than approximated
-//     against a different timestamp under the original label.
 //   - First Time Fix Rate: no revisit_required column -- shown as "—" per
 //     the spec's own explicit instruction for this case.
+//
+// Average Response/Completion Time are now tracked via first_assigned_at
+// (see computeAvgResponseMs/computeAvgAssignedToCompleteMs in shared.jsx) --
+// tickets that predate that column simply have a null first_assigned_at
+// and are excluded rather than fabricating a response time for them.
 
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { fetchAllMaintenanceCategoryNames } from '../../lib/maintenanceCategories'
 import {
   priorityTierLabel, priorityBadgeStyle, statusColour, statusLabel, formatUKDate,
-  filterSelectStyle, thStyle, tdStyle,
+  filterSelectStyle, thStyle, tdStyle, formatDuration, computeAvgResponseMs, computeAvgAssignedToCompleteMs,
 } from './shared'
 
 const GLOBAL_TRIAGE_THRESHOLD = 70
@@ -51,7 +52,7 @@ export default function PropertyMaintenanceTab({ property }) {
     const { data, error } = await supabase
       .schema('pmms')
       .from('tickets')
-      .select('id, ticket_number, status, category, issue_tag, description, priority_score, created_at, completed_at')
+      .select('id, ticket_number, status, category, issue_tag, description, priority_score, created_at, completed_at, first_assigned_at')
       .eq('property_id', property.id)
       .order('created_at', { ascending: false })
 
@@ -110,12 +111,14 @@ export default function PropertyMaintenanceTab({ property }) {
     return true
   })
 
-  // Performance metrics -- see file header for why these three can't be
+  // Performance metrics -- see file header for why two of these can't be
   // computed as literally specified.
   const completedTickets = tickets.filter(t => t.status === 'Completed' && t.completed_at)
   const avgTurnaroundHours = completedTickets.length > 0
     ? Math.round(completedTickets.reduce((sum, t) => sum + Math.max(0, new Date(t.completed_at) - new Date(t.created_at)), 0) / completedTickets.length / 3600000)
     : null
+  const avgResponseMs = computeAvgResponseMs(tickets)
+  const avgAssignedToCompleteMs = computeAvgAssignedToCompleteMs(completedTickets)
 
   return (
     <div>
@@ -251,13 +254,13 @@ export default function PropertyMaintenanceTab({ property }) {
         <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
           <div style={{ flex: '1 1 200px' }}>
             <p style={{ margin: '0 0 4px 0', fontSize: '12px', fontWeight: 700, color: '#94a3b8' }}>Average Response Time</p>
-            <p style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: '#94a3b8' }}>N/A</p>
-            <p style={{ margin: '2px 0 0 0', fontSize: '11px', color: '#cbd5e1' }}>Requires an assigned_at timestamp, not currently tracked</p>
+            <p style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: avgResponseMs != null ? '#0f172a' : '#94a3b8' }}>{avgResponseMs != null ? formatDuration(avgResponseMs) : 'N/A'}</p>
+            <p style={{ margin: '2px 0 0 0', fontSize: '11px', color: '#cbd5e1' }}>Raised → first assigned</p>
           </div>
           <div style={{ flex: '1 1 200px' }}>
             <p style={{ margin: '0 0 4px 0', fontSize: '12px', fontWeight: 700, color: '#94a3b8' }}>Average Completion Time</p>
-            <p style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: '#94a3b8' }}>N/A</p>
-            <p style={{ margin: '2px 0 0 0', fontSize: '11px', color: '#cbd5e1' }}>Requires an assigned_at timestamp, not currently tracked</p>
+            <p style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: avgAssignedToCompleteMs != null ? '#0f172a' : '#94a3b8' }}>{avgAssignedToCompleteMs != null ? formatDuration(avgAssignedToCompleteMs) : 'N/A'}</p>
+            <p style={{ margin: '2px 0 0 0', fontSize: '11px', color: '#cbd5e1' }}>Assigned → completed</p>
           </div>
           <div style={{ flex: '1 1 200px' }}>
             <p style={{ margin: '0 0 4px 0', fontSize: '12px', fontWeight: 700, color: '#94a3b8' }}>First Time Fix Rate</p>

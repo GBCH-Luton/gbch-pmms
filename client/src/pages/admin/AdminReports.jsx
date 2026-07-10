@@ -11,7 +11,7 @@ import { attachProperties } from '../../lib/properties'
 import { fetchAllMaintenanceCategoryNames } from '../../lib/maintenanceCategories'
 import {
   formatDuration, filterSelectStyle, thStyle, tdStyle,
-  fetchAssignableBuilders, resolveCategoryDivision, computeAvgTurnaroundMs, buildWeeklyTrend,
+  fetchAssignableBuilders, resolveCategoryDivision, computeAvgTurnaroundMs, computeAvgResponseMs, buildWeeklyTrend,
 } from './shared'
 import SimpleBarChart from '../../components/SimpleBarChart'
 
@@ -58,7 +58,7 @@ export default function AdminReports() {
     const { data, error } = await supabase
       .schema('pmms')
       .from('tickets')
-      .select('id, ticket_number, status, category, created_at, completed_at, property_id, assigned_builder_id')
+      .select('id, ticket_number, status, category, created_at, completed_at, first_assigned_at, property_id, assigned_builder_id')
 
     if (error) { setLoadError(error.message); setTickets([]); return }
 
@@ -115,7 +115,14 @@ export default function AdminReports() {
 
   const currentlyOpen = scopedTickets.filter(t => t.status !== 'Completed' && t.status !== 'Archived' && t.status !== 'Cancelled')
 
+  const assignedInRange = scopedTickets.filter(t => {
+    if (!t.first_assigned_at) return false
+    const c = new Date(t.first_assigned_at).getTime()
+    return c >= fromTime && c <= toTime
+  })
+
   const avgTurnaroundMs = computeAvgTurnaroundMs(completedInRange)
+  const avgResponseMs = computeAvgResponseMs(assignedInRange)
 
   // Weekly trend across the whole selected range, including empty weeks.
   const trendData = buildWeeklyTrend(fromDate, toDate, createdInRange, completedInRange)
@@ -147,7 +154,7 @@ export default function AdminReports() {
     .map(b => {
       const assigned = createdInRange.filter(t => t.assigned_builder_id === b.id)
       const completed = completedInRange.filter(t => t.assigned_builder_id === b.id)
-      return { id: b.id, name: b.name, assignedCount: assigned.length, completedCount: completed.length, avgMs: computeAvgTurnaroundMs(completed) }
+      return { id: b.id, name: b.name, assignedCount: assigned.length, completedCount: completed.length, avgMs: computeAvgTurnaroundMs(completed), avgResponseMs: computeAvgResponseMs(assigned) }
     })
     .filter(w => w.assignedCount > 0 || w.completedCount > 0)
     .sort((a, b) => b.assignedCount - a.assignedCount)
@@ -191,6 +198,10 @@ export default function AdminReports() {
         <div style={tileStyle('#9333ea')}>
           <p style={tileLabelStyle}>Avg. Turnaround</p>
           <p style={tileValueStyle}>{avgMsLabel(avgTurnaroundMs)}</p>
+        </div>
+        <div style={tileStyle('#2563eb')}>
+          <p style={tileLabelStyle}>Avg. Response Time</p>
+          <p style={tileValueStyle}>{avgMsLabel(avgResponseMs)}</p>
         </div>
       </div>
 
@@ -253,6 +264,7 @@ export default function AdminReports() {
                   <th style={thStyle}>Raised</th>
                   <th style={thStyle}>Completed</th>
                   <th style={thStyle}>Avg. Turnaround</th>
+                  <th style={thStyle}>Avg. Response Time</th>
                 </tr>
               </thead>
               <tbody>
@@ -262,6 +274,7 @@ export default function AdminReports() {
                     <td style={tdStyle}>{w.assignedCount}</td>
                     <td style={tdStyle}>{w.completedCount}</td>
                     <td style={tdStyle}>{avgMsLabel(w.avgMs)}</td>
+                    <td style={tdStyle}>{avgMsLabel(w.avgResponseMs)}</td>
                   </tr>
                 ))}
               </tbody>

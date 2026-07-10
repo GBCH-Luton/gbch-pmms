@@ -254,7 +254,7 @@ export default function BuilderDashboard({ profile }) {
     const { data, error } = await supabase
       .schema('pmms')
       .from('tickets')
-      .update({ assigned_builder_id: profile.id, status: 'Assigned', status_changed_at: new Date().toISOString(), stuck_alert_sent_at: null })
+      .update({ assigned_builder_id: profile.id, status: 'Assigned', status_changed_at: new Date().toISOString(), stuck_alert_sent_at: null, first_assigned_at: new Date().toISOString() })
       .eq('id', ticket.id)
       .is('assigned_builder_id', null)
       .select()

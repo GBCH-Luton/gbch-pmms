@@ -106,6 +106,10 @@ function RoomFormModal({ property, room, onClose, onSaved }) {
       current_status: form.current_status,
       tenant_name: form.current_status === 'Occupied' ? form.tenant_name.trim() : null,
       void_since: form.current_status === 'Void' ? (statusChanged ? today : (form.void_since || today)) : null,
+      // Always reset the aging-alert dedup here -- whether the room is
+      // (still) live-Void (re-arms alerting for this void period) or has
+      // just been marked Occupied (keeps the column clean/never stale).
+      void_alert_sent_at: null,
     }
 
     let result
@@ -200,7 +204,7 @@ function MarkVoidModal({ room, onClose, onSaved }) {
     const { data, error: updateError } = await supabase
       .schema('pmms')
       .from('property_rooms')
-      .update({ current_status: 'Void', void_since: moveOutDate, tenant_name: null })
+      .update({ current_status: 'Void', void_since: moveOutDate, tenant_name: null, void_alert_sent_at: null })
       .eq('id', room.id)
       .select()
       .single()
@@ -257,7 +261,7 @@ function MarkOccupiedModal({ room, onClose, onSaved }) {
     const { data, error: updateError } = await supabase
       .schema('pmms')
       .from('property_rooms')
-      .update({ current_status: 'Occupied', tenant_name: tenantName.trim(), void_since: null })
+      .update({ current_status: 'Occupied', tenant_name: tenantName.trim(), void_since: null, void_alert_sent_at: null })
       .eq('id', room.id)
       .select()
       .single()

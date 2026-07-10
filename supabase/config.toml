@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.check-compliance-expiry]
 verify_jwt = false
+
+[functions.check-void-aging]
+verify_jwt = false

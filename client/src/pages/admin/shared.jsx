@@ -221,6 +221,55 @@ export async function fetchComplianceAgingCounts() {
   return counts
 }
 
+// Mirrors computeComplianceAging's role: single source of truth reused by
+// the per-property Rooms tab, the portfolio-wide Voids page, and the
+// dashboard KPI tile. thresholdDays defaults to 45 to match the seeded
+// void_aging_threshold_days setting. "amber" (Aging) kicks in at 50% of
+// the threshold as a visual lead-in to the red/Overdue line -- there's no
+// separate stored admin knob for it, same as GLOBAL_TRIAGE_THRESHOLD/
+// P2_URGENT_THRESHOLD being a hardcoded ratio elsewhere in this file.
+export function computeVoidAging(room, thresholdDays = 45) {
+  if (!room || room.current_status !== 'Void') return null
+  if (!room.void_since) return { tier: 'grey', label: 'Unknown', daysSince: null }
+
+  const voidSince = new Date(room.void_since)
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const daysSince = Math.floor((today - voidSince) / 86400000)
+
+  if (daysSince >= thresholdDays) return { tier: 'red', label: 'Overdue', daysSince }
+  if (daysSince >= thresholdDays * 0.5) return { tier: 'amber', label: 'Aging', daysSince }
+  return { tier: 'green', label: 'Recent', daysSince }
+}
+
+// Shared by the dashboard's Void Aging tiles and the Voids page's own KPI
+// strip, so both always agree exactly -- same cross-check precedent as
+// fetchComplianceAgingCounts/fetchStuckTicketsCount.
+export async function fetchVoidAgingCounts() {
+  const { data: rooms } = await supabase
+    .schema('pmms')
+    .from('property_rooms')
+    .select('current_status, void_since')
+    .eq('current_status', 'Void')
+  const { data: thresholdRow } = await supabase
+    .schema('pmms')
+    .from('settings')
+    .select('setting_value')
+    .eq('setting_key', 'void_aging_threshold_days')
+    .maybeSingle()
+  const thresholdDays = thresholdRow?.setting_value != null ? Number(thresholdRow.setting_value) : 45
+
+  const counts = { overdue: 0, aging: 0, recent: 0 }
+  ;(rooms || []).forEach(r => {
+    const aging = computeVoidAging(r, thresholdDays)
+    if (!aging || aging.tier === 'grey') return
+    if (aging.tier === 'red') counts.overdue += 1
+    else if (aging.tier === 'amber') counts.aging += 1
+    else counts.recent += 1
+  })
+  return counts
+}
+
 export const formatUKDate = (isoString) => {
   if (!isoString) return ''
   const d = new Date(isoString)
@@ -298,6 +347,25 @@ export function formatDurationDays(ms) {
 export function computeAvgTurnaroundMs(completedTickets) {
   if (!completedTickets || completedTickets.length === 0) return null
   return completedTickets.reduce((sum, t) => sum + Math.max(0, new Date(t.completed_at) - new Date(t.created_at)), 0) / completedTickets.length
+}
+
+// Time from a ticket being raised to it first being assigned to a
+// builder -- distinct from total turnaround (created_at -> completed_at).
+// Tickets with no first_assigned_at predate this feature and are excluded
+// rather than treated as a fabricated ~0-minute response time.
+export function computeAvgResponseMs(tickets) {
+  const eligible = (tickets || []).filter(t => t.first_assigned_at)
+  if (eligible.length === 0) return null
+  return eligible.reduce((sum, t) => sum + Math.max(0, new Date(t.first_assigned_at) - new Date(t.created_at)), 0) / eligible.length
+}
+
+// Time actually spent working the job once assigned (first_assigned_at
+// -> completed_at), distinct from total turnaround (created_at ->
+// completed_at) and from response time (created_at -> first_assigned_at).
+export function computeAvgAssignedToCompleteMs(completedTickets) {
+  const eligible = (completedTickets || []).filter(t => t.first_assigned_at)
+  if (eligible.length === 0) return null
+  return eligible.reduce((sum, t) => sum + Math.max(0, new Date(t.completed_at) - new Date(t.first_assigned_at)), 0) / eligible.length
 }
 
 function mondayOf(date) {
@@ -673,7 +741,7 @@ export async function autoReassignDepartingStaffTickets(staffId, staffName, prof
       .from('tickets')
       .update({
         assigned_builder_id: newBuilder.id,
-        ...(promoteToAssigned ? { status: 'Assigned', status_changed_at: new Date().toISOString(), stuck_alert_sent_at: null } : {}),
+        ...(promoteToAssigned ? { status: 'Assigned', status_changed_at: new Date().toISOString(), stuck_alert_sent_at: null, first_assigned_at: new Date().toISOString() } : {}),
       })
       .eq('id', t.id)
 

@@ -124,6 +124,11 @@ export default function AdminSettings() {
   const [complianceAlertsSaving, setComplianceAlertsSaving] = useState(false)
   const [complianceAlertsSaved, setComplianceAlertsSaved] = useState(false)
 
+  const [voidAgingThresholdDays, setVoidAgingThresholdDays] = useState(45)
+  const [voidAlertsEnabled, setVoidAlertsEnabled] = useState(true)
+  const [voidAlertsSaving, setVoidAlertsSaving] = useState(false)
+  const [voidAlertsSaved, setVoidAlertsSaved] = useState(false)
+
   const [roster, setRoster] = useState([])
   const [rosterSaving, setRosterSaving] = useState(false)
   const [rosterSaved, setRosterSaved] = useState(false)
@@ -172,6 +177,8 @@ export default function AdminSettings() {
       if (map.stuck_alerts_enabled != null) setStuckAlertsEnabled(map.stuck_alerts_enabled)
       if (map.compliance_aging_threshold_days != null) setComplianceAgingThresholdDays(map.compliance_aging_threshold_days)
       if (map.compliance_alerts_enabled != null) setComplianceAlertsEnabled(map.compliance_alerts_enabled)
+      if (map.void_aging_threshold_days != null) setVoidAgingThresholdDays(map.void_aging_threshold_days)
+      if (map.void_alerts_enabled != null) setVoidAlertsEnabled(map.void_alerts_enabled)
       if (map.clock_overrun_hours != null) setClockOverrunHours(map.clock_overrun_hours)
       if (map.done_window_hours != null) setDoneWindowHours(map.done_window_hours)
       if (map.clock_distance_threshold_meters != null) setClockDistanceThresholdM(map.clock_distance_threshold_meters)
@@ -535,6 +542,16 @@ export default function AdminSettings() {
     setComplianceAlertsSaving(false)
     setComplianceAlertsSaved(true)
     setTimeout(() => setComplianceAlertsSaved(false), 2000)
+  }
+
+  async function saveVoidAlerts() {
+    setVoidAlertsSaving(true)
+    setVoidAlertsSaved(false)
+    await saveSetting('void_aging_threshold_days', Number(voidAgingThresholdDays))
+    await saveSetting('void_alerts_enabled', voidAlertsEnabled)
+    setVoidAlertsSaving(false)
+    setVoidAlertsSaved(true)
+    setTimeout(() => setVoidAlertsSaved(false), 2000)
   }
 
   async function addRosterContact() {
@@ -1141,6 +1158,34 @@ export default function AdminSettings() {
           {complianceAlertsSaving ? 'Saving...' : 'Save Compliance Alerts'}
         </button>
         {complianceAlertsSaved && <span style={savedTagStyle}>✓ Saved</span>}
+      </SettingsSection>
+
+      {/* Section 4d: Void Aging Alerts */}
+      <SettingsSection
+        title="Void Aging Alerts"
+        subtitle="How many days a room can sit void before it's flagged as overdue across the portfolio. Push notifications only fire once a void passes this threshold."
+        open={!!openSections['void-aging-alerts']}
+        onToggle={() => toggleSection('void-aging-alerts')}
+      >
+        <div style={{ marginBottom: '16px', maxWidth: '260px' }}>
+          <label style={fieldLabelStyle}>Days void before flagged as overdue</label>
+          <input
+            type="number"
+            value={voidAgingThresholdDays}
+            onChange={(e) => setVoidAgingThresholdDays(e.target.value)}
+            style={inputStyle}
+          />
+        </div>
+
+        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: 600, color: '#0f172a', marginBottom: '16px' }}>
+          <input type="checkbox" checked={voidAlertsEnabled} onChange={(e) => setVoidAlertsEnabled(e.target.checked)} />
+          Send push notifications when a void passes the threshold
+        </label>
+
+        <button onClick={saveVoidAlerts} disabled={voidAlertsSaving} style={{ ...saveBtnStyle, opacity: voidAlertsSaving ? 0.6 : 1, cursor: voidAlertsSaving ? 'not-allowed' : 'pointer' }}>
+          {voidAlertsSaving ? 'Saving...' : 'Save Void Aging Alerts'}
+        </button>
+        {voidAlertsSaved && <span style={savedTagStyle}>✓ Saved</span>}
       </SettingsSection>
 
       {/* Section 5: On-Call Roster */}

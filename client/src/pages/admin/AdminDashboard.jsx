@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
-import { priorityTierLabel, fetchFlaggedClockingCount, isTicketStuck, KpiTiles, fetchComplianceAgingCounts } from './shared'
+import { priorityTierLabel, fetchFlaggedClockingCount, isTicketStuck, KpiTiles, fetchComplianceAgingCounts, fetchVoidAgingCounts, computeAvgResponseMs, formatDuration } from './shared'
 
 const DEFAULT_NEW_PROPERTY_WINDOW_HOURS = 48
 
@@ -23,6 +23,7 @@ export default function AdminDashboard({ onNavigate }) {
   const [flaggedLocationsCount, setFlaggedLocationsCount] = useState(0)
   const [stuckThresholds, setStuckThresholds] = useState(null)
   const [complianceCounts, setComplianceCounts] = useState({ expired: 0, dueSoon: 0, noRecord: 0, valid: 0 })
+  const [voidAgingCounts, setVoidAgingCounts] = useState({ overdue: 0, aging: 0, recent: 0 })
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -33,13 +34,14 @@ export default function AdminDashboard({ onNavigate }) {
     fetchFlaggedClockingCount().then(setFlaggedLocationsCount)
     fetchStuckThresholds()
     fetchComplianceAgingCounts().then(setComplianceCounts)
+    fetchVoidAgingCounts().then(setVoidAgingCounts)
   }, [])
 
   async function fetchTickets() {
     const { data, error } = await supabase
       .schema('pmms')
       .from('tickets')
-      .select('id, status, created_at, completed_at, status_changed_at, priority_score, priority_override, mileage_logged')
+      .select('id, status, created_at, completed_at, status_changed_at, first_assigned_at, priority_score, priority_override, mileage_logged')
 
     if (!error) setTickets(data)
     setLoading(false)
@@ -149,11 +151,19 @@ export default function AdminDashboard({ onNavigate }) {
     { label: 'No Record', value: complianceCounts.noRecord, colour: '#94a3b8', tierFilter: 'No Record' },
   ]
 
+  const voidAgingKpis = [
+    { label: 'Overdue Voids', value: voidAgingCounts.overdue, colour: '#dc2626', tierFilter: 'Overdue' },
+    { label: 'Aging Voids', value: voidAgingCounts.aging, colour: '#d97706', tierFilter: 'Aging' },
+    { label: 'Recent Voids', value: voidAgingCounts.recent, colour: '#16a34a', tierFilter: 'Recent' },
+  ]
+
   const pendingSignOffCount = tickets.filter(t => t.status === 'Completed').length
 
   const fleetMileageThisMonth = tickets
     .filter(t => t.completed_at && new Date(t.completed_at) >= monthStart)
     .reduce((sum, t) => sum + (t.mileage_logged || 0), 0)
+
+  const avgResponseMs = computeAvgResponseMs(tickets)
 
   if (loading) return (
     <div style={{ minHeight: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -201,6 +211,15 @@ export default function AdminDashboard({ onNavigate }) {
           <KpiTiles
             kpis={complianceKpis}
             onTileClick={(kpi) => onNavigate?.('compliance', { tierFilter: kpi.tierFilter })}
+          />
+        </div>
+      </DashboardSection>
+
+      <DashboardSection title="Void Aging" background="#ffffff">
+        <div style={{ width: '100%' }}>
+          <KpiTiles
+            kpis={voidAgingKpis}
+            onTileClick={(kpi) => onNavigate?.('voids', { tierFilter: kpi.tierFilter })}
           />
         </div>
       </DashboardSection>
@@ -261,6 +280,17 @@ export default function AdminDashboard({ onNavigate }) {
         >
           <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Flagged Locations</p>
           <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: '#ffffff' }}>{flaggedLocationsCount}</p>
+        </button>
+
+        <button
+          onClick={() => onNavigate?.('reports')}
+          style={{
+            flex: '1 1 220px', background: '#0d9488', borderRadius: '16px', padding: '16px',
+            border: 'none', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', textAlign: 'center',
+          }}
+        >
+          <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Avg. Response Time</p>
+          <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: '#ffffff' }}>{avgResponseMs != null ? formatDuration(avgResponseMs) : 'N/A'}</p>
         </button>
       </DashboardSection>
     </div>

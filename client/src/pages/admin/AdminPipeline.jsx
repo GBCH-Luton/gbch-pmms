@@ -5,7 +5,7 @@ import BuilderProfileModal from './BuilderProfileModal'
 import PropertySearchSelect from '../../components/PropertySearchSelect'
 import { fetchAllMaintenanceCategoryNames } from '../../lib/maintenanceCategories'
 import {
-  priorityTierLabel, priorityBadgeStyle, statusColour, statusLabel, formatUKDate, formatUKDateTime, formatDurationDays,
+  priorityTierLabel, priorityBadgeStyle, statusColour, statusLabel, formatUKDate, formatUKDateTime, formatDurationDays, formatDuration,
   filterSelectStyle, thStyle, tdStyle, actionBtnStyle,
   modalOverlayStyle, modalCardStyle, modalTitleStyle, modalSubtitleStyle, modalLabelStyle,
   modalTextareaStyle, modalErrorStyle, modalCancelBtnStyle, modalConfirmBtnStyle, radioRowStyle,
@@ -165,7 +165,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
       .select(`
         id, ticket_number, status, category, description, room, priority_score, priority_override, mileage_logged,
         no_access_flag, no_access_note, hold_reason, hold_note, completion_note, photo_url, completion_photo_url,
-        completed_at, created_at, status_changed_at, assigned_builder_id, property_id
+        completed_at, created_at, status_changed_at, first_assigned_at, assigned_builder_id, property_id
       `)
       .order('created_at', { ascending: false })
 
@@ -216,7 +216,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
       .from('tickets')
       .update({
         assigned_builder_id: reassignBuilderId,
-        ...(promoteToAssigned ? { status: 'Assigned', status_changed_at: new Date().toISOString(), stuck_alert_sent_at: null } : {}),
+        ...(promoteToAssigned ? { status: 'Assigned', status_changed_at: new Date().toISOString(), stuck_alert_sent_at: null, first_assigned_at: new Date().toISOString() } : {}),
       })
       .eq('id', t.id)
 
@@ -266,7 +266,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
         .from('tickets')
         .update({
           assigned_builder_id: bulkReassignBuilderId,
-          ...(promoteToAssigned ? { status: 'Assigned', status_changed_at: new Date().toISOString(), stuck_alert_sent_at: null } : {}),
+          ...(promoteToAssigned ? { status: 'Assigned', status_changed_at: new Date().toISOString(), stuck_alert_sent_at: null, first_assigned_at: new Date().toISOString() } : {}),
         })
         .eq('id', t.id)
 
@@ -753,6 +753,11 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
 
                               <p style={expandLabelStyle}>Priority Score</p>
                               <p style={expandValueStyle}>{t.priority_score} pts</p>
+
+                              <p style={expandLabelStyle}>Time to Assignment</p>
+                              <p style={expandValueStyle}>
+                                {t.first_assigned_at ? formatDuration(new Date(t.first_assigned_at) - new Date(t.created_at)) : 'Not yet assigned'}
+                              </p>
 
                               {t.mileage_logged != null && (
                                 <>

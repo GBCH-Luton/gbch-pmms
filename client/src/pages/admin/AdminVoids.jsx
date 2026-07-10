@@ -1,0 +1,190 @@
+// Portfolio-wide void-room rollup -- one row per currently-void room,
+// sorted/filterable by how long it's been void. Deliberately read/
+// navigate-only: PropertyRoomsTab.jsx (a property's own Rooms tab)
+// remains the one place edits actually happen; a row click here just
+// deep-links into that tab instead of duplicating any edit UI.
+
+import { useState, useEffect } from 'react'
+import { supabase } from '../../lib/supabase'
+import PropertySearchSelect from '../../components/PropertySearchSelect'
+import {
+  RagPill, computeVoidAging, formatUKDate,
+  filterSelectStyle, thStyle, tdStyle, KpiTiles,
+} from './shared'
+
+const TIER_OPTIONS = ['All', 'Overdue', 'Aging', 'Recent', 'Unknown']
+
+function voidCategory(aging) {
+  if (aging.tier === 'grey') return 'Unknown'
+  if (aging.tier === 'red') return 'Overdue'
+  if (aging.tier === 'amber') return 'Aging'
+  return 'Recent'
+}
+
+export default function AdminVoids({ onNavigate, initialTierFilter, onInitialTierFilterConsumed }) {
+  const [rooms, setRooms] = useState([])
+  const [properties, setProperties] = useState([])
+  const [thresholdDays, setThresholdDays] = useState(45)
+  const [loading, setLoading] = useState(true)
+
+  const [tierFilter, setTierFilter] = useState('All')
+  const [propertyFilter, setPropertyFilter] = useState('')
+
+  const [sortColumn, setSortColumn] = useState(null)
+  const [sortDirection, setSortDirection] = useState('asc')
+
+  useEffect(() => {
+    fetchAll()
+    if (initialTierFilter) setTierFilter(initialTierFilter)
+    if (initialTierFilter) onInitialTierFilterConsumed?.()
+  }, [])
+
+  async function fetchAll() {
+    setLoading(true)
+    const [{ data: roomsData }, { data: propertiesData }, { data: thresholdRow }] = await Promise.all([
+      supabase.schema('pmms').from('property_rooms').select('id, property_id, room_name, room_type, current_status, void_since').eq('current_status', 'Void'),
+      supabase.schema('pmms').from('properties').select('id, address, postcode').order('address'),
+      supabase.schema('pmms').from('settings').select('setting_value').eq('setting_key', 'void_aging_threshold_days').maybeSingle(),
+    ])
+    setRooms(roomsData || [])
+    setProperties(propertiesData || [])
+    if (thresholdRow?.setting_value != null) setThresholdDays(Number(thresholdRow.setting_value))
+    setLoading(false)
+  }
+
+  const propertiesById = {}
+  properties.forEach(p => { propertiesById[p.id] = p })
+
+  const rows = rooms.map(room => {
+    const aging = computeVoidAging(room, thresholdDays)
+    return { room, property: propertiesById[room.property_id], aging, category: voidCategory(aging) }
+  }).filter(r => r.property)
+
+  const kpis = [
+    { label: 'Total Void', value: rows.length, colour: '#64748b', tierFilter: 'All' },
+    { label: 'Overdue', value: rows.filter(r => r.category === 'Overdue').length, colour: '#dc2626', tierFilter: 'Overdue' },
+    { label: 'Aging', value: rows.filter(r => r.category === 'Aging').length, colour: '#d97706', tierFilter: 'Aging' },
+    { label: 'Recent', value: rows.filter(r => r.category === 'Recent').length, colour: '#16a34a', tierFilter: 'Recent' },
+  ]
+
+  function applyKpiFilter(kpi) {
+    clearFilters()
+    setTierFilter(kpi.tierFilter || 'All')
+  }
+
+  function clearFilters() {
+    setTierFilter('All')
+    setPropertyFilter('')
+  }
+
+  const filteredRows = rows.filter(r => {
+    if (tierFilter !== 'All' && r.category !== tierFilter) return false
+    if (propertyFilter && String(r.property.id) !== String(propertyFilter)) return false
+    return true
+  })
+
+  function sortValue(r, column) {
+    switch (column) {
+      case 'property': return (r.property.address || '').toLowerCase()
+      case 'room': return (r.room.room_name || '').toLowerCase()
+      case 'roomType': return (r.room.room_type || '').toLowerCase()
+      case 'status': return r.category
+      case 'voidSince': return r.room.void_since ? new Date(r.room.void_since).getTime() : 0
+      case 'daysSince': return r.aging.daysSince ?? -Infinity
+      default: return ''
+    }
+  }
+
+  function toggleSort(column) {
+    if (sortColumn === column) {
+      setSortDirection(d => (d === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setSortColumn(column)
+      setSortDirection('asc')
+    }
+  }
+
+  function sortArrow(column) {
+    if (sortColumn !== column) return ''
+    return sortDirection === 'asc' ? ' ▲' : ' ▼'
+  }
+
+  const sortedRows = sortColumn
+    ? [...filteredRows].sort((a, b) => {
+        const va = sortValue(a, sortColumn)
+        const vb = sortValue(b, sortColumn)
+        if (va < vb) return sortDirection === 'asc' ? -1 : 1
+        if (va > vb) return sortDirection === 'asc' ? 1 : -1
+        return 0
+      })
+    : filteredRows
+
+  function goToPropertyRooms(row) {
+    onNavigate?.('properties', { propertyId: row.property.id, tab: 'Rooms' })
+  }
+
+  if (loading) return (
+    <div style={{ minHeight: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <p style={{ color: '#94a3b8', fontWeight: 600, fontFamily: 'system-ui' }}>Loading void rooms...</p>
+    </div>
+  )
+
+  return (
+    <div>
+      <KpiTiles kpis={kpis} onTileClick={applyKpiFilter} />
+
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
+        <select value={tierFilter} onChange={(e) => setTierFilter(e.target.value)} style={filterSelectStyle}>
+          {TIER_OPTIONS.map(c => <option key={c} value={c}>{c === 'All' ? 'All Statuses' : c}</option>)}
+        </select>
+        <div style={{ width: '220px' }}>
+          <PropertySearchSelect properties={properties} value={propertyFilter} onChange={setPropertyFilter} placeholder="All Properties" />
+        </div>
+        <button onClick={clearFilters} style={{ padding: '8px 14px', borderRadius: '10px', border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
+          Clear filters
+        </button>
+      </div>
+
+      <div style={{ background: '#fff', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+              <th style={{ ...thStyle, cursor: 'pointer' }} onClick={() => toggleSort('property')}>Property{sortArrow('property')}</th>
+              <th style={{ ...thStyle, cursor: 'pointer' }} onClick={() => toggleSort('room')}>Room{sortArrow('room')}</th>
+              <th style={{ ...thStyle, cursor: 'pointer' }} onClick={() => toggleSort('roomType')}>Room Type{sortArrow('roomType')}</th>
+              <th style={{ ...thStyle, cursor: 'pointer' }} onClick={() => toggleSort('status')}>Status{sortArrow('status')}</th>
+              <th style={{ ...thStyle, cursor: 'pointer' }} onClick={() => toggleSort('voidSince')}>Void Since{sortArrow('voidSince')}</th>
+              <th style={{ ...thStyle, cursor: 'pointer' }} onClick={() => toggleSort('daysSince')}>Days Void{sortArrow('daysSince')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sortedRows.length === 0 && (
+              <tr>
+                <td colSpan={6} style={{ ...tdStyle, textAlign: 'center', color: '#94a3b8', padding: '32px' }}>
+                  No void rooms match these filters.
+                </td>
+              </tr>
+            )}
+            {sortedRows.map(r => (
+              <tr
+                key={r.room.id}
+                onClick={() => goToPropertyRooms(r)}
+                style={{ borderBottom: '1px solid #f1f5f9', cursor: 'pointer' }}
+              >
+                <td style={tdStyle}>
+                  <span style={{ display: 'block', fontWeight: 700, color: '#0f172a' }}>{r.property.address}</span>
+                  {r.property.postcode && <span style={{ fontSize: '12px', color: '#94a3b8' }}>{r.property.postcode}</span>}
+                </td>
+                <td style={tdStyle}>{r.room.room_name}</td>
+                <td style={tdStyle}>{r.room.room_type || '—'}</td>
+                <td style={tdStyle}><RagPill tier={r.aging.tier} label={r.aging.label} /></td>
+                <td style={tdStyle}>{r.room.void_since ? formatUKDate(r.room.void_since) : '—'}</td>
+                <td style={tdStyle}>{r.aging.daysSince != null ? `${r.aging.daysSince}d` : '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
