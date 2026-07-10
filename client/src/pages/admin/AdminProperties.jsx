@@ -160,9 +160,19 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
   const [addError, setAddError] = useState('')
 
   useEffect(() => {
-    fetchProperties()
     fetchNewPropertyWindow()
     fetchVoidHistoryCounts()
+
+    fetchProperties().then((fetched) => {
+      if (initialPropertiesFilter?.propertyId) {
+        const match = fetched.find(p => String(p.id) === String(initialPropertiesFilter.propertyId))
+        if (match) {
+          setSelectedProperty(match)
+          setActiveTab(initialPropertiesFilter.tab || 'Compliance')
+        }
+        onPropertiesFilterConsumed?.()
+      }
+    })
 
     if (initialPropertiesFilter?.mode) {
       setFilterMode(initialPropertiesFilter.mode)
@@ -198,13 +208,14 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
       setProperties([])
       setLoadError(error.message)
       setLoading(false)
-      return
+      return []
     }
 
     setProperties(data || [])
     await fetchOpenTicketCounts(data.map(p => p.id))
     await fetchVoidRoomCounts(data.map(p => p.id))
     setLoading(false)
+    return data || []
   }
 
   async function fetchOpenTicketCounts(propertyIds) {

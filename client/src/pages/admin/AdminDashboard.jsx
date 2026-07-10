@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
-import { priorityTierLabel, fetchFlaggedClockingCount, isTicketStuck, KpiTiles } from './shared'
+import { priorityTierLabel, fetchFlaggedClockingCount, isTicketStuck, KpiTiles, fetchComplianceAgingCounts } from './shared'
 
 const DEFAULT_NEW_PROPERTY_WINDOW_HOURS = 48
 
@@ -22,6 +22,7 @@ export default function AdminDashboard({ onNavigate }) {
   const [clockedInCount, setClockedInCount] = useState(0)
   const [flaggedLocationsCount, setFlaggedLocationsCount] = useState(0)
   const [stuckThresholds, setStuckThresholds] = useState(null)
+  const [complianceCounts, setComplianceCounts] = useState({ expired: 0, dueSoon: 0, noRecord: 0, valid: 0 })
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -31,6 +32,7 @@ export default function AdminDashboard({ onNavigate }) {
     fetchClockedInCount()
     fetchFlaggedClockingCount().then(setFlaggedLocationsCount)
     fetchStuckThresholds()
+    fetchComplianceAgingCounts().then(setComplianceCounts)
   }, [])
 
   async function fetchTickets() {
@@ -141,6 +143,12 @@ export default function AdminDashboard({ onNavigate }) {
     { label: 'This Month', value: completedTickets.filter(t => new Date(t.completed_at) >= monthStart).length },
   ].map(kpi => ({ ...kpi, statusFilter: 'Completed' }))
 
+  const complianceKpis = [
+    { label: 'Expired Certs', value: complianceCounts.expired, colour: '#dc2626', tierFilter: 'Expired' },
+    { label: 'Due Soon', value: complianceCounts.dueSoon, colour: '#d97706', tierFilter: 'Due Soon' },
+    { label: 'No Record', value: complianceCounts.noRecord, colour: '#94a3b8', tierFilter: 'No Record' },
+  ]
+
   const pendingSignOffCount = tickets.filter(t => t.status === 'Completed').length
 
   const fleetMileageThisMonth = tickets
@@ -160,6 +168,16 @@ export default function AdminDashboard({ onNavigate }) {
           <KpiTiles
             kpis={kpis}
             onTileClick={(kpi) => onNavigate?.('pipeline', { statusFilter: kpi.statusFilter, priorityFilter: kpi.priorityFilter, stuckOnly: kpi.stuckOnly })}
+          />
+        </div>
+      </DashboardSection>
+
+      <DashboardSection title="Compliance" background="#ffffff">
+        <div style={{ width: '100%' }}>
+          <KpiTiles
+            kpis={complianceKpis}
+            columns={3}
+            onTileClick={(kpi) => onNavigate?.('compliance', { tierFilter: kpi.tierFilter })}
           />
         </div>
       </DashboardSection>

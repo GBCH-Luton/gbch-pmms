@@ -136,6 +136,91 @@ export function KpiTiles({ kpis, columns = 4, onTileClick }) {
   )
 }
 
+// Moved out of PropertyComplianceTab.jsx (where these used to be private to
+// that one file) so the portfolio-wide Compliance page and dashboard tile
+// can compute the exact same status a property's own tab already shows --
+// same "single source of truth" precedent as isTicketStuck.
+export const COMPLIANCE_TYPES = [
+  { key: 'gas_safety', title: 'Gas Safety (CP12)' },
+  { key: 'electrical_safety', title: 'Electrical Safety (EICR)' },
+  { key: 'pat_testing', title: 'PAT Testing' },
+  { key: 'fire_risk_assessment', title: 'Fire Risk Assessment' },
+  { key: 'fire_alarm_test_log', title: 'Fire Alarm Test Log' },
+  { key: 'fire_extinguisher_check', title: 'Fire Extinguisher Check', dateLabel: 'Next Due Date' },
+  { key: 'fire_extinguisher_service', title: 'Fire Extinguisher Service' },
+  { key: 'legionella_risk_assessment', title: 'Legionella Risk Assessment' },
+  { key: 'asbestos_management', title: 'Asbestos Management' },
+  { key: 'lift_safety', title: 'Lift Safety' },
+  { key: 'health_safety_inspection', title: 'Health & Safety Inspection' },
+]
+
+export const RAG_STYLES = {
+  green: { bg: '#dcfce7', color: '#16a34a' },
+  amber: { bg: '#fef3c7', color: '#d97706' },
+  red: { bg: '#fee2e2', color: '#dc2626' },
+  grey: { bg: '#f1f5f9', color: '#64748b' },
+}
+
+export function RagPill({ tier, label }) {
+  const style = RAG_STYLES[tier]
+  return (
+    <span style={{ fontSize: '11px', fontWeight: 800, color: style.color, background: style.bg, padding: '4px 12px', borderRadius: '20px', whiteSpace: 'nowrap' }}>
+      {label}
+    </span>
+  )
+}
+
+// Pure and render-safe -- used identically by the per-property Compliance
+// tab, the portfolio-wide Compliance page, and the dashboard KPI tiles.
+// thresholdDays defaults to 90 to match this app's behaviour before the
+// value became admin-configurable.
+export function computeComplianceAging(record, thresholdDays = 90) {
+  if (!record) return { tier: 'red', label: 'No Record', daysLeft: null }
+  if (record.not_applicable) return { tier: 'grey', label: 'N/A', daysLeft: null }
+  if (!record.expiry_date) return { tier: 'red', label: 'No Record', daysLeft: null }
+
+  const expiry = new Date(record.expiry_date)
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const daysLeft = Math.floor((expiry - today) / 86400000)
+
+  if (daysLeft < 0) return { tier: 'red', label: 'Expired', daysLeft }
+  if (daysLeft <= thresholdDays) return { tier: 'amber', label: `Due in ${daysLeft}d`, daysLeft }
+  return { tier: 'green', label: 'Valid', daysLeft }
+}
+
+// Shared by the dashboard's "Compliance" tiles and the portfolio Compliance
+// page's own KPI strip, so both always agree exactly -- same cross-check
+// precedent as fetchStuckTicketsCount().
+export async function fetchComplianceAgingCounts() {
+  const { data: properties } = await supabase.schema('pmms').from('properties').select('id')
+  const { data: records } = await supabase.schema('pmms').from('property_compliance').select('*')
+  const { data: thresholdRow } = await supabase
+    .schema('pmms')
+    .from('settings')
+    .select('setting_value')
+    .eq('setting_key', 'compliance_aging_threshold_days')
+    .maybeSingle()
+  const thresholdDays = thresholdRow?.setting_value != null ? Number(thresholdRow.setting_value) : 90
+
+  const recordsByKey = {}
+  ;(records || []).forEach(r => { recordsByKey[`${r.property_id}:${r.cert_type}`] = r })
+
+  const counts = { expired: 0, dueSoon: 0, noRecord: 0, valid: 0 }
+  ;(properties || []).forEach(p => {
+    COMPLIANCE_TYPES.forEach(type => {
+      const record = recordsByKey[`${p.id}:${type.key}`]
+      const aging = computeComplianceAging(record, thresholdDays)
+      if (aging.tier === 'grey') return
+      if (aging.label === 'No Record') counts.noRecord += 1
+      else if (aging.label === 'Expired') counts.expired += 1
+      else if (aging.tier === 'amber') counts.dueSoon += 1
+      else counts.valid += 1
+    })
+  })
+  return counts
+}
+
 export const formatUKDate = (isoString) => {
   if (!isoString) return ''
   const d = new Date(isoString)

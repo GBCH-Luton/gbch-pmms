@@ -32,7 +32,7 @@ const expandToggleBtnStyle = { width: '32px', height: '32px', borderRadius: '8px
 const orderInputStyle = { width: '40px', height: '32px', padding: 0, borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '13px', fontWeight: 700, color: '#475569', textAlign: 'center', boxSizing: 'border-box', flexShrink: 0 }
 const removeBtnStyle = { padding: '8px 14px', background: '#fff', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', flexShrink: 0, marginLeft: 'auto' }
 
-const SECTION_IDS = ['priority-thresholds', 'issue-scores', 'compliance-types', 'clocking-rules', 'stuck-ticket-alerts', 'on-call-roster', 'dashboard-metrics']
+const SECTION_IDS = ['priority-thresholds', 'issue-scores', 'compliance-types', 'clocking-rules', 'stuck-ticket-alerts', 'compliance-alerts', 'on-call-roster', 'dashboard-metrics']
 
 function SettingsSection({ title, subtitle, headerExtra, open, onToggle, children }) {
   return (
@@ -119,6 +119,11 @@ export default function AdminSettings() {
   const [stuckAlertsSaving, setStuckAlertsSaving] = useState(false)
   const [stuckAlertsSaved, setStuckAlertsSaved] = useState(false)
 
+  const [complianceAgingThresholdDays, setComplianceAgingThresholdDays] = useState(90)
+  const [complianceAlertsEnabled, setComplianceAlertsEnabled] = useState(true)
+  const [complianceAlertsSaving, setComplianceAlertsSaving] = useState(false)
+  const [complianceAlertsSaved, setComplianceAlertsSaved] = useState(false)
+
   const [roster, setRoster] = useState([])
   const [rosterSaving, setRosterSaving] = useState(false)
   const [rosterSaved, setRosterSaved] = useState(false)
@@ -165,6 +170,8 @@ export default function AdminSettings() {
       }
       if (map.stuck_ticket_thresholds) setStuckThresholds(map.stuck_ticket_thresholds)
       if (map.stuck_alerts_enabled != null) setStuckAlertsEnabled(map.stuck_alerts_enabled)
+      if (map.compliance_aging_threshold_days != null) setComplianceAgingThresholdDays(map.compliance_aging_threshold_days)
+      if (map.compliance_alerts_enabled != null) setComplianceAlertsEnabled(map.compliance_alerts_enabled)
       if (map.clock_overrun_hours != null) setClockOverrunHours(map.clock_overrun_hours)
       if (map.done_window_hours != null) setDoneWindowHours(map.done_window_hours)
       if (map.clock_distance_threshold_meters != null) setClockDistanceThresholdM(map.clock_distance_threshold_meters)
@@ -518,6 +525,16 @@ export default function AdminSettings() {
     setStuckAlertsSaving(false)
     setStuckAlertsSaved(true)
     setTimeout(() => setStuckAlertsSaved(false), 2000)
+  }
+
+  async function saveComplianceAlerts() {
+    setComplianceAlertsSaving(true)
+    setComplianceAlertsSaved(false)
+    await saveSetting('compliance_aging_threshold_days', Number(complianceAgingThresholdDays))
+    await saveSetting('compliance_alerts_enabled', complianceAlertsEnabled)
+    setComplianceAlertsSaving(false)
+    setComplianceAlertsSaved(true)
+    setTimeout(() => setComplianceAlertsSaved(false), 2000)
   }
 
   async function addRosterContact() {
@@ -1096,6 +1113,34 @@ export default function AdminSettings() {
           {stuckAlertsSaving ? 'Saving...' : 'Save Stuck Ticket Alerts'}
         </button>
         {stuckAlertsSaved && <span style={savedTagStyle}>✓ Saved</span>}
+      </SettingsSection>
+
+      {/* Section 4c: Compliance Alerts */}
+      <SettingsSection
+        title="Compliance Alerts"
+        subtitle="How many days before a certificate/inspection expiry it's flagged as due-soon across the portfolio. Push notifications only fire once a record actually expires."
+        open={!!openSections['compliance-alerts']}
+        onToggle={() => toggleSection('compliance-alerts')}
+      >
+        <div style={{ marginBottom: '16px', maxWidth: '260px' }}>
+          <label style={fieldLabelStyle}>Days before expiry to flag as due-soon</label>
+          <input
+            type="number"
+            value={complianceAgingThresholdDays}
+            onChange={(e) => setComplianceAgingThresholdDays(e.target.value)}
+            style={inputStyle}
+          />
+        </div>
+
+        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: 600, color: '#0f172a', marginBottom: '16px' }}>
+          <input type="checkbox" checked={complianceAlertsEnabled} onChange={(e) => setComplianceAlertsEnabled(e.target.checked)} />
+          Send push notifications when a certificate expires
+        </label>
+
+        <button onClick={saveComplianceAlerts} disabled={complianceAlertsSaving} style={{ ...saveBtnStyle, opacity: complianceAlertsSaving ? 0.6 : 1, cursor: complianceAlertsSaving ? 'not-allowed' : 'pointer' }}>
+          {complianceAlertsSaving ? 'Saving...' : 'Save Compliance Alerts'}
+        </button>
+        {complianceAlertsSaved && <span style={savedTagStyle}>✓ Saved</span>}
       </SettingsSection>
 
       {/* Section 5: On-Call Roster */}

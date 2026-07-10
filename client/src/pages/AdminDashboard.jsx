@@ -6,6 +6,7 @@ import gbchLogo from '../assets/gbch-logo.svg'
 import AdminDashboardPage from './admin/AdminDashboard'
 import AdminPipeline from './admin/AdminPipeline'
 import AdminProperties from './admin/AdminProperties'
+import AdminCompliance from './admin/AdminCompliance'
 import AdminSignOff from './admin/AdminSignOff'
 import AdminBuilders from './admin/AdminBuilders'
 import AdminClocking from './admin/AdminClocking'
@@ -20,6 +21,7 @@ const NAV_ITEMS = [
   { key: 'dashboard', label: 'Dashboard', Component: AdminDashboardPage },
   { key: 'pipeline', label: 'Pipeline', Component: AdminPipeline },
   { key: 'properties', label: 'Properties', Component: AdminProperties },
+  { key: 'compliance', label: 'Compliance', Component: AdminCompliance },
   { key: 'sign-off', label: 'Sign-Off', Component: AdminSignOff },
   { key: 'builders', label: 'Staff', Component: AdminBuilders },
   { key: 'clocking', label: 'Clocking', Component: AdminClocking },
@@ -51,6 +53,7 @@ export default function AdminDashboard({ profile }) {
   const [pipelineInitialPriorityFilter, setPipelineInitialPriorityFilter] = useState(null)
   const [pipelineInitialStuckFilter, setPipelineInitialStuckFilter] = useState(null)
   const [propertiesInitialFilter, setPropertiesInitialFilter] = useState(null)
+  const [complianceInitialTierFilter, setComplianceInitialTierFilter] = useState(null)
   const [pushEnabled, setPushEnabled] = useState(false)
   const [pushError, setPushError] = useState('')
 
@@ -119,6 +122,12 @@ export default function AdminDashboard({ profile }) {
     }
     if (key === 'properties' && opts.filterMode) {
       setPropertiesInitialFilter({ mode: opts.filterMode })
+    }
+    if (key === 'properties' && opts.propertyId) {
+      setPropertiesInitialFilter({ propertyId: opts.propertyId, tab: opts.tab })
+    }
+    if (key === 'compliance' && opts.tierFilter) {
+      setComplianceInitialTierFilter(opts.tierFilter)
     }
   }
 
@@ -265,6 +274,8 @@ export default function AdminDashboard({ profile }) {
             onInitialFilterConsumed={() => { setPipelineInitialFilter(null); setPipelineInitialPriorityFilter(null); setPipelineInitialStuckFilter(null) }}
             initialPropertiesFilter={currentPage === 'properties' ? propertiesInitialFilter : null}
             onPropertiesFilterConsumed={() => setPropertiesInitialFilter(null)}
+            initialTierFilter={currentPage === 'compliance' ? complianceInitialTierFilter : null}
+            onInitialTierFilterConsumed={() => setComplianceInitialTierFilter(null)}
           />
         </div>
       </div>
