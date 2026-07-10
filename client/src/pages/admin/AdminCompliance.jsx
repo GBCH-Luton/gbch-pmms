@@ -146,7 +146,7 @@ export default function AdminCompliance({ onNavigate, initialTierFilter, onIniti
 
   return (
     <div>
-      <KpiTiles kpis={kpis} columns={5} onTileClick={applyKpiFilter} />
+      <KpiTiles kpis={kpis} onTileClick={applyKpiFilter} />
 
       <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
         <select value={tierFilter} onChange={(e) => setTierFilter(e.target.value)} style={filterSelectStyle}>

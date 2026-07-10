@@ -200,7 +200,6 @@ export default function AdminDashboard({ onNavigate }) {
         <div style={{ width: '100%' }}>
           <KpiTiles
             kpis={complianceKpis}
-            columns={3}
             onTileClick={(kpi) => onNavigate?.('compliance', { tierFilter: kpi.tierFilter })}
           />
         </div>

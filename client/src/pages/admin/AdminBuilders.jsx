@@ -18,8 +18,8 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { normalizeCustomRoles } from '../../lib/roles'
 import { attachProperties } from '../../lib/properties'
-import BuilderProfileModal from './BuilderProfileModal'
-import { thStyle, tdStyle, actionBtnStyle, STAFF_AVAILABILITY_OPTIONS, STAFF_AVAILABILITY_STYLES, Avatar } from './shared'
+import BuilderProfilePage from './BuilderProfilePage'
+import { thStyle, tdStyle, actionBtnStyle, STAFF_AVAILABILITY_OPTIONS, STAFF_AVAILABILITY_STYLES, Avatar, computeDutyStatus } from './shared'
 
 const BUILT_IN_ROLES = ['Admin', 'Builder', 'Cleaner', 'Support Worker']
 
@@ -28,7 +28,7 @@ export default function AdminBuilders() {
   const [tickets, setTickets] = useState([])
   const [customRoles, setCustomRoles] = useState([])
   const [loading, setLoading] = useState(true)
-  const [builderProfileId, setBuilderProfileId] = useState(null)
+  const [selectedStaffId, setSelectedStaffId] = useState(null)
   const [roleFilter, setRoleFilter] = useState('All')
 
   useEffect(() => {
@@ -110,15 +110,7 @@ export default function AdminBuilders() {
   }
 
   function dutyFor(staffId) {
-    const theirs = tickets.filter(t => t.assigned_builder_id === staffId)
-    const activeJobs = theirs.filter(t => t.status !== 'Completed' && t.status !== 'Archived')
-    const inProgressJob = theirs.find(t => t.status === 'In Progress')
-
-    let badge = { label: 'Standby / Idle', bg: '#f1f5f9', color: '#94a3b8' }
-    if (inProgressJob) badge = { label: 'On-Site Active', bg: '#dcfce7', color: '#16a34a' }
-    else if (activeJobs.length > 0) badge = { label: 'Assigned / Transit', bg: '#dbeafe', color: '#1d4ed8' }
-
-    return { activeJobs, inProgressJob, badge, onDuty: !!inProgressJob }
+    return computeDutyStatus(tickets.filter(t => t.assigned_builder_id === staffId))
   }
 
   if (loading) return (
@@ -126,6 +118,10 @@ export default function AdminBuilders() {
       <p style={{ color: '#94a3b8', fontWeight: 600, fontFamily: 'system-ui' }}>Loading staff...</p>
     </div>
   )
+
+  if (selectedStaffId) {
+    return <BuilderProfilePage staffId={selectedStaffId} onBack={() => setSelectedStaffId(null)} />
+  }
 
   // Admin is the IT-only tier managed on the separate "Admin" page -- this
   // page is the Maintenance Manager's day-to-day team view, so IT admins
@@ -223,7 +219,7 @@ export default function AdminBuilders() {
                   <tr key={b.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                     <td style={tdStyle}>
                       <div
-                        onClick={() => setBuilderProfileId(b.id)}
+                        onClick={() => setSelectedStaffId(b.id)}
                         style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}
                       >
                         <Avatar name={b.name} photoUrl={b.photo_url} size={28} />
@@ -272,7 +268,7 @@ export default function AdminBuilders() {
                     </td>
                     <td style={tdStyle}>{activeJobs.length}</td>
                     <td style={{ ...tdStyle, textAlign: 'right' }}>
-                      <button onClick={() => setBuilderProfileId(b.id)} style={actionBtnStyle}>View Profile</button>
+                      <button onClick={() => setSelectedStaffId(b.id)} style={actionBtnStyle}>View Profile</button>
                     </td>
                   </tr>
                 )
@@ -281,8 +277,6 @@ export default function AdminBuilders() {
           </table>
         </div>
       </div>
-
-      <BuilderProfileModal builderId={builderProfileId} onClose={() => setBuilderProfileId(null)} />
     </div>
   )
 }

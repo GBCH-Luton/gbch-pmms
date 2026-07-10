@@ -11,7 +11,7 @@ import { attachProperties } from '../../lib/properties'
 import { fetchAllMaintenanceCategoryNames } from '../../lib/maintenanceCategories'
 import {
   formatDuration, filterSelectStyle, thStyle, tdStyle,
-  fetchAssignableBuilders, resolveCategoryDivision,
+  fetchAssignableBuilders, resolveCategoryDivision, computeAvgTurnaroundMs, buildWeeklyTrend,
 } from './shared'
 import SimpleBarChart from '../../components/SimpleBarChart'
 
@@ -30,21 +30,6 @@ function isoDateNDaysAgo(n) {
 
 function todayIso() {
   return new Date().toISOString().slice(0, 10)
-}
-
-function mondayOf(date) {
-  const d = new Date(date)
-  const day = d.getDay()
-  const diff = (day === 0 ? -6 : 1) - day
-  d.setDate(d.getDate() + diff)
-  d.setHours(0, 0, 0, 0)
-  return d
-}
-
-function shortLabel(date) {
-  const dd = String(date.getDate()).padStart(2, '0')
-  const mm = String(date.getMonth() + 1).padStart(2, '0')
-  return `${dd}/${mm}`
 }
 
 function avgMsLabel(ms) {
@@ -130,30 +115,10 @@ export default function AdminReports() {
 
   const currentlyOpen = scopedTickets.filter(t => t.status !== 'Completed' && t.status !== 'Archived' && t.status !== 'Cancelled')
 
-  const avgTurnaroundMs = completedInRange.length > 0
-    ? completedInRange.reduce((sum, t) => sum + Math.max(0, new Date(t.completed_at) - new Date(t.created_at)), 0) / completedInRange.length
-    : null
+  const avgTurnaroundMs = computeAvgTurnaroundMs(completedInRange)
 
   // Weekly trend across the whole selected range, including empty weeks.
-  const weekBuckets = []
-  let cursor = mondayOf(fromDate)
-  const rangeEnd = new Date(toTime)
-  while (cursor <= rangeEnd) {
-    weekBuckets.push(new Date(cursor))
-    cursor = new Date(cursor.getTime() + 7 * 86400000)
-  }
-  const trendData = weekBuckets.map(weekStart => {
-    const weekEnd = new Date(weekStart.getTime() + 7 * 86400000)
-    const createdCount = createdInRange.filter(t => {
-      const c = new Date(t.created_at)
-      return c >= weekStart && c < weekEnd
-    }).length
-    const completedCount = completedInRange.filter(t => {
-      const c = new Date(t.completed_at)
-      return c >= weekStart && c < weekEnd
-    }).length
-    return { label: shortLabel(weekStart), values: [createdCount, completedCount] }
-  })
+  const trendData = buildWeeklyTrend(fromDate, toDate, createdInRange, completedInRange)
 
   // Category/division breakdown, tickets raised in range.
   const breakdownCounts = {}
@@ -182,10 +147,7 @@ export default function AdminReports() {
     .map(b => {
       const assigned = createdInRange.filter(t => t.assigned_builder_id === b.id)
       const completed = completedInRange.filter(t => t.assigned_builder_id === b.id)
-      const avgMs = completed.length > 0
-        ? completed.reduce((sum, t) => sum + Math.max(0, new Date(t.completed_at) - new Date(t.created_at)), 0) / completed.length
-        : null
-      return { id: b.id, name: b.name, assignedCount: assigned.length, completedCount: completed.length, avgMs }
+      return { id: b.id, name: b.name, assignedCount: assigned.length, completedCount: completed.length, avgMs: computeAvgTurnaroundMs(completed) }
     })
     .filter(w => w.assignedCount > 0 || w.completedCount > 0)
     .sort((a, b) => b.assignedCount - a.assignedCount)

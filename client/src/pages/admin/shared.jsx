@@ -110,23 +110,23 @@ export function isTicketStuck(ticket, thresholdsSetting, nowMs = Date.now()) {
   return (nowMs - new Date(changedAt).getTime()) >= thresholdMs
 }
 
-// Shared by the dashboard's "Ticket Pipeline" tiles and the Pipeline
-// page's own metrics strip, so both stay pixel-identical and any layout
-// fix (e.g. the odd-tile-count spanning trick) only has to happen once.
+// Shared by the dashboard's "Ticket Pipeline"/"Compliance" tiles and the
+// Pipeline/Compliance pages' own metrics strips, so they all stay pixel-
+// identical. Flexbox (not a fixed-column grid) so it actually reflows on
+// narrow screens the same way the rest of this dashboard's tile rows
+// already do -- a fixed column count doesn't reflow, which squeezed these
+// tiles or forced horizontal overflow on small devices. This also fills an
+// uneven last row for free (each tile's flex-grow shares the leftover
+// space) instead of needing a manual "span the gap" calculation.
 // `kpis` items: { label, value, colour, ...whatever onTileClick needs }.
-export function KpiTiles({ kpis, columns = 4, onTileClick }) {
+export function KpiTiles({ kpis, onTileClick }) {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${columns}, minmax(140px, 1fr))`, gap: '12px', marginBottom: '16px' }}>
-      {kpis.map((kpi, i) => (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
+      {kpis.map((kpi) => (
         <button
           key={kpi.label}
           onClick={() => onTileClick?.(kpi)}
-          style={{
-            // Odd tile count -- the last one spans the leftover columns on
-            // its row instead of leaving a gap.
-            gridColumn: (i === kpis.length - 1 && kpis.length % columns !== 0) ? `span ${columns - (kpis.length % columns) + 1}` : undefined,
-            background: kpi.colour, borderRadius: '16px', padding: '16px', border: 'none', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', textAlign: 'center',
-          }}
+          style={{ flex: '1 1 160px', background: kpi.colour, borderRadius: '16px', padding: '16px', border: 'none', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', textAlign: 'center' }}
         >
           <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{kpi.label}</p>
           <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: '#ffffff' }}>{kpi.value}</p>
@@ -290,6 +290,71 @@ export function formatDurationDays(ms) {
   const minutes = totalMinutes % 60
   if (days > 0) return `${days}d ${hours}h`
   return `${hours}h ${minutes}m`
+}
+
+// Computed once here so AdminReports.jsx's portfolio-wide and per-builder
+// turnaround figures, and a staff profile's own KPI, all agree on the same
+// definition (completed_at - created_at, averaged, never negative).
+export function computeAvgTurnaroundMs(completedTickets) {
+  if (!completedTickets || completedTickets.length === 0) return null
+  return completedTickets.reduce((sum, t) => sum + Math.max(0, new Date(t.completed_at) - new Date(t.created_at)), 0) / completedTickets.length
+}
+
+function mondayOf(date) {
+  const d = new Date(date)
+  const day = d.getDay()
+  const diff = (day === 0 ? -6 : 1) - day
+  d.setDate(d.getDate() + diff)
+  d.setHours(0, 0, 0, 0)
+  return d
+}
+
+function shortDateLabel(date) {
+  const dd = String(date.getDate()).padStart(2, '0')
+  const mm = String(date.getMonth() + 1).padStart(2, '0')
+  return `${dd}/${mm}`
+}
+
+// Weekly created-vs-completed bucketing, in the exact {label, values:[a,b]}
+// shape SimpleBarChart expects -- shared by AdminReports.jsx's portfolio-
+// wide trend and a staff profile's own per-builder trend, so both agree on
+// how weeks are bucketed (Monday-start, inclusive of the end date's week).
+export function buildWeeklyTrend(fromDate, toDate, createdList, completedList) {
+  const weekBuckets = []
+  let cursor = mondayOf(fromDate)
+  const rangeEnd = new Date(new Date(toDate).getTime() + 86400000 - 1)
+  while (cursor <= rangeEnd) {
+    weekBuckets.push(new Date(cursor))
+    cursor = new Date(cursor.getTime() + 7 * 86400000)
+  }
+  return weekBuckets.map(weekStart => {
+    const weekEnd = new Date(weekStart.getTime() + 7 * 86400000)
+    const createdCount = createdList.filter(t => {
+      const c = new Date(t.created_at)
+      return c >= weekStart && c < weekEnd
+    }).length
+    const completedCount = completedList.filter(t => {
+      if (!t.completed_at) return false
+      const c = new Date(t.completed_at)
+      return c >= weekStart && c < weekEnd
+    }).length
+    return { label: shortDateLabel(weekStart), values: [createdCount, completedCount] }
+  })
+}
+
+// The same duty-badge logic previously duplicated between AdminBuilders.jsx
+// (the Staff list's "Live Field Radar") and the staff profile page --
+// derives current on-the-job status purely from tickets already assigned
+// to this one person.
+export function computeDutyStatus(staffTickets) {
+  const activeJobs = staffTickets.filter(t => t.status !== 'Completed' && t.status !== 'Archived')
+  const inProgressJob = staffTickets.find(t => t.status === 'In Progress')
+
+  let badge = { label: 'Standby / Idle', bg: '#f1f5f9', color: '#94a3b8' }
+  if (inProgressJob) badge = { label: 'On-Site Active', bg: '#dcfce7', color: '#16a34a' }
+  else if (activeJobs.length > 0) badge = { label: 'Assigned / Transit', bg: '#dbeafe', color: '#1d4ed8' }
+
+  return { activeJobs, inProgressJob, badge, onDuty: !!inProgressJob }
 }
 
 // Staff eligible to be assigned tickets under a given PMMS role name
