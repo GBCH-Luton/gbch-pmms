@@ -57,6 +57,27 @@ export function googleMapsLink(lat, lng) {
   return `https://www.google.com/maps?q=${lat},${lng}`
 }
 
+// Google's plain query-string embed mode -- no API key/billing needed
+// (this is the same free embedding Google already offers any website),
+// unlike the full JS Maps SDK or the Directions API. Used to show a map
+// inside an in-app modal instead of sending the manager to a new tab.
+export function googleMapsEmbedLink(lat, lng) {
+  return `https://www.google.com/maps?q=${lat},${lng}&output=embed`
+}
+
+// Same free embed mode, but with a start/end point -- Google draws the
+// actual driving route between them (not just a straight line) inside
+// its own embed UI. We still compute our own straight-line distance
+// separately (distanceMetres) since the embed is a visual iframe, not a
+// JSON API -- there's no number to read back out of it programmatically.
+export function googleMapsRouteEmbedLink(lat1, lon1, lat2, lon2) {
+  return `https://www.google.com/maps?saddr=${lat1},${lon1}&daddr=${lat2},${lon2}&output=embed`
+}
+
+export function metresToMiles(metres) {
+  return metres / 1609.344
+}
+
 // Geocodes any of the given properties that don't have cached lat/lng yet
 // (extracting the postcode from the address if needed), persists the
 // result, and returns a { [propertyId]: { latitude, longitude } } map

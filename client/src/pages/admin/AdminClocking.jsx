@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
-import { distanceMetres, googleMapsLink, ensurePropertyCoords } from '../../lib/geo'
+import { distanceMetres, googleMapsEmbedLink, googleMapsRouteEmbedLink, metresToMiles, ensurePropertyCoords } from '../../lib/geo'
 import { attachProperties } from '../../lib/properties'
 import {
   thStyle, tdStyle, actionBtnStyle, filterSelectStyle, formatUKDateTime,
@@ -11,16 +11,17 @@ import {
 const EIGHT_HOURS_MS = 8 * 60 * 60 * 1000
 const DEFAULT_CLOCK_DISTANCE_THRESHOLD_M = 250
 
-// Compact map-pin link + optional "too far" flag shown under a clock-in or
-// clock-out time in the timesheet, when that event has a recorded location.
-function LocationCell({ distance, thresholdM, lat, lng }) {
+// Compact map-pin button + optional "too far" flag shown under a clock-in
+// or clock-out time in the timesheet, when that event has a recorded
+// location. Opens the in-app map modal instead of a new browser tab.
+function LocationCell({ distance, thresholdM, lat, lng, onOpenMap }) {
   if (lat == null || lng == null) return null
   const tooFar = distance != null && distance > thresholdM
   return (
     <div style={{ fontFamily: 'system-ui', marginTop: '2px' }}>
-      <a href={googleMapsLink(lat, lng)} target="_blank" rel="noreferrer" style={{ fontSize: '11px', fontWeight: 700, color: '#1d4ed8', textDecoration: 'none' }}>
+      <button onClick={() => onOpenMap(lat, lng)} style={{ background: 'none', border: 'none', padding: 0, fontSize: '11px', fontWeight: 700, color: '#1d4ed8', cursor: 'pointer' }}>
         📍 Map
-      </a>
+      </button>
       {tooFar && (
         <span style={{ display: 'block', fontSize: '10px', fontWeight: 800, color: '#dc2626' }}>
           ⚠ {Math.round(distance)}m away
@@ -58,6 +59,17 @@ export default function AdminClocking({ profile }) {
   const [editClockOut, setEditClockOut] = useState('')
   const [editError, setEditError] = useState('')
   const [editSaving, setEditSaving] = useState(false)
+
+  const [mapModal, setMapModal] = useState(null)
+
+  function openPinMap(lat, lng) {
+    setMapModal({ mode: 'pin', embedUrl: googleMapsEmbedLink(lat, lng) })
+  }
+
+  function openRouteMap(inLat, inLng, outLat, outLng) {
+    const distanceMiles = metresToMiles(distanceMetres(inLat, inLng, outLat, outLng))
+    setMapModal({ mode: 'route', embedUrl: googleMapsRouteEmbedLink(inLat, inLng, outLat, outLng), distanceMiles })
+  }
 
   useEffect(() => {
     fetchAll()
@@ -320,9 +332,12 @@ export default function AdminClocking({ profile }) {
                     </span>
                   )}
                   {hasPin && (
-                    <a href={googleMapsLink(row.session.clock_in_lat, row.session.clock_in_lng)} target="_blank" rel="noreferrer" style={{ display: 'inline-block', marginTop: '4px', fontSize: '11px', fontWeight: 700, color: '#1d4ed8' }}>
+                    <button
+                      onClick={() => openPinMap(row.session.clock_in_lat, row.session.clock_in_lng)}
+                      style={{ display: 'inline-block', marginTop: '4px', background: 'none', border: 'none', padding: 0, fontSize: '11px', fontWeight: 700, color: '#1d4ed8', cursor: 'pointer' }}
+                    >
                       📍 View clock-in location
-                    </a>
+                    </button>
                   )}
                 </div>
                 <span style={{ fontFamily: 'monospace', fontSize: '16px', fontWeight: 800, color: overrun ? '#dc2626' : '#0d9488', whiteSpace: 'nowrap' }}>
@@ -379,13 +394,14 @@ export default function AdminClocking({ profile }) {
                 <th style={thStyle}>Clock-Out</th>
                 <th style={thStyle}>Total Time</th>
                 <th style={thStyle}>Miles</th>
+                <th style={thStyle}>Route</th>
                 <th style={{ ...thStyle, textAlign: 'right' }}>Correct</th>
               </tr>
             </thead>
             <tbody>
               {filteredCompletedRows.length === 0 && (
                 <tr>
-                  <td colSpan={7} style={{ padding: '32px', textAlign: 'center', color: '#94a3b8', fontWeight: 600 }}>
+                  <td colSpan={8} style={{ padding: '32px', textAlign: 'center', color: '#94a3b8', fontWeight: 600 }}>
                     No completed jobs to show.
                   </td>
                 </tr>
@@ -400,11 +416,11 @@ export default function AdminClocking({ profile }) {
                   <td style={tdStyle}>{row.builderName}</td>
                   <td style={{ ...tdStyle, fontFamily: 'monospace', fontSize: '12px' }}>
                     {formatUKDateTime(row.firstIn)}
-                    <LocationCell distance={row.clockInDistance} thresholdM={distanceThresholdM} lat={row.firstSession.clock_in_lat} lng={row.firstSession.clock_in_lng} />
+                    <LocationCell distance={row.clockInDistance} thresholdM={distanceThresholdM} lat={row.firstSession.clock_in_lat} lng={row.firstSession.clock_in_lng} onOpenMap={openPinMap} />
                   </td>
                   <td style={{ ...tdStyle, fontFamily: 'monospace', fontSize: '12px' }}>
                     {formatUKDateTime(row.lastOut)}
-                    <LocationCell distance={row.clockOutDistance} thresholdM={distanceThresholdM} lat={row.lastSession.clock_out_lat} lng={row.lastSession.clock_out_lng} />
+                    <LocationCell distance={row.clockOutDistance} thresholdM={distanceThresholdM} lat={row.lastSession.clock_out_lat} lng={row.lastSession.clock_out_lng} onOpenMap={openPinMap} />
                   </td>
                   <td style={{ ...tdStyle, fontWeight: 800, color: '#0d9488', fontFamily: 'monospace' }}>
                     {formatDuration(row.totalMs)}
@@ -413,6 +429,18 @@ export default function AdminClocking({ profile }) {
                     )}
                   </td>
                   <td style={tdStyle}>{(row.ticket.mileage_logged || 0).toFixed(1)}</td>
+                  <td style={tdStyle}>
+                    {row.firstSession.clock_in_lat != null && row.firstSession.clock_in_lng != null && row.lastSession.clock_out_lat != null && row.lastSession.clock_out_lng != null ? (
+                      <button
+                        onClick={() => openRouteMap(row.firstSession.clock_in_lat, row.firstSession.clock_in_lng, row.lastSession.clock_out_lat, row.lastSession.clock_out_lng)}
+                        style={{ background: 'none', border: 'none', padding: 0, fontSize: '11px', fontWeight: 700, color: '#1d4ed8', cursor: 'pointer' }}
+                      >
+                        🧭 Route
+                      </button>
+                    ) : (
+                      <span style={{ fontSize: '11px', color: '#cbd5e1' }}>—</span>
+                    )}
+                  </td>
                   <td style={{ ...tdStyle, textAlign: 'right' }}>
                     <button onClick={() => openEditModal(row)} style={actionBtnStyle}>Edit</button>
                   </td>
@@ -459,6 +487,34 @@ export default function AdminClocking({ profile }) {
               <button onClick={submitEdit} disabled={editSaving} style={{ ...modalConfirmBtnStyle, opacity: editSaving ? 0.6 : 1, cursor: editSaving ? 'not-allowed' : 'pointer' }}>
                 {editSaving ? 'Saving...' : 'Save Correction'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Map / route modal -- Google's free query-string embed, no API
+          key or billing, shown in-app instead of sending the manager to
+          a new tab. */}
+      {mapModal && (
+        <div style={modalOverlayStyle}>
+          <div style={{ ...modalCardStyle, maxWidth: '640px' }}>
+            <p style={modalTitleStyle}>{mapModal.mode === 'route' ? 'Clock-In → Clock-Out Route' : 'Location'}</p>
+            {mapModal.mode === 'route' && (
+              <p style={{ margin: '2px 0 12px 0', fontSize: '13px', color: '#64748b' }}>
+                Estimated straight-line distance: <strong>{mapModal.distanceMiles.toFixed(2)} miles</strong>
+              </p>
+            )}
+            <iframe
+              title="Map"
+              src={mapModal.embedUrl}
+              width="100%"
+              height="400"
+              style={{ border: 0, borderRadius: '10px', marginTop: mapModal.mode === 'route' ? 0 : '12px' }}
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+            />
+            <div style={{ display: 'flex', marginTop: '16px' }}>
+              <button onClick={() => setMapModal(null)} style={{ ...modalCancelBtnStyle, width: '100%' }}>Close</button>
             </div>
           </div>
         </div>
