@@ -263,7 +263,7 @@ export default function AdminDashboard({ profile }) {
         </div>
 
         {/* Main content */}
-        <div style={{ flex: 1, padding: '20px', width: '100%', maxWidth: '1800px', margin: '0 auto', boxSizing: 'border-box' }}>
+        <div style={{ flex: 1, padding: '20px', width: '100%', boxSizing: 'border-box' }}>
           <ActivePage
             profile={profile}
             onTicketsChanged={refreshCounts}

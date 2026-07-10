@@ -172,6 +172,30 @@ export default function AdminDashboard({ onNavigate }) {
         </div>
       </DashboardSection>
 
+      <DashboardSection title="Properties" background="#ffffff">
+        <button
+          onClick={() => onNavigate?.('properties', { filterMode: 'newProperties' })}
+          style={{
+            flex: '1 1 220px', background: '#0f766e', borderRadius: '16px', padding: '16px',
+            border: 'none', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', textAlign: 'center',
+          }}
+        >
+          <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>New Properties</p>
+          <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: '#ffffff' }}>{newPropertiesCount}</p>
+        </button>
+
+        <button
+          onClick={() => onNavigate?.('properties', { filterMode: 'voids' })}
+          style={{
+            flex: '1 1 220px', background: currentVoidsCount > 0 ? '#dc2626' : '#16a34a', borderRadius: '16px', padding: '16px',
+            border: 'none', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', textAlign: 'center',
+          }}
+        >
+          <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Current Voids</p>
+          <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: '#ffffff' }}>{currentVoidsCount}</p>
+        </button>
+      </DashboardSection>
+
       <DashboardSection title="Compliance" background="#ffffff">
         <div style={{ width: '100%' }}>
           <KpiTiles
@@ -180,6 +204,19 @@ export default function AdminDashboard({ onNavigate }) {
             onTileClick={(kpi) => onNavigate?.('compliance', { tierFilter: kpi.tierFilter })}
           />
         </div>
+      </DashboardSection>
+
+      <DashboardSection title="Jobs Completed" background="#f8fafc">
+        {completionKpis.map(kpi => (
+          <button
+            key={kpi.label}
+            onClick={() => onNavigate?.('pipeline', { statusFilter: kpi.statusFilter })}
+            style={{ flex: '1 1 160px', background: '#19562e', borderRadius: '16px', padding: '16px', border: 'none', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', textAlign: 'center' }}
+          >
+            <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{kpi.label}</p>
+            <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: '#ffffff' }}>{kpi.value}</p>
+          </button>
+        ))}
       </DashboardSection>
 
       <DashboardSection title="Sign-Off & Mileage" background="#f8fafc">
@@ -226,43 +263,6 @@ export default function AdminDashboard({ onNavigate }) {
           <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Flagged Locations</p>
           <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: '#ffffff' }}>{flaggedLocationsCount}</p>
         </button>
-      </DashboardSection>
-
-      <DashboardSection title="Properties" background="#ffffff">
-        <button
-          onClick={() => onNavigate?.('properties', { filterMode: 'newProperties' })}
-          style={{
-            flex: '1 1 220px', background: '#0f766e', borderRadius: '16px', padding: '16px',
-            border: 'none', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', textAlign: 'center',
-          }}
-        >
-          <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>New Properties</p>
-          <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: '#ffffff' }}>{newPropertiesCount}</p>
-        </button>
-
-        <button
-          onClick={() => onNavigate?.('properties', { filterMode: 'voids' })}
-          style={{
-            flex: '1 1 220px', background: currentVoidsCount > 0 ? '#dc2626' : '#16a34a', borderRadius: '16px', padding: '16px',
-            border: 'none', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', textAlign: 'center',
-          }}
-        >
-          <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Current Voids</p>
-          <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: '#ffffff' }}>{currentVoidsCount}</p>
-        </button>
-      </DashboardSection>
-
-      <DashboardSection title="Jobs Completed" background="#f8fafc">
-        {completionKpis.map(kpi => (
-          <button
-            key={kpi.label}
-            onClick={() => onNavigate?.('pipeline', { statusFilter: kpi.statusFilter })}
-            style={{ flex: '1 1 160px', background: '#19562e', borderRadius: '16px', padding: '16px', border: 'none', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', textAlign: 'center' }}
-          >
-            <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{kpi.label}</p>
-            <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: '#ffffff' }}>{kpi.value}</p>
-          </button>
-        ))}
       </DashboardSection>
     </div>
   )
