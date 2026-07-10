@@ -22,8 +22,9 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
+import { fetchAllMaintenanceCategoryNames } from '../../lib/maintenanceCategories'
 import {
-  CATEGORIES, priorityTierLabel, priorityBadgeStyle, statusColour, statusLabel, formatUKDate,
+  priorityTierLabel, priorityBadgeStyle, statusColour, statusLabel, formatUKDate,
   filterSelectStyle, thStyle, tdStyle,
 } from './shared'
 
@@ -39,9 +40,11 @@ export default function PropertyMaintenanceTab({ property }) {
   const [loadError, setLoadError] = useState('')
   const [statusFilter, setStatusFilter] = useState('All')
   const [categoryFilter, setCategoryFilter] = useState('All')
+  const [categoryOptions, setCategoryOptions] = useState([])
 
   useEffect(() => {
     fetchTickets()
+    fetchAllMaintenanceCategoryNames().then(setCategoryOptions)
   }, [property.id])
 
   async function fetchTickets() {
@@ -195,7 +198,7 @@ export default function PropertyMaintenanceTab({ property }) {
             </select>
             <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} style={filterSelectStyle}>
               <option value="All">All Categories</option>
-              {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+              {categoryOptions.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
         </div>

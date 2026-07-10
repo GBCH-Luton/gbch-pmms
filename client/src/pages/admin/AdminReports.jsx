@@ -8,8 +8,9 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { attachProperties } from '../../lib/properties'
+import { fetchAllMaintenanceCategoryNames } from '../../lib/maintenanceCategories'
 import {
-  CATEGORIES, formatDuration, filterSelectStyle, thStyle, tdStyle,
+  formatDuration, filterSelectStyle, thStyle, tdStyle,
   fetchAssignableBuilders, resolveCategoryDivision,
 } from './shared'
 import SimpleBarChart from '../../components/SimpleBarChart'
@@ -56,6 +57,7 @@ export default function AdminReports() {
   const [loadError, setLoadError] = useState('')
   const [builders, setBuilders] = useState([])
   const [categoriesSettingsRow, setCategoriesSettingsRow] = useState(null)
+  const [categoryOptions, setCategoryOptions] = useState([])
 
   const [fromDate, setFromDate] = useState(isoDateNDaysAgo(30))
   const [toDate, setToDate] = useState(todayIso())
@@ -86,6 +88,7 @@ export default function AdminReports() {
       .eq('setting_key', 'maintenance_categories')
       .maybeSingle()
     setCategoriesSettingsRow(categoriesRow)
+    setCategoryOptions(await fetchAllMaintenanceCategoryNames())
   }
 
   if (tickets === null) {
@@ -202,7 +205,7 @@ export default function AdminReports() {
         </div>
         <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} style={filterSelectStyle}>
           <option value="All">All Categories</option>
-          {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+          {categoryOptions.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
         <select value={builderFilter} onChange={e => setBuilderFilter(e.target.value)} style={filterSelectStyle}>
           <option value="All">All Staff</option>

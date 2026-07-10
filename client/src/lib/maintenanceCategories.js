@@ -82,10 +82,7 @@ export function migrateLegacyArrayShape(raw) {
   return result
 }
 
-// Returns only enabled categories, for the ticket-raising screens. The
-// Settings page itself reads the raw, unfiltered value directly (it needs
-// to show disabled categories too, so they can be re-enabled).
-export async function fetchMaintenanceCategories() {
+async function fetchRawMaintenanceCategories() {
   const { data } = await supabase
     .schema('pmms')
     .from('settings')
@@ -94,9 +91,24 @@ export async function fetchMaintenanceCategories() {
     .maybeSingle()
 
   const raw = data?.setting_value
-  const categories = Array.isArray(raw)
+  return Array.isArray(raw)
     ? migrateLegacyArrayShape(raw)
     : (raw && typeof raw === 'object' && Object.keys(raw).length > 0 ? raw : DEFAULT_MAINTENANCE_CATEGORIES)
+}
 
+// Returns only enabled categories, for the ticket-raising screens. The
+// Settings page itself reads the raw, unfiltered value directly (it needs
+// to show disabled categories too, so they can be re-enabled).
+export async function fetchMaintenanceCategories() {
+  const categories = await fetchRawMaintenanceCategories()
   return Object.fromEntries(Object.entries(categories).filter(([, c]) => c.enabled !== false))
+}
+
+// All category names (enabled AND disabled), in display order -- for
+// filter dropdowns (Pipeline, Reports, a property's Maintenance tab).
+// Unlike fetchMaintenanceCategories(), a disabled category must still show
+// up here so existing tickets raised under it stay filterable.
+export async function fetchAllMaintenanceCategoryNames() {
+  const categories = await fetchRawMaintenanceCategories()
+  return sortedCategoryEntries(categories).map(([name]) => name)
 }

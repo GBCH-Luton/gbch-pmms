@@ -9,7 +9,6 @@ import { attachProperties } from '../../lib/properties'
 
 const DEFAULT_CLOCK_DISTANCE_THRESHOLD_M = 250
 
-export const CATEGORIES = ['Electricity', 'Plumbing', 'Doors/Locks', 'Other / Unlisted Trade']
 export const GLOBAL_TRIAGE_THRESHOLD = 70
 export const P2_URGENT_THRESHOLD = 40
 

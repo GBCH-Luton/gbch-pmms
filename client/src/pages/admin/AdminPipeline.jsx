@@ -3,8 +3,9 @@ import { supabase } from '../../lib/supabase'
 import { attachProperties } from '../../lib/properties'
 import BuilderProfileModal from './BuilderProfileModal'
 import PropertySearchSelect from '../../components/PropertySearchSelect'
+import { fetchAllMaintenanceCategoryNames } from '../../lib/maintenanceCategories'
 import {
-  CATEGORIES, priorityTierLabel, priorityBadgeStyle, statusColour, statusLabel, formatUKDate, formatUKDateTime, formatDurationDays,
+  priorityTierLabel, priorityBadgeStyle, statusColour, statusLabel, formatUKDate, formatUKDateTime, formatDurationDays,
   filterSelectStyle, thStyle, tdStyle, actionBtnStyle,
   modalOverlayStyle, modalCardStyle, modalTitleStyle, modalSubtitleStyle, modalLabelStyle,
   modalTextareaStyle, modalErrorStyle, modalCancelBtnStyle, modalConfirmBtnStyle, radioRowStyle,
@@ -25,6 +26,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
   const [sortDirection, setSortDirection] = useState('asc')
   const [builders, setBuilders] = useState([])
   const [properties, setProperties] = useState([])
+  const [categoryOptions, setCategoryOptions] = useState([])
   // Who can be reassigned THIS ticket, scoped to its category's division --
   // e.g. a Housekeeping ticket offers Housekeepers here, not Builders.
   // Deliberately separate from `builders` above, which stays the flat
@@ -86,6 +88,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
     fetchBuilders()
     fetchProperties()
     fetchStuckThresholds()
+    fetchAllMaintenanceCategoryNames().then(setCategoryOptions)
     if (initialStatusFilter) setStatusFilter(initialStatusFilter)
     if (initialPriorityFilter) setPriorityFilter(initialPriorityFilter)
     if (initialStuckFilter) setStuckOnlyFilter(true)
@@ -540,7 +543,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
         />
         <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} style={filterSelectStyle}>
           <option value="All">All Categories</option>
-          {CATEGORIES.map(c => (
+          {categoryOptions.map(c => (
             <option key={c} value={c}>{c}</option>
           ))}
         </select>
