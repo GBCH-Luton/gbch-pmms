@@ -111,6 +111,32 @@ export function isTicketStuck(ticket, thresholdsSetting, nowMs = Date.now()) {
   return (nowMs - new Date(changedAt).getTime()) >= thresholdMs
 }
 
+// Shared by the dashboard's "Ticket Pipeline" tiles and the Pipeline
+// page's own metrics strip, so both stay pixel-identical and any layout
+// fix (e.g. the odd-tile-count spanning trick) only has to happen once.
+// `kpis` items: { label, value, colour, ...whatever onTileClick needs }.
+export function KpiTiles({ kpis, columns = 4, onTileClick }) {
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${columns}, minmax(140px, 1fr))`, gap: '12px', marginBottom: '16px' }}>
+      {kpis.map((kpi, i) => (
+        <button
+          key={kpi.label}
+          onClick={() => onTileClick?.(kpi)}
+          style={{
+            // Odd tile count -- the last one spans the leftover columns on
+            // its row instead of leaving a gap.
+            gridColumn: (i === kpis.length - 1 && kpis.length % columns !== 0) ? `span ${columns - (kpis.length % columns) + 1}` : undefined,
+            background: kpi.colour, borderRadius: '16px', padding: '16px', border: 'none', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', textAlign: 'center',
+          }}
+        >
+          <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{kpi.label}</p>
+          <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: '#ffffff' }}>{kpi.value}</p>
+        </button>
+      ))}
+    </div>
+  )
+}
+
 export const formatUKDate = (isoString) => {
   if (!isoString) return ''
   const d = new Date(isoString)

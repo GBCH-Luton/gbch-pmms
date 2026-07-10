@@ -9,7 +9,7 @@ import {
   modalOverlayStyle, modalCardStyle, modalTitleStyle, modalSubtitleStyle, modalLabelStyle,
   modalTextareaStyle, modalErrorStyle, modalCancelBtnStyle, modalConfirmBtnStyle, radioRowStyle,
   roleBadgeStyle, postSystemComment, postAuditEvent, fetchAssignableBuilders, fetchAssignableStaffForCategory, STAFF_AVAILABILITY_STYLES,
-  createNotification, sendPushNotification, pushEmergencyAlert, resolveCategoryDivision, isTicketStuck,
+  createNotification, sendPushNotification, pushEmergencyAlert, resolveCategoryDivision, isTicketStuck, KpiTiles,
 } from './shared'
 
 const expandLabelStyle = { margin: '0 0 2px 0', fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em' }
@@ -481,6 +481,30 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
     setStuckOnlyFilter(false)
   }
 
+  // Mirrors the dashboard's "Ticket Pipeline" tiles exactly -- counts are
+  // always off the full ticket list, never the currently filtered view,
+  // so every tile stays a stable shortcut to that category regardless of
+  // whatever filter combination happens to be applied right now.
+  const kpis = [
+    { label: 'Total tickets', value: tickets.length, colour: '#64748b', statusFilter: 'All' },
+    { label: 'Unassigned', value: tickets.filter(t => t.status === 'Pending').length, colour: '#dc2626', statusFilter: 'Pending' },
+    { label: 'In Progress', value: tickets.filter(t => t.status === 'In Progress').length, colour: '#0d9488', statusFilter: 'In Progress' },
+    { label: 'On Hold', value: tickets.filter(t => t.status === 'On Hold').length, colour: '#f59e0b', statusFilter: 'On Hold' },
+    { label: 'Completed', value: tickets.filter(t => t.status === 'Completed').length, colour: '#16a34a', statusFilter: 'Completed' },
+    { label: 'P1 Critical', value: tickets.filter(t => effectiveTier(t) === 'P1 Critical').length, colour: '#dc2626', statusFilter: 'All', priorityFilter: 'P1 Critical' },
+    { label: 'Stuck', value: tickets.filter(t => isTicketStuck(t, stuckThresholds)).length, colour: '#d97706', statusFilter: 'All', stuckOnly: true },
+  ]
+
+  // Clicking a tile is a "jump to this category" shortcut, same as
+  // arriving fresh from the dashboard -- resets every other filter first
+  // so the result always matches the tile's count exactly.
+  function applyKpiFilter(kpi) {
+    clearFilters()
+    setStatusFilter(kpi.statusFilter || 'All')
+    if (kpi.priorityFilter) setPriorityFilter(kpi.priorityFilter)
+    if (kpi.stuckOnly) setStuckOnlyFilter(true)
+  }
+
   if (loading) return (
     <div style={{ minHeight: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <p style={{ color: '#94a3b8', fontWeight: 600, fontFamily: 'system-ui' }}>Loading tickets...</p>
@@ -489,6 +513,8 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
 
   return (
     <div>
+
+      <KpiTiles kpis={kpis} onTileClick={applyKpiFilter} />
 
       {/* Pipeline filters */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
