@@ -4,11 +4,14 @@ import { priorityTierLabel, fetchFlaggedClockingCount, isTicketStuck } from './s
 
 const DEFAULT_NEW_PROPERTY_WINDOW_HOURS = 48
 
-function DashboardSection({ title, background, children }) {
+function DashboardSection({ title, background, columns, children }) {
   return (
     <div style={{ background, borderRadius: '16px', padding: '20px', marginBottom: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
       <p style={{ margin: '0 0 14px 0', fontSize: '15px', fontWeight: 800, color: '#0f172a' }}>{title}</p>
-      <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+      <div style={columns
+        ? { display: 'grid', gridTemplateColumns: `repeat(${columns}, minmax(140px, 1fr))`, gap: '12px' }
+        : { display: 'flex', gap: '12px', flexWrap: 'wrap' }}
+      >
         {children}
       </div>
     </div>
@@ -155,12 +158,18 @@ export default function AdminDashboard({ onNavigate }) {
 
   return (
     <div>
-      <DashboardSection title="Ticket Pipeline" background="#ffffff">
-        {kpis.map(kpi => (
+      <DashboardSection title="Ticket Pipeline" background="#ffffff" columns={4}>
+        {kpis.map((kpi, i) => (
           <button
             key={kpi.label}
             onClick={() => onNavigate?.('pipeline', { statusFilter: kpi.statusFilter, priorityFilter: kpi.priorityFilter, stuckOnly: kpi.stuckOnly })}
-            style={{ flex: '1 1 160px', background: kpi.colour, borderRadius: '16px', padding: '16px', border: 'none', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', textAlign: 'center' }}
+            style={{
+              // Odd tile count -- the last one spans the leftover column on
+              // its row instead of leaving a gap (e.g. 7 tiles in a 4-wide
+              // grid: 4 in row one, 3 in row two with this one stretched).
+              gridColumn: (i === kpis.length - 1 && kpis.length % 4 !== 0) ? `span ${4 - (kpis.length % 4) + 1}` : undefined,
+              background: kpi.colour, borderRadius: '16px', padding: '16px', border: 'none', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', textAlign: 'center',
+            }}
           >
             <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{kpi.label}</p>
             <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: '#ffffff' }}>{kpi.value}</p>
