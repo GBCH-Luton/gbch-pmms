@@ -4,7 +4,7 @@ import { attachProperties } from '../../lib/properties'
 import BuilderProfileModal from './BuilderProfileModal'
 import PropertySearchSelect from '../../components/PropertySearchSelect'
 import {
-  CATEGORIES, priorityTierLabel, priorityBadgeStyle, statusColour, statusLabel, formatUKDate, formatUKDateTime, formatDuration,
+  CATEGORIES, priorityTierLabel, priorityBadgeStyle, statusColour, statusLabel, formatUKDate, formatUKDateTime, formatDurationDays,
   filterSelectStyle, thStyle, tdStyle, actionBtnStyle,
   modalOverlayStyle, modalCardStyle, modalTitleStyle, modalSubtitleStyle, modalLabelStyle,
   modalTextareaStyle, modalErrorStyle, modalCancelBtnStyle, modalConfirmBtnStyle, radioRowStyle,
@@ -655,7 +655,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
                         )}
                         {stuck && (
                           <span style={{ display: 'block', fontSize: '10px', color: '#b45309', fontWeight: 800, marginTop: '3px' }}>
-                            ⚠ Stuck {formatDuration(Date.now() - new Date(t.status_changed_at || t.created_at).getTime())}
+                            ⚠ Stuck {formatDurationDays(Date.now() - new Date(t.status_changed_at || t.created_at).getTime())}
                           </span>
                         )}
                       </td>

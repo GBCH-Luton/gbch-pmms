@@ -168,6 +168,20 @@ export function formatDuration(ms) {
   return `${h}h ${m}m`
 }
 
+// For durations that can realistically run into days (e.g. how long a
+// ticket has been stuck) -- formatDuration()'s plain hour count gets
+// unreadable past a day or two (e.g. "165h 14m"), so this switches to a
+// "Xd Yh" form once it crosses 24h and only stays as "Xh Ym" below that.
+export function formatDurationDays(ms) {
+  if (!ms || ms < 0) ms = 0
+  const totalMinutes = Math.round(ms / 60000)
+  const days = Math.floor(totalMinutes / 1440)
+  const hours = Math.floor((totalMinutes % 1440) / 60)
+  const minutes = totalMinutes % 60
+  if (days > 0) return `${days}d ${hours}h`
+  return `${hours}h ${minutes}m`
+}
+
 // Staff eligible to be assigned tickets under a given PMMS role name
 // (pmms.staff_roles), NOT the company-wide job_title, so this always matches
 // who the Staff page lists under that role. Also excludes inactive staff.
