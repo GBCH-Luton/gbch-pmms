@@ -121,7 +121,7 @@ export default function BuilderProfilePage({ staffId, onBack }) {
     )
   }
 
-  const { activeJobs, inProgressJob, badge: dutyBadge } = computeDutyStatus(tickets)
+  const { activeJobs, inProgressJob, badge: dutyBadge } = computeDutyStatus(tickets, availability?.status)
   const completedJobs = tickets.filter(t => t.status === 'Completed' || t.status === 'Archived')
   const totalMiles = tickets.reduce((sum, t) => sum + (t.mileage_logged || 0), 0)
   const hoursWorkedMs = workSessions.reduce((sum, s) => sum + (new Date(s.ended_at) - new Date(s.started_at)), 0)

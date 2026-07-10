@@ -110,7 +110,8 @@ export default function AdminBuilders() {
   }
 
   function dutyFor(staffId) {
-    return computeDutyStatus(tickets.filter(t => t.assigned_builder_id === staffId))
+    const s = staffList.find(s => s.id === staffId)
+    return computeDutyStatus(tickets.filter(t => t.assigned_builder_id === staffId), s?.availability)
   }
 
   if (loading) return (

@@ -346,9 +346,18 @@ export function buildWeeklyTrend(fromDate, toDate, createdList, completedList) {
 // (the Staff list's "Live Field Radar") and the staff profile page --
 // derives current on-the-job status purely from tickets already assigned
 // to this one person.
-export function computeDutyStatus(staffTickets) {
+export function computeDutyStatus(staffTickets, availabilityStatus) {
   const activeJobs = staffTickets.filter(t => t.status !== 'Completed' && t.status !== 'Archived')
   const inProgressJob = staffTickets.find(t => t.status === 'In Progress')
+
+  // Availability overrides ticket-derived status -- someone marked On
+  // Leave/Sick can't actually be on-site, even if a ticket is still
+  // sitting "In Progress" because nobody paused or reassigned it when
+  // they went off duty. Without this, "On Duty Now" and the duty badge
+  // could contradict the availability badge shown right next to it.
+  if (availabilityStatus === 'On Leave' || availabilityStatus === 'Sick') {
+    return { activeJobs, inProgressJob, badge: { label: 'Off Duty', bg: '#f1f5f9', color: '#94a3b8' }, onDuty: false }
+  }
 
   let badge = { label: 'Standby / Idle', bg: '#f1f5f9', color: '#94a3b8' }
   if (inProgressJob) badge = { label: 'On-Site Active', bg: '#dcfce7', color: '#16a34a' }
