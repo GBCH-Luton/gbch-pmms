@@ -4,12 +4,12 @@ import { attachProperties } from '../../lib/properties'
 import BuilderProfileModal from './BuilderProfileModal'
 import PropertySearchSelect from '../../components/PropertySearchSelect'
 import {
-  CATEGORIES, priorityTierLabel, priorityBadgeStyle, statusColour, statusLabel, formatUKDate, formatUKDateTime,
+  CATEGORIES, priorityTierLabel, priorityBadgeStyle, statusColour, statusLabel, formatUKDate, formatUKDateTime, formatDuration,
   filterSelectStyle, thStyle, tdStyle, actionBtnStyle,
   modalOverlayStyle, modalCardStyle, modalTitleStyle, modalSubtitleStyle, modalLabelStyle,
   modalTextareaStyle, modalErrorStyle, modalCancelBtnStyle, modalConfirmBtnStyle, radioRowStyle,
   roleBadgeStyle, postSystemComment, postAuditEvent, fetchAssignableBuilders, fetchAssignableStaffForCategory, STAFF_AVAILABILITY_STYLES,
-  createNotification, sendPushNotification, pushEmergencyAlert, resolveCategoryDivision,
+  createNotification, sendPushNotification, pushEmergencyAlert, resolveCategoryDivision, isTicketStuck,
 } from './shared'
 
 const expandLabelStyle = { margin: '0 0 2px 0', fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em' }
@@ -17,7 +17,7 @@ const expandValueStyle = { margin: '0 0 10px 0', fontSize: '13px', fontWeight: 6
 const expandSectionStyle = { background: '#fff', borderRadius: '12px', padding: '16px', border: '1px solid #e2e8f0' }
 const expandSectionTitleStyle = { margin: '0 0 12px 0', fontSize: '11px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }
 
-export default function AdminPipeline({ profile, onTicketsChanged, initialStatusFilter, initialPriorityFilter, onInitialFilterConsumed }) {
+export default function AdminPipeline({ profile, onTicketsChanged, initialStatusFilter, initialPriorityFilter, initialStuckFilter, onInitialFilterConsumed }) {
   const [tickets, setTickets] = useState([])
   const [loading, setLoading] = useState(true)
   const [expandedTicketId, setExpandedTicketId] = useState(null)
@@ -37,6 +37,8 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
   const [builderFilter, setBuilderFilter] = useState('All')
   const [priorityFilter, setPriorityFilter] = useState('All')
   const [ticketNumberSearch, setTicketNumberSearch] = useState('')
+  const [stuckOnlyFilter, setStuckOnlyFilter] = useState(false)
+  const [stuckThresholds, setStuckThresholds] = useState(null)
 
   const [reassignModalTicket, setReassignModalTicket] = useState(null)
   const [reassignBuilderId, setReassignBuilderId] = useState('')
@@ -83,10 +85,22 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
     fetchTickets()
     fetchBuilders()
     fetchProperties()
+    fetchStuckThresholds()
     if (initialStatusFilter) setStatusFilter(initialStatusFilter)
     if (initialPriorityFilter) setPriorityFilter(initialPriorityFilter)
-    if (initialStatusFilter || initialPriorityFilter) onInitialFilterConsumed?.()
+    if (initialStuckFilter) setStuckOnlyFilter(true)
+    if (initialStatusFilter || initialPriorityFilter || initialStuckFilter) onInitialFilterConsumed?.()
   }, [])
+
+  async function fetchStuckThresholds() {
+    const { data } = await supabase
+      .schema('pmms')
+      .from('settings')
+      .select('setting_value')
+      .eq('setting_key', 'stuck_ticket_thresholds')
+      .maybeSingle()
+    if (data?.setting_value) setStuckThresholds(data.setting_value)
+  }
 
   useEffect(() => {
     if (reassignModalTicket) {
@@ -148,7 +162,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
       .select(`
         id, ticket_number, status, category, description, room, priority_score, priority_override, mileage_logged,
         no_access_flag, no_access_note, hold_reason, hold_note, completion_note, photo_url, completion_photo_url,
-        completed_at, created_at, assigned_builder_id, property_id
+        completed_at, created_at, status_changed_at, assigned_builder_id, property_id
       `)
       .order('created_at', { ascending: false })
 
@@ -199,7 +213,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
       .from('tickets')
       .update({
         assigned_builder_id: reassignBuilderId,
-        ...(promoteToAssigned ? { status: 'Assigned' } : {}),
+        ...(promoteToAssigned ? { status: 'Assigned', status_changed_at: new Date().toISOString(), stuck_alert_sent_at: null } : {}),
       })
       .eq('id', t.id)
 
@@ -249,7 +263,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
         .from('tickets')
         .update({
           assigned_builder_id: bulkReassignBuilderId,
-          ...(promoteToAssigned ? { status: 'Assigned' } : {}),
+          ...(promoteToAssigned ? { status: 'Assigned', status_changed_at: new Date().toISOString(), stuck_alert_sent_at: null } : {}),
         })
         .eq('id', t.id)
 
@@ -294,6 +308,8 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
       .from('tickets')
       .update({
         status: 'Cancelled',
+        status_changed_at: new Date().toISOString(),
+        stuck_alert_sent_at: null,
         cancel_type: cancelType,
         cancel_reason: cancelReason.trim(),
         cancel_duplicate_ref: (cancelType === 'Duplicate' && dupRef) ? dupRef : null,
@@ -415,6 +431,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
     if (builderFilter !== 'All' && t.assigned_builder_id !== builderFilter) return false
     if (priorityFilter !== 'All' && effectiveTier(t) !== priorityFilter) return false
     if (ticketNumberSearch.trim() && !String(t.ticket_number).includes(ticketNumberSearch.trim())) return false
+    if (stuckOnlyFilter && !isTicketStuck(t, stuckThresholds)) return false
     return true
   })
 
@@ -461,6 +478,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
     setBuilderFilter('All')
     setPriorityFilter('All')
     setTicketNumberSearch('')
+    setStuckOnlyFilter(false)
   }
 
   if (loading) return (
@@ -512,6 +530,10 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
           <option value="P2 Urgent">P2 Urgent</option>
           <option value="P3 Routine">P3 Routine</option>
         </select>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 12px', borderRadius: '10px', border: '1px solid #fde68a', background: '#fffbeb', color: '#92400e', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
+          <input type="checkbox" checked={stuckOnlyFilter} onChange={(e) => setStuckOnlyFilter(e.target.checked)} />
+          ⚠ Stuck only
+        </label>
         <button onClick={clearFilters} style={{ padding: '8px 14px', borderRadius: '10px', border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
           Clear filters
         </button>
@@ -577,14 +599,15 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
                 const isCompliance = (t.description || '').startsWith('[Compliance Failure:')
                 const isExpanded = expandedTicketId === t.id
                 const isSelected = selectedTicketIds.has(t.id)
+                const stuck = isTicketStuck(t, stuckThresholds)
                 return (
                   <Fragment key={t.id}>
                     <tr
                       onClick={() => setExpandedTicketId(isExpanded ? null : t.id)}
                       style={{
                         borderBottom: isExpanded ? 'none' : '1px solid #f1f5f9', cursor: 'pointer',
-                        background: isExpanded ? '#fef2f2' : isSelected ? '#eff6ff' : undefined,
-                        boxShadow: isExpanded ? 'inset 4px 0 0 #dc2626' : undefined,
+                        background: isExpanded ? '#fef2f2' : isSelected ? '#eff6ff' : stuck ? '#fffbeb' : undefined,
+                        boxShadow: isExpanded ? 'inset 4px 0 0 #dc2626' : stuck ? 'inset 4px 0 0 #d97706' : undefined,
                       }}
                     >
                       <td style={tdStyle} onClick={(e) => e.stopPropagation()}>
@@ -629,6 +652,11 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
                         </span>
                         {t.status === 'On Hold' && t.hold_reason && (
                           <span style={{ display: 'block', fontSize: '10px', color: '#d97706', fontWeight: 700, marginTop: '3px' }}>{t.hold_reason}</span>
+                        )}
+                        {stuck && (
+                          <span style={{ display: 'block', fontSize: '10px', color: '#b45309', fontWeight: 800, marginTop: '3px' }}>
+                            ⚠ Stuck {formatDuration(Date.now() - new Date(t.status_changed_at || t.created_at).getTime())}
+                          </span>
                         )}
                       </td>
                       <td style={tdStyle}>

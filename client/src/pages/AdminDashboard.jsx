@@ -49,6 +49,7 @@ export default function AdminDashboard({ profile }) {
   const [totalTicketsCount, setTotalTicketsCount] = useState(0)
   const [pipelineInitialFilter, setPipelineInitialFilter] = useState(null)
   const [pipelineInitialPriorityFilter, setPipelineInitialPriorityFilter] = useState(null)
+  const [pipelineInitialStuckFilter, setPipelineInitialStuckFilter] = useState(null)
   const [propertiesInitialFilter, setPropertiesInitialFilter] = useState(null)
   const [pushEnabled, setPushEnabled] = useState(false)
   const [pushError, setPushError] = useState('')
@@ -112,6 +113,9 @@ export default function AdminDashboard({ profile }) {
     }
     if (key === 'pipeline' && opts.priorityFilter) {
       setPipelineInitialPriorityFilter(opts.priorityFilter)
+    }
+    if (key === 'pipeline' && opts.stuckOnly) {
+      setPipelineInitialStuckFilter(true)
     }
     if (key === 'properties' && opts.filterMode) {
       setPropertiesInitialFilter({ mode: opts.filterMode })
@@ -257,7 +261,8 @@ export default function AdminDashboard({ profile }) {
             onNavigate={goToPage}
             initialStatusFilter={currentPage === 'pipeline' ? pipelineInitialFilter : null}
             initialPriorityFilter={currentPage === 'pipeline' ? pipelineInitialPriorityFilter : null}
-            onInitialFilterConsumed={() => { setPipelineInitialFilter(null); setPipelineInitialPriorityFilter(null) }}
+            initialStuckFilter={currentPage === 'pipeline' ? pipelineInitialStuckFilter : null}
+            onInitialFilterConsumed={() => { setPipelineInitialFilter(null); setPipelineInitialPriorityFilter(null); setPipelineInitialStuckFilter(null) }}
             initialPropertiesFilter={currentPage === 'properties' ? propertiesInitialFilter : null}
             onPropertiesFilterConsumed={() => setPropertiesInitialFilter(null)}
           />

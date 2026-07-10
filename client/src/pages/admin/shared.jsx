@@ -87,6 +87,30 @@ export function statusLabel(status) {
   return status === 'Pending' ? 'Unassigned' : status
 }
 
+// The 4 statuses a ticket can be "stuck" in -- Completed/Archived/Cancelled
+// are terminal and never count, matching OPEN_TICKET_STATUS_EXCLUSION.
+export const STUCK_ELIGIBLE_STATUSES = ['Pending', 'Assigned', 'In Progress', 'On Hold']
+
+export function thresholdToMs({ value, unit } = {}) {
+  return (Number(value) || 0) * (unit === 'days' ? 86400000 : 3600000)
+}
+
+export function getStuckThresholdMs(status, tier, thresholdsSetting) {
+  const cell = thresholdsSetting?.[status]?.[tier]
+  return cell ? thresholdToMs(cell) : null
+}
+
+// Pure and render-safe -- used identically by the Pipeline highlight/filter
+// and the dashboard KPI tile, so they always agree on what counts as stuck.
+export function isTicketStuck(ticket, thresholdsSetting, nowMs = Date.now()) {
+  if (!thresholdsSetting || !STUCK_ELIGIBLE_STATUSES.includes(ticket.status)) return false
+  const tier = ticket.priority_override || priorityTierLabel(ticket.priority_score)
+  const thresholdMs = getStuckThresholdMs(ticket.status, tier, thresholdsSetting)
+  if (thresholdMs == null) return false
+  const changedAt = ticket.status_changed_at || ticket.created_at
+  return (nowMs - new Date(changedAt).getTime()) >= thresholdMs
+}
+
 export const formatUKDate = (isoString) => {
   if (!isoString) return ''
   const d = new Date(isoString)
@@ -339,6 +363,24 @@ export async function fetchFlaggedClockingCount() {
   return flaggedCount
 }
 
+export async function fetchStuckTicketsCount() {
+  const { data: thresholdsRow } = await supabase
+    .schema('pmms')
+    .from('settings')
+    .select('setting_value')
+    .eq('setting_key', 'stuck_ticket_thresholds')
+    .maybeSingle()
+  if (!thresholdsRow?.setting_value) return 0
+
+  const { data: openTickets } = await supabase
+    .schema('pmms')
+    .from('tickets')
+    .select('id, status, status_changed_at, created_at, priority_score, priority_override')
+    .in('status', STUCK_ELIGIBLE_STATUSES)
+
+  return (openTickets || []).filter(t => isTicketStuck(t, thresholdsRow.setting_value)).length
+}
+
 export async function postSystemComment(ticketId, profile, body) {
   await supabase
     .schema('pmms')
@@ -433,7 +475,7 @@ export async function autoReassignDepartingStaffTickets(staffId, staffName, prof
       .from('tickets')
       .update({
         assigned_builder_id: newBuilder.id,
-        ...(promoteToAssigned ? { status: 'Assigned' } : {}),
+        ...(promoteToAssigned ? { status: 'Assigned', status_changed_at: new Date().toISOString(), stuck_alert_sent_at: null } : {}),
       })
       .eq('id', t.id)
 

@@ -1,1 +1,4 @@
 project_id = "gbch-pmms"
+
+[functions.check-stuck-tickets]
+verify_jwt = false

@@ -5,10 +5,19 @@ import { DEFAULT_MAINTENANCE_CATEGORIES, migrateLegacyArrayShape, sortedCategory
 import { DEFAULT_DIVISIONS } from '../../lib/divisions'
 import {
   modalOverlayStyle, modalCardStyle, modalTitleStyle, modalSubtitleStyle,
-  modalCancelBtnStyle, modalConfirmBtnStyle,
+  modalCancelBtnStyle, modalConfirmBtnStyle, statusLabel,
 } from './shared'
 
 const CATEGORY_OPTIONS = ['Electricity', 'Plumbing', 'Doors/Locks', 'Other / Unlisted Trade']
+
+const STUCK_STATUSES = ['Pending', 'Assigned', 'In Progress', 'On Hold']
+const STUCK_TIERS = ['P1 Critical', 'P2 Urgent', 'P3 Routine']
+const DEFAULT_STUCK_THRESHOLDS = {
+  'Pending':     { 'P1 Critical': { value: 2, unit: 'hours' }, 'P2 Urgent': { value: 8, unit: 'hours' }, 'P3 Routine': { value: 1, unit: 'days' } },
+  'Assigned':    { 'P1 Critical': { value: 4, unit: 'hours' }, 'P2 Urgent': { value: 1, unit: 'days' },  'P3 Routine': { value: 3, unit: 'days' } },
+  'In Progress': { 'P1 Critical': { value: 8, unit: 'hours' }, 'P2 Urgent': { value: 2, unit: 'days' },  'P3 Routine': { value: 5, unit: 'days' } },
+  'On Hold':     { 'P1 Critical': { value: 1, unit: 'days' },  'P2 Urgent': { value: 3, unit: 'days' },  'P3 Routine': { value: 7, unit: 'days' } },
+}
 
 const cardStyle = { background: '#fff', borderRadius: '16px', padding: '20px', marginBottom: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }
 const cardHeadingStyle = { margin: '0 0 4px 0', fontSize: '15px', fontWeight: 800, color: '#0f172a' }
@@ -23,7 +32,7 @@ const expandToggleBtnStyle = { width: '32px', height: '32px', borderRadius: '8px
 const orderInputStyle = { width: '40px', height: '32px', padding: 0, borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '13px', fontWeight: 700, color: '#475569', textAlign: 'center', boxSizing: 'border-box', flexShrink: 0 }
 const removeBtnStyle = { padding: '8px 14px', background: '#fff', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', flexShrink: 0, marginLeft: 'auto' }
 
-const SECTION_IDS = ['priority-thresholds', 'issue-scores', 'compliance-types', 'clocking-rules', 'on-call-roster', 'dashboard-metrics']
+const SECTION_IDS = ['priority-thresholds', 'issue-scores', 'compliance-types', 'clocking-rules', 'stuck-ticket-alerts', 'on-call-roster', 'dashboard-metrics']
 
 function SettingsSection({ title, subtitle, headerExtra, open, onToggle, children }) {
   return (
@@ -105,6 +114,11 @@ export default function AdminSettings() {
   const [clockingSaving, setClockingSaving] = useState(false)
   const [clockingSaved, setClockingSaved] = useState(false)
 
+  const [stuckThresholds, setStuckThresholds] = useState(DEFAULT_STUCK_THRESHOLDS)
+  const [stuckAlertsEnabled, setStuckAlertsEnabled] = useState(true)
+  const [stuckAlertsSaving, setStuckAlertsSaving] = useState(false)
+  const [stuckAlertsSaved, setStuckAlertsSaved] = useState(false)
+
   const [roster, setRoster] = useState([])
   const [rosterSaving, setRosterSaving] = useState(false)
   const [rosterSaved, setRosterSaved] = useState(false)
@@ -149,6 +163,8 @@ export default function AdminSettings() {
           })))
         }
       }
+      if (map.stuck_ticket_thresholds) setStuckThresholds(map.stuck_ticket_thresholds)
+      if (map.stuck_alerts_enabled != null) setStuckAlertsEnabled(map.stuck_alerts_enabled)
       if (map.clock_overrun_hours != null) setClockOverrunHours(map.clock_overrun_hours)
       if (map.done_window_hours != null) setDoneWindowHours(map.done_window_hours)
       if (map.clock_distance_threshold_meters != null) setClockDistanceThresholdM(map.clock_distance_threshold_meters)
@@ -485,6 +501,23 @@ export default function AdminSettings() {
     setClockingSaving(false)
     setClockingSaved(true)
     setTimeout(() => setClockingSaved(false), 2000)
+  }
+
+  function updateStuckThresholdCell(status, tier, field, value) {
+    setStuckThresholds(prev => ({
+      ...prev,
+      [status]: { ...prev[status], [tier]: { ...prev[status]?.[tier], [field]: value } },
+    }))
+  }
+
+  async function saveStuckTicketAlerts() {
+    setStuckAlertsSaving(true)
+    setStuckAlertsSaved(false)
+    await saveSetting('stuck_ticket_thresholds', stuckThresholds)
+    await saveSetting('stuck_alerts_enabled', stuckAlertsEnabled)
+    setStuckAlertsSaving(false)
+    setStuckAlertsSaved(true)
+    setTimeout(() => setStuckAlertsSaved(false), 2000)
   }
 
   async function addRosterContact() {
@@ -1002,6 +1035,67 @@ export default function AdminSettings() {
           {clockingSaving ? 'Saving...' : 'Save Clocking Rules'}
         </button>
         {clockingSaved && <span style={savedTagStyle}>✓ Saved</span>}
+      </SettingsSection>
+
+      {/* Section 4b: Stuck Ticket Alerts */}
+      <SettingsSection
+        title="Stuck Ticket Alerts"
+        subtitle="How long a ticket can sit in a status before it's flagged as stuck on the Pipeline page and managers are pushed an alert. Thresholds scale by priority tier."
+        open={!!openSections['stuck-ticket-alerts']}
+        onToggle={() => toggleSection('stuck-ticket-alerts')}
+      >
+        <div style={{ overflowX: 'auto', marginBottom: '16px' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '520px' }}>
+            <thead>
+              <tr>
+                <th style={{ textAlign: 'left', padding: '0 12px 8px 0', fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Status</th>
+                {STUCK_TIERS.map(tier => (
+                  <th key={tier} style={{ textAlign: 'left', padding: '0 12px 8px 0', fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{tier}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {STUCK_STATUSES.map(status => (
+                <tr key={status}>
+                  <td style={{ padding: '6px 12px 6px 0', fontSize: '13px', fontWeight: 700, color: '#0f172a', whiteSpace: 'nowrap' }}>{statusLabel(status)}</td>
+                  {STUCK_TIERS.map(tier => {
+                    const cell = stuckThresholds[status]?.[tier] || { value: '', unit: 'hours' }
+                    return (
+                      <td key={tier} style={{ padding: '6px 12px 6px 0' }}>
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <input
+                            type="number"
+                            value={cell.value}
+                            onChange={(e) => updateStuckThresholdCell(status, tier, 'value', e.target.value)}
+                            style={{ ...inputStyle, width: '70px' }}
+                          />
+                          <select
+                            value={cell.unit}
+                            onChange={(e) => updateStuckThresholdCell(status, tier, 'unit', e.target.value)}
+                            style={{ ...inputStyle, width: '90px' }}
+                          >
+                            <option value="hours">hours</option>
+                            <option value="days">days</option>
+                          </select>
+                        </div>
+                      </td>
+                    )
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: 600, color: '#0f172a', marginBottom: '16px' }}>
+          <input type="checkbox" checked={stuckAlertsEnabled} onChange={(e) => setStuckAlertsEnabled(e.target.checked)} />
+          Send push notifications for stuck tickets
+        </label>
+
+        <button onClick={saveStuckTicketAlerts} disabled={stuckAlertsSaving} style={{ ...saveBtnStyle, opacity: stuckAlertsSaving ? 0.6 : 1, cursor: stuckAlertsSaving ? 'not-allowed' : 'pointer' }}>
+          {stuckAlertsSaving ? 'Saving...' : 'Save Stuck Ticket Alerts'}
+        </button>
+        {stuckAlertsSaved && <span style={savedTagStyle}>✓ Saved</span>}
       </SettingsSection>
 
       {/* Section 5: On-Call Roster */}

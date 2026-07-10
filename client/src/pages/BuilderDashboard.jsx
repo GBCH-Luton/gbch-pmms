@@ -254,7 +254,7 @@ export default function BuilderDashboard({ profile }) {
     const { data, error } = await supabase
       .schema('pmms')
       .from('tickets')
-      .update({ assigned_builder_id: profile.id, status: 'Assigned' })
+      .update({ assigned_builder_id: profile.id, status: 'Assigned', status_changed_at: new Date().toISOString(), stuck_alert_sent_at: null })
       .eq('id', ticket.id)
       .is('assigned_builder_id', null)
       .select()
@@ -325,7 +325,7 @@ export default function BuilderDashboard({ profile }) {
     const { error: ticketError } = await supabase
       .schema('pmms')
       .from('tickets')
-      .update({ status: 'In Progress', mileage_logged: milesLogged, transit_start: transitStart })
+      .update({ status: 'In Progress', status_changed_at: now, stuck_alert_sent_at: null, mileage_logged: milesLogged, transit_start: transitStart })
       .eq('id', selectedTicket.id)
 
     if (ticketError) {
@@ -380,7 +380,7 @@ export default function BuilderDashboard({ profile }) {
     await supabase
       .schema('pmms')
       .from('tickets')
-      .update({ status: 'Completed', completed_at: now, completion_note: note.trim(), completion_photo_url: photoUrl })
+      .update({ status: 'Completed', status_changed_at: now, stuck_alert_sent_at: null, completed_at: now, completion_note: note.trim(), completion_photo_url: photoUrl })
       .eq('id', selectedTicket.id)
 
     await supabase
@@ -405,7 +405,7 @@ export default function BuilderDashboard({ profile }) {
     await supabase
       .schema('pmms')
       .from('tickets')
-      .update({ status: 'On Hold', hold_reason: reason, hold_note: note })
+      .update({ status: 'On Hold', status_changed_at: now, stuck_alert_sent_at: null, hold_reason: reason, hold_note: note })
       .eq('id', selectedTicket.id)
 
     await supabase
@@ -429,7 +429,7 @@ export default function BuilderDashboard({ profile }) {
     const { error: ticketError } = await supabase
       .schema('pmms')
       .from('tickets')
-      .update({ status: 'In Progress', hold_reason: null, hold_note: null })
+      .update({ status: 'In Progress', status_changed_at: now, stuck_alert_sent_at: null, hold_reason: null, hold_note: null })
       .eq('id', selectedTicket.id)
 
     if (ticketError) {
@@ -484,7 +484,7 @@ export default function BuilderDashboard({ profile }) {
     await supabase
       .schema('pmms')
       .from('tickets')
-      .update({ status: 'Assigned', no_access_flag: true, no_access_note: note.trim(), no_access_photo_url: photoUrl })
+      .update({ status: 'Assigned', status_changed_at: now, stuck_alert_sent_at: null, no_access_flag: true, no_access_note: note.trim(), no_access_photo_url: photoUrl })
       .eq('id', selectedTicket.id)
 
     await supabase
@@ -726,6 +726,7 @@ export default function BuilderDashboard({ profile }) {
         raised_by_name: profile.name,
         photo_url: photoUrl,
         created_at: new Date().toISOString(),
+        status_changed_at: new Date().toISOString(),
       })
       .select('id, ticket_number')
 
@@ -821,6 +822,7 @@ export default function BuilderDashboard({ profile }) {
           raised_by: profile.id,
           raised_by_name: profile.name,
           created_at: new Date().toISOString(),
+          status_changed_at: new Date().toISOString(),
         })
         .select('id, ticket_number')
 

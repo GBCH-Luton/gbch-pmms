@@ -108,7 +108,7 @@ export default function AdminSignOff({ profile, onTicketsChanged }) {
     const { error } = await supabase
       .schema('pmms')
       .from('tickets')
-      .update({ status: 'Archived' })
+      .update({ status: 'Archived', status_changed_at: new Date().toISOString(), stuck_alert_sent_at: null })
       .eq('id', ticket.id)
 
     if (error) {
@@ -134,7 +134,7 @@ export default function AdminSignOff({ profile, onTicketsChanged }) {
     const { error } = await supabase
       .schema('pmms')
       .from('tickets')
-      .update({ status: 'Assigned' })
+      .update({ status: 'Assigned', status_changed_at: new Date().toISOString(), stuck_alert_sent_at: null })
       .eq('id', t.id)
 
     if (error) { setReopenError(error.message); return }

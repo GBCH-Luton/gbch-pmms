@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
-import { priorityTierLabel, fetchFlaggedClockingCount } from './shared'
+import { priorityTierLabel, fetchFlaggedClockingCount, isTicketStuck } from './shared'
 
 const DEFAULT_NEW_PROPERTY_WINDOW_HOURS = 48
 
@@ -21,6 +21,7 @@ export default function AdminDashboard({ onNavigate }) {
   const [currentVoidsCount, setCurrentVoidsCount] = useState(0)
   const [clockedInCount, setClockedInCount] = useState(0)
   const [flaggedLocationsCount, setFlaggedLocationsCount] = useState(0)
+  const [stuckThresholds, setStuckThresholds] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -29,16 +30,27 @@ export default function AdminDashboard({ onNavigate }) {
     fetchVoidsCount()
     fetchClockedInCount()
     fetchFlaggedClockingCount().then(setFlaggedLocationsCount)
+    fetchStuckThresholds()
   }, [])
 
   async function fetchTickets() {
     const { data, error } = await supabase
       .schema('pmms')
       .from('tickets')
-      .select('id, status, completed_at, priority_score, priority_override, mileage_logged')
+      .select('id, status, created_at, completed_at, status_changed_at, priority_score, priority_override, mileage_logged')
 
     if (!error) setTickets(data)
     setLoading(false)
+  }
+
+  async function fetchStuckThresholds() {
+    const { data } = await supabase
+      .schema('pmms')
+      .from('settings')
+      .select('setting_value')
+      .eq('setting_key', 'stuck_ticket_thresholds')
+      .maybeSingle()
+    if (data?.setting_value) setStuckThresholds(data.setting_value)
   }
 
   async function fetchPropertiesMetrics() {
@@ -97,6 +109,13 @@ export default function AdminDashboard({ onNavigate }) {
       statusFilter: 'All',
       priorityFilter: 'P1 Critical',
     },
+    {
+      label: 'Stuck',
+      value: tickets.filter(t => isTicketStuck(t, stuckThresholds)).length,
+      colour: '#d97706',
+      statusFilter: 'All',
+      stuckOnly: true,
+    },
   ]
 
   const isSameDay = (a, b) =>
@@ -140,7 +159,7 @@ export default function AdminDashboard({ onNavigate }) {
         {kpis.map(kpi => (
           <button
             key={kpi.label}
-            onClick={() => onNavigate?.('pipeline', { statusFilter: kpi.statusFilter, priorityFilter: kpi.priorityFilter })}
+            onClick={() => onNavigate?.('pipeline', { statusFilter: kpi.statusFilter, priorityFilter: kpi.priorityFilter, stuckOnly: kpi.stuckOnly })}
             style={{ flex: '1 1 160px', background: kpi.colour, borderRadius: '16px', padding: '16px', border: 'none', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', textAlign: 'center' }}
           >
             <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{kpi.label}</p>

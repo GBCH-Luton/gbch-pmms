@@ -257,6 +257,7 @@ export default function AdminRaiseTicket({ profile }) {
         raised_by_name: profile.name,
         photo_url: photoUrl,
         created_at: new Date().toISOString(),
+        status_changed_at: new Date().toISOString(),
       })
       .select('id, ticket_number')
 
@@ -364,6 +365,7 @@ export default function AdminRaiseTicket({ profile }) {
           raised_by: profile.id,
           raised_by_name: profile.name,
           created_at: new Date().toISOString(),
+          status_changed_at: new Date().toISOString(),
         })
         .select('id, ticket_number')
 
