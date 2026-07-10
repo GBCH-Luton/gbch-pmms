@@ -78,6 +78,15 @@ export function metresToMiles(metres) {
   return metres / 1609.344
 }
 
+// A raw metre count (e.g. "1112m") is hard to read at a glance past a
+// few hundred metres -- switches to km with one decimal place once it
+// crosses 1000m, same reasoning as formatDurationDays switching from a
+// plain hour count to "Xd Yh".
+export function formatDistanceMetres(metres) {
+  if (metres >= 1000) return `${(metres / 1000).toFixed(1)}km`
+  return `${Math.round(metres)}m`
+}
+
 // Geocodes any of the given properties that don't have cached lat/lng yet
 // (extracting the postcode from the address if needed), persists the
 // result, and returns a { [propertyId]: { latitude, longitude } } map

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
-import { distanceMetres, googleMapsEmbedLink, googleMapsRouteEmbedLink, metresToMiles, ensurePropertyCoords } from '../../lib/geo'
+import { distanceMetres, googleMapsEmbedLink, googleMapsRouteEmbedLink, metresToMiles, formatDistanceMetres, ensurePropertyCoords } from '../../lib/geo'
 import { attachProperties } from '../../lib/properties'
 import {
   thStyle, tdStyle, actionBtnStyle, filterSelectStyle, formatUKDateTime,
@@ -24,7 +24,7 @@ function LocationCell({ distance, thresholdM, lat, lng, onOpenMap }) {
       </button>
       {tooFar && (
         <span style={{ display: 'block', fontSize: '10px', fontWeight: 800, color: '#dc2626' }}>
-          ⚠ {Math.round(distance)}m away
+          ⚠ {formatDistanceMetres(distance)} away
         </span>
       )}
     </div>
@@ -328,7 +328,7 @@ export default function AdminClocking({ profile }) {
                   )}
                   {tooFar && (
                     <span style={{ display: 'block', marginTop: '4px', fontSize: '11px', fontWeight: 800, color: '#dc2626' }}>
-                      ⚠ Clocked in {Math.round(row.clockInDistance)}m from the property
+                      ⚠ Clocked in {formatDistanceMetres(row.clockInDistance)} from the property
                     </span>
                   )}
                   {hasPin && (
