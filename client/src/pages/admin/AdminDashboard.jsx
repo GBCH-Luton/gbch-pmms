@@ -196,7 +196,7 @@ export default function AdminDashboard({ onNavigate }) {
         <button
           onClick={() => onNavigate?.('properties')}
           style={{
-            flex: '1 1 220px', background: '#0f766e', borderRadius: '16px', padding: '16px',
+            flex: '1 1 220px', background: '#2563eb', borderRadius: '16px', padding: '16px',
             border: 'none', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', textAlign: 'center',
           }}
         >
