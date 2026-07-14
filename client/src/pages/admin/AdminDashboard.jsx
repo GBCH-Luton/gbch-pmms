@@ -4,12 +4,58 @@ import { priorityTierLabel, fetchFlaggedClockingCount, isTicketStuck, KpiTiles, 
 
 const DEFAULT_NEW_PROPERTY_WINDOW_HOURS = 48
 
-function DashboardSection({ title, background, children }) {
+// Collapsed/expanded state persists per section in localStorage (keyed by
+// `id`, not the title text, so a future title rename doesn't reset
+// everyone's preference) -- every section starts expanded on first visit.
+// alertCount only ever renders while collapsed: the point is to let an
+// admin collapse a normally-quiet section without silently losing sight
+// of it if something in it later needs attention.
+function DashboardSection({ id, title, background, alertCount = 0, children }) {
+  const storageKey = `pmms_dashboard_collapsed_${id}`
+  const [collapsed, setCollapsed] = useState(() => {
+    try { return localStorage.getItem(storageKey) === 'true' } catch { return false }
+  })
+
+  function toggle() {
+    setCollapsed(prev => {
+      const next = !prev
+      try { localStorage.setItem(storageKey, String(next)) } catch { /* ignore */ }
+      return next
+    })
+  }
+
   return (
-    <div style={{ background, borderRadius: '16px', padding: '20px', marginBottom: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-      <p style={{ margin: '0 0 14px 0', fontSize: '15px', fontWeight: 800, color: '#0f172a' }}>{title}</p>
-      <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-        {children}
+    <div style={{ borderRadius: '16px', marginBottom: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
+      <div
+        onClick={toggle}
+        style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px',
+          padding: '10px 20px', cursor: 'pointer', userSelect: 'none',
+          background: '#eef1f6', borderBottom: '1px solid #e2e8f0',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <p style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: '#0f172a' }}>{title}</p>
+          {collapsed && alertCount > 0 && (
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '20px', height: '20px',
+              padding: '0 6px', borderRadius: '20px', background: '#dc2626', color: '#fff', fontSize: '11px', fontWeight: 800,
+            }}>
+              {alertCount}
+            </span>
+          )}
+        </div>
+        <span style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center', width: '20px', height: '20px', flexShrink: 0,
+          color: '#64748b', transition: 'transform 0.2s ease', transform: collapsed ? 'rotate(-90deg)' : 'none',
+        }}>▾</span>
+      </div>
+      <div style={{ display: 'grid', gridTemplateRows: collapsed ? '0fr' : '1fr', transition: 'grid-template-rows 0.22s ease' }}>
+        <div style={{ overflow: 'hidden' }}>
+          <div style={{ background, display: 'flex', gap: '12px', flexWrap: 'wrap', padding: '20px' }}>
+            {children}
+          </div>
+        </div>
       </div>
     </div>
   )
@@ -172,7 +218,7 @@ export default function AdminDashboard({ onNavigate }) {
 
   return (
     <div>
-      <DashboardSection title="Ticket Pipeline" background="#ffffff">
+      <DashboardSection id="pipeline" title="Ticket Pipeline" background="#ffffff" alertCount={kpis.find(k => k.label === 'Stuck')?.value || 0}>
         <div style={{ width: '100%' }}>
           <KpiTiles
             kpis={kpis}
@@ -181,7 +227,7 @@ export default function AdminDashboard({ onNavigate }) {
         </div>
       </DashboardSection>
 
-      <DashboardSection title="Properties" background="#ffffff">
+      <DashboardSection id="properties" title="Properties" background="#ffffff">
         <button
           onClick={() => onNavigate?.('properties', { filterMode: 'newProperties' })}
           style={{
@@ -205,7 +251,7 @@ export default function AdminDashboard({ onNavigate }) {
         </button>
       </DashboardSection>
 
-      <DashboardSection title="Compliance" background="#ffffff">
+      <DashboardSection id="compliance" title="Compliance" background="#ffffff" alertCount={complianceCounts.expired}>
         <div style={{ width: '100%' }}>
           <KpiTiles
             kpis={complianceKpis}
@@ -214,7 +260,7 @@ export default function AdminDashboard({ onNavigate }) {
         </div>
       </DashboardSection>
 
-      <DashboardSection title="Void Aging" background="#ffffff">
+      <DashboardSection id="void-aging" title="Void Aging" background="#ffffff" alertCount={voidAgingCounts.overdue}>
         <div style={{ width: '100%' }}>
           <KpiTiles
             kpis={voidAgingKpis}
@@ -223,7 +269,7 @@ export default function AdminDashboard({ onNavigate }) {
         </div>
       </DashboardSection>
 
-      <DashboardSection title="Jobs Completed" background="#f8fafc">
+      <DashboardSection id="jobs-completed" title="Jobs Completed" background="#f8fafc">
         {completionKpis.map(kpi => (
           <button
             key={kpi.label}
@@ -236,7 +282,7 @@ export default function AdminDashboard({ onNavigate }) {
         ))}
       </DashboardSection>
 
-      <DashboardSection title="Sign-Off & Mileage" background="#f8fafc">
+      <DashboardSection id="sign-off-mileage" title="Sign-Off & Mileage" background="#f8fafc" alertCount={flaggedLocationsCount}>
         <button
           onClick={() => onNavigate?.('sign-off')}
           style={{
