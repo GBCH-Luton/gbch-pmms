@@ -44,6 +44,7 @@ import {
 } from './shared'
 
 const ROOM_TYPES = ['Bedroom', 'Bathroom', 'Kitchen', 'Living Room', 'Other']
+const BED_TYPES = ['Single', 'Double', 'Twin', 'Bunk']
 
 const STATUS_STYLES = {
   Occupied: { bg: '#dcfce7', color: '#16a34a' },
@@ -63,7 +64,7 @@ async function insertHistory(roomId, propertyId, action, actionDate, tenantName,
     .insert({ room_id: roomId, property_id: propertyId, action, action_date: actionDate, tenant_name: tenantName || null, notes: notes || null })
 }
 
-const emptyForm = { room_name: '', room_type: 'Bedroom', current_status: 'Occupied', tenant_name: '', void_since: '' }
+const emptyForm = { room_name: '', room_type: 'Bedroom', bed_type: '', current_status: 'Occupied', tenant_name: '', void_since: '' }
 
 function RoomFormModal({ property, room, onClose, onSaved }) {
   const [form, setForm] = useState(emptyForm)
@@ -75,6 +76,7 @@ function RoomFormModal({ property, room, onClose, onSaved }) {
       setForm({
         room_name: room.room_name || '',
         room_type: room.room_type || 'Bedroom',
+        bed_type: room.bed_type || '',
         current_status: room.current_status || 'Occupied',
         tenant_name: room.tenant_name || '',
         void_since: room.void_since || '',
@@ -92,6 +94,7 @@ function RoomFormModal({ property, room, onClose, onSaved }) {
   async function handleSave() {
     setError('')
     if (!form.room_name.trim()) { setError('Room Name is required.'); return }
+    if (!form.bed_type) { setError('Bed Type is required.'); return }
     if (form.current_status === 'Occupied' && !form.tenant_name.trim()) { setError('Tenant Name is required for an occupied room.'); return }
 
     setSaving(true)
@@ -103,6 +106,7 @@ function RoomFormModal({ property, room, onClose, onSaved }) {
       property_id: property.id,
       room_name: form.room_name.trim(),
       room_type: form.room_type,
+      bed_type: form.bed_type,
       current_status: form.current_status,
       tenant_name: form.current_status === 'Occupied' ? form.tenant_name.trim() : null,
       void_since: form.current_status === 'Void' ? (statusChanged ? today : (form.void_since || today)) : null,
@@ -152,6 +156,12 @@ function RoomFormModal({ property, room, onClose, onSaved }) {
         <p style={modalLabelStyle}>Room Type</p>
         <select value={form.room_type} onChange={(e) => set('room_type', e.target.value)} style={inputStyle}>
           {ROOM_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+        </select>
+
+        <p style={modalLabelStyle}>Bed Type</p>
+        <select value={form.bed_type} onChange={(e) => set('bed_type', e.target.value)} style={inputStyle}>
+          <option value="">Select bed type…</option>
+          {BED_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
         </select>
 
         <p style={modalLabelStyle}>Current Status</p>
@@ -221,6 +231,12 @@ function MarkVoidModal({ room, onClose, onSaved }) {
     <div style={modalOverlayStyle}>
       <div style={{ ...modalCardStyle, maxWidth: '380px' }}>
         <p style={modalTitleStyle}>Mark "{room.room_name}" as Void</p>
+
+        <p style={{ margin: '0 0 12px 0', fontSize: '13px', color: '#64748b' }}>
+          Bed Type: {room.bed_type
+            ? <strong style={{ color: '#0f172a' }}>{room.bed_type}</strong>
+            : <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>Not set</span>}
+        </p>
 
         <p style={modalLabelStyle}>Move-out Date</p>
         <input type="date" value={moveOutDate} onChange={(e) => setMoveOutDate(e.target.value)} style={inputStyle} />
@@ -377,11 +393,22 @@ function RoomCard({ room, onEdit, onMarkVoid, onMarkOccupied, onViewHistory }) {
         </span>
       </div>
 
-      {room.room_type && (
-        <span style={{ display: 'inline-block', marginBottom: '12px', fontSize: '10px', fontWeight: 700, color: '#1d4ed8', background: '#dbeafe', padding: '2px 8px', borderRadius: '20px' }}>
-          {room.room_type}
-        </span>
-      )}
+      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '12px' }}>
+        {room.room_type && (
+          <span style={{ display: 'inline-block', fontSize: '10px', fontWeight: 700, color: '#1d4ed8', background: '#dbeafe', padding: '2px 8px', borderRadius: '20px' }}>
+            {room.room_type}
+          </span>
+        )}
+        {room.bed_type ? (
+          <span style={{ display: 'inline-block', fontSize: '10px', fontWeight: 700, color: '#7c3aed', background: '#ede9fe', padding: '2px 8px', borderRadius: '20px' }}>
+            {room.bed_type}
+          </span>
+        ) : (
+          <span style={{ display: 'inline-block', fontSize: '10px', color: '#94a3b8', fontStyle: 'italic', padding: '2px 8px' }}>
+            Bed type not set
+          </span>
+        )}
+      </div>
 
       <div style={{ marginBottom: '14px' }}>
         {room.current_status === 'Occupied' ? (

@@ -42,7 +42,7 @@ export default function AdminVoids({ onNavigate, initialTierFilter, onInitialTie
   async function fetchAll() {
     setLoading(true)
     const [{ data: roomsData }, { data: propertiesData }, { data: thresholdRow }] = await Promise.all([
-      supabase.schema('pmms').from('property_rooms').select('id, property_id, room_name, room_type, current_status, void_since').eq('current_status', 'Void'),
+      supabase.schema('pmms').from('property_rooms').select('id, property_id, room_name, room_type, bed_type, current_status, void_since').eq('current_status', 'Void'),
       supabase.schema('pmms').from('properties').select('id, address, postcode').order('address'),
       supabase.schema('pmms').from('settings').select('setting_value').eq('setting_key', 'void_aging_threshold_days').maybeSingle(),
     ])
@@ -88,6 +88,7 @@ export default function AdminVoids({ onNavigate, initialTierFilter, onInitialTie
       case 'property': return (r.property.address || '').toLowerCase()
       case 'room': return (r.room.room_name || '').toLowerCase()
       case 'roomType': return (r.room.room_type || '').toLowerCase()
+      case 'bedType': return (r.room.bed_type || '').toLowerCase()
       case 'status': return r.category
       case 'voidSince': return r.room.void_since ? new Date(r.room.void_since).getTime() : 0
       case 'daysSince': return r.aging.daysSince ?? -Infinity
@@ -152,6 +153,7 @@ export default function AdminVoids({ onNavigate, initialTierFilter, onInitialTie
               <th style={{ ...thStyle, cursor: 'pointer' }} onClick={() => toggleSort('property')}>Property{sortArrow('property')}</th>
               <th style={{ ...thStyle, cursor: 'pointer' }} onClick={() => toggleSort('room')}>Room{sortArrow('room')}</th>
               <th style={{ ...thStyle, cursor: 'pointer' }} onClick={() => toggleSort('roomType')}>Room Type{sortArrow('roomType')}</th>
+              <th style={{ ...thStyle, cursor: 'pointer' }} onClick={() => toggleSort('bedType')}>Bed Type{sortArrow('bedType')}</th>
               <th style={{ ...thStyle, cursor: 'pointer' }} onClick={() => toggleSort('status')}>Status{sortArrow('status')}</th>
               <th style={{ ...thStyle, cursor: 'pointer' }} onClick={() => toggleSort('voidSince')}>Void Since{sortArrow('voidSince')}</th>
               <th style={{ ...thStyle, cursor: 'pointer' }} onClick={() => toggleSort('daysSince')}>Days Void{sortArrow('daysSince')}</th>
@@ -160,7 +162,7 @@ export default function AdminVoids({ onNavigate, initialTierFilter, onInitialTie
           <tbody>
             {sortedRows.length === 0 && (
               <tr>
-                <td colSpan={6} style={{ ...tdStyle, textAlign: 'center', color: '#94a3b8', padding: '32px' }}>
+                <td colSpan={7} style={{ ...tdStyle, textAlign: 'center', color: '#94a3b8', padding: '32px' }}>
                   No void rooms match these filters.
                 </td>
               </tr>
@@ -177,6 +179,7 @@ export default function AdminVoids({ onNavigate, initialTierFilter, onInitialTie
                 </td>
                 <td style={tdStyle}>{r.room.room_name}</td>
                 <td style={tdStyle}>{r.room.room_type || '—'}</td>
+                <td style={tdStyle}>{r.room.bed_type || '—'}</td>
                 <td style={tdStyle}><RagPill tier={r.aging.tier} label={r.aging.label} /></td>
                 <td style={tdStyle}>{r.room.void_since ? formatUKDate(r.room.void_since) : '—'}</td>
                 <td style={tdStyle}>{r.aging.daysSince != null ? `${r.aging.daysSince}d` : '—'}</td>
