@@ -336,14 +336,17 @@ export default function AdminSettings() {
     persistMaintenanceCategories(updated)
   }
 
-  // Fixed thresholds for this section specifically (separate from the
-  // adjustable Priority Engine Thresholds above, which govern real ticket
-  // escalation) -- these are just the display labels shown on each
-  // category/sub-category card while editing.
+  // Mirrors the real, live thresholds (GLOBAL_TRIAGE_THRESHOLD=70,
+  // P2_URGENT_THRESHOLD=40 -- see shared.jsx) that actually govern ticket
+  // escalation, so this display label can never disagree with what a real
+  // ticket at this score would do. (The "Priority Engine Thresholds"
+  // section above is not yet wired to those constants -- see its own
+  // note -- so this deliberately matches the hardcoded values, not that
+  // section's editable ones.)
   function categoryTierForScore(score) {
     const n = Number(score)
-    if (n >= 120) return { label: 'P1 Critical', color: '#dc2626' }
-    if (n >= 70) return { label: 'P2 Urgent', color: '#d97706' }
+    if (n >= 70) return { label: 'P1 Critical', color: '#dc2626' }
+    if (n >= 40) return { label: 'P2 Urgent', color: '#d97706' }
     return { label: 'Routine', color: '#64748b' }
   }
 
@@ -611,7 +614,15 @@ export default function AdminSettings() {
         </div>
       </div>
 
-      {/* Section 1: Priority Engine Thresholds */}
+      {/* Section 1: Priority Engine Thresholds
+          KNOWN GAP (pre-existing, not yet fixed): this section saves to
+          priority_threshold_p1/p2 in pmms.settings, but nothing else in
+          the codebase reads those keys -- real ticket escalation still
+          uses the hardcoded GLOBAL_TRIAGE_THRESHOLD=70/P2_URGENT_THRESHOLD=40
+          constants (see shared.jsx). Editing and saving here currently has
+          no effect on live ticket behaviour. Flagged for a future fix
+          (wire the constants to read from settings) rather than changed
+          here. */}
       <SettingsSection
         title="Priority Engine Thresholds"
         subtitle="Controls when a ticket is treated as P1 Critical or P2 Urgent."
