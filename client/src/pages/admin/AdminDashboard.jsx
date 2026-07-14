@@ -161,7 +161,7 @@ export default function AdminDashboard({ onNavigate }) {
     {
       label: 'Stuck',
       value: tickets.filter(t => isTicketStuck(t, stuckThresholds)).length,
-      colour: '#d97706',
+      colour: '#dc2626',
       statusFilter: 'All',
       stuckOnly: true,
     },

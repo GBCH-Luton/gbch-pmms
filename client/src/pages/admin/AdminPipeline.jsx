@@ -495,7 +495,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
     { label: 'On Hold', value: tickets.filter(t => t.status === 'On Hold').length, colour: '#f59e0b', statusFilter: 'On Hold' },
     { label: 'Completed', value: tickets.filter(t => t.status === 'Completed').length, colour: '#16a34a', statusFilter: 'Completed' },
     { label: 'P1 Critical', value: tickets.filter(t => effectiveTier(t) === 'P1 Critical').length, colour: '#dc2626', statusFilter: 'All', priorityFilter: 'P1 Critical' },
-    { label: 'Stuck', value: tickets.filter(t => isTicketStuck(t, stuckThresholds)).length, colour: '#d97706', statusFilter: 'All', stuckOnly: true },
+    { label: 'Stuck', value: tickets.filter(t => isTicketStuck(t, stuckThresholds)).length, colour: '#dc2626', statusFilter: 'All', stuckOnly: true },
   ]
 
   // Clicking a tile is a "jump to this category" shortcut, same as
