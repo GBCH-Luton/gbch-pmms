@@ -54,10 +54,31 @@ export function builderOptionLabel(b) {
   return `${b.name} — ${b.availability}${b.availabilityNote ? `: ${b.availabilityNote}` : ''}`
 }
 
-export function priorityTierLabel(score) {
-  if (score >= GLOBAL_TRIAGE_THRESHOLD) return 'P1 Critical'
-  if (score >= P2_URGENT_THRESHOLD) return 'P2 Urgent'
+export function priorityTierLabel(score, p1Threshold = GLOBAL_TRIAGE_THRESHOLD, p2Threshold = P2_URGENT_THRESHOLD) {
+  if (score >= p1Threshold) return 'P1 Critical'
+  if (score >= p2Threshold) return 'P2 Urgent'
   return 'P3 Routine'
+}
+
+// Mirrors fetchComplianceAgingCounts/fetchStuckTicketsCount's own
+// settings-fetch convention -- callers that don't yet fetch these
+// should keep calling priorityTierLabel()/isTicketStuck() with no
+// threshold args, which fall back to the GLOBAL_TRIAGE_THRESHOLD/
+// P2_URGENT_THRESHOLD constants above unchanged.
+export async function fetchPriorityThresholds() {
+  const { data } = await supabase
+    .schema('pmms')
+    .from('settings')
+    .select('setting_key, setting_value')
+    .in('setting_key', ['priority_threshold_p1', 'priority_threshold_p2'])
+
+  const map = {}
+  ;(data || []).forEach(r => { map[r.setting_key] = r.setting_value })
+
+  return {
+    p1: map.priority_threshold_p1 != null ? Number(map.priority_threshold_p1) : GLOBAL_TRIAGE_THRESHOLD,
+    p2: map.priority_threshold_p2 != null ? Number(map.priority_threshold_p2) : P2_URGENT_THRESHOLD,
+  }
 }
 
 export function priorityBadgeStyle(tier) {
@@ -101,9 +122,9 @@ export function getStuckThresholdMs(status, tier, thresholdsSetting) {
 
 // Pure and render-safe -- used identically by the Pipeline highlight/filter
 // and the dashboard KPI tile, so they always agree on what counts as stuck.
-export function isTicketStuck(ticket, thresholdsSetting, nowMs = Date.now()) {
+export function isTicketStuck(ticket, thresholdsSetting, nowMs = Date.now(), p1Threshold = GLOBAL_TRIAGE_THRESHOLD, p2Threshold = P2_URGENT_THRESHOLD) {
   if (!thresholdsSetting || !STUCK_ELIGIBLE_STATUSES.includes(ticket.status)) return false
-  const tier = ticket.priority_override || priorityTierLabel(ticket.priority_score)
+  const tier = ticket.priority_override || priorityTierLabel(ticket.priority_score, p1Threshold, p2Threshold)
   const thresholdMs = getStuckThresholdMs(ticket.status, tier, thresholdsSetting)
   if (thresholdMs == null) return false
   const changedAt = ticket.status_changed_at || ticket.created_at

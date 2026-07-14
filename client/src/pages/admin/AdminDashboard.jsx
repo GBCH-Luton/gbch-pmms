@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
-import { priorityTierLabel, fetchFlaggedClockingCount, isTicketStuck, KpiTiles, fetchComplianceAgingCounts, fetchVoidAgingCounts, computeAvgResponseMs, formatDuration } from './shared'
+import { priorityTierLabel, fetchFlaggedClockingCount, isTicketStuck, KpiTiles, fetchComplianceAgingCounts, fetchVoidAgingCounts, computeAvgResponseMs, formatDuration, fetchPriorityThresholds } from './shared'
 
 const DEFAULT_NEW_PROPERTY_WINDOW_HOURS = 48
 
@@ -70,6 +70,8 @@ export default function AdminDashboard({ onNavigate }) {
   const [stuckThresholds, setStuckThresholds] = useState(null)
   const [complianceCounts, setComplianceCounts] = useState({ expired: 0, dueSoon: 0, noRecord: 0, valid: 0 })
   const [voidAgingCounts, setVoidAgingCounts] = useState({ overdue: 0, aging: 0, recent: 0 })
+  const [p1Threshold, setP1Threshold] = useState(70)
+  const [p2Threshold, setP2Threshold] = useState(40)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -81,6 +83,7 @@ export default function AdminDashboard({ onNavigate }) {
     fetchStuckThresholds()
     fetchComplianceAgingCounts().then(setComplianceCounts)
     fetchVoidAgingCounts().then(setVoidAgingCounts)
+    fetchPriorityThresholds().then(({ p1, p2 }) => { setP1Threshold(p1); setP2Threshold(p2) })
   }, [])
 
   async function fetchTickets() {
@@ -153,14 +156,14 @@ export default function AdminDashboard({ onNavigate }) {
       // (priority_override wins over the raw score) so this count always
       // equals the number of rows you land on after clicking the tile.
       label: 'P1 Critical',
-      value: tickets.filter(t => (t.priority_override || priorityTierLabel(t.priority_score)) === 'P1 Critical').length,
+      value: tickets.filter(t => (t.priority_override || priorityTierLabel(t.priority_score, p1Threshold, p2Threshold)) === 'P1 Critical').length,
       colour: '#dc2626',
       statusFilter: 'All',
       priorityFilter: 'P1 Critical',
     },
     {
       label: 'Stuck',
-      value: tickets.filter(t => isTicketStuck(t, stuckThresholds)).length,
+      value: tickets.filter(t => isTicketStuck(t, stuckThresholds, Date.now(), p1Threshold, p2Threshold)).length,
       colour: '#dc2626',
       statusFilter: 'All',
       stuckOnly: true,

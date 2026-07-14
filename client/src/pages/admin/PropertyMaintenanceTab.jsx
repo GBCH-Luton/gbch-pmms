@@ -10,9 +10,9 @@
 //   - Overdue: no due_date column -> falls back to the spec's own stated
 //     fallback (created_at older than 7 days, status still open).
 //   - Priority = 'P1'/'urgent': no `priority` text column exists, only
-//     priority_score (integer). Reuses the same GLOBAL_TRIAGE_THRESHOLD (70)
-//     cutoff used everywhere else in the app (shared.js, BuilderDashboard,
-//     AdminDashboard) to mean "P1 Critical".
+//     priority_score (integer). Reuses the same admin-configurable P1
+//     Critical threshold (Settings -> Priority Engine Thresholds, default
+//     70) used everywhere else in the app to mean "P1 Critical".
 //   - First Time Fix Rate: no revisit_required column -- shown as "—" per
 //     the spec's own explicit instruction for this case.
 //
@@ -27,9 +27,9 @@ import { fetchAllMaintenanceCategoryNames } from '../../lib/maintenanceCategorie
 import {
   priorityTierLabel, priorityBadgeStyle, statusColour, statusLabel, formatUKDate,
   filterSelectStyle, thStyle, tdStyle, formatDuration, computeAvgResponseMs, computeAvgAssignedToCompleteMs,
+  fetchPriorityThresholds,
 } from './shared'
 
-const GLOBAL_TRIAGE_THRESHOLD = 70
 const OVERDUE_DAYS = 7
 
 const tileStyle = (colour) => ({ flex: '1 1 160px', background: colour, borderRadius: '16px', padding: '16px', textAlign: 'center' })
@@ -42,10 +42,13 @@ export default function PropertyMaintenanceTab({ property }) {
   const [statusFilter, setStatusFilter] = useState('All')
   const [categoryFilter, setCategoryFilter] = useState('All')
   const [categoryOptions, setCategoryOptions] = useState([])
+  const [p1Threshold, setP1Threshold] = useState(70)
+  const [p2Threshold, setP2Threshold] = useState(40)
 
   useEffect(() => {
     fetchTickets()
     fetchAllMaintenanceCategoryNames().then(setCategoryOptions)
+    fetchPriorityThresholds().then(({ p1, p2 }) => { setP1Threshold(p1); setP2Threshold(p2) })
   }, [property.id])
 
   async function fetchTickets() {
@@ -84,7 +87,7 @@ export default function PropertyMaintenanceTab({ property }) {
   const openCount = tickets.filter(isOpen).length
   const completedCount = tickets.filter(t => t.status === 'Completed').length
   const overdueCount = tickets.filter(t => isOpen(t) && (now - new Date(t.created_at).getTime()) > OVERDUE_DAYS * 86400000).length
-  const emergencyCount = tickets.filter(t => (t.priority_score || 0) >= GLOBAL_TRIAGE_THRESHOLD).length
+  const emergencyCount = tickets.filter(t => (t.priority_score || 0) >= p1Threshold).length
 
   // Recurring issues -- grouped by category
   const categoryCounts = {}
@@ -224,7 +227,7 @@ export default function PropertyMaintenanceTab({ property }) {
               </thead>
               <tbody>
                 {filteredTickets.map(t => {
-                  const tier = priorityTierLabel(t.priority_score)
+                  const tier = priorityTierLabel(t.priority_score, p1Threshold, p2Threshold)
                   const tierStyle = priorityBadgeStyle(tier)
                   return (
                     <tr key={t.id} style={{ borderBottom: '1px solid #f1f5f9' }}>

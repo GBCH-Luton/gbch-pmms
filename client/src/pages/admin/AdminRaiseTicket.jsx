@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
-import { fetchAssignableStaffForCategory, builderOptionLabel, createNotification, sendPushNotification, pushEmergencyAlert } from './shared'
+import { fetchAssignableStaffForCategory, builderOptionLabel, createNotification, sendPushNotification, pushEmergencyAlert, priorityTierLabel, fetchPriorityThresholds } from './shared'
 import { fetchComplianceCheckTypes } from '../../lib/compliance'
 import { fetchMaintenanceCategories, sortedCategoryEntries } from '../../lib/maintenanceCategories'
 import PropertySearchSelect from '../../components/PropertySearchSelect'
@@ -8,8 +8,6 @@ import PropertySearchSelect from '../../components/PropertySearchSelect'
 const ROOM_OPTIONS = ['Kitchen', 'Bathroom', 'Communal Area', 'Bedroom', 'Hallways / Stairs', 'Other Area...']
 
 const UNLISTED_MARKER_PREFIX = '__UNLISTED_FALLBACK__'
-const GLOBAL_TRIAGE_THRESHOLD = 70
-const P2_URGENT_THRESHOLD = 40
 
 const DEPARTMENTS = ['Residential', 'Supported Living', 'Administration', 'Maintenance']
 
@@ -29,12 +27,6 @@ const calculatePriorityScore = (maintenanceCategories, category, issueTag) => {
     if (sub) return Number(sub.score)
   }
   return Number(cat.weight) ?? 15
-}
-
-const priorityTierLabel = (score) => {
-  if (score >= GLOBAL_TRIAGE_THRESHOLD) return 'P1 Critical'
-  if (score >= P2_URGENT_THRESHOLD) return 'P2 Urgent'
-  return 'Routine'
 }
 
 function floorContextOptions(property) {
@@ -112,11 +104,14 @@ export default function AdminRaiseTicket({ profile }) {
   const [sendPushOnAssign, setSendPushOnAssign] = useState(false)
   const [priorityOverride, setPriorityOverride] = useState('')
   const [department, setDepartment] = useState('')
+  const [p1Threshold, setP1Threshold] = useState(70)
+  const [p2Threshold, setP2Threshold] = useState(40)
 
   useEffect(() => {
     fetchTicketProperties()
     fetchComplianceTypes()
     fetchMaintenanceCategories().then(setMaintenanceCategories)
+    fetchPriorityThresholds().then(({ p1, p2 }) => { setP1Threshold(p1); setP2Threshold(p2) })
   }, [])
 
   // Which staff can be assigned depends on the selected category's division
@@ -276,7 +271,7 @@ export default function AdminRaiseTicket({ profile }) {
       }
     }
 
-    const effectiveTier = priorityOverride || priorityTierLabel(priorityScore)
+    const effectiveTier = priorityOverride || priorityTierLabel(priorityScore, p1Threshold, p2Threshold)
     if (effectiveTier === 'P1 Critical') {
       const division = maintenanceCategories[ticketCategory]?.division || 'Maintenance'
       await pushEmergencyAlert(
@@ -384,7 +379,7 @@ export default function AdminRaiseTicket({ profile }) {
         }
       }
 
-      const effectiveTier = priorityOverride || priorityTierLabel(score)
+      const effectiveTier = priorityOverride || priorityTierLabel(score, p1Threshold, p2Threshold)
       if (effectiveTier === 'P1 Critical') {
         const division = maintenanceCategories[category]?.division || 'Maintenance'
         await pushEmergencyAlert(
@@ -608,7 +603,7 @@ export default function AdminRaiseTicket({ profile }) {
                 const baseScore = calculatePriorityScore(maintenanceCategories, ticketCategory, ticketIssueTag)
                 const vulnBonus = selectedTicketProperty?.high_vulnerability ? 30 : 0
                 const total = baseScore + vulnBonus
-                const isP1 = total >= GLOBAL_TRIAGE_THRESHOLD
+                const isP1 = total >= p1Threshold
                 return (
                   <div style={{ marginTop: '12px', padding: '14px', borderRadius: '10px', background: '#ffffff', border: '1px solid #e2e8f0' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', paddingBottom: '8px', borderBottom: '1px solid #e2e8f0' }}>
@@ -814,8 +809,8 @@ export default function AdminRaiseTicket({ profile }) {
                 {(complianceCheckTypes.find(t => t.name === complianceCheckType)?.items || []).map((item, idx) => {
                   const vulnBonus = selectedTicketProperty?.high_vulnerability ? 30 : 0
                   const effectiveScore = item.score + vulnBonus
-                  const tier = priorityTierLabel(effectiveScore)
-                  const tierColour = effectiveScore >= GLOBAL_TRIAGE_THRESHOLD ? '#dc2626' : effectiveScore >= P2_URGENT_THRESHOLD ? '#d97706' : '#64748b'
+                  const tier = priorityTierLabel(effectiveScore, p1Threshold, p2Threshold)
+                  const tierColour = effectiveScore >= p1Threshold ? '#dc2626' : effectiveScore >= p2Threshold ? '#d97706' : '#64748b'
                   const result = complianceResults[idx]
                   return (
                     <div key={item.label} style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '12px', background: '#ffffff' }}>

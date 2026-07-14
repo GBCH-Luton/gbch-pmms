@@ -10,7 +10,7 @@ import {
   modalOverlayStyle, modalCardStyle, modalTitleStyle, modalSubtitleStyle, modalLabelStyle,
   modalTextareaStyle, modalErrorStyle, modalCancelBtnStyle, modalConfirmBtnStyle, radioRowStyle,
   roleBadgeStyle, postSystemComment, postAuditEvent, fetchAssignableBuilders, fetchAssignableStaffForCategory, STAFF_AVAILABILITY_STYLES,
-  createNotification, sendPushNotification, pushEmergencyAlert, resolveCategoryDivision, isTicketStuck, KpiTiles,
+  createNotification, sendPushNotification, pushEmergencyAlert, resolveCategoryDivision, isTicketStuck, KpiTiles, fetchPriorityThresholds,
 } from './shared'
 
 const expandLabelStyle = { margin: '0 0 2px 0', fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em' }
@@ -41,6 +41,8 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
   const [ticketNumberSearch, setTicketNumberSearch] = useState('')
   const [stuckOnlyFilter, setStuckOnlyFilter] = useState(false)
   const [stuckThresholds, setStuckThresholds] = useState(null)
+  const [p1Threshold, setP1Threshold] = useState(70)
+  const [p2Threshold, setP2Threshold] = useState(40)
 
   const [reassignModalTicket, setReassignModalTicket] = useState(null)
   const [reassignBuilderId, setReassignBuilderId] = useState('')
@@ -88,6 +90,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
     fetchBuilders()
     fetchProperties()
     fetchStuckThresholds()
+    fetchPriorityThresholds().then(({ p1, p2 }) => { setP1Threshold(p1); setP2Threshold(p2) })
     fetchAllMaintenanceCategoryNames().then(setCategoryOptions)
     if (initialStatusFilter) setStatusFilter(initialStatusFilter)
     if (initialPriorityFilter) setPriorityFilter(initialPriorityFilter)
@@ -143,7 +146,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
 
   useEffect(() => {
     if (priorityModalTicket) {
-      setPriorityTier(priorityModalTicket.priority_override || priorityTierLabel(priorityModalTicket.priority_score))
+      setPriorityTier(priorityModalTicket.priority_override || priorityTierLabel(priorityModalTicket.priority_score, p1Threshold, p2Threshold))
       setPriorityReason('')
       setPriorityError('')
     }
@@ -424,7 +427,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
   }
 
   function effectiveTier(t) {
-    return t.priority_override || priorityTierLabel(t.priority_score)
+    return t.priority_override || priorityTierLabel(t.priority_score, p1Threshold, p2Threshold)
   }
 
   const filteredTickets = tickets.filter(t => {
@@ -434,7 +437,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
     if (builderFilter !== 'All' && t.assigned_builder_id !== builderFilter) return false
     if (priorityFilter !== 'All' && effectiveTier(t) !== priorityFilter) return false
     if (ticketNumberSearch.trim() && !String(t.ticket_number).includes(ticketNumberSearch.trim())) return false
-    if (stuckOnlyFilter && !isTicketStuck(t, stuckThresholds)) return false
+    if (stuckOnlyFilter && !isTicketStuck(t, stuckThresholds, Date.now(), p1Threshold, p2Threshold)) return false
     return true
   })
 
@@ -495,7 +498,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
     { label: 'On Hold', value: tickets.filter(t => t.status === 'On Hold').length, colour: '#f59e0b', statusFilter: 'On Hold' },
     { label: 'Completed', value: tickets.filter(t => t.status === 'Completed').length, colour: '#16a34a', statusFilter: 'Completed' },
     { label: 'P1 Critical', value: tickets.filter(t => effectiveTier(t) === 'P1 Critical').length, colour: '#dc2626', statusFilter: 'All', priorityFilter: 'P1 Critical' },
-    { label: 'Stuck', value: tickets.filter(t => isTicketStuck(t, stuckThresholds)).length, colour: '#dc2626', statusFilter: 'All', stuckOnly: true },
+    { label: 'Stuck', value: tickets.filter(t => isTicketStuck(t, stuckThresholds, Date.now(), p1Threshold, p2Threshold)).length, colour: '#dc2626', statusFilter: 'All', stuckOnly: true },
   ]
 
   // Clicking a tile is a "jump to this category" shortcut, same as
@@ -628,7 +631,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
                 const isCompliance = (t.description || '').startsWith('[Compliance Failure:')
                 const isExpanded = expandedTicketId === t.id
                 const isSelected = selectedTicketIds.has(t.id)
-                const stuck = isTicketStuck(t, stuckThresholds)
+                const stuck = isTicketStuck(t, stuckThresholds, Date.now(), p1Threshold, p2Threshold)
                 return (
                   <Fragment key={t.id}>
                     <tr

@@ -19,7 +19,7 @@ import { supabase } from '../../lib/supabase'
 import {
   priorityTierLabel, priorityBadgeStyle, statusColour, statusLabel, GENDER_RESTRICTION_STYLES,
   modalOverlayStyle, modalCardStyle, modalTitleStyle, modalLabelStyle, modalErrorStyle,
-  modalCancelBtnStyle, modalConfirmBtnStyle, formatUKDateTime,
+  modalCancelBtnStyle, modalConfirmBtnStyle, formatUKDateTime, fetchPriorityThresholds,
 } from './shared'
 import PropertyCoreTab from './PropertyCoreTab'
 import PropertyComplianceTab from './PropertyComplianceTab'
@@ -39,8 +39,8 @@ const DEFAULT_NEW_PROPERTY_WINDOW_HOURS = 48
 const readLabelStyle = { fontSize: '12px', fontWeight: 700, color: '#94a3b8' }
 const readValueStyle = { fontSize: '13px', fontWeight: 600, color: '#0f172a', textAlign: 'right' }
 
-function TicketDetailModal({ ticket, onClose }) {
-  const tier = priorityTierLabel(ticket.priority_score)
+function TicketDetailModal({ ticket, onClose, p1Threshold, p2Threshold }) {
+  const tier = priorityTierLabel(ticket.priority_score, p1Threshold, p2Threshold)
   const tierStyle = priorityBadgeStyle(tier)
 
   return (
@@ -131,6 +131,8 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
   const [voidRoomCounts, setVoidRoomCounts] = useState({})
   const [newPropertyWindowHours, setNewPropertyWindowHours] = useState(DEFAULT_NEW_PROPERTY_WINDOW_HOURS)
   const [filterMode, setFilterMode] = useState('all') // 'all' | 'newProperties'
+  const [p1Threshold, setP1Threshold] = useState(70)
+  const [p2Threshold, setP2Threshold] = useState(40)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [search, setSearch] = useState('')
@@ -160,6 +162,7 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
 
   useEffect(() => {
     fetchNewPropertyWindow()
+    fetchPriorityThresholds().then(({ p1, p2 }) => { setP1Threshold(p1); setP2Threshold(p2) })
 
     fetchProperties().then((fetched) => {
       if (initialPropertiesFilter?.propertyId) {
@@ -489,7 +492,7 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
               <>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   {(showAllOpenTickets ? selectedOpenTickets : selectedOpenTickets.slice(0, OPEN_TICKETS_PREVIEW_COUNT)).map(t => {
-                    const tier = priorityTierLabel(t.priority_score)
+                    const tier = priorityTierLabel(t.priority_score, p1Threshold, p2Threshold)
                     const tierStyle = priorityBadgeStyle(tier)
                     return (
                       <button
@@ -527,7 +530,7 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
         </div>
 
         {ticketDetailModal && (
-          <TicketDetailModal ticket={ticketDetailModal} onClose={() => setTicketDetailModal(null)} />
+          <TicketDetailModal ticket={ticketDetailModal} onClose={() => setTicketDetailModal(null)} p1Threshold={p1Threshold} p2Threshold={p2Threshold} />
         )}
 
         {/* Property Profile tabs */}

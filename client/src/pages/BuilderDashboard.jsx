@@ -6,7 +6,7 @@ import { fetchMaintenanceCategories, sortedCategoryEntries } from '../lib/mainte
 import { attachProperties } from '../lib/properties'
 import { logLoginEvent } from '../lib/loginEvents'
 import { pushNotificationsSupported, hasActivePushSubscription, enablePushNotifications } from '../lib/pushNotifications'
-import { pushEmergencyAlert } from './admin/shared'
+import { pushEmergencyAlert, priorityTierLabel, fetchPriorityThresholds } from './admin/shared'
 import PropertySearchSelect from '../components/PropertySearchSelect'
 import gbchLogo from '../assets/gbch-logo.svg'
 
@@ -40,6 +40,8 @@ export default function BuilderDashboard({ profile }) {
   const [noAccessSubmitting, setNoAccessSubmitting] = useState(false)
   const [noAccessError, setNoAccessError] = useState('')
   const [loggingMode, setLoggingMode] = useState('maintenance') // 'maintenance' | 'compliance'
+  const [p1Threshold, setP1Threshold] = useState(70)
+  const [p2Threshold, setP2Threshold] = useState(40)
   const [ticketProperties, setTicketProperties] = useState([])
   const [ticketPropertyId, setTicketPropertyId] = useState('')
   const [ticketRoom, setTicketRoom] = useState(null)
@@ -84,6 +86,7 @@ export default function BuilderDashboard({ profile }) {
     fetchTickets()
     fetchNotifications()
     fetchAvailableJobs()
+    fetchPriorityThresholds().then(({ p1, p2 }) => { setP1Threshold(p1); setP2Threshold(p2) })
     // Permission alone doesn't mean a subscription actually exists (a
     // browser can report "granted" with nothing ever subscribed) -- this
     // is the real check for whether the button should offer to enable.
@@ -518,8 +521,6 @@ export default function BuilderDashboard({ profile }) {
   const ROOM_OPTIONS = ['Kitchen', 'Bathroom', 'Communal Area', 'Bedroom', 'Hallways / Stairs', 'Other Area...']
 
   const UNLISTED_MARKER_PREFIX = '__UNLISTED_FALLBACK__'
-  const GLOBAL_TRIAGE_THRESHOLD = 70 // score >= this = P1 Critical
-  const P2_URGENT_THRESHOLD = 40     // score >= this (but < P1) = P2 Urgent -- used for compliance item tiers
 
   const isUnlistedTag = (tag) => typeof tag === 'string' && tag.startsWith(UNLISTED_MARKER_PREFIX)
   const unlistedTagFor = (category) => `${UNLISTED_MARKER_PREFIX}${category}`
@@ -536,12 +537,6 @@ export default function BuilderDashboard({ profile }) {
       if (sub) return Number(sub.score)
     }
     return Number(cat.weight) ?? 15
-  }
-
-  const priorityTierLabel = (score) => {
-    if (score >= GLOBAL_TRIAGE_THRESHOLD) return 'P1 Critical'
-    if (score >= P2_URGENT_THRESHOLD) return 'P2 Urgent'
-    return 'Routine'
   }
 
   const selectedTicketProperty = ticketProperties.find(p => String(p.id) === String(ticketPropertyId))
@@ -737,7 +732,7 @@ export default function BuilderDashboard({ profile }) {
       return
     }
 
-    if (priorityTierLabel(priorityScore) === 'P1 Critical') {
+    if (priorityTierLabel(priorityScore, p1Threshold, p2Threshold) === 'P1 Critical') {
       const division = maintenanceCategories[ticketCategory]?.division || 'Maintenance'
       await pushEmergencyAlert(
         { ticket_number: data[0].ticket_number, category: ticketCategory, property: selectedTicketProperty },
@@ -832,7 +827,7 @@ export default function BuilderDashboard({ profile }) {
         return
       }
 
-      if (priorityTierLabel(score) === 'P1 Critical') {
+      if (priorityTierLabel(score, p1Threshold, p2Threshold) === 'P1 Critical') {
         const division = maintenanceCategories[category]?.division || 'Maintenance'
         await pushEmergencyAlert(
           { ticket_number: data[0].ticket_number, category, property: selectedTicketProperty },
@@ -864,8 +859,8 @@ export default function BuilderDashboard({ profile }) {
   const statusLabel = (status) => (status === 'Pending' ? 'Unassigned' : status)
 
   const inProgressTickets = tickets.filter(t => t.status === 'In Progress')
-  const urgentTickets = tickets.filter(t => t.status === 'Assigned' && t.priority_score >= 70)
-  const toDoTickets = tickets.filter(t => t.status === 'Assigned' && t.priority_score < 70)
+  const urgentTickets = tickets.filter(t => t.status === 'Assigned' && t.priority_score >= p1Threshold)
+  const toDoTickets = tickets.filter(t => t.status === 'Assigned' && t.priority_score < p1Threshold)
   const onHoldTickets = tickets.filter(t => t.status === 'On Hold')
   const doneTickets = tickets.filter(t => t.status === 'Completed')
 
@@ -1253,7 +1248,7 @@ export default function BuilderDashboard({ profile }) {
               <p style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: '#dc2626' }}>⚠ Vulnerable Occupant — handle with care</p>
             </div>
           )}
-          {selectedTicket.priority_score >= GLOBAL_TRIAGE_THRESHOLD && (
+          {selectedTicket.priority_score >= p1Threshold && (
             <div style={{ background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: '10px', padding: '10px 14px', marginBottom: '8px' }}>
               <p style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: '#92400e' }}>🔴 Urgent Priority</p>
             </div>
@@ -2143,7 +2138,7 @@ export default function BuilderDashboard({ profile }) {
                       const baseScore = calculatePriorityScore(ticketCategory, ticketIssueTag)
                       const vulnBonus = selectedTicketProperty?.high_vulnerability ? 30 : 0
                       const total = baseScore + vulnBonus
-                      const isP1 = total >= GLOBAL_TRIAGE_THRESHOLD
+                      const isP1 = total >= p1Threshold
                       return (
                         <div style={{ marginTop: '12px', padding: '14px', borderRadius: '10px', background: '#ffffff', border: '1px solid #e2e8f0' }}>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', paddingBottom: '8px', borderBottom: '1px solid #e2e8f0' }}>
@@ -2301,8 +2296,8 @@ export default function BuilderDashboard({ profile }) {
                       {(complianceCheckTypes.find(t => t.name === complianceCheckType)?.items || []).map((item, idx) => {
                         const vulnBonus = selectedTicketProperty?.high_vulnerability ? 30 : 0
                         const effectiveScore = item.score + vulnBonus
-                        const tier = priorityTierLabel(effectiveScore)
-                        const tierColour = effectiveScore >= GLOBAL_TRIAGE_THRESHOLD ? '#dc2626' : effectiveScore >= P2_URGENT_THRESHOLD ? '#d97706' : '#64748b'
+                        const tier = priorityTierLabel(effectiveScore, p1Threshold, p2Threshold)
+                        const tierColour = effectiveScore >= p1Threshold ? '#dc2626' : effectiveScore >= p2Threshold ? '#d97706' : '#64748b'
                         const result = complianceResults[idx]
                         return (
                           <div key={item.label} style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '12px', background: '#ffffff' }}>
