@@ -15,6 +15,7 @@ export default function AdminSignOff({ profile, onTicketsChanged }) {
 
   const [propertyFilter, setPropertyFilter] = useState('All')
   const [ticketNumberFilter, setTicketNumberFilter] = useState('')
+  const [raiserFilter, setRaiserFilter] = useState('All')
 
   const [reopenModalTicket, setReopenModalTicket] = useState(null)
   const [reopenReason, setReopenReason] = useState('')
@@ -44,7 +45,7 @@ export default function AdminSignOff({ profile, onTicketsChanged }) {
       .schema('pmms')
       .from('tickets')
       .select(`
-        id, ticket_number, category, description, room, issue_tag, completion_note, completion_photo_url, photo_url, assigned_builder_id, property_id
+        id, ticket_number, category, description, room, issue_tag, completion_note, completion_photo_url, photo_url, assigned_builder_id, property_id, raised_by, raised_by_name
       `)
       .eq('status', 'Completed')
       .order('completed_at', { ascending: false })
@@ -151,11 +152,22 @@ export default function AdminSignOff({ profile, onTicketsChanged }) {
     </div>
   )
 
+  // Derived from whichever tickets are actually pending sign-off right now,
+  // not a full staff fetch -- keeps the dropdown short and relevant instead
+  // of listing every builder/admin who has never raised anything.
+  const raisers = Object.values(
+    tickets.reduce((acc, t) => {
+      if (t.raised_by) acc[t.raised_by] = { id: t.raised_by, name: t.raised_by_name || 'Unknown' }
+      return acc
+    }, {})
+  ).sort((a, b) => a.name.localeCompare(b.name))
+
   const filteredTickets = tickets.filter(t => {
     // Native <select> values are always strings, but property_id off the
     // ticket is a number -- compare as strings so "3" matches 3.
     if (propertyFilter !== 'All' && String(t.property_id) !== String(propertyFilter)) return false
     if (ticketNumberFilter.trim() && !String(t.id).includes(ticketNumberFilter.trim())) return false
+    if (raiserFilter !== 'All' && String(t.raised_by) !== String(raiserFilter)) return false
     return true
   })
 
@@ -176,6 +188,12 @@ export default function AdminSignOff({ profile, onTicketsChanged }) {
             <option key={p.id} value={p.id}>{p.address}</option>
           ))}
         </select>
+        <select value={raiserFilter} onChange={(e) => setRaiserFilter(e.target.value)} style={filterSelectStyle}>
+          <option value="All">All Raisers</option>
+          {raisers.map(r => (
+            <option key={r.id} value={r.id}>{r.name}</option>
+          ))}
+        </select>
         <input
           type="text"
           value={ticketNumberFilter}
@@ -183,9 +201,9 @@ export default function AdminSignOff({ profile, onTicketsChanged }) {
           placeholder="Search ticket #..."
           style={{ ...filterSelectStyle, cursor: 'text', width: '160px' }}
         />
-        {(propertyFilter !== 'All' || ticketNumberFilter) && (
+        {(propertyFilter !== 'All' || ticketNumberFilter || raiserFilter !== 'All') && (
           <button
-            onClick={() => { setPropertyFilter('All'); setTicketNumberFilter('') }}
+            onClick={() => { setPropertyFilter('All'); setTicketNumberFilter(''); setRaiserFilter('All') }}
             style={{ ...filterSelectStyle, background: '#fff' }}
           >
             Clear filters
@@ -208,6 +226,7 @@ export default function AdminSignOff({ profile, onTicketsChanged }) {
                 <span style={{ display: 'block', fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>{t.property?.address}</span>
                 <span style={{ display: 'block', fontSize: '13px', color: '#475569' }}>{t.room ? `${t.room} — ` : ''}{t.issue_tag || t.category}</span>
                 <span style={{ display: 'block', fontSize: '13px', color: '#7e22ce', fontWeight: 600, marginTop: '2px' }}>Completed by {t.builderName || 'Unknown'}</span>
+                <span style={{ display: 'block', fontSize: '12px', color: '#64748b', marginTop: '1px' }}>Raised by {t.raised_by_name || 'Unknown'}</span>
                 {workedMsByTicket[t.id] != null && (
                   <span style={{ display: 'inline-block', marginTop: '6px', fontSize: '11px', fontWeight: 700, color: '#0d9488', background: '#f0fdfa', padding: '2px 8px', borderRadius: '20px' }}>
                     ⏱ {formatDuration(workedMsByTicket[t.id])} worked
