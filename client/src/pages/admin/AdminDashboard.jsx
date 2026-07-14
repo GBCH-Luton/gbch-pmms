@@ -18,7 +18,7 @@ function DashboardSection({ title, background, children }) {
 export default function AdminDashboard({ onNavigate }) {
   const [tickets, setTickets] = useState([])
   const [newPropertiesCount, setNewPropertiesCount] = useState(0)
-  const [currentVoidsCount, setCurrentVoidsCount] = useState(0)
+  const [totalPropertiesCount, setTotalPropertiesCount] = useState(0)
   const [clockedInCount, setClockedInCount] = useState(0)
   const [flaggedLocationsCount, setFlaggedLocationsCount] = useState(0)
   const [stuckThresholds, setStuckThresholds] = useState(null)
@@ -29,7 +29,7 @@ export default function AdminDashboard({ onNavigate }) {
   useEffect(() => {
     fetchTickets()
     fetchPropertiesMetrics()
-    fetchVoidsCount()
+    fetchTotalPropertiesCount()
     fetchClockedInCount()
     fetchFlaggedClockingCount().then(setFlaggedLocationsCount)
     fetchStuckThresholds()
@@ -77,14 +77,13 @@ export default function AdminDashboard({ onNavigate }) {
     setNewPropertiesCount(count || 0)
   }
 
-  async function fetchVoidsCount() {
+  async function fetchTotalPropertiesCount() {
     const { count } = await supabase
       .schema('pmms')
-      .from('property_rooms')
+      .from('properties')
       .select('id', { count: 'exact', head: true })
-      .eq('current_status', 'Void')
 
-    setCurrentVoidsCount(count || 0)
+    setTotalPropertiesCount(count || 0)
   }
 
   async function fetchClockedInCount() {
@@ -195,14 +194,14 @@ export default function AdminDashboard({ onNavigate }) {
         </button>
 
         <button
-          onClick={() => onNavigate?.('properties', { filterMode: 'voids' })}
+          onClick={() => onNavigate?.('properties')}
           style={{
-            flex: '1 1 220px', background: currentVoidsCount > 0 ? '#dc2626' : '#16a34a', borderRadius: '16px', padding: '16px',
+            flex: '1 1 220px', background: '#0f766e', borderRadius: '16px', padding: '16px',
             border: 'none', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', textAlign: 'center',
           }}
         >
-          <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Current Voids</p>
-          <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: '#ffffff' }}>{currentVoidsCount}</p>
+          <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Total Properties</p>
+          <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: '#ffffff' }}>{totalPropertiesCount}</p>
         </button>
       </DashboardSection>
 

@@ -25,6 +25,7 @@ export default function AdminVoids({ onNavigate, initialTierFilter, onInitialTie
   const [rooms, setRooms] = useState([])
   const [properties, setProperties] = useState([])
   const [thresholdDays, setThresholdDays] = useState(45)
+  const [voidHistoryCounts, setVoidHistoryCounts] = useState({ today: 0, thisWeek: 0, thisMonth: 0 })
   const [loading, setLoading] = useState(true)
 
   const [tierFilter, setTierFilter] = useState('All')
@@ -35,9 +36,45 @@ export default function AdminVoids({ onNavigate, initialTierFilter, onInitialTie
 
   useEffect(() => {
     fetchAll()
+    fetchVoidHistoryCounts()
     if (initialTierFilter) setTierFilter(initialTierFilter)
     if (initialTierFilter) onInitialTierFilterConsumed?.()
   }, [])
+
+  // Portfolio-wide, independent of the tier/property filters below --
+  // "how many rooms went void today/this week/this month" is a glance at
+  // turnover velocity, distinct from the aging tiles above (which measure
+  // how long currently-void rooms have sat empty). 'Moved Out' and 'Room
+  // Added (Void)' are the two history actions that mean "became void"
+  // (see PropertyRoomsTab.jsx) -- 'Moved In' means the opposite.
+  async function fetchVoidHistoryCounts() {
+    const { data, error } = await supabase
+      .schema('pmms')
+      .from('property_room_history')
+      .select('action_date')
+      .in('action', ['Moved Out', 'Room Added (Void)'])
+
+    if (error || !data) { setVoidHistoryCounts({ today: 0, thisWeek: 0, thisMonth: 0 }); return }
+
+    const now = new Date()
+    const todayIso = now.toISOString().slice(0, 10)
+    const monday = new Date(now)
+    const day = monday.getDay()
+    monday.setDate(monday.getDate() - day + (day === 0 ? -6 : 1))
+    monday.setHours(0, 0, 0, 0)
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+
+    let today = 0, thisWeek = 0, thisMonth = 0
+    data.forEach(r => {
+      if (!r.action_date) return
+      if (r.action_date === todayIso) today += 1
+      const d = new Date(r.action_date)
+      if (d >= monday) thisWeek += 1
+      if (d >= monthStart) thisMonth += 1
+    })
+
+    setVoidHistoryCounts({ today, thisWeek, thisMonth })
+  }
 
   async function fetchAll() {
     setLoading(true)
@@ -133,6 +170,20 @@ export default function AdminVoids({ onNavigate, initialTierFilter, onInitialTie
   return (
     <div>
       <KpiTiles kpis={kpis} onTileClick={applyKpiFilter} />
+
+      <p style={{ margin: '0 0 8px 0', fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Voided Recently</p>
+      <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
+        {[
+          { label: 'Voided Today', value: voidHistoryCounts.today },
+          { label: 'Voided This Week', value: voidHistoryCounts.thisWeek },
+          { label: 'Voided This Month', value: voidHistoryCounts.thisMonth },
+        ].map(m => (
+          <div key={m.label} style={{ flex: '1 1 160px', background: '#475569', borderRadius: '16px', padding: '16px', textAlign: 'center' }}>
+            <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{m.label}</p>
+            <p style={{ margin: 0, fontSize: '26px', fontWeight: 800, color: '#ffffff' }}>{m.value}</p>
+          </div>
+        ))}
+      </div>
 
       <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
         <select value={tierFilter} onChange={(e) => setTierFilter(e.target.value)} style={filterSelectStyle}>
