@@ -134,6 +134,7 @@ export default function AdminSettings() {
   const [rosterSaved, setRosterSaved] = useState(false)
 
   const [newPropertyWindowHours, setNewPropertyWindowHours] = useState(48)
+  const [totalTicketsPeriod, setTotalTicketsPeriod] = useState('all_time')
   const [dashboardMetricsSaving, setDashboardMetricsSaving] = useState(false)
   const [dashboardMetricsSaved, setDashboardMetricsSaved] = useState(false)
 
@@ -184,6 +185,7 @@ export default function AdminSettings() {
       if (map.clock_distance_threshold_meters != null) setClockDistanceThresholdM(map.clock_distance_threshold_meters)
       if (map.on_call_roster) setRoster(map.on_call_roster)
       if (map.new_property_window_hours != null) setNewPropertyWindowHours(map.new_property_window_hours)
+      if (map.dashboard_total_tickets_period != null) setTotalTicketsPeriod(map.dashboard_total_tickets_period)
       if (Array.isArray(map.divisions) && map.divisions.length > 0) setDivisions(map.divisions)
     }
     setLoading(false)
@@ -579,6 +581,7 @@ export default function AdminSettings() {
     setDashboardMetricsSaving(true)
     setDashboardMetricsSaved(false)
     await saveSetting('new_property_window_hours', Number(newPropertyWindowHours))
+    await saveSetting('dashboard_total_tickets_period', totalTicketsPeriod)
     setDashboardMetricsSaving(false)
     setDashboardMetricsSaved(true)
     setTimeout(() => setDashboardMetricsSaved(false), 2000)
@@ -1263,6 +1266,22 @@ export default function AdminSettings() {
             <option value={720}>30 days</option>
           </select>
           <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: '#94a3b8' }}>Properties added within this window count toward the "New Properties" dashboard tile.</p>
+        </div>
+
+        <div style={{ marginBottom: '16px' }}>
+          <label style={fieldLabelStyle}>Total Tickets period</label>
+          <select
+            value={totalTicketsPeriod}
+            onChange={(e) => setTotalTicketsPeriod(e.target.value)}
+            style={inputStyle}
+          >
+            <option value="today">Today</option>
+            <option value="week">This Week</option>
+            <option value="month">This Month</option>
+            <option value="year">This Year</option>
+            <option value="all_time">All Time</option>
+          </select>
+          <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: '#94a3b8' }}>Controls what the "Total Tickets" dashboard tile counts, so it doesn't grow into an unwieldy all-time number.</p>
         </div>
 
         <button onClick={saveDashboardMetrics} disabled={dashboardMetricsSaving} style={{ ...saveBtnStyle, opacity: dashboardMetricsSaving ? 0.6 : 1, cursor: dashboardMetricsSaving ? 'not-allowed' : 'pointer' }}>

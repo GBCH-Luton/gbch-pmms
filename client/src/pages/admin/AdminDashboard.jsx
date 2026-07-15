@@ -72,6 +72,7 @@ export default function AdminDashboard({ onNavigate }) {
   const [voidAgingCounts, setVoidAgingCounts] = useState({ overdue: 0, aging: 0, recent: 0 })
   const [p1Threshold, setP1Threshold] = useState(70)
   const [p2Threshold, setP2Threshold] = useState(40)
+  const [totalTicketsPeriod, setTotalTicketsPeriod] = useState('all_time')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -84,6 +85,7 @@ export default function AdminDashboard({ onNavigate }) {
     fetchComplianceAgingCounts().then(setComplianceCounts)
     fetchVoidAgingCounts().then(setVoidAgingCounts)
     fetchPriorityThresholds().then(({ p1, p2 }) => { setP1Threshold(p1); setP2Threshold(p2) })
+    fetchTotalTicketsPeriod()
   }, [])
 
   async function fetchTickets() {
@@ -104,6 +106,16 @@ export default function AdminDashboard({ onNavigate }) {
       .eq('setting_key', 'stuck_ticket_thresholds')
       .maybeSingle()
     if (data?.setting_value) setStuckThresholds(data.setting_value)
+  }
+
+  async function fetchTotalTicketsPeriod() {
+    const { data } = await supabase
+      .schema('pmms')
+      .from('settings')
+      .select('setting_value')
+      .eq('setting_key', 'dashboard_total_tickets_period')
+      .maybeSingle()
+    if (data?.setting_value) setTotalTicketsPeriod(data.setting_value)
   }
 
   async function fetchPropertiesMetrics() {
@@ -145,8 +157,37 @@ export default function AdminDashboard({ onNavigate }) {
     setClockedInCount(count || 0)
   }
 
+  const isSameDay = (a, b) =>
+    a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
+
+  const getMonday = (d) => {
+    const date = new Date(d)
+    const day = date.getDay()
+    const diff = date.getDate() - day + (day === 0 ? -6 : 1)
+    date.setDate(diff)
+    date.setHours(0, 0, 0, 0)
+    return date
+  }
+
+  const now = new Date()
+  const weekStart = getMonday(now)
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+  const yearStart = new Date(now.getFullYear(), 0, 1)
+
+  // Settings-controlled so "Total tickets" doesn't grow into an unwieldy
+  // all-time number as the ticket history builds up -- see AdminSettings.jsx's
+  // "Dashboard Metrics" section (dashboard_total_tickets_period).
+  const TOTAL_TICKETS_PERIOD_LABELS = { today: 'Today', week: 'This Week', month: 'This Month', year: 'This Year', all_time: 'All Time' }
+  const totalTicketsCount = (
+    totalTicketsPeriod === 'today' ? tickets.filter(t => isSameDay(new Date(t.created_at), now)) :
+    totalTicketsPeriod === 'week' ? tickets.filter(t => new Date(t.created_at) >= weekStart) :
+    totalTicketsPeriod === 'month' ? tickets.filter(t => new Date(t.created_at) >= monthStart) :
+    totalTicketsPeriod === 'year' ? tickets.filter(t => new Date(t.created_at) >= yearStart) :
+    tickets
+  ).length
+
   const kpis = [
-    { label: 'Total tickets', value: tickets.length, colour: '#64748b', statusFilter: 'All' },
+    { label: `Total Tickets (${TOTAL_TICKETS_PERIOD_LABELS[totalTicketsPeriod] || 'All Time'})`, value: totalTicketsCount, colour: '#64748b', statusFilter: 'All' },
     { label: 'Unassigned', value: tickets.filter(t => t.status === 'Pending').length, colour: '#dc2626', statusFilter: 'Pending' },
     { label: 'In Progress', value: tickets.filter(t => t.status === 'In Progress').length, colour: '#0d9488', statusFilter: 'In Progress' },
     { label: 'On Hold', value: tickets.filter(t => t.status === 'On Hold').length, colour: '#f59e0b', statusFilter: 'On Hold' },
@@ -170,21 +211,6 @@ export default function AdminDashboard({ onNavigate }) {
     },
   ]
 
-  const isSameDay = (a, b) =>
-    a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
-
-  const getMonday = (d) => {
-    const date = new Date(d)
-    const day = date.getDay()
-    const diff = date.getDate() - day + (day === 0 ? -6 : 1)
-    date.setDate(diff)
-    date.setHours(0, 0, 0, 0)
-    return date
-  }
-
-  const now = new Date()
-  const weekStart = getMonday(now)
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
   const completedTickets = tickets.filter(t => t.status === 'Completed' && t.completed_at)
 
   const completionKpis = [
