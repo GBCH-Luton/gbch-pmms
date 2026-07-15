@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.check-void-aging]
 verify_jwt = false
+
+[functions.check-routine-visits-due]
+verify_jwt = false

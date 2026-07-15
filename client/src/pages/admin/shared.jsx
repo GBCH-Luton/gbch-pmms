@@ -472,7 +472,7 @@ export async function fetchAssignableStaffForRole(roleName) {
 
   const { data: staffRows, error: staffError } = await supabase
     .from('staff')
-    .select('id, name, skills')
+    .select('id, name, skills, gender')
     .in('id', roleRows.map(r => r.staff_id))
     .eq('active', true)
     .order('name')

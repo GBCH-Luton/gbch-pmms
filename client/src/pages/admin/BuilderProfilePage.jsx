@@ -18,6 +18,56 @@ const cardLabelStyle = { margin: '0 0 12px 0', fontSize: '11px', fontWeight: 700
 const ACTIVITY_PREVIEW_COUNT = 10
 const TREND_WEEKS = 8
 
+// Powers automated matching against a property's staff_gender_restriction
+// (see PropertyCoreTab.jsx's CleanerAssignmentSection) -- general-purpose,
+// not Housekeeping-specific, same as that restriction field itself. This
+// whole page has no other editable fields (staff details are set once at
+// account creation), so this is a small self-contained inline editor
+// rather than fitting into a larger edit-mode toggle that doesn't exist yet.
+function GenderRow({ staff, onSaved }) {
+  const [editing, setEditing] = useState(false)
+  const [value, setValue] = useState(staff.gender || '')
+  const [saving, setSaving] = useState(false)
+
+  function startEdit() {
+    setValue(staff.gender || '')
+    setEditing(true)
+  }
+
+  async function save() {
+    setSaving(true)
+    await supabase.from('staff').update({ gender: value || null }).eq('id', staff.id)
+    setSaving(false)
+    onSaved(value || null)
+    setEditing(false)
+  }
+
+  if (!editing) {
+    return (
+      <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#64748b', display: 'flex', alignItems: 'center', gap: '8px' }}>
+        Gender: {staff.gender || 'Not set'}
+        <button onClick={startEdit} style={{ fontSize: '11px', fontWeight: 700, color: '#1d4ed8', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>Edit</button>
+      </p>
+    )
+  }
+
+  return (
+    <div style={{ marginTop: '6px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+      <select value={value} onChange={(e) => setValue(e.target.value)} style={{ padding: '6px 10px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '13px' }}>
+        <option value="">Not set</option>
+        <option value="Male">Male</option>
+        <option value="Female">Female</option>
+      </select>
+      <button onClick={save} disabled={saving} style={{ fontSize: '12px', fontWeight: 700, color: '#fff', background: '#16a34a', border: 'none', borderRadius: '8px', padding: '6px 12px', cursor: saving ? 'not-allowed' : 'pointer' }}>
+        {saving ? 'Saving...' : 'Save'}
+      </button>
+      <button onClick={() => setEditing(false)} style={{ fontSize: '12px', fontWeight: 700, color: '#475569', background: '#f1f5f9', border: 'none', borderRadius: '8px', padding: '6px 12px', cursor: 'pointer' }}>
+        Cancel
+      </button>
+    </div>
+  )
+}
+
 export default function BuilderProfilePage({ staffId, onBack }) {
   const [staff, setStaff] = useState(null)
   const [loadError, setLoadError] = useState(false)
@@ -38,7 +88,7 @@ export default function BuilderProfilePage({ staffId, onBack }) {
 
       const { data: staffData, error: staffError } = await supabase
         .from('staff')
-        .select('id, name, email, job_title, department, phone, skills, photo_url, active')
+        .select('id, name, email, job_title, department, phone, skills, photo_url, active, gender')
         .eq('id', staffId)
         .single()
 
@@ -185,6 +235,7 @@ export default function BuilderProfilePage({ staffId, onBack }) {
             <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#64748b' }}>
               {[staff.phone, staff.email].filter(Boolean).join(' · ') || '—'}
             </p>
+            <GenderRow staff={staff} onSaved={(gender) => setStaff(prev => ({ ...prev, gender }))} />
             {staff.skills?.length > 0 && (
               <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '10px' }}>
                 {staff.skills.map(skill => (

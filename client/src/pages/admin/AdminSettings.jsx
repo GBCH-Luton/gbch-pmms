@@ -129,6 +129,11 @@ export default function AdminSettings() {
   const [voidAlertsSaving, setVoidAlertsSaving] = useState(false)
   const [voidAlertsSaved, setVoidAlertsSaved] = useState(false)
 
+  const [routineVisitFlagDays, setRoutineVisitFlagDays] = useState(12)
+  const [routineVisitAlertsEnabled, setRoutineVisitAlertsEnabled] = useState(true)
+  const [routineVisitSaving, setRoutineVisitSaving] = useState(false)
+  const [routineVisitSaved, setRoutineVisitSaved] = useState(false)
+
   const [roster, setRoster] = useState([])
   const [rosterSaving, setRosterSaving] = useState(false)
   const [rosterSaved, setRosterSaved] = useState(false)
@@ -180,6 +185,8 @@ export default function AdminSettings() {
       if (map.compliance_alerts_enabled != null) setComplianceAlertsEnabled(map.compliance_alerts_enabled)
       if (map.void_aging_threshold_days != null) setVoidAgingThresholdDays(map.void_aging_threshold_days)
       if (map.void_alerts_enabled != null) setVoidAlertsEnabled(map.void_alerts_enabled)
+      if (map.routine_visit_flag_days != null) setRoutineVisitFlagDays(map.routine_visit_flag_days)
+      if (map.routine_visit_alerts_enabled != null) setRoutineVisitAlertsEnabled(map.routine_visit_alerts_enabled)
       if (map.clock_overrun_hours != null) setClockOverrunHours(map.clock_overrun_hours)
       if (map.done_window_hours != null) setDoneWindowHours(map.done_window_hours)
       if (map.clock_distance_threshold_meters != null) setClockDistanceThresholdM(map.clock_distance_threshold_meters)
@@ -550,6 +557,16 @@ export default function AdminSettings() {
     setVoidAlertsSaving(false)
     setVoidAlertsSaved(true)
     setTimeout(() => setVoidAlertsSaved(false), 2000)
+  }
+
+  async function saveRoutineVisitAlerts() {
+    setRoutineVisitSaving(true)
+    setRoutineVisitSaved(false)
+    await saveSetting('routine_visit_flag_days', Number(routineVisitFlagDays))
+    await saveSetting('routine_visit_alerts_enabled', routineVisitAlertsEnabled)
+    setRoutineVisitSaving(false)
+    setRoutineVisitSaved(true)
+    setTimeout(() => setRoutineVisitSaved(false), 2000)
   }
 
   async function addRosterContact() {
@@ -1185,6 +1202,34 @@ export default function AdminSettings() {
           {voidAlertsSaving ? 'Saving...' : 'Save Void Aging Alerts'}
         </button>
         {voidAlertsSaved && <span style={savedTagStyle}>✓ Saved</span>}
+      </SettingsSection>
+
+      {/* Section 4e: Routine Cleaning Visits (Cleaners Rota) */}
+      <SettingsSection
+        title="Routine Cleaning Visits"
+        subtitle="How many days after a property's last routine visit (or since a cleaner was assigned, if there's no visit yet) a new visit is automatically created on the cleaner's job list."
+        open={!!openSections['routine-visit-alerts']}
+        onToggle={() => toggleSection('routine-visit-alerts')}
+      >
+        <div style={{ marginBottom: '16px', maxWidth: '260px' }}>
+          <label style={fieldLabelStyle}>Days since last visit before a new one is created</label>
+          <input
+            type="number"
+            value={routineVisitFlagDays}
+            onChange={(e) => setRoutineVisitFlagDays(e.target.value)}
+            style={inputStyle}
+          />
+        </div>
+
+        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: 600, color: '#0f172a', marginBottom: '16px' }}>
+          <input type="checkbox" checked={routineVisitAlertsEnabled} onChange={(e) => setRoutineVisitAlertsEnabled(e.target.checked)} />
+          Automatically create routine visit jobs
+        </label>
+
+        <button onClick={saveRoutineVisitAlerts} disabled={routineVisitSaving} style={{ ...saveBtnStyle, opacity: routineVisitSaving ? 0.6 : 1, cursor: routineVisitSaving ? 'not-allowed' : 'pointer' }}>
+          {routineVisitSaving ? 'Saving...' : 'Save Routine Visit Settings'}
+        </button>
+        {routineVisitSaved && <span style={savedTagStyle}>✓ Saved</span>}
       </SettingsSection>
 
       {/* Section 5: On-Call Roster */}

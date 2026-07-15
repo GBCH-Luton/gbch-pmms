@@ -12,9 +12,9 @@
 // so it doesn't collide with the existing layout_type column that drives
 // the Builder's floor/area picker (2-Floors/3-Floors/Flat).
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
-import { modalLabelStyle, modalErrorStyle } from './shared'
+import { modalLabelStyle, modalErrorStyle, fetchAssignableStaffForCategory } from './shared'
 
 const PROPERTY_TYPES = ['House', 'Flat', 'HMO', 'Specialist Supported Living', 'Commercial', 'Other']
 const TENURE_TYPES = ['Freehold', 'Leasehold', 'Rented']
@@ -236,6 +236,114 @@ function VulnerabilitySection({ property, onSave }) {
   )
 }
 
+// One cleaner per property (Cleaners Rota Phase 1). Reuses
+// fetchAssignableStaffForCategory('Cleaning Rota') -- the exact same
+// division-routing logic that already offers Housekeepers instead of
+// Builders when raising a Housekeeping-division ticket -- rather than a
+// bespoke staff query, so this list of assignable cleaners never drifts
+// out of sync with who's actually eligible elsewhere in the app. When
+// the property has a staff_gender_restriction set, the list is narrowed
+// to staff whose `gender` matches -- an unset staff gender is treated as
+// "unknown, don't offer" for a restricted property, matching the "only
+// cleaners who match that requirement will be offered" spec.
+function CleanerAssignmentSection({ property, onSave }) {
+  const [editing, setEditing] = useState(false)
+  const [cleaners, setCleaners] = useState([])
+  const [cleanersLoading, setCleanersLoading] = useState(false)
+  const [selectedId, setSelectedId] = useState('')
+  const [currentName, setCurrentName] = useState(null)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    if (!property.assigned_cleaner_id) { setCurrentName(null); return }
+    supabase.from('staff').select('name').eq('id', property.assigned_cleaner_id).maybeSingle()
+      .then(({ data }) => { if (!cancelled) setCurrentName(data?.name || null) })
+    return () => { cancelled = true }
+  }, [property.assigned_cleaner_id])
+
+  async function startEdit() {
+    setSelectedId(property.assigned_cleaner_id || '')
+    setError('')
+    setEditing(true)
+    setCleanersLoading(true)
+    const staff = await fetchAssignableStaffForCategory('Cleaning Rota')
+    setCleaners(staff)
+    setCleanersLoading(false)
+  }
+
+  const restrictionGender = { 'Male Only': 'Male', 'Female Only': 'Female' }[property.staff_gender_restriction]
+  const eligibleCleaners = restrictionGender ? cleaners.filter(c => c.gender === restrictionGender) : cleaners
+
+  async function save() {
+    setSaving(true)
+    setError('')
+    const err = await onSave({
+      assigned_cleaner_id: selectedId || null,
+      cleaner_assigned_since: selectedId ? new Date().toISOString() : null,
+    })
+    setSaving(false)
+    if (err) { setError(err); return }
+    setEditing(false)
+  }
+
+  return (
+    <div style={{ background: '#fff', borderRadius: '16px', padding: '20px', marginBottom: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+        <p style={{ margin: 0, fontSize: '14px', fontWeight: 800, color: '#0f172a' }}>Assigned Cleaner</p>
+        {!editing && (
+          <button
+            onClick={startEdit}
+            style={{ padding: '6px 14px', background: '#1d4ed8', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
+          >
+            {property.assigned_cleaner_id ? 'Reassign' : 'Assign'}
+          </button>
+        )}
+      </div>
+
+      {!editing ? (
+        <div style={readRowStyle}>
+          <span style={readLabelStyle}>Responsible Cleaner</span>
+          <span style={readValueStyle}>{currentName || '—'}</span>
+        </div>
+      ) : (
+        <div>
+          <p style={modalLabelStyle}>Cleaner</p>
+          {cleanersLoading ? (
+            <p style={{ margin: 0, fontSize: '13px', color: '#94a3b8' }}>Loading eligible cleaners...</p>
+          ) : (
+            <select value={selectedId} onChange={(e) => setSelectedId(e.target.value)} style={inputStyle}>
+              <option value="">Unassigned</option>
+              {eligibleCleaners.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          )}
+          {!cleanersLoading && restrictionGender && eligibleCleaners.length === 0 && (
+            <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: '#d97706' }}>
+              No {restrictionGender.toLowerCase()} cleaners available to match this property's gender restriction.
+            </p>
+          )}
+
+          {error && <p style={modalErrorStyle}>{error}</p>}
+
+          <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
+            <button onClick={() => setEditing(false)} style={{ flex: 1, padding: '10px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
+              Cancel
+            </button>
+            <button
+              onClick={save}
+              disabled={saving}
+              style={{ flex: 2, padding: '10px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.6 : 1 }}
+            >
+              {saving ? 'Saving...' : 'Save'}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function PropertyCoreTab({ property, onFieldsSaved }) {
   const [photoUploading, setPhotoUploading] = useState(false)
   const [photoError, setPhotoError] = useState('')
@@ -344,6 +452,8 @@ export default function PropertyCoreTab({ property, onFieldsSaved }) {
       />
 
       <VulnerabilitySection property={property} onSave={saveFields} />
+
+      <CleanerAssignmentSection property={property} onSave={saveFields} />
 
       <EditableSection
         title="Utilities"
