@@ -65,6 +65,8 @@ export default function AdminDashboard({ onNavigate }) {
   const [tickets, setTickets] = useState([])
   const [newPropertiesCount, setNewPropertiesCount] = useState(0)
   const [totalPropertiesCount, setTotalPropertiesCount] = useState(0)
+  const [procuredPropertiesCount, setProcuredPropertiesCount] = useState(0)
+  const [livePropertiesCount, setLivePropertiesCount] = useState(0)
   const [clockedInCount, setClockedInCount] = useState(0)
   const [flaggedLocationsCount, setFlaggedLocationsCount] = useState(0)
   const [stuckThresholds, setStuckThresholds] = useState(null)
@@ -79,6 +81,8 @@ export default function AdminDashboard({ onNavigate }) {
     fetchTickets()
     fetchPropertiesMetrics()
     fetchTotalPropertiesCount()
+    fetchProcuredPropertiesCount()
+    fetchLivePropertiesCount()
     fetchClockedInCount()
     fetchFlaggedClockingCount().then(setFlaggedLocationsCount)
     fetchStuckThresholds()
@@ -145,6 +149,26 @@ export default function AdminDashboard({ onNavigate }) {
       .select('id', { count: 'exact', head: true })
 
     setTotalPropertiesCount(count || 0)
+  }
+
+  async function fetchProcuredPropertiesCount() {
+    const { count } = await supabase
+      .schema('pmms')
+      .from('properties')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'Procured')
+
+    setProcuredPropertiesCount(count || 0)
+  }
+
+  async function fetchLivePropertiesCount() {
+    const { count } = await supabase
+      .schema('pmms')
+      .from('properties')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'Live')
+
+    setLivePropertiesCount(count || 0)
   }
 
   async function fetchClockedInCount() {
@@ -258,6 +282,17 @@ export default function AdminDashboard({ onNavigate }) {
 
       <DashboardSection id="properties" title="Properties" background="#ffffff">
         <button
+          onClick={() => onNavigate?.('properties')}
+          style={{
+            flex: '1 1 220px', background: '#2563eb', borderRadius: '16px', padding: '16px',
+            border: 'none', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', textAlign: 'center',
+          }}
+        >
+          <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Total Properties</p>
+          <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: '#ffffff' }}>{totalPropertiesCount}</p>
+        </button>
+
+        <button
           onClick={() => onNavigate?.('properties', { filterMode: 'newProperties' })}
           style={{
             flex: '1 1 220px', background: '#0f766e', borderRadius: '16px', padding: '16px',
@@ -269,14 +304,25 @@ export default function AdminDashboard({ onNavigate }) {
         </button>
 
         <button
-          onClick={() => onNavigate?.('properties')}
+          onClick={() => onNavigate?.('properties', { filterMode: 'procured' })}
           style={{
-            flex: '1 1 220px', background: '#2563eb', borderRadius: '16px', padding: '16px',
+            flex: '1 1 220px', background: '#64748b', borderRadius: '16px', padding: '16px',
             border: 'none', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', textAlign: 'center',
           }}
         >
-          <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Total Properties</p>
-          <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: '#ffffff' }}>{totalPropertiesCount}</p>
+          <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Procured</p>
+          <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: '#ffffff' }}>{procuredPropertiesCount}</p>
+        </button>
+
+        <button
+          onClick={() => onNavigate?.('properties', { filterMode: 'live' })}
+          style={{
+            flex: '1 1 220px', background: '#16a34a', borderRadius: '16px', padding: '16px',
+            border: 'none', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', textAlign: 'center',
+          }}
+        >
+          <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Live</p>
+          <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: '#ffffff' }}>{livePropertiesCount}</p>
         </button>
       </DashboardSection>
 

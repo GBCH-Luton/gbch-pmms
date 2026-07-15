@@ -130,7 +130,7 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
   const [openTicketCounts, setOpenTicketCounts] = useState({})
   const [voidRoomCounts, setVoidRoomCounts] = useState({})
   const [newPropertyWindowHours, setNewPropertyWindowHours] = useState(DEFAULT_NEW_PROPERTY_WINDOW_HOURS)
-  const [filterMode, setFilterMode] = useState('all') // 'all' | 'newProperties'
+  const [filterMode, setFilterMode] = useState('all') // 'all' | 'newProperties' | 'procured' | 'live'
   const [p1Threshold, setP1Threshold] = useState(70)
   const [p2Threshold, setP2Threshold] = useState(40)
   const [loading, setLoading] = useState(true)
@@ -375,10 +375,16 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
       if (!matches) return false
     }
     if (filterMode === 'newProperties' && !isNewProperty(p)) return false
+    if (filterMode === 'procured' && p.status !== 'Procured') return false
+    if (filterMode === 'live' && p.status !== 'Live') return false
     return true
   })
 
-  const filterModeLabel = filterMode === 'newProperties' ? 'New Properties' : null
+  const filterModeLabel =
+    filterMode === 'newProperties' ? 'New Properties' :
+    filterMode === 'procured' ? 'Procured' :
+    filterMode === 'live' ? 'Live' :
+    null
 
   const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '13px', fontFamily: 'inherit', boxSizing: 'border-box' }
 
