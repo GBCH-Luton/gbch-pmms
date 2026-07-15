@@ -325,6 +325,7 @@ export default function BuilderDashboard({ profile }) {
   }
 
   async function handleClockIn(transitStart, milesLogged) {
+    if (tickets.some(t => t.status === 'In Progress' && t.id !== selectedTicket.id)) return
     const now = new Date().toISOString()
     const previousStatus = selectedTicket.status
     const position = await getCurrentPositionSafe()
@@ -429,6 +430,7 @@ export default function BuilderDashboard({ profile }) {
   }
 
   async function handleResumeWork() {
+    if (tickets.some(t => t.status === 'In Progress' && t.id !== selectedTicket.id)) return
     const now = new Date().toISOString()
     const previousStatus = selectedTicket.status
     const position = await getCurrentPositionSafe()
@@ -863,6 +865,7 @@ export default function BuilderDashboard({ profile }) {
   const statusLabel = (status) => (status === 'Pending' ? 'Unassigned' : status)
 
   const inProgressTickets = tickets.filter(t => t.status === 'In Progress')
+  const activeTicket = inProgressTickets[0] || null
   const urgentTickets = tickets.filter(t => t.status === 'Assigned' && t.priority_score >= p1Threshold)
   const toDoTickets = tickets.filter(t => t.status === 'Assigned' && t.priority_score < p1Threshold)
   const onHoldTickets = tickets.filter(t => t.status === 'On Hold')
@@ -1309,7 +1312,14 @@ export default function BuilderDashboard({ profile }) {
       {/* Actions */}
       <div style={{ background: '#fff', borderRadius: '16px', padding: '20px', marginBottom: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
         <p style={{ margin: '0 0 14px 0', fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Actions</p>
-        {selectedTicket.status === 'Assigned' && (
+        {selectedTicket.status === 'Assigned' && (activeTicket ? (
+          <div style={{ padding: '14px', borderRadius: '10px', background: '#fffbeb', border: '1px solid #fcd34d' }}>
+            <p style={{ margin: '0 0 4px 0', fontSize: '11px', fontWeight: 700, color: '#92400e', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Job in progress</p>
+            <p style={{ margin: 0, fontSize: '14px', color: '#78350f' }}>
+              Finish or hold Job #{activeTicket.ticket_number} before starting another job.
+            </p>
+          </div>
+        ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div>
               <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Coming from</p>
@@ -1385,7 +1395,7 @@ export default function BuilderDashboard({ profile }) {
               ✓ I've arrived — start work
             </button>
           </div>
-        )}
+        ))}
         {selectedTicket.status === 'In Progress' && !showPauseReasons && !showCompleteConfirm && !showNoAccessConfirm && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <button onClick={() => setShowCompleteConfirm(true)} style={{ width: '100%', padding: '16px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: 700, cursor: 'pointer' }}>
@@ -1561,12 +1571,21 @@ export default function BuilderDashboard({ profile }) {
                 </p>
               </div>
             )}
-            <button
-              onClick={handleResumeWork}
-              style={{ width: '100%', padding: '16px', background: '#0d9488', color: '#fff', border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: 700, cursor: 'pointer' }}
-            >
-              ✓ Back on site — restart work
-            </button>
+            {activeTicket ? (
+              <div style={{ padding: '14px', borderRadius: '10px', background: '#fffbeb', border: '1px solid #fcd34d' }}>
+                <p style={{ margin: '0 0 4px 0', fontSize: '11px', fontWeight: 700, color: '#92400e', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Job in progress</p>
+                <p style={{ margin: 0, fontSize: '14px', color: '#78350f' }}>
+                  Finish or hold Job #{activeTicket.ticket_number} before starting another job.
+                </p>
+              </div>
+            ) : (
+              <button
+                onClick={handleResumeWork}
+                style={{ width: '100%', padding: '16px', background: '#0d9488', color: '#fff', border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: 700, cursor: 'pointer' }}
+              >
+                ✓ Back on site — restart work
+              </button>
+            )}
           </div>
         )}
       </div>
