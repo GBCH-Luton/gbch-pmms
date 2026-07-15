@@ -37,6 +37,8 @@ export default function BuilderDashboard({ profile }) {
   const [completePhotoPreview, setCompletePhotoPreview] = useState(null)
   const [completeSubmitting, setCompleteSubmitting] = useState(false)
   const [completeError, setCompleteError] = useState('')
+  const [routineVisitChecklistTemplate, setRoutineVisitChecklistTemplate] = useState([])
+  const [checklistChecked, setChecklistChecked] = useState({})
   const [showNoAccessConfirm, setShowNoAccessConfirm] = useState(false)
   const [noAccessNote, setNoAccessNote] = useState('')
   const [noAccessPhotoFile, setNoAccessPhotoFile] = useState(null)
@@ -91,6 +93,7 @@ export default function BuilderDashboard({ profile }) {
     fetchNotifications()
     fetchAvailableJobs()
     fetchPriorityThresholds().then(({ p1, p2 }) => { setP1Threshold(p1); setP2Threshold(p2) })
+    fetchRoutineVisitChecklistTemplate()
     // Permission alone doesn't mean a subscription actually exists (a
     // browser can report "granted" with nothing ever subscribed) -- this
     // is the real check for whether the button should offer to enable.
@@ -302,6 +305,16 @@ export default function BuilderDashboard({ profile }) {
     if (!error) setNotifications(data)
   }
 
+  async function fetchRoutineVisitChecklistTemplate() {
+    const { data } = await supabase
+      .schema('pmms')
+      .from('settings')
+      .select('setting_value')
+      .eq('setting_key', 'routine_visit_checklist')
+      .maybeSingle()
+    if (Array.isArray(data?.setting_value)) setRoutineVisitChecklistTemplate(data.setting_value)
+  }
+
   async function markNotificationRead(id) {
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n))
     await supabase
@@ -359,7 +372,7 @@ export default function BuilderDashboard({ profile }) {
     setSelectedTicket(prev => ({ ...prev, status: 'In Progress' }))
   }
 
-  async function handleComplete(note, photoFile) {
+  async function handleComplete(note, photoFile, checklistResponses) {
     setCompleteError('')
 
     if (!note || !note.trim()) {
@@ -388,7 +401,11 @@ export default function BuilderDashboard({ profile }) {
     await supabase
       .schema('pmms')
       .from('tickets')
-      .update({ status: 'Completed', status_changed_at: now, stuck_alert_sent_at: null, completed_at: now, completion_note: note.trim(), completion_photo_url: photoUrl })
+      .update({
+        status: 'Completed', status_changed_at: now, stuck_alert_sent_at: null, completed_at: now,
+        completion_note: note.trim(), completion_photo_url: photoUrl,
+        ...(checklistResponses ? { checklist_responses: checklistResponses } : {}),
+      })
       .eq('id', selectedTicket.id)
 
     await supabase
@@ -866,6 +883,8 @@ export default function BuilderDashboard({ profile }) {
 
   const inProgressTickets = tickets.filter(t => t.status === 'In Progress')
   const activeTicket = inProgressTickets[0] || null
+  const isRoutineVisit = selectedTicket?.category === 'Cleaning Rota' && selectedTicket?.issue_tag === 'Routine 2-Week Visit'
+  const checklistIncomplete = isRoutineVisit && routineVisitChecklistTemplate.some(item => !checklistChecked[item])
   const urgentTickets = tickets.filter(t => t.status === 'Assigned' && t.priority_score >= p1Threshold)
   const toDoTickets = tickets.filter(t => t.status === 'Assigned' && t.priority_score < p1Threshold)
   const onHoldTickets = tickets.filter(t => t.status === 'On Hold')
@@ -1398,7 +1417,7 @@ export default function BuilderDashboard({ profile }) {
         ))}
         {selectedTicket.status === 'In Progress' && !showPauseReasons && !showCompleteConfirm && !showNoAccessConfirm && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <button onClick={() => setShowCompleteConfirm(true)} style={{ width: '100%', padding: '16px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: 700, cursor: 'pointer' }}>
+            <button onClick={() => { setChecklistChecked({}); setShowCompleteConfirm(true) }} style={{ width: '100%', padding: '16px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: 700, cursor: 'pointer' }}>
               ✓ Mark complete
             </button>
             <button onClick={() => setShowPauseReasons(true)} style={{ width: '100%', padding: '14px', background: '#fffbeb', color: '#92400e', border: '2px solid #fcd34d', borderRadius: '12px', fontSize: '14px', fontWeight: 700, cursor: 'pointer' }}>
@@ -1413,8 +1432,31 @@ export default function BuilderDashboard({ profile }) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div>
               <p style={{ margin: '0 0 2px 0', fontSize: '16px', fontWeight: 800, color: '#0f172a' }}>Confirm job complete</p>
-              <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>Add a note on the work done, and a photo if you have one</p>
+              <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>
+                {isRoutineVisit ? 'Work through the checklist, then add a note and a photo if you have one' : 'Add a note on the work done, and a photo if you have one'}
+              </p>
             </div>
+
+            {isRoutineVisit && (
+              <div>
+                <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Checklist</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {routineVisitChecklistTemplate.map(item => (
+                    <label
+                      key={item}
+                      style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: checklistChecked[item] ? '#f0fdf4' : '#f8fafc', cursor: 'pointer' }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={!!checklistChecked[item]}
+                        onChange={(e) => setChecklistChecked(prev => ({ ...prev, [item]: e.target.checked }))}
+                      />
+                      <span style={{ fontSize: '13px', fontWeight: 600, color: '#0f172a' }}>{item}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <textarea
               value={completeNote}
@@ -1439,10 +1481,13 @@ export default function BuilderDashboard({ profile }) {
               <p style={{ margin: 0, fontSize: '13px', color: '#ef4444' }}>{completeError}</p>
             )}
 
+            {checklistIncomplete && (
+              <p style={{ margin: 0, fontSize: '12px', color: '#d97706' }}>Complete every checklist item before confirming.</p>
+            )}
             <button
-              onClick={() => handleComplete(completeNote, completePhotoFile)}
-              disabled={completeSubmitting}
-              style={{ width: '100%', padding: '16px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: 700, cursor: completeSubmitting ? 'not-allowed' : 'pointer', opacity: completeSubmitting ? 0.6 : 1 }}
+              onClick={() => handleComplete(completeNote, completePhotoFile, isRoutineVisit ? routineVisitChecklistTemplate.map(label => ({ label, checked: !!checklistChecked[label] })) : undefined)}
+              disabled={completeSubmitting || checklistIncomplete}
+              style={{ width: '100%', padding: '16px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: 700, cursor: (completeSubmitting || checklistIncomplete) ? 'not-allowed' : 'pointer', opacity: (completeSubmitting || checklistIncomplete) ? 0.6 : 1 }}
             >
               {completeSubmitting ? 'Submitting...' : '✓ Confirm complete'}
             </button>

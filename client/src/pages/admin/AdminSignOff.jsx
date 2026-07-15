@@ -45,7 +45,7 @@ export default function AdminSignOff({ profile, onTicketsChanged }) {
       .schema('pmms')
       .from('tickets')
       .select(`
-        id, ticket_number, category, description, room, issue_tag, completion_note, completion_photo_url, photo_url, assigned_builder_id, property_id, raised_by, raised_by_name
+        id, ticket_number, category, description, room, issue_tag, completion_note, completion_photo_url, photo_url, assigned_builder_id, property_id, raised_by, raised_by_name, checklist_responses
       `)
       .eq('status', 'Completed')
       .order('completed_at', { ascending: false })
@@ -259,6 +259,16 @@ export default function AdminSignOff({ profile, onTicketsChanged }) {
                   ) : (
                     <div style={{ width: '100%', height: '140px', borderRadius: '8px', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '6px' }}>
                       <span style={{ fontSize: '12px', color: '#94a3b8', fontStyle: 'italic' }}>No photo</span>
+                    </div>
+                  )}
+                  {t.checklist_responses?.length > 0 && (
+                    <div style={{ marginBottom: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      {t.checklist_responses.map((item, i) => (
+                        <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', fontSize: '12px', color: item.checked ? '#16a34a' : '#dc2626' }}>
+                          <span>{item.checked ? '✓' : '✕'}</span>
+                          <span style={{ color: '#374151' }}>{item.label}</span>
+                        </div>
+                      ))}
                     </div>
                   )}
                   <p style={{ margin: 0, fontSize: '13px', color: '#475569' }}>{t.completion_note || 'No completion note recorded.'}</p>

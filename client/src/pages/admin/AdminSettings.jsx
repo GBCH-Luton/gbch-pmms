@@ -134,6 +134,11 @@ export default function AdminSettings() {
   const [routineVisitSaving, setRoutineVisitSaving] = useState(false)
   const [routineVisitSaved, setRoutineVisitSaved] = useState(false)
 
+  const [routineVisitChecklist, setRoutineVisitChecklist] = useState([])
+  const [newChecklistItem, setNewChecklistItem] = useState('')
+  const [checklistError, setChecklistError] = useState('')
+  const [checklistSaving, setChecklistSaving] = useState(false)
+
   const [roster, setRoster] = useState([])
   const [rosterSaving, setRosterSaving] = useState(false)
   const [rosterSaved, setRosterSaved] = useState(false)
@@ -187,6 +192,7 @@ export default function AdminSettings() {
       if (map.void_alerts_enabled != null) setVoidAlertsEnabled(map.void_alerts_enabled)
       if (map.routine_visit_flag_days != null) setRoutineVisitFlagDays(map.routine_visit_flag_days)
       if (map.routine_visit_alerts_enabled != null) setRoutineVisitAlertsEnabled(map.routine_visit_alerts_enabled)
+      if (Array.isArray(map.routine_visit_checklist)) setRoutineVisitChecklist(map.routine_visit_checklist)
       if (map.clock_overrun_hours != null) setClockOverrunHours(map.clock_overrun_hours)
       if (map.done_window_hours != null) setDoneWindowHours(map.done_window_hours)
       if (map.clock_distance_threshold_meters != null) setClockDistanceThresholdM(map.clock_distance_threshold_meters)
@@ -567,6 +573,26 @@ export default function AdminSettings() {
     setRoutineVisitSaving(false)
     setRoutineVisitSaved(true)
     setTimeout(() => setRoutineVisitSaved(false), 2000)
+  }
+
+  async function handleAddChecklistItem() {
+    setChecklistError('')
+    const label = newChecklistItem.trim()
+    if (!label) { setChecklistError('Enter a checklist item.'); return }
+    if (routineVisitChecklist.some(i => i.toLowerCase() === label.toLowerCase())) { setChecklistError('That item already exists.'); return }
+
+    setChecklistSaving(true)
+    const next = [...routineVisitChecklist, label]
+    await saveSetting('routine_visit_checklist', next)
+    setRoutineVisitChecklist(next)
+    setChecklistSaving(false)
+    setNewChecklistItem('')
+  }
+
+  async function handleDeleteChecklistItem(label) {
+    const next = routineVisitChecklist.filter(i => i !== label)
+    await saveSetting('routine_visit_checklist', next)
+    setRoutineVisitChecklist(next)
   }
 
   async function addRosterContact() {
@@ -1230,6 +1256,50 @@ export default function AdminSettings() {
           {routineVisitSaving ? 'Saving...' : 'Save Routine Visit Settings'}
         </button>
         {routineVisitSaved && <span style={savedTagStyle}>✓ Saved</span>}
+      </SettingsSection>
+
+      {/* Section 4f: Routine Visit Checklist (Cleaners Rota) */}
+      <SettingsSection
+        title="Routine Visit Checklist"
+        subtitle="The baseline a cleaner must work through before a routine visit can be marked complete. Photos and a note are captured on top of this, not instead of it."
+        open={!!openSections['routine-visit-checklist']}
+        onToggle={() => toggleSection('routine-visit-checklist')}
+      >
+        {routineVisitChecklist.length === 0 && (
+          <p style={{ margin: '0 0 10px 0', fontSize: '13px', color: '#94a3b8', fontStyle: 'italic' }}>No checklist items yet.</p>
+        )}
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '12px' }}>
+          {routineVisitChecklist.map(item => (
+            <div key={item} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', padding: '8px 12px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px' }}>
+              <span style={{ fontSize: '13px', fontWeight: 600, color: '#0f172a' }}>{item}</span>
+              <button
+                onClick={() => handleDeleteChecklistItem(item)}
+                style={{ background: 'none', border: 'none', color: '#dc2626', fontSize: '12px', fontWeight: 800, cursor: 'pointer', padding: '0 2px', flexShrink: 0 }}
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <input
+            type="text"
+            value={newChecklistItem}
+            onChange={(e) => setNewChecklistItem(e.target.value)}
+            placeholder="New checklist item..."
+            style={{ ...inputStyle, flex: '1 1 220px' }}
+          />
+          <button
+            onClick={handleAddChecklistItem}
+            disabled={checklistSaving}
+            style={{ padding: '10px 20px', background: '#1e3a8a', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: checklistSaving ? 'not-allowed' : 'pointer', opacity: checklistSaving ? 0.6 : 1 }}
+          >
+            {checklistSaving ? 'Saving...' : '+ Add Item'}
+          </button>
+        </div>
+        {checklistError && <p style={modalErrorStyle}>{checklistError}</p>}
       </SettingsSection>
 
       {/* Section 5: On-Call Roster */}
