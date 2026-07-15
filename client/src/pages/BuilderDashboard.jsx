@@ -10,6 +10,10 @@ import { pushEmergencyAlert, priorityTierLabel, fetchPriorityThresholds } from '
 import PropertySearchSelect from '../components/PropertySearchSelect'
 import gbchLogo from '../assets/gbch-logo.svg'
 
+// Hidden for now, not removed -- flip back to true to bring the builder's
+// self-serve "Log a Ticket" form back into the nav menu.
+const SHOW_LOG_TICKET_NAV = false
+
 export default function BuilderDashboard({ profile }) {
   const [tickets, setTickets] = useState([])
   const [loading, setLoading] = useState(true)
@@ -1035,12 +1039,14 @@ export default function BuilderDashboard({ profile }) {
             <p style={{ margin: '0 0 18px 0', fontSize: '13px', fontWeight: 500, color: '#ffffff', opacity: 0.8 }}>{profile.job_title}</p>
 
             <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <button
-                onClick={() => { setPage('new-ticket'); setMenuOpen(false) }}
-                style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
-              >
-                📝 Log a Ticket
-              </button>
+              {SHOW_LOG_TICKET_NAV && (
+                <button
+                  onClick={() => { setPage('new-ticket'); setMenuOpen(false) }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
+                >
+                  📝 Log a Ticket
+                </button>
+              )}
               <button
                 onClick={() => { setPage('available-jobs'); setMenuOpen(false) }}
                 style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
@@ -1200,12 +1206,14 @@ export default function BuilderDashboard({ profile }) {
           <p style={{ margin: '0 0 18px 0', fontSize: '13px', fontWeight: 500, color: '#ffffff', opacity: 0.8 }}>{profile.job_title}</p>
 
           <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <button
-              onClick={() => { setPage('new-ticket'); setMenuOpen(false) }}
-              style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
-            >
-              📝 Log a Ticket
-            </button>
+            {SHOW_LOG_TICKET_NAV && (
+              <button
+                onClick={() => { setPage('new-ticket'); setMenuOpen(false) }}
+                style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
+              >
+                📝 Log a Ticket
+              </button>
+            )}
             <button
               onClick={() => { setPage('my-reports'); setMenuOpen(false) }}
               style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
@@ -1642,12 +1650,14 @@ export default function BuilderDashboard({ profile }) {
                 <p style={{ margin: '0 0 18px 0', fontSize: '13px', fontWeight: 500, color: '#ffffff', opacity: 0.8 }}>{profile.job_title}</p>
 
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <button
-                    onClick={() => { setPage('new-ticket'); setMenuOpen(false) }}
-                    style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
-                  >
-                    📝 Log a Ticket
-                  </button>
+                  {SHOW_LOG_TICKET_NAV && (
+                    <button
+                      onClick={() => { setPage('new-ticket'); setMenuOpen(false) }}
+                      style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
+                    >
+                      📝 Log a Ticket
+                    </button>
+                  )}
                   <button
                     onClick={() => { setPage('my-reports'); setMenuOpen(false) }}
                     style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
@@ -1757,12 +1767,14 @@ export default function BuilderDashboard({ profile }) {
                 <p style={{ margin: '0 0 18px 0', fontSize: '13px', fontWeight: 500, color: '#ffffff', opacity: 0.8 }}>{profile.job_title}</p>
 
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <button
-                    onClick={() => { setPage('new-ticket'); setMenuOpen(false) }}
-                    style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
-                  >
-                    📝 Log a Ticket
-                  </button>
+                  {SHOW_LOG_TICKET_NAV && (
+                    <button
+                      onClick={() => { setPage('new-ticket'); setMenuOpen(false) }}
+                      style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
+                    >
+                      📝 Log a Ticket
+                    </button>
+                  )}
                   <button
                     onClick={() => { setPage('my-reports'); setMenuOpen(false) }}
                     style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
@@ -1896,12 +1908,14 @@ export default function BuilderDashboard({ profile }) {
                 <p style={{ margin: '0 0 18px 0', fontSize: '13px', fontWeight: 500, color: '#ffffff', opacity: 0.8 }}>{profile.job_title}</p>
 
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <button
-                    onClick={() => { setPage('new-ticket'); setMenuOpen(false) }}
-                    style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
-                  >
-                    📝 Log a Ticket
-                  </button>
+                  {SHOW_LOG_TICKET_NAV && (
+                    <button
+                      onClick={() => { setPage('new-ticket'); setMenuOpen(false) }}
+                      style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
+                    >
+                      📝 Log a Ticket
+                    </button>
+                  )}
                   <button
                     onClick={() => { setPage('my-reports'); setMenuOpen(false) }}
                     style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
@@ -2462,12 +2476,14 @@ export default function BuilderDashboard({ profile }) {
                 <p style={{ margin: '0 0 18px 0', fontSize: '13px', fontWeight: 500, color: '#ffffff', opacity: 0.8 }}>{profile.job_title}</p>
 
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <button
-                    onClick={() => { setPage('new-ticket'); setMenuOpen(false) }}
-                    style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
-                  >
-                    📝 Log a Ticket
-                  </button>
+                  {SHOW_LOG_TICKET_NAV && (
+                    <button
+                      onClick={() => { setPage('new-ticket'); setMenuOpen(false) }}
+                      style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
+                    >
+                      📝 Log a Ticket
+                    </button>
+                  )}
                   <button
                     onClick={() => { setPage('my-reports'); setMenuOpen(false) }}
                     style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
