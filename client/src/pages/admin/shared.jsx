@@ -291,6 +291,69 @@ export async function fetchVoidAgingCounts() {
   return counts
 }
 
+// Per-property "when is this cleaner's next routine visit due" view, for
+// the Housekeeping manager screen (walkthrough: "which properties are
+// coming up for their two-week visit, and which are overdue"). Mirrors
+// check-routine-visits-due's own baseline logic exactly (last completed
+// Routine Visit ticket, or cleaner_assigned_since) so the two always
+// agree on what's overdue -- same cross-check precedent as
+// fetchVoidAgingCounts/computeVoidAging.
+export async function fetchRoutineVisitAging() {
+  const { data: properties } = await supabase
+    .schema('pmms')
+    .from('properties')
+    .select('id, address, assigned_cleaner_id, cleaner_assigned_since')
+    .not('assigned_cleaner_id', 'is', null)
+
+  if (!properties?.length) return []
+
+  const { data: visitTickets } = await supabase
+    .schema('pmms')
+    .from('tickets')
+    .select('property_id, status, completed_at')
+    .eq('category', 'Cleaning Rota')
+    .eq('issue_tag', 'Routine 2-Week Visit')
+
+  const { data: thresholdRow } = await supabase
+    .schema('pmms')
+    .from('settings')
+    .select('setting_value')
+    .eq('setting_key', 'routine_visit_flag_days')
+    .maybeSingle()
+  const flagDays = thresholdRow?.setting_value != null ? Number(thresholdRow.setting_value) : 12
+
+  const cleanerIds = [...new Set(properties.map(p => p.assigned_cleaner_id))]
+  const { data: cleaners } = await supabase.from('staff').select('id, name').in('id', cleanerIds)
+  const cleanerNameById = {}
+  ;(cleaners || []).forEach(c => { cleanerNameById[c.id] = c.name })
+
+  const nowMs = Date.now()
+  return properties.map(property => {
+    const ticketsForProperty = (visitTickets || []).filter(t => t.property_id === property.id)
+    const lastCompleted = ticketsForProperty
+      .filter(t => t.completed_at)
+      .sort((a, b) => new Date(b.completed_at).getTime() - new Date(a.completed_at).getTime())[0]
+    const baseline = lastCompleted?.completed_at || property.cleaner_assigned_since
+    const daysSince = baseline ? Math.floor((nowMs - new Date(baseline).getTime()) / 86400000) : null
+
+    let tier = 'green'
+    let label = 'OK'
+    if (daysSince == null) { tier = 'grey'; label = 'Unknown' }
+    else if (daysSince >= flagDays) { tier = 'red'; label = 'Overdue' }
+    else if (daysSince >= flagDays * 0.5) { tier = 'amber'; label = 'Due Soon' }
+
+    return {
+      propertyId: property.id,
+      address: property.address,
+      cleanerId: property.assigned_cleaner_id,
+      cleanerName: cleanerNameById[property.assigned_cleaner_id] || 'Unknown',
+      daysSince,
+      tier,
+      label,
+    }
+  }).sort((a, b) => (b.daysSince ?? -1) - (a.daysSince ?? -1))
+}
+
 export const formatUKDate = (isoString) => {
   if (!isoString) return ''
   const d = new Date(isoString)

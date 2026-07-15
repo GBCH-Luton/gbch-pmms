@@ -17,18 +17,20 @@ import AdminReports from './admin/AdminReports'
 import AdminSettings from './admin/AdminSettings'
 import AdminAccess from './admin/AdminAccess'
 import AdminHelp from './admin/AdminHelp'
+import AdminHousekeeping from './admin/AdminHousekeeping'
 
 const NAV_ITEMS = [
   { key: 'dashboard', label: 'Dashboard', Component: AdminDashboardPage },
   { key: 'pipeline', label: 'Pipeline', Component: AdminPipeline },
   { key: 'properties', label: 'Properties', Component: AdminProperties },
-  { key: 'compliance', label: 'Compliance', Component: AdminCompliance },
-  { key: 'voids', label: 'Voids', Component: AdminVoids },
+  { key: 'compliance', label: 'Compliance', Component: AdminCompliance, divisions: ['Maintenance'] },
+  { key: 'voids', label: 'Voids', Component: AdminVoids, divisions: ['Maintenance'] },
   { key: 'sign-off', label: 'Sign-Off', Component: AdminSignOff },
+  { key: 'housekeeping', label: 'Housekeeping', Component: AdminHousekeeping, divisionOnly: 'Housekeeping' },
   { key: 'builders', label: 'Staff', Component: AdminBuilders },
   { key: 'clocking', label: 'Clocking', Component: AdminClocking },
   { key: 'raise-ticket', label: 'Log a Ticket', Component: AdminRaiseTicket },
-  { key: 'stock', label: 'Stock', Component: AdminStock },
+  { key: 'stock', label: 'Stock', Component: AdminStock, divisions: ['Maintenance'] },
   { key: 'reports', label: 'Reports', Component: AdminReports },
   { key: 'settings', label: 'Settings', Component: AdminSettings },
   { key: 'admin', label: 'Admin', Component: AdminAccess, adminOnly: true },
@@ -40,9 +42,26 @@ const PENDING_SIGN_OFF_POLL_MS = 20000
 // Settings is hidden per-role via profile.hideSettings (a UI-only
 // convenience for e.g. a "Maintenance Assistant" role -- see roles.js),
 // separate from the access-level-based adminOnly flag above.
+//
+// Two different division-filtering shapes, deliberately not one:
+//
+// `divisions` (opt-out allow-list, e.g. Compliance/Voids/Stock): hidden
+// only for a manager explicitly scoped to a *different* division. An
+// unscoped manager (today's default for every existing role) keeps
+// seeing these exactly as before -- no regression, matching the
+// guarantee the ticket-level RLS division scoping already established.
+//
+// `divisionOnly` (opt-in only, e.g. the new Housekeeping item): shown
+// only to a manager explicitly scoped to that division, or an Admin.
+// Using `divisions` semantics here would have been wrong -- an unscoped
+// manager (e.g. today's Maintenance Manager) would incorrectly also see
+// a brand-new item nobody has ever seen before, since there's no
+// existing visibility to "regress" from.
 function isNavItemVisible(item, profile) {
   if (item.adminOnly && profile.role !== 'admin') return false
   if (item.key === 'settings' && profile.hideSettings) return false
+  if (item.divisions && profile.division && !item.divisions.includes(profile.division)) return false
+  if (item.divisionOnly && profile.role !== 'admin' && profile.division !== item.divisionOnly) return false
   return true
 }
 

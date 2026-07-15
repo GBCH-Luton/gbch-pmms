@@ -31,6 +31,10 @@ export default function BuilderDashboard({ profile }) {
   const [showPauseReasons, setShowPauseReasons] = useState(false)
   const [pauseReason, setPauseReason] = useState(null)
   const [pauseNote, setPauseNote] = useState('')
+  const [showDelayReasonForm, setShowDelayReasonForm] = useState(false)
+  const [delayReason, setDelayReason] = useState(null)
+  const [delayReasonNote, setDelayReasonNote] = useState('')
+  const [delayReasonSubmitting, setDelayReasonSubmitting] = useState(false)
   const [showCompleteConfirm, setShowCompleteConfirm] = useState(false)
   const [completeNote, setCompleteNote] = useState('')
   const [completePhotoFile, setCompletePhotoFile] = useState(null)
@@ -224,7 +228,7 @@ export default function BuilderDashboard({ profile }) {
       .schema('pmms')
       .from('tickets')
       .select(`
-        id, ticket_number, status, category, description, room, priority_score, mileage_logged, transit_start, created_at, completed_at, hold_reason, hold_note, photo_url, property_id
+        id, ticket_number, status, category, issue_tag, description, room, priority_score, mileage_logged, transit_start, created_at, completed_at, hold_reason, hold_note, photo_url, property_id, checklist_responses, delay_reason, delay_reason_note, delay_reason_status
       `)
       .eq('assigned_builder_id', profile.id)
       .not('status', 'in', '("Archived","Cancelled")')
@@ -444,6 +448,31 @@ export default function BuilderDashboard({ profile }) {
 
     await fetchTickets()
     setSelectedTicket(null)
+  }
+
+  async function handleReportDelay(reason, note) {
+    setDelayReasonSubmitting(true)
+    const now = new Date().toISOString()
+
+    const { error } = await supabase
+      .schema('pmms')
+      .from('tickets')
+      .update({
+        delay_reason: reason, delay_reason_note: note, delay_reason_status: 'pending',
+        delay_reason_submitted_at: now, delay_reason_reviewed_at: null, delay_reason_reviewed_by: null,
+      })
+      .eq('id', selectedTicket.id)
+
+    setDelayReasonSubmitting(false)
+    if (error) return
+
+    await postAuditEvent(selectedTicket.id, 'Delay Reason Submitted', `${reason}${note ? ' — ' + note : ''} (awaiting manager review)`)
+
+    setSelectedTicket(prev => ({ ...prev, delay_reason: reason, delay_reason_note: note, delay_reason_status: 'pending' }))
+    setShowDelayReasonForm(false)
+    setDelayReason(null)
+    setDelayReasonNote('')
+    await fetchTickets()
   }
 
   async function handleResumeWork() {
@@ -1413,6 +1442,70 @@ export default function BuilderDashboard({ profile }) {
             >
               ✓ I've arrived — start work
             </button>
+
+            {isRoutineVisit && (
+              selectedTicket.delay_reason_status === 'pending' ? (
+                <div style={{ padding: '14px', borderRadius: '10px', background: '#fffbeb', border: '1px solid #fcd34d' }}>
+                  <p style={{ margin: '0 0 4px 0', fontSize: '11px', fontWeight: 700, color: '#92400e', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Delay reason submitted</p>
+                  <p style={{ margin: 0, fontSize: '14px', color: '#78350f' }}>
+                    {selectedTicket.delay_reason}{selectedTicket.delay_reason_note ? ` — ${selectedTicket.delay_reason_note}` : ''} — awaiting manager review.
+                  </p>
+                </div>
+              ) : showDelayReasonForm ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '14px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                  <div>
+                    <p style={{ margin: '0 0 2px 0', fontSize: '14px', fontWeight: 800, color: '#0f172a' }}>Why can't this be done on time?</p>
+                    <p style={{ margin: 0, fontSize: '12px', color: '#64748b' }}>A manager will review this before it's accepted</p>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {['Couldn\'t get access', 'Ran out of time today', 'Property not ready for cleaning', 'Other'].map(reason => {
+                      const active = delayReason === reason
+                      return (
+                        <button
+                          key={reason}
+                          onClick={() => setDelayReason(reason)}
+                          style={{
+                            width: '100%', padding: '12px', borderRadius: '10px',
+                            border: active ? '2px solid #d97706' : '1px solid #e2e8f0',
+                            background: active ? '#d9770614' : '#f8fafc',
+                            color: '#0f172a', fontSize: '14px', fontWeight: 700, cursor: 'pointer', textAlign: 'left',
+                          }}
+                        >
+                          {reason}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  <textarea
+                    value={delayReasonNote}
+                    onChange={(e) => setDelayReasonNote(e.target.value)}
+                    placeholder="Add a note (optional)"
+                    rows={3}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '14px', fontFamily: 'inherit', boxSizing: 'border-box', resize: 'vertical' }}
+                  />
+                  <button
+                    onClick={() => handleReportDelay(delayReason, delayReasonNote)}
+                    disabled={!delayReason || delayReasonSubmitting}
+                    style={{ width: '100%', padding: '14px', background: '#d97706', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: 700, cursor: (!delayReason || delayReasonSubmitting) ? 'not-allowed' : 'pointer', opacity: (!delayReason || delayReasonSubmitting) ? 0.6 : 1 }}
+                  >
+                    {delayReasonSubmitting ? 'Submitting...' : 'Submit for review'}
+                  </button>
+                  <button
+                    onClick={() => { setShowDelayReasonForm(false); setDelayReason(null); setDelayReasonNote('') }}
+                    style={{ width: '100%', padding: '8px', background: 'none', border: 'none', color: '#64748b', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setShowDelayReasonForm(true)}
+                  style={{ width: '100%', padding: '12px', background: 'none', color: '#92400e', border: '1px dashed #fcd34d', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}
+                >
+                  ⚠ Can't do this on time? Report a delay
+                </button>
+              )
+            )}
           </div>
         ))}
         {selectedTicket.status === 'In Progress' && !showPauseReasons && !showCompleteConfirm && !showNoAccessConfirm && (
