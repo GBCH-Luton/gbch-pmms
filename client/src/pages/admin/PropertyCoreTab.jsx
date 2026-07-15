@@ -18,7 +18,7 @@ import { modalLabelStyle, modalErrorStyle } from './shared'
 
 const PROPERTY_TYPES = ['House', 'Flat', 'HMO', 'Specialist Supported Living', 'Commercial', 'Other']
 const TENURE_TYPES = ['Freehold', 'Leasehold', 'Rented']
-const PROPERTY_STATUSES = ['Occupied', 'Void', 'Under Repair', 'Active', 'Inactive']
+const PROPERTY_STATUSES = ['Occupied', 'Void', 'Procured', 'Live']
 const UNIT_LAYOUT_TYPES = ['Studio', '1-Bed', '2-Bed', '3-Bed', '4-Bed', '5-Bed', 'HMO', 'Other']
 const CONSTRUCTION_TYPES = ['Brick', 'Timber Frame', 'Concrete', 'Other']
 

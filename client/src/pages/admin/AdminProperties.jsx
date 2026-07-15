@@ -10,7 +10,7 @@
 //   address text NOT NULL,
 //   postcode text,
 //   property_type text,
-//   status text DEFAULT 'Active',
+//   status text DEFAULT 'Procured',
 //   created_at timestamptz DEFAULT now()
 // );
 
@@ -148,7 +148,7 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
   const [editAddress, setEditAddress] = useState('')
   const [editPostcode, setEditPostcode] = useState('')
   const [editType, setEditType] = useState('House')
-  const [editStatus, setEditStatus] = useState('Active')
+  const [editStatus, setEditStatus] = useState('Procured')
   const [editSaving, setEditSaving] = useState(false)
   const [editError, setEditError] = useState('')
 
@@ -156,7 +156,7 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
   const [addAddress, setAddAddress] = useState('')
   const [addPostcode, setAddPostcode] = useState('')
   const [addType, setAddType] = useState('House')
-  const [addStatus, setAddStatus] = useState('Active')
+  const [addStatus, setAddStatus] = useState('Procured')
   const [addSaving, setAddSaving] = useState(false)
   const [addError, setAddError] = useState('')
 
@@ -260,7 +260,7 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
     setEditAddress(property.address || '')
     setEditPostcode(property.postcode || '')
     setEditType(property.property_type || 'House')
-    setEditStatus(property.status || 'Active')
+    setEditStatus(property.status || 'Procured')
     setEditError('')
     setTicketsSectionOpen(false)
     setShowAllOpenTickets(false)
@@ -334,7 +334,7 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
     setAddAddress('')
     setAddPostcode('')
     setAddType('House')
-    setAddStatus('Active')
+    setAddStatus('Procured')
     setAddError('')
     setShowAddModal(true)
   }
@@ -384,9 +384,8 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
 
   const statusPillStyle = (status) => {
     if (status === 'Void') return { fontSize: '11px', fontWeight: 700, padding: '3px 10px', borderRadius: '20px', color: '#dc2626', background: '#fee2e2' }
-    if (status === 'Under Repair') return { fontSize: '11px', fontWeight: 700, padding: '3px 10px', borderRadius: '20px', color: '#d97706', background: '#fef3c7' }
-    if (status === 'Inactive') return { fontSize: '11px', fontWeight: 700, padding: '3px 10px', borderRadius: '20px', color: '#64748b', background: '#f1f5f9' }
-    return { fontSize: '11px', fontWeight: 700, padding: '3px 10px', borderRadius: '20px', color: '#16a34a', background: '#dcfce7' } // Occupied / Active
+    if (status === 'Procured') return { fontSize: '11px', fontWeight: 700, padding: '3px 10px', borderRadius: '20px', color: '#64748b', background: '#f1f5f9' }
+    return { fontSize: '11px', fontWeight: 700, padding: '3px 10px', borderRadius: '20px', color: '#16a34a', background: '#dcfce7' } // Occupied / Live
   }
 
   if (loading) return (
@@ -412,7 +411,7 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px', flexWrap: 'wrap' }}>
                     <h1 style={{ margin: 0, fontSize: '20px', fontWeight: 800, color: '#0f172a' }}>{selectedProperty.address}</h1>
-                    <span style={statusPillStyle(selectedProperty.status)}>{selectedProperty.status || 'Active'}</span>
+                    <span style={statusPillStyle(selectedProperty.status)}>{selectedProperty.status || 'Procured'}</span>
                   </div>
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
                     {selectedProperty.property_type && (
@@ -457,9 +456,8 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
               <select value={editStatus} onChange={(e) => setEditStatus(e.target.value)} style={inputStyle}>
                 <option value="Occupied">Occupied</option>
                 <option value="Void">Void</option>
-                <option value="Under Repair">Under Repair</option>
-                <option value="Active">Active</option>
-                <option value="Inactive">Inactive</option>
+                <option value="Procured">Procured</option>
+                <option value="Live">Live</option>
               </select>
 
               {editError && <p style={modalErrorStyle}>{editError}</p>}
@@ -684,8 +682,8 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
 
             <p style={modalLabelStyle}>Status</p>
             <select value={addStatus} onChange={(e) => setAddStatus(e.target.value)} style={inputStyle}>
-              <option value="Active">Active</option>
-              <option value="Inactive">Inactive</option>
+              <option value="Procured">Procured</option>
+              <option value="Live">Live</option>
             </select>
 
             {addError && <p style={modalErrorStyle}>{addError}</p>}
