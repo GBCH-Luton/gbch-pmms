@@ -5,7 +5,7 @@ import { attachProperties } from '../../lib/properties'
 import {
   thStyle, tdStyle, actionBtnStyle, filterSelectStyle, formatUKDateTime,
   modalOverlayStyle, modalCardStyle, modalTitleStyle, modalLabelStyle,
-  modalErrorStyle, modalCancelBtnStyle, modalConfirmBtnStyle, fetchAssignableBuilders,
+  modalErrorStyle, modalCancelBtnStyle, modalConfirmBtnStyle, fetchAssignableBuilders, fetchAssignableStaffForDivision,
 } from './shared'
 
 const EIGHT_HOURS_MS = 8 * 60 * 60 * 1000
@@ -108,7 +108,7 @@ export default function AdminClocking({ profile }) {
     const { data: builderData } = await supabase
       .from('staff')
       .select('id, name')
-    setBuilders(await fetchAssignableBuilders())
+    setBuilders(await (profile.division ? fetchAssignableStaffForDivision(profile.division) : fetchAssignableBuilders()))
 
     // --- Section 1: currently clocked in (open work_sessions) ---
     const { data: openSessions } = await supabase

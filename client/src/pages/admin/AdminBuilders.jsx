@@ -23,7 +23,7 @@ import { thStyle, tdStyle, actionBtnStyle, STAFF_AVAILABILITY_OPTIONS, STAFF_AVA
 
 const BUILT_IN_ROLES = ['Admin', 'Builder', 'Cleaner', 'Support Worker']
 
-export default function AdminBuilders() {
+export default function AdminBuilders({ profile }) {
   const [staffList, setStaffList] = useState([])
   const [tickets, setTickets] = useState([])
   const [customRoles, setCustomRoles] = useState([])
@@ -82,7 +82,7 @@ export default function AdminBuilders() {
       })))
     }
     if (!ticketError) setTickets(await attachProperties(ticketData || [], 'address'))
-    if (!settingsError) setCustomRoles(normalizeCustomRoles(settingsRow?.setting_value).map(r => r.name))
+    if (!settingsError) setCustomRoles(normalizeCustomRoles(settingsRow?.setting_value))
 
     setLoading(false)
   }
@@ -128,7 +128,27 @@ export default function AdminBuilders() {
   // page is the Maintenance Manager's day-to-day team view, so IT admins
   // aren't part of the roster being monitored here at all (not in the KPI
   // counts, not in the radar table, not as a filter tab).
-  const roleOptions = [...BUILT_IN_ROLES, ...customRoles].filter(r => r !== 'Admin')
+  //
+  // For a division-scoped manager (e.g. Housekeeping Manager), also narrow
+  // to roles belonging to their own division -- 'Builder' is implicitly
+  // Maintenance (matching fetchAssignableStaffForDivision's own
+  // convention), custom roles carry their own `.division`, and any role
+  // this can't resolve a division for (Cleaner/Support Worker, or an
+  // unrecognised legacy value) is left visible everywhere rather than
+  // risk hiding someone. Unscoped managers and Admin see every role,
+  // completely unchanged.
+  function roleDivision(roleName) {
+    if (roleName === 'Builder') return 'Maintenance'
+    const custom = customRoles.find(r => r.name === roleName)
+    return custom ? (custom.division || 'Maintenance') : null
+  }
+  const allRoleOptions = [...BUILT_IN_ROLES, ...customRoles.map(r => r.name)].filter(r => r !== 'Admin')
+  const roleOptions = profile.division
+    ? allRoleOptions.filter(r => {
+        const div = roleDivision(r)
+        return div === null || div === profile.division
+      })
+    : allRoleOptions
   const relevantStaff = staffList.filter(s => roleOptions.includes(s.role))
 
   const totalStaff = relevantStaff.length
