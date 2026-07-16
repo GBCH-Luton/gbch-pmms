@@ -32,7 +32,12 @@ import PropertyRoomsTab from './PropertyRoomsTab'
 import PropertyRestrictionsTab from './PropertyRestrictionsTab'
 
 const PROPERTY_TYPES = ['House', 'Flat', 'HMO', 'Commercial', 'Other']
-const PROFILE_TABS = ['Core', 'Compliance', 'Assets', 'Maintenance', 'Lease & Legal', 'Documents', 'Notes', 'Rooms', 'Restrictions']
+const ALL_PROFILE_TABS = ['Core', 'Compliance', 'Assets', 'Maintenance', 'Lease & Legal', 'Documents', 'Notes', 'Rooms', 'Restrictions']
+// A Housekeeping Manager only interacts with cleaner assignment (Core) and
+// gender-restriction matching (Restrictions) -- everything else here is
+// Maintenance/lettings-specific and was explicitly scoped down to "just
+// what he will interact with, no more."
+const HOUSEKEEPING_PROFILE_TABS = ['Core', 'Restrictions']
 
 const DEFAULT_NEW_PROPERTY_WINDOW_HOURS = 48
 
@@ -538,45 +543,53 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
         )}
 
         {/* Property Profile tabs */}
-        <div style={{ display: 'flex', gap: '4px', marginBottom: '16px', flexWrap: 'wrap', borderBottom: '1px solid #e2e8f0' }}>
-          {PROFILE_TABS.map(tab => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              style={{
-                padding: '10px 16px', background: 'none', border: 'none', borderBottom: activeTab === tab ? '2px solid #0f766e' : '2px solid transparent',
-                color: activeTab === tab ? '#0f766e' : '#64748b', fontSize: '13px', fontWeight: 700, cursor: 'pointer', marginBottom: '-1px',
-              }}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
+        {(() => {
+          const profileTabs = profile.division === 'Housekeeping' ? HOUSEKEEPING_PROFILE_TABS : ALL_PROFILE_TABS
+          // Falls back to 'Core' (always present) if the current selection
+          // isn't in the scoped list -- covers both a stale tab left over
+          // from before a role change, and initialPropertiesFilter's own
+          // 'Compliance' default (used when navigating in without an
+          // explicit tab) landing on something now hidden.
+          const effectiveActiveTab = profileTabs.includes(activeTab) ? activeTab : 'Core'
+          return (
+            <>
+              <div style={{ display: 'flex', gap: '4px', marginBottom: '16px', flexWrap: 'wrap', borderBottom: '1px solid #e2e8f0' }}>
+                {profileTabs.map(tab => (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    style={{
+                      padding: '10px 16px', background: 'none', border: 'none', borderBottom: effectiveActiveTab === tab ? '2px solid #0f766e' : '2px solid transparent',
+                      color: effectiveActiveTab === tab ? '#0f766e' : '#64748b', fontSize: '13px', fontWeight: 700, cursor: 'pointer', marginBottom: '-1px',
+                    }}
+                  >
+                    {tab}
+                  </button>
+                ))}
+              </div>
 
-        {activeTab === 'Core' ? (
-          <PropertyCoreTab property={selectedProperty} onFieldsSaved={handleCoreFieldsSaved} />
-        ) : activeTab === 'Compliance' ? (
-          <PropertyComplianceTab property={selectedProperty} />
-        ) : activeTab === 'Assets' ? (
-          <PropertyAssetsTab property={selectedProperty} />
-        ) : activeTab === 'Maintenance' ? (
-          <PropertyMaintenanceTab property={selectedProperty} />
-        ) : activeTab === 'Lease & Legal' ? (
-          <PropertyLeaseLegalTab property={selectedProperty} onFieldsSaved={handleCoreFieldsSaved} />
-        ) : activeTab === 'Documents' ? (
-          <PropertyDocumentsTab property={selectedProperty} profile={profile} />
-        ) : activeTab === 'Notes' ? (
-          <PropertyNotesTab property={selectedProperty} profile={profile} />
-        ) : activeTab === 'Rooms' ? (
-          <PropertyRoomsTab property={selectedProperty} />
-        ) : activeTab === 'Restrictions' ? (
-          <PropertyRestrictionsTab property={selectedProperty} onFieldsSaved={handleCoreFieldsSaved} />
-        ) : (
-          <div style={{ background: '#fff', borderRadius: '16px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-            <p style={{ margin: '0 0 8px 0', fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{activeTab}</p>
-            <p style={{ margin: 0, fontSize: '13px', color: '#94a3b8', fontStyle: 'italic' }}>Coming soon</p>
-          </div>
-        )}
+              {effectiveActiveTab === 'Core' ? (
+                <PropertyCoreTab property={selectedProperty} onFieldsSaved={handleCoreFieldsSaved} />
+              ) : effectiveActiveTab === 'Compliance' ? (
+                <PropertyComplianceTab property={selectedProperty} />
+              ) : effectiveActiveTab === 'Assets' ? (
+                <PropertyAssetsTab property={selectedProperty} />
+              ) : effectiveActiveTab === 'Maintenance' ? (
+                <PropertyMaintenanceTab property={selectedProperty} />
+              ) : effectiveActiveTab === 'Lease & Legal' ? (
+                <PropertyLeaseLegalTab property={selectedProperty} onFieldsSaved={handleCoreFieldsSaved} />
+              ) : effectiveActiveTab === 'Documents' ? (
+                <PropertyDocumentsTab property={selectedProperty} profile={profile} />
+              ) : effectiveActiveTab === 'Notes' ? (
+                <PropertyNotesTab property={selectedProperty} profile={profile} />
+              ) : effectiveActiveTab === 'Rooms' ? (
+                <PropertyRoomsTab property={selectedProperty} />
+              ) : effectiveActiveTab === 'Restrictions' ? (
+                <PropertyRestrictionsTab property={selectedProperty} onFieldsSaved={handleCoreFieldsSaved} />
+              ) : null}
+            </>
+          )
+        })()}
       </div>
     )
   }

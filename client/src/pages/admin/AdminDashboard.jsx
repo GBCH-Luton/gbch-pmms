@@ -172,10 +172,17 @@ export default function AdminDashboard({ profile, onNavigate }) {
   }
 
   async function fetchClockedInCount() {
+    // Joins through tickets!inner rather than a plain count so this
+    // naturally respects the same division-scoped RLS the Clocking page's
+    // own "currently clocked in" list already goes through -- a
+    // division-scoped manager can't read another division's ticket rows,
+    // so a work_session tied to one drops out of the inner join instead
+    // of inflating this tile's number with sessions the linked page won't
+    // actually show them.
     const { count } = await supabase
       .schema('pmms')
       .from('work_sessions')
-      .select('id', { count: 'exact', head: true })
+      .select('id, tickets!inner(id)', { count: 'exact', head: true })
       .is('ended_at', null)
 
     setClockedInCount(count || 0)
