@@ -565,6 +565,35 @@ export async function fetchAssignableBuilders() {
   return fetchAssignableStaffForRole('Builder')
 }
 
+// General "which staff can be assigned something" filter, keyed directly
+// by division rather than resolved from one ticket's category (unlike
+// fetchAssignableStaffForCategory below) -- for filter dropdowns (Pipeline,
+// Reports) that aren't about a single ticket. No skill-narrowing step,
+// matching fetchAssignableBuilders()'s own behaviour above (that's a
+// Maintenance-specific refinement that doesn't apply to a general
+// division-wide list).
+export async function fetchAssignableStaffForDivision(division) {
+  const { data: rolesRow } = await supabase
+    .schema('pmms')
+    .from('settings')
+    .select('setting_value')
+    .eq('setting_key', 'custom_roles')
+    .maybeSingle()
+
+  const normalizedCustomRoles = normalizeCustomRoles(rolesRow?.setting_value)
+
+  const roleNames = normalizedCustomRoles
+    .filter(r => r.accessLevel === 'builder' && (r.division || 'Maintenance') === division)
+    .map(r => r.name)
+
+  if (division === 'Maintenance') roleNames.push('Builder')
+
+  const staffLists = await Promise.all(roleNames.map(fetchAssignableStaffForRole))
+  const byId = {}
+  staffLists.flat().forEach(s => { byId[s.id] = s })
+  return Object.values(byId).sort((a, b) => a.name.localeCompare(b.name))
+}
+
 // Staff eligible to be assigned a ticket in a given category, taking the
 // Divisions feature into account: looks up which division the category
 // belongs to (pmms.settings['maintenance_categories'][category].division,

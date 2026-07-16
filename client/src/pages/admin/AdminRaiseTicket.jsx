@@ -110,7 +110,7 @@ export default function AdminRaiseTicket({ profile }) {
   useEffect(() => {
     fetchTicketProperties()
     fetchComplianceTypes()
-    fetchMaintenanceCategories().then(setMaintenanceCategories)
+    fetchMaintenanceCategories(profile.division).then(setMaintenanceCategories)
     fetchPriorityThresholds().then(({ p1, p2 }) => { setP1Threshold(p1); setP2Threshold(p2) })
   }, [])
 

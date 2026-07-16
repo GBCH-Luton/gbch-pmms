@@ -11,7 +11,7 @@ import { attachProperties } from '../../lib/properties'
 import { fetchAllMaintenanceCategoryNames } from '../../lib/maintenanceCategories'
 import {
   formatDuration, filterSelectStyle, thStyle, tdStyle,
-  fetchAssignableBuilders, resolveCategoryDivision, computeAvgTurnaroundMs, computeAvgResponseMs, buildWeeklyTrend,
+  fetchAssignableBuilders, fetchAssignableStaffForDivision, resolveCategoryDivision, computeAvgTurnaroundMs, computeAvgResponseMs, buildWeeklyTrend,
 } from './shared'
 import SimpleBarChart from '../../components/SimpleBarChart'
 
@@ -37,7 +37,7 @@ function avgMsLabel(ms) {
   return formatDuration(ms)
 }
 
-export default function AdminReports() {
+export default function AdminReports({ profile }) {
   const [tickets, setTickets] = useState(null)
   const [loadError, setLoadError] = useState('')
   const [builders, setBuilders] = useState([])
@@ -64,7 +64,7 @@ export default function AdminReports() {
 
     const withProperties = await attachProperties(data || [], 'address')
     setTickets(withProperties)
-    setBuilders(await fetchAssignableBuilders())
+    setBuilders(await (profile.division ? fetchAssignableStaffForDivision(profile.division) : fetchAssignableBuilders()))
 
     const { data: categoriesRow } = await supabase
       .schema('pmms')
@@ -73,7 +73,7 @@ export default function AdminReports() {
       .eq('setting_key', 'maintenance_categories')
       .maybeSingle()
     setCategoriesSettingsRow(categoriesRow)
-    setCategoryOptions(await fetchAllMaintenanceCategoryNames())
+    setCategoryOptions(await fetchAllMaintenanceCategoryNames(profile.division))
   }
 
   if (tickets === null) {

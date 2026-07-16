@@ -9,7 +9,7 @@ import {
   filterSelectStyle, thStyle, tdStyle, actionBtnStyle,
   modalOverlayStyle, modalCardStyle, modalTitleStyle, modalSubtitleStyle, modalLabelStyle,
   modalTextareaStyle, modalErrorStyle, modalCancelBtnStyle, modalConfirmBtnStyle, radioRowStyle,
-  roleBadgeStyle, postSystemComment, postAuditEvent, fetchAssignableBuilders, fetchAssignableStaffForCategory, STAFF_AVAILABILITY_STYLES,
+  roleBadgeStyle, postSystemComment, postAuditEvent, fetchAssignableBuilders, fetchAssignableStaffForDivision, fetchAssignableStaffForCategory, STAFF_AVAILABILITY_STYLES,
   createNotification, sendPushNotification, pushEmergencyAlert, resolveCategoryDivision, isTicketStuck, KpiTiles, fetchPriorityThresholds,
 } from './shared'
 
@@ -91,7 +91,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
     fetchProperties()
     fetchStuckThresholds()
     fetchPriorityThresholds().then(({ p1, p2 }) => { setP1Threshold(p1); setP2Threshold(p2) })
-    fetchAllMaintenanceCategoryNames().then(setCategoryOptions)
+    fetchAllMaintenanceCategoryNames(profile.division).then(setCategoryOptions)
     if (initialStatusFilter) setStatusFilter(initialStatusFilter)
     if (initialPriorityFilter) setPriorityFilter(initialPriorityFilter)
     if (initialStuckFilter) setStuckOnlyFilter(true)
@@ -189,7 +189,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
   }
 
   async function fetchBuilders() {
-    setBuilders(await fetchAssignableBuilders())
+    setBuilders(await (profile.division ? fetchAssignableStaffForDivision(profile.division) : fetchAssignableBuilders()))
   }
 
   async function fetchProperties() {

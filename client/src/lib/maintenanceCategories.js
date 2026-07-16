@@ -99,16 +99,27 @@ async function fetchRawMaintenanceCategories() {
 // Returns only enabled categories, for the ticket-raising screens. The
 // Settings page itself reads the raw, unfiltered value directly (it needs
 // to show disabled categories too, so they can be re-enabled).
-export async function fetchMaintenanceCategories() {
+//
+// `division`, when passed, narrows the result to that division's
+// categories only -- for a division-scoped manager (e.g. Housekeeping
+// Manager) so their category picker doesn't list every Maintenance
+// category. Omitted (the default for unscoped managers and Admin), this
+// returns every category exactly as before -- no behaviour change there.
+export async function fetchMaintenanceCategories(division) {
   const categories = await fetchRawMaintenanceCategories()
-  return Object.fromEntries(Object.entries(categories).filter(([, c]) => c.enabled !== false))
+  return Object.fromEntries(
+    Object.entries(categories).filter(([, c]) => c.enabled !== false && (!division || (c.division || 'Maintenance') === division))
+  )
 }
 
 // All category names (enabled AND disabled), in display order -- for
 // filter dropdowns (Pipeline, Reports, a property's Maintenance tab).
 // Unlike fetchMaintenanceCategories(), a disabled category must still show
 // up here so existing tickets raised under it stay filterable.
-export async function fetchAllMaintenanceCategoryNames() {
+// Same optional `division` narrowing as fetchMaintenanceCategories() above.
+export async function fetchAllMaintenanceCategoryNames(division) {
   const categories = await fetchRawMaintenanceCategories()
-  return sortedCategoryEntries(categories).map(([name]) => name)
+  return sortedCategoryEntries(categories)
+    .filter(([, c]) => !division || (c.division || 'Maintenance') === division)
+    .map(([name]) => name)
 }

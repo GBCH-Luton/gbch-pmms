@@ -61,7 +61,7 @@ function DashboardSection({ id, title, background, alertCount = 0, children }) {
   )
 }
 
-export default function AdminDashboard({ onNavigate }) {
+export default function AdminDashboard({ profile, onNavigate }) {
   const [tickets, setTickets] = useState([])
   const [newPropertiesCount, setNewPropertiesCount] = useState(0)
   const [totalPropertiesCount, setTotalPropertiesCount] = useState(0)
@@ -326,23 +326,27 @@ export default function AdminDashboard({ onNavigate }) {
         </button>
       </DashboardSection>
 
-      <DashboardSection id="compliance" title="Compliance" background="#ffffff" alertCount={complianceCounts.expired}>
-        <div style={{ width: '100%' }}>
-          <KpiTiles
-            kpis={complianceKpis}
-            onTileClick={(kpi) => onNavigate?.('compliance', { tierFilter: kpi.tierFilter })}
-          />
-        </div>
-      </DashboardSection>
+      {profile.division !== 'Housekeeping' && (
+        <DashboardSection id="compliance" title="Compliance" background="#ffffff" alertCount={complianceCounts.expired}>
+          <div style={{ width: '100%' }}>
+            <KpiTiles
+              kpis={complianceKpis}
+              onTileClick={(kpi) => onNavigate?.('compliance', { tierFilter: kpi.tierFilter })}
+            />
+          </div>
+        </DashboardSection>
+      )}
 
-      <DashboardSection id="void-aging" title="Void Aging" background="#ffffff" alertCount={voidAgingCounts.overdue}>
-        <div style={{ width: '100%' }}>
-          <KpiTiles
-            kpis={voidAgingKpis}
-            onTileClick={(kpi) => onNavigate?.('voids', { tierFilter: kpi.tierFilter })}
-          />
-        </div>
-      </DashboardSection>
+      {profile.division !== 'Housekeeping' && (
+        <DashboardSection id="void-aging" title="Void Aging" background="#ffffff" alertCount={voidAgingCounts.overdue}>
+          <div style={{ width: '100%' }}>
+            <KpiTiles
+              kpis={voidAgingKpis}
+              onTileClick={(kpi) => onNavigate?.('voids', { tierFilter: kpi.tierFilter })}
+            />
+          </div>
+        </DashboardSection>
+      )}
 
       <DashboardSection id="jobs-completed" title="Jobs Completed" background="#f8fafc">
         {completionKpis.map(kpi => (
