@@ -17,7 +17,7 @@ const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: '10px', 
 const readRowStyle = { display: 'flex', justifyContent: 'space-between', gap: '12px', padding: '8px 0' }
 const readLabelStyle = { fontSize: '12px', fontWeight: 700, color: '#94a3b8' }
 
-export default function PropertyRestrictionsTab({ property, onFieldsSaved }) {
+export default function PropertyRestrictionsTab({ property, onFieldsSaved, readOnly = false }) {
   const [editing, setEditing] = useState(false)
   const [value, setValue] = useState(property.staff_gender_restriction || '')
   const [saving, setSaving] = useState(false)
@@ -53,7 +53,7 @@ export default function PropertyRestrictionsTab({ property, onFieldsSaved }) {
     <div style={{ background: '#fff', borderRadius: '16px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
         <p style={{ margin: 0, fontSize: '14px', fontWeight: 800, color: '#0f172a' }}>Support Worker Restrictions</p>
-        {!editing && (
+        {!editing && !readOnly && (
           <button
             onClick={startEdit}
             style={{ padding: '6px 14px', background: '#1d4ed8', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}

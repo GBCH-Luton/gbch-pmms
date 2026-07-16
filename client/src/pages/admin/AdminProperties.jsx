@@ -569,7 +569,7 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
               </div>
 
               {effectiveActiveTab === 'Core' ? (
-                <PropertyCoreTab property={selectedProperty} onFieldsSaved={handleCoreFieldsSaved} />
+                <PropertyCoreTab property={selectedProperty} onFieldsSaved={handleCoreFieldsSaved} profile={profile} />
               ) : effectiveActiveTab === 'Compliance' ? (
                 <PropertyComplianceTab property={selectedProperty} />
               ) : effectiveActiveTab === 'Assets' ? (
@@ -585,7 +585,7 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
               ) : effectiveActiveTab === 'Rooms' ? (
                 <PropertyRoomsTab property={selectedProperty} />
               ) : effectiveActiveTab === 'Restrictions' ? (
-                <PropertyRestrictionsTab property={selectedProperty} onFieldsSaved={handleCoreFieldsSaved} />
+                <PropertyRestrictionsTab property={selectedProperty} onFieldsSaved={handleCoreFieldsSaved} readOnly={profile.division === 'Housekeeping'} />
               ) : null}
             </>
           )
