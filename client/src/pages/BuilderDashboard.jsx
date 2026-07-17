@@ -596,7 +596,7 @@ export default function BuilderDashboard({ profile }) {
     setMenuOpen(false)
   }
 
-  const ROOM_OPTIONS = ['Kitchen', 'Bathroom', 'Communal Area', 'Bedroom', 'Hallways / Stairs', 'Other Area...']
+  const ROOM_OPTIONS = ['Kitchen', 'Bathroom', 'Communal Area', 'Bedroom', 'Hallways / Stairs', 'Garden', 'Other Area...']
 
   const UNLISTED_MARKER_PREFIX = '__UNLISTED_FALLBACK__'
 
@@ -736,6 +736,7 @@ export default function BuilderDashboard({ profile }) {
 
   function ticketRoomString() {
     if (ticketRoom === 'Other Area...') return ticketOtherArea
+    if (ticketRoom === 'Garden') return ticketRoom
     if (ticketRoom === 'Bedroom' && ticketRoomCode.trim()) return `${ticketRoom} (${ticketRoomContext}) - ${ticketRoomCode.trim()}`
     return `${ticketRoom} (${ticketRoomContext})`
   }
@@ -1030,6 +1031,8 @@ export default function BuilderDashboard({ profile }) {
 
   const ticketStep2Complete = ticketRoom === 'Other Area...'
     ? !!ticketOtherArea.trim()
+    : ticketRoom === 'Garden'
+    ? true
     : !!(ticketRoom && ticketRoomContext)
 
   const ticketStep4Complete = !!ticketIssueTag && (!isUnlistedTag(ticketIssueTag) || !!ticketIssueOther.trim())
@@ -2210,7 +2213,7 @@ export default function BuilderDashboard({ profile }) {
                       })}
                     </div>
 
-                    {ticketRoom && ticketRoom !== 'Other Area...' && (
+                    {ticketRoom && ticketRoom !== 'Other Area...' && ticketRoom !== 'Garden' && (
                       <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px dashed #e2e8f0' }}>
                         <p style={{ margin: '0 0 8px 0', fontSize: '11px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                           {floorContextLabel(selectedTicketProperty)}
