@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { getCurrentPositionSafe } from '../lib/geo'
 import { fetchComplianceCheckTypes } from '../lib/compliance'
-import { fetchMaintenanceCategories, sortedCategoryEntries } from '../lib/maintenanceCategories'
+import { fetchMaintenanceCategories, fetchAllMaintenanceCategoryNames, sortedCategoryEntries } from '../lib/maintenanceCategories'
 import { attachProperties } from '../lib/properties'
 import { logLoginEvent } from '../lib/loginEvents'
 import { pushNotificationsSupported, hasActivePushSubscription, enablePushNotifications } from '../lib/pushNotifications'
@@ -238,10 +238,12 @@ export default function BuilderDashboard({ profile }) {
     setLoading(false)
   }
 
-  // Unassigned tickets matching this builder's own tagged skills -- an
-  // untagged builder (profile.skills empty) sees every unassigned
-  // Pending ticket, matching the "no tags = eligible for everything"
-  // default used everywhere else this feature touches.
+  // A division-scoped builder (e.g. Housekeeper) only ever sees jobs in
+  // their own division -- skill tags don't apply to them. An unscoped
+  // builder (today's default "Builder" role) keeps the pre-existing
+  // behaviour unchanged: matching their own tagged skills, or -- if
+  // untagged -- every unassigned Pending ticket ("no tags = eligible
+  // for everything").
   async function fetchAvailableJobs() {
     let query = supabase
       .schema('pmms')
@@ -251,7 +253,12 @@ export default function BuilderDashboard({ profile }) {
       .eq('status', 'Pending')
       .order('priority_score', { ascending: false })
 
-    if (profile.skills?.length) query = query.in('category', profile.skills)
+    if (profile.division) {
+      const divisionCategories = await fetchAllMaintenanceCategoryNames(profile.division)
+      query = query.in('category', divisionCategories)
+    } else if (profile.skills?.length) {
+      query = query.in('category', profile.skills)
+    }
 
     const { data, error } = await query
     if (!error) setAvailableJobs(await attachProperties(data, 'address'))
