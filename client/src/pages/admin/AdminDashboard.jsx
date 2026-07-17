@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
-import { priorityTierLabel, fetchFlaggedClockingCount, isTicketStuck, KpiTiles, fetchComplianceAgingCounts, fetchVoidAgingCounts, computeAvgResponseMs, formatDuration, fetchPriorityThresholds } from './shared'
+import { priorityTierLabel, fetchFlaggedClockingCount, isTicketStuck, KpiTiles, fetchComplianceAgingCounts, fetchVoidAgingCounts, fetchGardenReviewAging, computeAvgResponseMs, formatDuration, fetchPriorityThresholds } from './shared'
 
 const DEFAULT_NEW_PROPERTY_WINDOW_HOURS = 48
 
@@ -72,6 +72,7 @@ export default function AdminDashboard({ profile, onNavigate }) {
   const [stuckThresholds, setStuckThresholds] = useState(null)
   const [complianceCounts, setComplianceCounts] = useState({ expired: 0, dueSoon: 0, noRecord: 0, valid: 0 })
   const [voidAgingCounts, setVoidAgingCounts] = useState({ overdue: 0, aging: 0, recent: 0 })
+  const [gardenAgingCounts, setGardenAgingCounts] = useState({ overdue: 0, aging: 0, recent: 0 })
   const [p1Threshold, setP1Threshold] = useState(70)
   const [p2Threshold, setP2Threshold] = useState(40)
   const [totalTicketsPeriod, setTotalTicketsPeriod] = useState('all_time')
@@ -88,6 +89,7 @@ export default function AdminDashboard({ profile, onNavigate }) {
     fetchStuckThresholds()
     fetchComplianceAgingCounts().then(setComplianceCounts)
     fetchVoidAgingCounts().then(setVoidAgingCounts)
+    fetchGardenReviewAging().then(setGardenAgingCounts)
     fetchPriorityThresholds().then(({ p1, p2 }) => { setP1Threshold(p1); setP2Threshold(p2) })
     fetchTotalTicketsPeriod()
   }, [])
@@ -262,6 +264,12 @@ export default function AdminDashboard({ profile, onNavigate }) {
     { label: 'Recent Voids', value: voidAgingCounts.recent, colour: '#16a34a', tierFilter: 'Recent' },
   ]
 
+  const gardenAgingKpis = [
+    { label: 'Overdue Gardens', value: gardenAgingCounts.overdue, colour: '#dc2626' },
+    { label: 'Due Soon', value: gardenAgingCounts.aging, colour: '#d97706' },
+    { label: 'Recently Attended', value: gardenAgingCounts.recent, colour: '#16a34a' },
+  ]
+
   const pendingSignOffCount = tickets.filter(t => t.status === 'Completed').length
 
   const fleetMileageThisMonth = tickets
@@ -350,6 +358,17 @@ export default function AdminDashboard({ profile, onNavigate }) {
             <KpiTiles
               kpis={voidAgingKpis}
               onTileClick={(kpi) => onNavigate?.('voids', { tierFilter: kpi.tierFilter })}
+            />
+          </div>
+        </DashboardSection>
+      )}
+
+      {profile.division !== 'Housekeeping' && (
+        <DashboardSection id="gardens" title="Gardens" background="#ffffff" alertCount={gardenAgingCounts.overdue}>
+          <div style={{ width: '100%' }}>
+            <KpiTiles
+              kpis={gardenAgingKpis}
+              onTileClick={() => onNavigate?.('properties', { filterMode: 'gardensOverdue' })}
             />
           </div>
         </DashboardSection>

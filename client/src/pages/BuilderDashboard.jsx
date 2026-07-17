@@ -426,6 +426,25 @@ export default function BuilderDashboard({ profile }) {
       .eq('ticket_id', selectedTicket.id)
       .is('ended_at', null)
 
+    // Gardens tracking: a completed garden-related job stamps the property's
+    // "last attended" record automatically -- the only path for a staff visit,
+    // since a contractor visit (no PMMS login) has to be entered by hand on
+    // the property's Gardens tab instead. Deliberately doesn't touch
+    // garden_state or the front/back photos here -- there's no reliable way
+    // to know which of the two a single completion photo represents.
+    const isGardenJob = selectedTicket.category === 'Grounds & External Works' &&
+      ['Garden maintenance', 'Tree/hedge trimming', 'Grass cutting'].includes(selectedTicket.issue_tag)
+    if (isGardenJob) {
+      // Builders only have SELECT on pmms.properties -- this goes through a
+      // security-definer function that verifies server-side this is really
+      // the builder's own garden job before stamping the property, rather
+      // than granting broad property UPDATE access just for this.
+      await supabase.schema('pmms').rpc('complete_garden_ticket_property_update', {
+        p_ticket_id: selectedTicket.id,
+        p_attended_by: profile.name,
+      })
+    }
+
     await postAuditEvent(selectedTicket.id, 'Status Changed', `${previousStatus} → Completed — ${note.trim()}`)
 
     setCompleteSubmitting(false)

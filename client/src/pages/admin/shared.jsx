@@ -19,6 +19,13 @@ export const GENDER_RESTRICTION_STYLES = {
   'Both': { bg: '#ccfbf1', color: '#0d9488' },
 }
 
+export const GARDEN_STATE_OPTIONS = ['Good', 'Needs Attention', 'Overgrown']
+export const GARDEN_STATE_STYLES = {
+  'Good': { bg: '#dcfce7', color: '#16a34a' },
+  'Needs Attention': { bg: '#fef3c7', color: '#d97706' },
+  'Overgrown': { bg: '#fee2e2', color: '#dc2626' },
+}
+
 export const STAFF_AVAILABILITY_OPTIONS = ['Available', 'On Leave', 'Sick']
 export const STAFF_AVAILABILITY_STYLES = {
   'Available': { bg: '#dcfce7', color: '#16a34a' },
@@ -352,6 +359,39 @@ export async function fetchRoutineVisitAging() {
       label,
     }
   }).sort((a, b) => (b.daysSince ?? -1) - (a.daysSince ?? -1))
+}
+
+// Portfolio-wide "which gardens need review" counts, for the dashboard's
+// Gardens section -- same shape and same 0.5x-threshold "aging" bucket
+// convention as fetchVoidAgingCounts(), so a manager reads both the same
+// way. A garden that's never been attended to (garden_last_attended_date
+// is null) counts as overdue outright, same as a missing baseline
+// anywhere else in this file.
+export async function fetchGardenReviewAging() {
+  const { data: properties } = await supabase
+    .schema('pmms')
+    .from('properties')
+    .select('id, garden_last_attended_date')
+    .eq('has_garden', true)
+
+  const { data: thresholdRow } = await supabase
+    .schema('pmms')
+    .from('settings')
+    .select('setting_value')
+    .eq('setting_key', 'garden_review_days')
+    .maybeSingle()
+  const thresholdDays = thresholdRow?.setting_value != null ? Number(thresholdRow.setting_value) : 30
+
+  const nowMs = Date.now()
+  const counts = { overdue: 0, aging: 0, recent: 0 }
+  ;(properties || []).forEach(p => {
+    if (!p.garden_last_attended_date) { counts.overdue += 1; return }
+    const daysSince = Math.floor((nowMs - new Date(p.garden_last_attended_date).getTime()) / 86400000)
+    if (daysSince >= thresholdDays) counts.overdue += 1
+    else if (daysSince >= thresholdDays * 0.5) counts.aging += 1
+    else counts.recent += 1
+  })
+  return counts
 }
 
 export const formatUKDate = (isoString) => {

@@ -30,9 +30,10 @@ import PropertyDocumentsTab from './PropertyDocumentsTab'
 import PropertyNotesTab from './PropertyNotesTab'
 import PropertyRoomsTab from './PropertyRoomsTab'
 import PropertyRestrictionsTab from './PropertyRestrictionsTab'
+import PropertyGardensTab from './PropertyGardensTab'
 
 const PROPERTY_TYPES = ['House', 'Flat', 'HMO', 'Commercial', 'Other']
-const ALL_PROFILE_TABS = ['Core', 'Compliance', 'Assets', 'Maintenance', 'Lease & Legal', 'Documents', 'Notes', 'Rooms', 'Restrictions']
+const ALL_PROFILE_TABS = ['Core', 'Compliance', 'Assets', 'Maintenance', 'Lease & Legal', 'Documents', 'Notes', 'Rooms', 'Restrictions', 'Gardens']
 // A Housekeeping Manager only interacts with cleaner assignment (Core) and
 // gender-restriction matching (Restrictions) -- everything else here is
 // Maintenance/lettings-specific and was explicitly scoped down to "just
@@ -135,7 +136,7 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
   const [openTicketCounts, setOpenTicketCounts] = useState({})
   const [voidRoomCounts, setVoidRoomCounts] = useState({})
   const [newPropertyWindowHours, setNewPropertyWindowHours] = useState(DEFAULT_NEW_PROPERTY_WINDOW_HOURS)
-  const [filterMode, setFilterMode] = useState('all') // 'all' | 'newProperties' | 'procured' | 'live'
+  const [filterMode, setFilterMode] = useState('all') // 'all' | 'newProperties' | 'procured' | 'live' | 'gardensOverdue'
   const [p1Threshold, setP1Threshold] = useState(70)
   const [p2Threshold, setP2Threshold] = useState(40)
   const [loading, setLoading] = useState(true)
@@ -382,6 +383,7 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
     if (filterMode === 'newProperties' && !isNewProperty(p)) return false
     if (filterMode === 'procured' && p.status !== 'Procured') return false
     if (filterMode === 'live' && p.status !== 'Live') return false
+    if (filterMode === 'gardensOverdue' && !p.has_garden) return false
     return true
   })
 
@@ -389,6 +391,7 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
     filterMode === 'newProperties' ? 'New Properties' :
     filterMode === 'procured' ? 'Procured' :
     filterMode === 'live' ? 'Live' :
+    filterMode === 'gardensOverdue' ? 'Gardens' :
     null
 
   const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '13px', fontFamily: 'inherit', boxSizing: 'border-box' }
@@ -586,6 +589,8 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
                 <PropertyRoomsTab property={selectedProperty} />
               ) : effectiveActiveTab === 'Restrictions' ? (
                 <PropertyRestrictionsTab property={selectedProperty} onFieldsSaved={handleCoreFieldsSaved} readOnly={profile.division === 'Housekeeping'} />
+              ) : effectiveActiveTab === 'Gardens' ? (
+                <PropertyGardensTab property={selectedProperty} onFieldsSaved={handleCoreFieldsSaved} />
               ) : null}
             </>
           )
