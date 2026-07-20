@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase'
 import { DEFAULT_COMPLIANCE_CHECK_TYPES } from '../../lib/compliance'
 import { DEFAULT_MAINTENANCE_CATEGORIES, migrateLegacyArrayShape, sortedCategoryEntries } from '../../lib/maintenanceCategories'
 import { DEFAULT_DIVISIONS } from '../../lib/divisions'
+import { DEFAULT_TOWNS } from '../../lib/towns'
 import {
   modalOverlayStyle, modalCardStyle, modalTitleStyle, modalSubtitleStyle,
   modalCancelBtnStyle, modalConfirmBtnStyle, statusLabel,
@@ -143,6 +144,10 @@ export default function AdminSettings() {
   const [newChecklistItem, setNewChecklistItem] = useState('')
   const [checklistError, setChecklistError] = useState('')
   const [checklistSaving, setChecklistSaving] = useState(false)
+  const [towns, setTowns] = useState(DEFAULT_TOWNS)
+  const [newTownName, setNewTownName] = useState('')
+  const [townError, setTownError] = useState('')
+  const [townSaving, setTownSaving] = useState(false)
 
   const [roster, setRoster] = useState([])
   const [rosterSaving, setRosterSaving] = useState(false)
@@ -200,6 +205,7 @@ export default function AdminSettings() {
       if (map.garden_review_days != null) setGardenReviewDays(map.garden_review_days)
       if (map.garden_review_alerts_enabled != null) setGardenReviewAlertsEnabled(map.garden_review_alerts_enabled)
       if (Array.isArray(map.routine_visit_checklist)) setRoutineVisitChecklist(map.routine_visit_checklist)
+      if (Array.isArray(map.towns) && map.towns.length > 0) setTowns(map.towns)
       if (map.clock_overrun_hours != null) setClockOverrunHours(map.clock_overrun_hours)
       if (map.done_window_hours != null) setDoneWindowHours(map.done_window_hours)
       if (map.clock_distance_threshold_meters != null) setClockDistanceThresholdM(map.clock_distance_threshold_meters)
@@ -610,6 +616,26 @@ export default function AdminSettings() {
     const next = routineVisitChecklist.filter(i => i !== label)
     await saveSetting('routine_visit_checklist', next)
     setRoutineVisitChecklist(next)
+  }
+
+  async function handleAddTown() {
+    setTownError('')
+    const name = newTownName.trim()
+    if (!name) { setTownError('Enter a town/city name.'); return }
+    if (towns.some(t => t.toLowerCase() === name.toLowerCase())) { setTownError('That town already exists.'); return }
+
+    setTownSaving(true)
+    const next = [...towns, name]
+    await saveSetting('towns', next)
+    setTowns(next)
+    setTownSaving(false)
+    setNewTownName('')
+  }
+
+  async function handleDeleteTown(name) {
+    const next = towns.filter(t => t !== name)
+    await saveSetting('towns', next)
+    setTowns(next)
   }
 
   async function addRosterContact() {
@@ -1345,6 +1371,51 @@ export default function AdminSettings() {
           </button>
         </div>
         {checklistError && <p style={modalErrorStyle}>{checklistError}</p>}
+      </SettingsSection>
+
+      {/* Section 4g: Towns / Areas */}
+      <SettingsSection
+        title="Towns / Areas"
+        subtitle="The list of towns/cities properties can be tagged with, so the portfolio can be filtered by area on the Properties page."
+        open={!!openSections['towns-areas']}
+        onToggle={() => toggleSection('towns-areas')}
+      >
+        {towns.length === 0 && (
+          <p style={{ margin: '0 0 10px 0', fontSize: '13px', color: '#94a3b8', fontStyle: 'italic' }}>No towns added yet.</p>
+        )}
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '12px' }}>
+          {towns.map(town => (
+            <div key={town} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', padding: '8px 12px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px' }}>
+              <span style={{ fontSize: '13px', fontWeight: 600, color: '#0f172a' }}>{town}</span>
+              <button
+                onClick={() => handleDeleteTown(town)}
+                title="Remove from the picklist -- properties already tagged with this town keep it, they just won't be able to change to it again unless it's re-added"
+                style={{ background: 'none', border: 'none', color: '#dc2626', fontSize: '12px', fontWeight: 800, cursor: 'pointer', padding: '0 2px', flexShrink: 0 }}
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <input
+            type="text"
+            value={newTownName}
+            onChange={(e) => setNewTownName(e.target.value)}
+            placeholder="New town/city..."
+            style={{ ...inputStyle, flex: '1 1 220px' }}
+          />
+          <button
+            onClick={handleAddTown}
+            disabled={townSaving}
+            style={{ padding: '10px 20px', background: '#1e3a8a', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: townSaving ? 'not-allowed' : 'pointer', opacity: townSaving ? 0.6 : 1 }}
+          >
+            {townSaving ? 'Saving...' : '+ Add Town'}
+          </button>
+        </div>
+        {townError && <p style={modalErrorStyle}>{townError}</p>}
       </SettingsSection>
 
       {/* Section 5: On-Call Roster */}

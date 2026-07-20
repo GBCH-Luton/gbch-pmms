@@ -31,6 +31,7 @@ import PropertyNotesTab from './PropertyNotesTab'
 import PropertyRoomsTab from './PropertyRoomsTab'
 import PropertyRestrictionsTab from './PropertyRestrictionsTab'
 import PropertyGardensTab from './PropertyGardensTab'
+import { fetchTowns, DEFAULT_TOWNS } from '../../lib/towns'
 
 const PROPERTY_TYPES = ['House', 'Flat', 'HMO', 'Commercial', 'Other']
 const ALL_PROFILE_TABS = ['Core', 'Compliance', 'Assets', 'Maintenance', 'Lease & Legal', 'Documents', 'Notes', 'Rooms', 'Restrictions', 'Gardens']
@@ -142,6 +143,8 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [search, setSearch] = useState('')
+  const [towns, setTowns] = useState(DEFAULT_TOWNS)
+  const [townFilter, setTownFilter] = useState('')
 
   const [selectedProperty, setSelectedProperty] = useState(null)
   const [activeTab, setActiveTab] = useState('Core')
@@ -153,6 +156,7 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
   const [editing, setEditing] = useState(false)
   const [editAddress, setEditAddress] = useState('')
   const [editPostcode, setEditPostcode] = useState('')
+  const [editTown, setEditTown] = useState('')
   const [editType, setEditType] = useState('House')
   const [editStatus, setEditStatus] = useState('Procured')
   const [editSaving, setEditSaving] = useState(false)
@@ -161,6 +165,7 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
   const [showAddModal, setShowAddModal] = useState(false)
   const [addAddress, setAddAddress] = useState('')
   const [addPostcode, setAddPostcode] = useState('')
+  const [addTown, setAddTown] = useState('')
   const [addType, setAddType] = useState('House')
   const [addStatus, setAddStatus] = useState('Procured')
   const [addSaving, setAddSaving] = useState(false)
@@ -169,6 +174,7 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
   useEffect(() => {
     fetchNewPropertyWindow()
     fetchPriorityThresholds().then(({ p1, p2 }) => { setP1Threshold(p1); setP2Threshold(p2) })
+    fetchTowns().then(setTowns)
 
     fetchProperties().then((fetched) => {
       if (initialPropertiesFilter?.propertyId) {
@@ -265,6 +271,7 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
     setEditing(false)
     setEditAddress(property.address || '')
     setEditPostcode(property.postcode || '')
+    setEditTown(property.town || '')
     setEditType(property.property_type || 'House')
     setEditStatus(property.status || 'Procured')
     setEditError('')
@@ -321,6 +328,7 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
       .update({
         address: editAddress.trim(),
         postcode: editPostcode.trim() || null,
+        town: editTown || null,
         property_type: editType,
         status: editStatus,
       })
@@ -330,7 +338,7 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
 
     if (error) { setEditError(error.message); return }
 
-    const updated = { ...selectedProperty, address: editAddress.trim(), postcode: editPostcode.trim() || null, property_type: editType, status: editStatus }
+    const updated = { ...selectedProperty, address: editAddress.trim(), postcode: editPostcode.trim() || null, town: editTown || null, property_type: editType, status: editStatus }
     setSelectedProperty(updated)
     setProperties(prev => prev.map(p => p.id === updated.id ? updated : p))
     setEditing(false)
@@ -339,6 +347,7 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
   function openAddModal() {
     setAddAddress('')
     setAddPostcode('')
+    setAddTown('')
     setAddType('House')
     setAddStatus('Procured')
     setAddError('')
@@ -356,6 +365,7 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
       .insert({
         address: addAddress.trim(),
         postcode: addPostcode.trim() || null,
+        town: addTown || null,
         property_type: addType,
         status: addStatus,
       })
@@ -377,9 +387,10 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
   const filteredProperties = properties.filter(p => {
     if (search.trim()) {
       const q = search.trim().toLowerCase()
-      const matches = (p.address || '').toLowerCase().includes(q) || (p.postcode || '').toLowerCase().includes(q)
+      const matches = (p.address || '').toLowerCase().includes(q) || (p.postcode || '').toLowerCase().includes(q) || (p.town || '').toLowerCase().includes(q)
       if (!matches) return false
     }
+    if (townFilter && p.town !== townFilter) return false
     if (filterMode === 'newProperties' && !isNewProperty(p)) return false
     if (filterMode === 'procured' && p.status !== 'Procured') return false
     if (filterMode === 'live' && p.status !== 'Live') return false
@@ -440,6 +451,9 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
                         {selectedProperty.staff_gender_restriction}
                       </span>
                     )}
+                    {selectedProperty.town && (
+                      <span style={{ fontSize: '11px', fontWeight: 700, color: '#0f766e', background: '#ccfbf1', padding: '3px 10px', borderRadius: '20px' }}>{selectedProperty.town}</span>
+                    )}
                     {selectedProperty.postcode && (
                       <span style={{ fontSize: '13px', color: '#64748b' }}>{selectedProperty.postcode}</span>
                     )}
@@ -460,6 +474,12 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
 
               <p style={modalLabelStyle}>Postcode</p>
               <input type="text" value={editPostcode} onChange={(e) => setEditPostcode(e.target.value)} style={inputStyle} />
+
+              <p style={modalLabelStyle}>Town / City</p>
+              <select value={editTown} onChange={(e) => setEditTown(e.target.value)} style={inputStyle}>
+                <option value="">Not set</option>
+                {towns.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
 
               <p style={modalLabelStyle}>Property Type</p>
               <select value={editType} onChange={(e) => setEditType(e.target.value)} style={inputStyle}>
@@ -612,6 +632,14 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
           placeholder="Search by property name or postcode..."
           style={{ flex: '1 1 260px', padding: '10px 14px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '13px', boxSizing: 'border-box' }}
         />
+        <select
+          value={townFilter}
+          onChange={(e) => setTownFilter(e.target.value)}
+          style={{ padding: '10px 14px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '13px', boxSizing: 'border-box' }}
+        >
+          <option value="">All Towns</option>
+          {towns.map(t => <option key={t} value={t}>{t}</option>)}
+        </select>
         <button
           onClick={openAddModal}
           style={{ padding: '10px 18px', background: '#1e3a8a', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
@@ -668,6 +696,9 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
                       {voidCount} Void{voidCount === 1 ? '' : 's'}
                     </span>
                   )}
+                  {p.town && (
+                    <span style={{ flexShrink: 0, fontSize: '10px', fontWeight: 700, color: '#0f766e', background: '#ccfbf1', padding: '2px 8px', borderRadius: '20px' }}>{p.town}</span>
+                  )}
                   <span style={{ flexShrink: 0, fontSize: '13px', color: '#64748b' }}>{p.postcode || '—'}</span>
                 </div>
 
@@ -698,6 +729,12 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
 
             <p style={modalLabelStyle}>Postcode</p>
             <input type="text" value={addPostcode} onChange={(e) => setAddPostcode(e.target.value)} placeholder="e.g. B1 1AA" style={inputStyle} />
+
+            <p style={modalLabelStyle}>Town / City</p>
+            <select value={addTown} onChange={(e) => setAddTown(e.target.value)} style={inputStyle}>
+              <option value="">Not set</option>
+              {towns.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
 
             <p style={modalLabelStyle}>Property Type</p>
             <select value={addType} onChange={(e) => setAddType(e.target.value)} style={inputStyle}>
