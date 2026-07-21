@@ -43,8 +43,8 @@ export function roleFromJobTitle(jobTitle) {
 export function normalizeCustomRoles(raw) {
   if (!Array.isArray(raw)) return []
   return raw.map(r => (typeof r === 'string'
-    ? { name: r, accessLevel: 'none', hideSettings: false, division: null }
-    : { name: r.name, accessLevel: r.accessLevel || 'none', hideSettings: !!r.hideSettings, division: r.division || null }
+    ? { name: r, accessLevel: 'none', hideSettings: false, division: null, canCreateEvents: false }
+    : { name: r.name, accessLevel: r.accessLevel || 'none', hideSettings: !!r.hideSettings, division: r.division || null, canCreateEvents: !!r.canCreateEvents }
   ))
 }
 
@@ -70,6 +70,16 @@ export function accessLevelForRole(roleName, normalizedCustomRoles) {
 // roles (Admin/Builder/Cleaner/Support Worker) never hide it.
 export function hideSettingsForRole(roleName, normalizedCustomRoles) {
   return !!normalizedCustomRoles.find(r => r.name === roleName)?.hideSettings
+}
+
+// Can this named role create a new Event (the Compliance/Landlord Liaison
+// ticket-coordination feature)? Only ever true for a custom role explicitly
+// given this permission -- built-in roles never grant it, matching
+// hideSettingsForRole's shape exactly. Mirrored server-side by
+// pmms.current_can_create_events() for actual RLS enforcement -- this
+// client-side check alone only controls what the UI offers.
+export function canCreateEventsForRole(roleName, normalizedCustomRoles) {
+  return !!normalizedCustomRoles.find(r => r.name === roleName)?.canCreateEvents
 }
 
 // Which division (e.g. "Housekeeping") this named role is scoped to, or

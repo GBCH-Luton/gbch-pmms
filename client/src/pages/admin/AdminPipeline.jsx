@@ -83,6 +83,12 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
   const [commentError, setCommentError] = useState('')
   const [commentPosting, setCommentPosting] = useState(false)
 
+  const [addToEventModalTicket, setAddToEventModalTicket] = useState(null)
+  const [openEventOptions, setOpenEventOptions] = useState([])
+  const [selectedEventIdForTicket, setSelectedEventIdForTicket] = useState('')
+  const [addToEventError, setAddToEventError] = useState('')
+  const [addToEventSubmitting, setAddToEventSubmitting] = useState(false)
+
   const [builderProfileId, setBuilderProfileId] = useState(null)
 
   useEffect(() => {
@@ -168,7 +174,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
       .select(`
         id, ticket_number, status, category, description, room, priority_score, priority_override, mileage_logged,
         no_access_flag, no_access_note, hold_reason, hold_note, completion_note, photo_url, completion_photo_url,
-        completed_at, created_at, status_changed_at, first_assigned_at, assigned_builder_id, property_id
+        completed_at, created_at, status_changed_at, first_assigned_at, assigned_builder_id, property_id, event_id
       `)
       .order('created_at', { ascending: false })
 
@@ -234,6 +240,55 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
     }
     await fetchTickets()
     closeReassignModal()
+  }
+
+  // Any manager can add a ticket to an existing Event, regardless of
+  // division -- the Event itself is meant to coordinate across
+  // divisions (e.g. a landlord inspection touches both Housekeeping and
+  // Maintenance). Only lists OPEN events (not every linked ticket
+  // already in a terminal status) -- same computed-completion logic as
+  // AdminEvents.jsx, kept in sync by definition since both read the same
+  // ticket rows rather than a stored flag.
+  async function openAddToEventModal(ticket) {
+    setAddToEventModalTicket(ticket)
+    setSelectedEventIdForTicket(ticket.event_id || '')
+    setAddToEventError('')
+
+    const { data: eventRows } = await supabase.schema('pmms').from('events').select('id, title')
+    const { data: ticketRows } = await supabase.schema('pmms').from('tickets').select('id, event_id, status')
+
+    const terminal = ['Completed', 'Archived', 'Cancelled']
+    const open = (eventRows || []).filter(e => {
+      const linked = (ticketRows || []).filter(t => t.event_id === e.id)
+      return linked.length === 0 || !linked.every(t => terminal.includes(t.status))
+    })
+    setOpenEventOptions(open)
+  }
+
+  function closeAddToEventModal() { setAddToEventModalTicket(null) }
+
+  async function submitAddToEvent() {
+    if (!selectedEventIdForTicket) { setAddToEventError('Please select an Event.'); return }
+
+    setAddToEventSubmitting(true)
+    setAddToEventError('')
+
+    const t = addToEventModalTicket
+    const eventTitle = openEventOptions.find(e => e.id === selectedEventIdForTicket)?.title || 'an Event'
+
+    const { error } = await supabase
+      .schema('pmms')
+      .from('tickets')
+      .update({ event_id: selectedEventIdForTicket })
+      .eq('id', t.id)
+
+    setAddToEventSubmitting(false)
+
+    if (error) { setAddToEventError(error.message); return }
+
+    await postAuditEvent(t.id, profile, 'Added to Event', `Added to "${eventTitle}" by ${profile.name}.`)
+    await fetchTickets()
+    closeAddToEventModal()
   }
 
   function openBulkReassignModal() { setBulkReassignOpen(true) }
@@ -812,6 +867,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
                               <button onClick={() => openCommentsModal(t)} style={actionBtnStyle}>Comments</button>
                               <button onClick={() => openHistoryModal(t)} style={actionBtnStyle}>History</button>
                               <button onClick={() => openPriorityModal(t)} style={actionBtnStyle}>Priority</button>
+                              <button onClick={() => openAddToEventModal(t)} style={actionBtnStyle}>{t.event_id ? 'Change Event' : 'Add to Event'}</button>
                               {t.status !== 'Cancelled' && (
                                 <button onClick={() => openCancelModal(t)} style={{ ...actionBtnStyle, color: '#dc2626', borderColor: '#fecaca' }}>Cancel</button>
                               )}
@@ -1087,6 +1143,46 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
             <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
               <button onClick={closePriorityOverrideModal} style={modalCancelBtnStyle}>Cancel</button>
               <button onClick={submitPriorityOverride} style={modalConfirmBtnStyle}>Set Priority</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add to Event modal -- any manager, regardless of division, can
+          link this ticket to an existing open Event (see AdminEvents.jsx) */}
+      {addToEventModalTicket && (
+        <div style={modalOverlayStyle}>
+          <div style={modalCardStyle}>
+            <p style={modalTitleStyle}>Add to Event — Ticket #{addToEventModalTicket.ticket_number}</p>
+            <p style={modalSubtitleStyle}>{addToEventModalTicket.property?.address}</p>
+
+            {openEventOptions.length === 0 ? (
+              <p style={{ margin: '16px 0', fontSize: '13px', color: '#94a3b8', fontStyle: 'italic' }}>
+                No open Events yet -- create one from the Events page first.
+              </p>
+            ) : (
+              <>
+                <label style={modalLabelStyle}>Event</label>
+                <select
+                  value={selectedEventIdForTicket}
+                  onChange={(e) => setSelectedEventIdForTicket(e.target.value)}
+                  style={filterSelectStyle}
+                >
+                  <option value="">Select an Event...</option>
+                  {openEventOptions.map(ev => <option key={ev.id} value={ev.id}>{ev.title}</option>)}
+                </select>
+              </>
+            )}
+
+            {addToEventError && <p style={modalErrorStyle}>{addToEventError}</p>}
+
+            <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
+              <button onClick={closeAddToEventModal} style={modalCancelBtnStyle}>Cancel</button>
+              {openEventOptions.length > 0 && (
+                <button onClick={submitAddToEvent} disabled={addToEventSubmitting} style={{ ...modalConfirmBtnStyle, opacity: addToEventSubmitting ? 0.6 : 1, cursor: addToEventSubmitting ? 'not-allowed' : 'pointer' }}>
+                  {addToEventSubmitting ? 'Saving...' : 'Save'}
+                </button>
+              )}
             </div>
           </div>
         </div>

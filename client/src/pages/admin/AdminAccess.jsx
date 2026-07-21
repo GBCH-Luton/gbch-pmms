@@ -493,6 +493,14 @@ function RolesPanel({ staffList, customRoles, customRolesError, onRolesChanged, 
     await saveCustomRoles(customRoles.map(r => r.name === name ? { ...r, hideSettings } : r))
   }
 
+  // Grants/revokes this role's ability to create a new Event (the
+  // Compliance/Landlord Liaison ticket-coordination feature) -- enforced
+  // for real server-side by pmms.current_can_create_events(), this just
+  // controls whether the UI offers the "+ New Event" button.
+  async function handleChangeCanCreateEvents(name, canCreateEvents) {
+    await saveCustomRoles(customRoles.map(r => r.name === name ? { ...r, canCreateEvents } : r))
+  }
+
   // Scopes this role's database access (via RLS, not just the UI) to a
   // single division -- e.g. a "Housekeeping Manager" role only ever sees
   // tickets whose category is tagged Housekeeping. Empty/"None" means
@@ -638,6 +646,17 @@ function RolesPanel({ staffList, customRoles, customRolesError, onRolesChanged, 
                   onChange={(e) => handleChangeHideSettings(r.name, e.target.checked)}
                 />
                 Hide Settings
+              </label>
+              <label
+                title="Lets this role create a new Event (the Compliance/Landlord Liaison ticket-coordination feature). Any manager can still add a ticket to an existing Event regardless of this setting."
+                style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 700, color: '#64748b', cursor: 'pointer', whiteSpace: 'nowrap' }}
+              >
+                <input
+                  type="checkbox"
+                  checked={!!r.canCreateEvents}
+                  onChange={(e) => handleChangeCanCreateEvents(r.name, e.target.checked)}
+                />
+                Can Create Events
               </label>
               <button
                 onClick={() => setDeleteTarget(r.name)}

@@ -18,6 +18,7 @@ import AdminSettings from './admin/AdminSettings'
 import AdminAccess from './admin/AdminAccess'
 import AdminHelp from './admin/AdminHelp'
 import AdminHousekeeping from './admin/AdminHousekeeping'
+import AdminEvents from './admin/AdminEvents'
 
 const NAV_ITEMS = [
   { key: 'dashboard', label: 'Dashboard', Component: AdminDashboardPage },
@@ -26,6 +27,7 @@ const NAV_ITEMS = [
   { key: 'compliance', label: 'Compliance', Component: AdminCompliance, divisions: ['Maintenance'] },
   { key: 'voids', label: 'Voids', Component: AdminVoids, divisions: ['Maintenance'] },
   { key: 'sign-off', label: 'Sign-Off', Component: AdminSignOff },
+  { key: 'events', label: 'Events', Component: AdminEvents },
   { key: 'housekeeping', label: 'Housekeeping', Component: AdminHousekeeping, divisionOnly: 'Housekeeping' },
   { key: 'builders', label: 'Staff', Component: AdminBuilders },
   { key: 'clocking', label: 'Clocking', Component: AdminClocking },

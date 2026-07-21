@@ -106,13 +106,32 @@ export default function AdminRaiseTicket({ profile }) {
   const [department, setDepartment] = useState('')
   const [p1Threshold, setP1Threshold] = useState(70)
   const [p2Threshold, setP2Threshold] = useState(40)
+  const [openEvents, setOpenEvents] = useState([])
+  const [selectedEventId, setSelectedEventId] = useState('')
 
   useEffect(() => {
     fetchTicketProperties()
     fetchComplianceTypes()
     fetchMaintenanceCategories(profile.division).then(setMaintenanceCategories)
     fetchPriorityThresholds().then(({ p1, p2 }) => { setP1Threshold(p1); setP2Threshold(p2) })
+    fetchOpenEvents()
   }, [])
+
+  // Any manager can tag a new ticket to an existing open Event at
+  // creation time (see AdminEvents.jsx/AdminPipeline.jsx's "Add to
+  // Event" for the retrofit path) -- "open" is computed the same way
+  // everywhere: not every linked ticket already in a terminal status.
+  async function fetchOpenEvents() {
+    const { data: eventRows } = await supabase.schema('pmms').from('events').select('id, title')
+    const { data: ticketRows } = await supabase.schema('pmms').from('tickets').select('id, event_id, status')
+
+    const terminal = ['Completed', 'Archived', 'Cancelled']
+    const open = (eventRows || []).filter(e => {
+      const linked = (ticketRows || []).filter(t => t.event_id === e.id)
+      return linked.length === 0 || !linked.every(t => terminal.includes(t.status))
+    })
+    setOpenEvents(open)
+  }
 
   // Which staff can be assigned depends on the selected category's division
   // (e.g. a Housekeeping category offers Housekeepers, not Builders) -- see
@@ -170,6 +189,7 @@ export default function AdminRaiseTicket({ profile }) {
     setAssignedBuilderId('')
     setPriorityOverride('')
     setDepartment('')
+    setSelectedEventId('')
   }
 
   const selectedTicketProperty = ticketProperties.find(p => String(p.id) === String(ticketPropertyId))
@@ -248,6 +268,7 @@ export default function AdminRaiseTicket({ profile }) {
         priority_override: priorityOverride || null,
         assigned_builder_id: assignedBuilderId || null,
         department: department || null,
+        event_id: selectedEventId || null,
         status: assignedBuilderId ? 'Assigned' : 'Pending',
         first_assigned_at: assignedBuilderId ? new Date().toISOString() : null,
         raised_by: profile.id,
@@ -669,11 +690,23 @@ export default function AdminRaiseTicket({ profile }) {
               <select
                 value={department}
                 onChange={(e) => setDepartment(e.target.value)}
-                style={fieldSelectStyle}
+                style={{ ...fieldSelectStyle, marginBottom: '14px' }}
               >
                 <option value="">Select a department...</option>
                 {DEPARTMENTS.map(d => (
                   <option key={d} value={d}>{d}</option>
+                ))}
+              </select>
+
+              <p style={fieldLabelStyle}>Event (optional)</p>
+              <select
+                value={selectedEventId}
+                onChange={(e) => setSelectedEventId(e.target.value)}
+                style={fieldSelectStyle}
+              >
+                <option value="">None</option>
+                {openEvents.map(ev => (
+                  <option key={ev.id} value={ev.id}>{ev.title}</option>
                 ))}
               </select>
             </div>

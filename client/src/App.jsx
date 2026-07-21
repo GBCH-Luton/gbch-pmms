@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { supabase } from './lib/supabase'
-import { roleFromJobTitle, normalizeCustomRoles, accessLevelForRole, hideSettingsForRole, divisionForRole } from './lib/roles'
+import { roleFromJobTitle, normalizeCustomRoles, accessLevelForRole, hideSettingsForRole, divisionForRole, canCreateEventsForRole } from './lib/roles'
 import { logLoginEvent } from './lib/loginEvents'
 import Login from './pages/Login'
 import SetPassword from './pages/SetPassword'
@@ -91,6 +91,7 @@ export default function App() {
     let role = roleFromJobTitle(data.job_title)
     let hideSettings = false
     let division = null
+    let canCreateEvents = false
 
     // job_title lives on a company-wide table PMMS doesn't control -- a
     // rename there (even a legitimate one) can otherwise silently lock
@@ -125,6 +126,10 @@ export default function App() {
       // just so the UI can adapt (e.g. narrowing the Pipeline's category
       // filter for a division-scoped manager).
       division = divisionForRole(roleRow.role, normalizedCustomRoles)
+      // UI-only convenience (shows/hides the "+ New Event" button) -- the
+      // real restriction is enforced server-side by
+      // pmms.current_can_create_events().
+      canCreateEvents = canCreateEventsForRole(roleRow.role, normalizedCustomRoles)
     }
 
     // Deactivating someone (the Admin page's "Deactivate" button) must
@@ -134,7 +139,7 @@ export default function App() {
     // no exception.
     if (data.active === false) role = null
 
-    const resolvedProfile = { ...data, role, hideSettings, division }
+    const resolvedProfile = { ...data, role, hideSettings, division, canCreateEvents }
     setProfile(resolvedProfile)
     setLoading(false)
     return resolvedProfile
