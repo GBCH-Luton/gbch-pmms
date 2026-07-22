@@ -11,6 +11,7 @@ import {
   modalTextareaStyle, modalErrorStyle, modalCancelBtnStyle, modalConfirmBtnStyle, radioRowStyle,
   roleBadgeStyle, postSystemComment, postAuditEvent, fetchAssignableBuilders, fetchAssignableStaffForDivision, fetchAssignableStaffForCategory, STAFF_AVAILABILITY_STYLES,
   createNotification, sendPushNotification, pushEmergencyAlert, resolveCategoryDivision, isTicketStuck, KpiTiles, fetchPriorityThresholds,
+  EVENTS_FEATURE_ENABLED,
 } from './shared'
 
 const expandLabelStyle = { margin: '0 0 2px 0', fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em' }
@@ -867,7 +868,9 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
                               <button onClick={() => openCommentsModal(t)} style={actionBtnStyle}>Comments</button>
                               <button onClick={() => openHistoryModal(t)} style={actionBtnStyle}>History</button>
                               <button onClick={() => openPriorityModal(t)} style={actionBtnStyle}>Priority</button>
-                              <button onClick={() => openAddToEventModal(t)} style={actionBtnStyle}>{t.event_id ? 'Change Event' : 'Add to Event'}</button>
+                              {EVENTS_FEATURE_ENABLED && (
+                                <button onClick={() => openAddToEventModal(t)} style={actionBtnStyle}>{t.event_id ? 'Change Event' : 'Add to Event'}</button>
+                              )}
                               {t.status !== 'Cancelled' && (
                                 <button onClick={() => openCancelModal(t)} style={{ ...actionBtnStyle, color: '#dc2626', borderColor: '#fecaca' }}>Cancel</button>
                               )}

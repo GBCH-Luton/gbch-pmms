@@ -9,6 +9,14 @@ import { attachProperties } from '../../lib/properties'
 
 const DEFAULT_CLOCK_DISTANCE_THRESHOLD_M = 250
 
+// Paused 2026-07-22 -- the managers want to settle how Compliance/Landlord
+// Liaison division access should work before revisiting cross-division
+// ticket coordination. The Events table, RLS, and page all still exist
+// (see AdminEvents.jsx) -- this just pulls its nav item and the two
+// Pipeline/Raise-Ticket entry points out of view. Flip back to true to
+// bring it all back with no rebuilding.
+export const EVENTS_FEATURE_ENABLED = false
+
 export const GLOBAL_TRIAGE_THRESHOLD = 70
 export const P2_URGENT_THRESHOLD = 40
 

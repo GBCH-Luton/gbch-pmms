@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
-import { fetchAssignableStaffForCategory, builderOptionLabel, createNotification, sendPushNotification, pushEmergencyAlert, priorityTierLabel, fetchPriorityThresholds } from './shared'
+import { fetchAssignableStaffForCategory, builderOptionLabel, createNotification, sendPushNotification, pushEmergencyAlert, priorityTierLabel, fetchPriorityThresholds, EVENTS_FEATURE_ENABLED } from './shared'
 import { fetchComplianceCheckTypes } from '../../lib/compliance'
 import { fetchMaintenanceCategories, sortedCategoryEntries } from '../../lib/maintenanceCategories'
 import PropertySearchSelect from '../../components/PropertySearchSelect'
@@ -698,17 +698,21 @@ export default function AdminRaiseTicket({ profile }) {
                 ))}
               </select>
 
-              <p style={fieldLabelStyle}>Event (optional)</p>
-              <select
-                value={selectedEventId}
-                onChange={(e) => setSelectedEventId(e.target.value)}
-                style={fieldSelectStyle}
-              >
-                <option value="">None</option>
-                {openEvents.map(ev => (
-                  <option key={ev.id} value={ev.id}>{ev.title}</option>
-                ))}
-              </select>
+              {EVENTS_FEATURE_ENABLED && (
+                <>
+                  <p style={fieldLabelStyle}>Event (optional)</p>
+                  <select
+                    value={selectedEventId}
+                    onChange={(e) => setSelectedEventId(e.target.value)}
+                    style={fieldSelectStyle}
+                  >
+                    <option value="">None</option>
+                    {openEvents.map(ev => (
+                      <option key={ev.id} value={ev.id}>{ev.title}</option>
+                    ))}
+                  </select>
+                </>
+              )}
             </div>
           )}
 

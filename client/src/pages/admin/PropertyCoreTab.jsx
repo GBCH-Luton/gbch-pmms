@@ -48,7 +48,7 @@ function fieldInput(field, value, onChange) {
   }
   return (
     <input
-      type={field.type === 'number' ? 'number' : 'text'}
+      type={field.type === 'number' ? 'number' : field.type === 'date' ? 'date' : 'text'}
       value={value ?? ''}
       onChange={(e) => onChange(field.type === 'number' ? (e.target.value === '' ? null : Number(e.target.value)) : e.target.value)}
       style={inputStyle}
@@ -477,6 +477,10 @@ export default function PropertyCoreTab({ property, onFieldsSaved, profile }) {
               { key: 'gas_supplier', label: 'Gas Supplier', type: 'text' },
               { key: 'electric_supplier', label: 'Electric Supplier', type: 'text' },
               { key: 'water_supplier', label: 'Water Supplier', type: 'text' },
+              { key: 'wifi_provider', label: 'WiFi Provider', type: 'text' },
+              { key: 'wifi_account', label: 'WiFi Account', type: 'text' },
+              { key: 'wifi_payment_method', label: 'WiFi Payment Method', type: 'text' },
+              { key: 'wifi_start_date', label: 'WiFi Start Date', type: 'date' },
             ]}
           />
 

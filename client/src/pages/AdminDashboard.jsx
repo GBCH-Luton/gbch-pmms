@@ -19,15 +19,16 @@ import AdminAccess from './admin/AdminAccess'
 import AdminHelp from './admin/AdminHelp'
 import AdminHousekeeping from './admin/AdminHousekeeping'
 import AdminEvents from './admin/AdminEvents'
+import { EVENTS_FEATURE_ENABLED } from './admin/shared'
 
 const NAV_ITEMS = [
   { key: 'dashboard', label: 'Dashboard', Component: AdminDashboardPage },
   { key: 'pipeline', label: 'Pipeline', Component: AdminPipeline },
   { key: 'properties', label: 'Properties', Component: AdminProperties },
-  { key: 'compliance', label: 'Compliance', Component: AdminCompliance, divisions: ['Maintenance'] },
+  { key: 'compliance', label: 'Compliance', Component: AdminCompliance, divisions: ['Maintenance', 'Compliance'] },
   { key: 'voids', label: 'Voids', Component: AdminVoids, divisions: ['Maintenance'] },
   { key: 'sign-off', label: 'Sign-Off', Component: AdminSignOff },
-  { key: 'events', label: 'Events', Component: AdminEvents },
+  ...(EVENTS_FEATURE_ENABLED ? [{ key: 'events', label: 'Events', Component: AdminEvents }] : []),
   { key: 'housekeeping', label: 'Housekeeping', Component: AdminHousekeeping, divisionOnly: 'Housekeeping' },
   { key: 'builders', label: 'Staff', Component: AdminBuilders },
   { key: 'clocking', label: 'Clocking', Component: AdminClocking },
@@ -172,7 +173,7 @@ export default function AdminDashboard({ profile }) {
           style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'none', border: 'none', padding: '20px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.1)', width: '100%', textAlign: 'left' }}
         >
           <img src={gbchLogo} alt="GBCH" style={{ height: '32px' }} />
-          <span style={{ fontSize: '15px', fontWeight: 800, color: '#ffffff' }}>PMMS Admin</span>
+          <span style={{ fontSize: '15px', fontWeight: 800, color: '#ffffff' }}>PMMS</span>
         </button>
 
         <nav style={{ flex: 1, padding: '12px', overflowY: 'auto' }}>
@@ -276,7 +277,7 @@ export default function AdminDashboard({ profile }) {
             style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
           >
             <img src={gbchLogo} alt="GBCH" style={{ height: '28px' }} />
-            <span style={{ color: '#ffffff', fontWeight: 800, fontSize: '14px' }}>PMMS Admin</span>
+            <span style={{ color: '#ffffff', fontWeight: 800, fontSize: '14px' }}>PMMS</span>
           </button>
           <button
             onClick={() => setSidebarOpen(true)}
