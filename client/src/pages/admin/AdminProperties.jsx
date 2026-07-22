@@ -469,12 +469,17 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
                     )}
                   </div>
                 </div>
-                <button
-                  onClick={() => setEditing(true)}
-                  style={{ padding: '8px 16px', background: '#1d4ed8', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}
-                >
-                  Edit
-                </button>
+                {/* Address/postcode/town/type/status aren't any division-scoped
+                    manager's data to change -- same reasoning as the tab
+                    restriction below, just a separate surface that bypassed it. */}
+                {!profile.division && (
+                  <button
+                    onClick={() => setEditing(true)}
+                    style={{ padding: '8px 16px', background: '#1d4ed8', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}
+                  >
+                    Edit
+                  </button>
+                )}
               </div>
             </>
           ) : (
@@ -650,12 +655,16 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
           <option value="">All Towns</option>
           {towns.map(t => <option key={t} value={t}>{t}</option>)}
         </select>
-        <button
-          onClick={openAddModal}
-          style={{ padding: '10px 18px', background: '#1e3a8a', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
-        >
-          ＋ Add Property
-        </button>
+        {/* Procuring a brand-new property is Maintenance/Admin territory,
+            same reasoning as the per-property Edit button above. */}
+        {!profile.division && (
+          <button
+            onClick={openAddModal}
+            style={{ padding: '10px 18px', background: '#1e3a8a', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
+          >
+            ＋ Add Property
+          </button>
+        )}
       </div>
 
       {filterModeLabel && (
