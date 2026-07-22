@@ -31,8 +31,10 @@ const NAV_ITEMS = [
   { key: 'sign-off', label: 'Sign-Off', Component: AdminSignOff },
   ...(EVENTS_FEATURE_ENABLED ? [{ key: 'events', label: 'Events', Component: AdminEvents }] : []),
   { key: 'properties', label: 'Properties', Component: AdminProperties },
-  { key: 'compliance', label: 'Compliance', Component: AdminCompliance, divisions: ['Maintenance', 'Compliance'] },
   { key: 'voids', label: 'Voids', Component: AdminVoids, divisions: ['Maintenance'] },
+  // Division dashboards, grouped together in this order -- Landlord
+  // Liaison goes here too once it exists.
+  { key: 'compliance', label: 'Compliance', Component: AdminCompliance, divisions: ['Maintenance', 'Compliance'] },
   { key: 'housekeeping', label: 'Housekeeping', Component: AdminHousekeeping, divisionOnly: 'Housekeeping' },
   { key: 'builders', label: 'Staff', Component: AdminBuilders },
   { key: 'clocking', label: 'Clocking', Component: AdminClocking },
