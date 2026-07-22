@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, Fragment } from 'react'
 import { supabase } from '../lib/supabase'
 import { logLoginEvent } from '../lib/loginEvents'
 import { pushNotificationsSupported, hasActivePushSubscription, enablePushNotifications } from '../lib/pushNotifications'
@@ -22,17 +22,20 @@ import AdminEvents from './admin/AdminEvents'
 import { EVENTS_FEATURE_ENABLED } from './admin/shared'
 
 const NAV_ITEMS = [
+  // Grouped by what they're actually for: core ticket lifecycle first,
+  // then property/division monitoring, then people-ops, then stock, then
+  // reports/config at the bottom (2026-07-22 reorder).
   { key: 'dashboard', label: 'Dashboard', Component: AdminDashboardPage },
   { key: 'pipeline', label: 'Pipeline', Component: AdminPipeline },
+  { key: 'raise-ticket', label: 'Log a Ticket', Component: AdminRaiseTicket },
+  { key: 'sign-off', label: 'Sign-Off', Component: AdminSignOff },
+  ...(EVENTS_FEATURE_ENABLED ? [{ key: 'events', label: 'Events', Component: AdminEvents }] : []),
   { key: 'properties', label: 'Properties', Component: AdminProperties },
   { key: 'compliance', label: 'Compliance', Component: AdminCompliance, divisions: ['Maintenance', 'Compliance'] },
   { key: 'voids', label: 'Voids', Component: AdminVoids, divisions: ['Maintenance'] },
-  { key: 'sign-off', label: 'Sign-Off', Component: AdminSignOff },
-  ...(EVENTS_FEATURE_ENABLED ? [{ key: 'events', label: 'Events', Component: AdminEvents }] : []),
   { key: 'housekeeping', label: 'Housekeeping', Component: AdminHousekeeping, divisionOnly: 'Housekeeping' },
   { key: 'builders', label: 'Staff', Component: AdminBuilders },
   { key: 'clocking', label: 'Clocking', Component: AdminClocking },
-  { key: 'raise-ticket', label: 'Log a Ticket', Component: AdminRaiseTicket },
   { key: 'stock', label: 'Stock', Component: AdminStock, divisions: ['Maintenance'] },
   { key: 'reports', label: 'Reports', Component: AdminReports },
   { key: 'settings', label: 'Settings', Component: AdminSettings },
@@ -178,11 +181,14 @@ export default function AdminDashboard({ profile }) {
 
         <nav style={{ flex: 1, padding: '12px', overflowY: 'auto' }}>
           {NAV_ITEMS.filter(item => isNavItemVisible(item, profile)).map(item => (
-            <button
-              key={item.key}
-              onClick={() => goToPage(item.key)}
-              style={navButtonStyle(currentPage === item.key)}
-            >
+            <Fragment key={item.key}>
+              {item.key === 'settings' && (
+                <div style={{ borderTop: '1px solid rgba(255,255,255,0.12)', margin: '8px 4px' }} />
+              )}
+              <button
+                onClick={() => goToPage(item.key)}
+                style={navButtonStyle(currentPage === item.key)}
+              >
               <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 {item.label}
                 {item.key === 'sign-off' && pendingSignOffCount > 0 && (
@@ -206,7 +212,8 @@ export default function AdminDashboard({ profile }) {
                   </span>
                 )}
               </span>
-            </button>
+              </button>
+            </Fragment>
           ))}
         </nav>
 
