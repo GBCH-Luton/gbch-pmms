@@ -341,7 +341,10 @@ export default function AdminDashboard({ profile, onNavigate }) {
         </button>
       </DashboardSection>
 
-      {profile.division !== 'Housekeeping' && (
+      {/* Compliance is relevant to an unscoped (Maintenance) manager and to
+          Compliance Manager alike -- only Housekeeping/other divisions
+          don't need it. Void Aging and Gardens are Maintenance-only. */}
+      {(!profile.division || profile.division === 'Compliance') && (
         <DashboardSection id="compliance" title="Compliance" background="#ffffff" alertCount={complianceCounts.expired}>
           <div style={{ width: '100%' }}>
             <KpiTiles
@@ -352,7 +355,7 @@ export default function AdminDashboard({ profile, onNavigate }) {
         </DashboardSection>
       )}
 
-      {profile.division !== 'Housekeeping' && (
+      {!profile.division && (
         <DashboardSection id="void-aging" title="Void Aging" background="#ffffff" alertCount={voidAgingCounts.overdue}>
           <div style={{ width: '100%' }}>
             <KpiTiles
@@ -363,7 +366,7 @@ export default function AdminDashboard({ profile, onNavigate }) {
         </DashboardSection>
       )}
 
-      {profile.division !== 'Housekeeping' && (
+      {!profile.division && (
         <DashboardSection id="gardens" title="Gardens" background="#ffffff" alertCount={gardenAgingCounts.overdue}>
           <div style={{ width: '100%' }}>
             <KpiTiles

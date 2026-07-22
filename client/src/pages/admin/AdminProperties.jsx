@@ -35,11 +35,21 @@ import { fetchTowns, DEFAULT_TOWNS } from '../../lib/towns'
 
 const PROPERTY_TYPES = ['House', 'Flat', 'HMO', 'Commercial', 'Other']
 const ALL_PROFILE_TABS = ['Core', 'Compliance', 'Assets', 'Maintenance', 'Lease & Legal', 'Documents', 'Notes', 'Rooms', 'Restrictions', 'Gardens']
-// A Housekeeping Manager only interacts with cleaner assignment (Core) and
-// gender-restriction matching (Restrictions) -- everything else here is
-// Maintenance/lettings-specific and was explicitly scoped down to "just
-// what he will interact with, no more."
-const HOUSEKEEPING_PROFILE_TABS = ['Core', 'Restrictions']
+// Division-scoped managers only see the tabs relevant to what they
+// actually do -- everything else here is out of scope for their role,
+// even though the underlying RLS doesn't enforce this (see
+// admin_manager_full_access on pmms.properties -- a real database-level
+// restriction is a separate, parked piece of work). Falls back to
+// ALL_PROFILE_TABS for an unscoped manager (e.g. Maintenance Manager) or
+// any division without its own entry here.
+const DIVISION_PROFILE_TABS = {
+  // Cleaner assignment (Core) and gender-restriction matching (Restrictions)
+  // -- everything else is Maintenance/lettings-specific.
+  Housekeeping: ['Core', 'Restrictions'],
+  // Certificate tracking (their core job) plus Assets -- fire alarms,
+  // sprinklers, boilers etc. tie directly into compliance.
+  Compliance: ['Compliance', 'Assets'],
+}
 
 const DEFAULT_NEW_PROPERTY_WINDOW_HOURS = 48
 
@@ -567,7 +577,7 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
 
         {/* Property Profile tabs */}
         {(() => {
-          const profileTabs = profile.division === 'Housekeeping' ? HOUSEKEEPING_PROFILE_TABS : ALL_PROFILE_TABS
+          const profileTabs = DIVISION_PROFILE_TABS[profile.division] || ALL_PROFILE_TABS
           // Falls back to 'Core' (always present) if the current selection
           // isn't in the scoped list -- covers both a stale tab left over
           // from before a role change, and initialPropertiesFilter's own
