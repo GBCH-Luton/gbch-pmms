@@ -583,12 +583,14 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
         {/* Property Profile tabs */}
         {(() => {
           const profileTabs = DIVISION_PROFILE_TABS[profile.division] || ALL_PROFILE_TABS
-          // Falls back to 'Core' (always present) if the current selection
-          // isn't in the scoped list -- covers both a stale tab left over
-          // from before a role change, and initialPropertiesFilter's own
-          // 'Compliance' default (used when navigating in without an
-          // explicit tab) landing on something now hidden.
-          const effectiveActiveTab = profileTabs.includes(activeTab) ? activeTab : 'Core'
+          // Falls back to the first tab this role is actually scoped to if
+          // the current selection isn't in that list -- covers both a stale
+          // tab left over from before a role change, and
+          // initialPropertiesFilter's own 'Compliance' default (used when
+          // navigating in without an explicit tab) landing on something now
+          // hidden. NOT hardcoded to 'Core' -- that's not even in every
+          // role's list (e.g. Compliance Manager's is ['Compliance', 'Assets']).
+          const effectiveActiveTab = profileTabs.includes(activeTab) ? activeTab : profileTabs[0]
           return (
             <>
               <div style={{ display: 'flex', gap: '4px', marginBottom: '16px', flexWrap: 'wrap', borderBottom: '1px solid #e2e8f0' }}>
