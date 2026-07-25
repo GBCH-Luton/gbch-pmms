@@ -52,7 +52,7 @@ import { fetchDivisions, saveDivisions, DEFAULT_DIVISIONS } from '../../lib/divi
 import { fetchMaintenanceCategories, sortedCategoryEntries } from '../../lib/maintenanceCategories'
 import { supabase } from '../../lib/supabase'
 import {
-  actionBtnStyle, Avatar, thStyle, tdStyle, formatUKDateTime,
+  actionBtnStyle, Avatar, thStyle, tdStyle, formatUKDateTime, filterSelectStyle,
   modalOverlayStyle, modalCardStyle, modalTitleStyle, modalLabelStyle, modalErrorStyle,
   modalCancelBtnStyle, modalConfirmBtnStyle, autoReassignDepartingStaffTickets,
 } from './shared'
@@ -1181,29 +1181,21 @@ export default function AdminAccess({ profile }) {
       {/* Staff List + Role Management */}
       <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
         <div style={{ flex: '2 1 480px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '12px', flexWrap: 'wrap' }}>
-            <p style={{ margin: 0, fontSize: '14px', fontWeight: 800, color: '#0f172a' }}>Staff List</p>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '14px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+              <p style={{ margin: 0, fontSize: '14px', fontWeight: 800, color: '#0f172a' }}>Staff List</p>
+              <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)} style={filterSelectStyle}>
+                {filterTabs.map(tab => (
+                  <option key={tab} value={tab}>{tab}</option>
+                ))}
+              </select>
+            </div>
             <button
               onClick={() => setModalStaff(null)}
               style={{ padding: '9px 16px', background: '#0f766e', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
             >
               ＋ Add Staff Member
             </button>
-          </div>
-
-          <div style={{ display: 'flex', gap: '4px', marginBottom: '14px', flexWrap: 'wrap', borderBottom: '1px solid #e2e8f0' }}>
-            {filterTabs.map(tab => (
-              <button
-                key={tab}
-                onClick={() => setRoleFilter(tab)}
-                style={{
-                  padding: '8px 14px', background: 'none', border: 'none', borderBottom: roleFilter === tab ? '2px solid #0f766e' : '2px solid transparent',
-                  color: roleFilter === tab ? '#0f766e' : '#64748b', fontSize: '13px', fontWeight: 700, cursor: 'pointer', marginBottom: '-1px', whiteSpace: 'nowrap',
-                }}
-              >
-                {tab}
-              </button>
-            ))}
           </div>
 
           {filteredStaff.length === 0 ? (
