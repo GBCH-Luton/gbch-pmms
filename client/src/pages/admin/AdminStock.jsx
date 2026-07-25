@@ -26,7 +26,7 @@ export default function AdminStock() {
       <h1 style={{ margin: '0 0 4px 0', fontSize: '18px', fontWeight: 800, color: '#0f172a' }}>Stock</h1>
       <p style={{ margin: '0 0 6px 0', fontSize: '13px', color: '#64748b' }}>Maintenance stock and appliances available to builders when fixing a property.</p>
       <p style={{ margin: '0 0 20px 0', fontSize: '12px', color: '#d97706', fontWeight: 600 }}>
-        Prototype data -- not yet connected to real SIMS inventory. See lib/simsMaterialsBridge.js.
+        Real SIMS catalog, but a static snapshot -- not a live connection. Won't reflect stock changes made in SIMS since 2026-07-22. See lib/simsMaterialsBridge.js.
       </p>
 
       <div style={{ background: '#fff', borderRadius: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
