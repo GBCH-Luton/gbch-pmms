@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, Fragment } from 'react'
 import { supabase } from '../lib/supabase'
 import { logLoginEvent } from '../lib/loginEvents'
 import { pushNotificationsSupported, hasActivePushSubscription, enablePushNotifications } from '../lib/pushNotifications'
@@ -49,6 +49,12 @@ const NAV_ITEMS = [
 ]
 
 const POPOVER_ITEM_KEYS = ['settings', 'admin', 'help']
+
+// Visual grouping dividers in the main nav: Dashboard alone, then the
+// ticket lifecycle (Pipeline/Log a Ticket/Sign-Off), then property/
+// division monitoring (Properties/Voids/Compliance/Housekeeping), then
+// people-ops (Staff/Clocking), then Stock/Reports.
+const DIVIDER_AFTER_KEYS = ['dashboard', 'sign-off', 'housekeeping', 'clocking']
 
 const PENDING_SIGN_OFF_POLL_MS = 20000
 
@@ -221,36 +227,40 @@ export default function AdminDashboard({ profile }) {
 
         <nav style={{ flex: 1, padding: '10px', overflowY: 'auto' }}>
           {mainNavItems.map(item => (
-            <button
-              key={item.key}
-              onClick={() => goToPage(item.key)}
-              style={navButtonStyle(currentPage === item.key)}
-            >
-              <span style={navIconStyle}>{item.icon}</span>
-              <span style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label}</span>
-                {item.key === 'sign-off' && pendingSignOffCount > 0 && (
-                  <span
-                    style={{
-                      background: '#dc2626', color: '#ffffff', fontSize: '11px', fontWeight: 800,
-                      borderRadius: '999px', padding: '1px 8px', marginLeft: '8px', minWidth: '20px', textAlign: 'center', flexShrink: 0,
-                    }}
-                  >
-                    {pendingSignOffCount}
-                  </span>
-                )}
-                {item.key === 'pipeline' && totalTicketsCount > 0 && (
-                  <span
-                    style={{
-                      background: '#dc2626', color: '#ffffff', fontSize: '11px', fontWeight: 800,
-                      borderRadius: '999px', padding: '1px 8px', marginLeft: '8px', minWidth: '20px', textAlign: 'center', flexShrink: 0,
-                    }}
-                  >
-                    {totalTicketsCount}
-                  </span>
-                )}
-              </span>
-            </button>
+            <Fragment key={item.key}>
+              <button
+                onClick={() => goToPage(item.key)}
+                style={navButtonStyle(currentPage === item.key)}
+              >
+                <span style={navIconStyle}>{item.icon}</span>
+                <span style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label}</span>
+                  {item.key === 'sign-off' && pendingSignOffCount > 0 && (
+                    <span
+                      style={{
+                        background: '#dc2626', color: '#ffffff', fontSize: '11px', fontWeight: 800,
+                        borderRadius: '999px', padding: '1px 8px', marginLeft: '8px', minWidth: '20px', textAlign: 'center', flexShrink: 0,
+                      }}
+                    >
+                      {pendingSignOffCount}
+                    </span>
+                  )}
+                  {item.key === 'pipeline' && totalTicketsCount > 0 && (
+                    <span
+                      style={{
+                        background: '#dc2626', color: '#ffffff', fontSize: '11px', fontWeight: 800,
+                        borderRadius: '999px', padding: '1px 8px', marginLeft: '8px', minWidth: '20px', textAlign: 'center', flexShrink: 0,
+                      }}
+                    >
+                      {totalTicketsCount}
+                    </span>
+                  )}
+                </span>
+              </button>
+              {DIVIDER_AFTER_KEYS.includes(item.key) && (
+                <div style={{ borderTop: '1px solid rgba(255,255,255,0.12)', margin: '6px 4px' }} />
+              )}
+            </Fragment>
           ))}
         </nav>
 
