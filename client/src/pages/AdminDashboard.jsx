@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, Fragment } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { logLoginEvent } from '../lib/loginEvents'
 import { pushNotificationsSupported, hasActivePushSubscription, enablePushNotifications } from '../lib/pushNotifications'
@@ -25,25 +25,30 @@ const NAV_ITEMS = [
   // Grouped by what they're actually for: core ticket lifecycle first,
   // then property/division monitoring, then people-ops, then stock, then
   // reports/config at the bottom (2026-07-22 reorder).
-  { key: 'dashboard', label: 'Dashboard', Component: AdminDashboardPage },
-  { key: 'pipeline', label: 'Pipeline', Component: AdminPipeline },
-  { key: 'raise-ticket', label: 'Log a Ticket', Component: AdminRaiseTicket },
-  { key: 'sign-off', label: 'Sign-Off', Component: AdminSignOff },
-  ...(EVENTS_FEATURE_ENABLED ? [{ key: 'events', label: 'Events', Component: AdminEvents }] : []),
-  { key: 'properties', label: 'Properties', Component: AdminProperties },
-  { key: 'voids', label: 'Voids', Component: AdminVoids, divisions: ['Maintenance'] },
+  { key: 'dashboard', label: 'Dashboard', icon: '🏠', Component: AdminDashboardPage },
+  { key: 'pipeline', label: 'Pipeline', icon: '🛠️', Component: AdminPipeline },
+  { key: 'raise-ticket', label: 'Log a Ticket', icon: '📝', Component: AdminRaiseTicket },
+  { key: 'sign-off', label: 'Sign-Off', icon: '✅', Component: AdminSignOff },
+  ...(EVENTS_FEATURE_ENABLED ? [{ key: 'events', label: 'Events', icon: '📅', Component: AdminEvents }] : []),
+  { key: 'properties', label: 'Properties', icon: '🏢', Component: AdminProperties },
+  { key: 'voids', label: 'Voids', icon: '🔑', Component: AdminVoids, divisions: ['Maintenance'] },
   // Division dashboards, grouped together in this order -- Landlord
   // Liaison goes here too once it exists.
-  { key: 'compliance', label: 'Compliance', Component: AdminCompliance, divisions: ['Maintenance', 'Compliance'] },
-  { key: 'housekeeping', label: 'Housekeeping', Component: AdminHousekeeping, divisionOnly: 'Housekeeping' },
-  { key: 'builders', label: 'Staff', Component: AdminBuilders },
-  { key: 'clocking', label: 'Clocking', Component: AdminClocking },
-  { key: 'stock', label: 'Stock', Component: AdminStock, divisions: ['Maintenance'] },
-  { key: 'reports', label: 'Reports', Component: AdminReports },
-  { key: 'settings', label: 'Settings', Component: AdminSettings },
-  { key: 'admin', label: 'Admin', Component: AdminAccess, adminOnly: true },
-  { key: 'help', label: 'Help & Guide', Component: AdminHelp, adminOnly: true },
+  { key: 'compliance', label: 'Compliance', icon: '🛡️', Component: AdminCompliance, divisions: ['Maintenance', 'Compliance'] },
+  { key: 'housekeeping', label: 'Housekeeping', icon: '🧹', Component: AdminHousekeeping, divisionOnly: 'Housekeeping' },
+  { key: 'builders', label: 'Staff', icon: '👥', Component: AdminBuilders },
+  { key: 'clocking', label: 'Clocking', icon: '⏱️', Component: AdminClocking },
+  { key: 'stock', label: 'Stock', icon: '📦', Component: AdminStock, divisions: ['Maintenance'] },
+  { key: 'reports', label: 'Reports', icon: '📈', Component: AdminReports },
+  // These three are rendered in the profile popover, not the main nav list
+  // (see SidebarContent) -- still present here so NAV_ITEMS/isNavItemVisible
+  // keep working as the single source of truth for routing + visibility.
+  { key: 'settings', label: 'Settings', icon: '⚙️', Component: AdminSettings },
+  { key: 'admin', label: 'Admin', icon: '🔐', Component: AdminAccess, adminOnly: true },
+  { key: 'help', label: 'Help & Guide', icon: '📖', Component: AdminHelp, adminOnly: true },
 ]
+
+const POPOVER_ITEM_KEYS = ['settings', 'admin', 'help']
 
 const PENDING_SIGN_OFF_POLL_MS = 20000
 
@@ -165,12 +170,45 @@ export default function AdminDashboard({ profile }) {
   }
 
   const navButtonStyle = (active) => ({
-    display: 'block', width: '100%', textAlign: 'left', padding: '12px 14px', marginBottom: '4px',
-    borderRadius: '10px', border: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: 600,
-    background: active ? '#19562e' : 'transparent', color: '#ffffff',
+    display: 'flex', alignItems: 'center', gap: '10px', width: '100%', textAlign: 'left', padding: '7px 12px', marginBottom: '1px',
+    borderRadius: '8px', border: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: active ? 700 : 400,
+    background: active ? '#19562e' : 'transparent', color: '#ffffff', fontFamily: 'inherit',
   })
+  const navIconStyle = { width: '18px', flexShrink: 0, textAlign: 'center', fontSize: '14px', lineHeight: 1 }
 
+  // A real nested component, instantiated twice (desktop sidebar + mobile
+  // drawer, below) -- React gives each JSX usage its own hook state, so
+  // popoverOpen/popoverRef/triggerRef are automatically independent between
+  // the two without any extra work.
   function SidebarContent() {
+    const [popoverOpen, setPopoverOpen] = useState(false)
+    const popoverRef = useRef(null)
+    const triggerRef = useRef(null)
+
+    // Same click-outside pattern as PropertySearchSelect.jsx.
+    useEffect(() => {
+      function handleClickOutside(e) {
+        if (popoverRef.current?.contains(e.target)) return
+        if (triggerRef.current?.contains(e.target)) return
+        setPopoverOpen(false)
+      }
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }, [])
+
+    const mainNavItems = NAV_ITEMS.filter(item => !POPOVER_ITEM_KEYS.includes(item.key) && isNavItemVisible(item, profile))
+    const popoverItems = NAV_ITEMS.filter(item => POPOVER_ITEM_KEYS.includes(item.key) && isNavItemVisible(item, profile))
+
+    function handlePopoverNav(key) {
+      setPopoverOpen(false)
+      goToPage(key)
+    }
+
+    async function handlePopoverSignOut() {
+      setPopoverOpen(false)
+      await handleSignOut()
+    }
+
     return (
       <>
         <button
@@ -181,23 +219,21 @@ export default function AdminDashboard({ profile }) {
           <span style={{ fontSize: '15px', fontWeight: 800, color: '#ffffff' }}>PMMS</span>
         </button>
 
-        <nav style={{ flex: 1, padding: '12px', overflowY: 'auto' }}>
-          {NAV_ITEMS.filter(item => isNavItemVisible(item, profile)).map(item => (
-            <Fragment key={item.key}>
-              {item.key === 'settings' && (
-                <div style={{ borderTop: '1px solid rgba(255,255,255,0.12)', margin: '8px 4px' }} />
-              )}
-              <button
-                onClick={() => goToPage(item.key)}
-                style={navButtonStyle(currentPage === item.key)}
-              >
-              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                {item.label}
+        <nav style={{ flex: 1, padding: '10px', overflowY: 'auto' }}>
+          {mainNavItems.map(item => (
+            <button
+              key={item.key}
+              onClick={() => goToPage(item.key)}
+              style={navButtonStyle(currentPage === item.key)}
+            >
+              <span style={navIconStyle}>{item.icon}</span>
+              <span style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label}</span>
                 {item.key === 'sign-off' && pendingSignOffCount > 0 && (
                   <span
                     style={{
                       background: '#dc2626', color: '#ffffff', fontSize: '11px', fontWeight: 800,
-                      borderRadius: '999px', padding: '1px 8px', marginLeft: '8px', minWidth: '20px', textAlign: 'center',
+                      borderRadius: '999px', padding: '1px 8px', marginLeft: '8px', minWidth: '20px', textAlign: 'center', flexShrink: 0,
                     }}
                   >
                     {pendingSignOffCount}
@@ -207,20 +243,50 @@ export default function AdminDashboard({ profile }) {
                   <span
                     style={{
                       background: '#dc2626', color: '#ffffff', fontSize: '11px', fontWeight: 800,
-                      borderRadius: '999px', padding: '1px 8px', marginLeft: '8px', minWidth: '20px', textAlign: 'center',
+                      borderRadius: '999px', padding: '1px 8px', marginLeft: '8px', minWidth: '20px', textAlign: 'center', flexShrink: 0,
                     }}
                   >
                     {totalTicketsCount}
                   </span>
                 )}
               </span>
-              </button>
-            </Fragment>
+            </button>
           ))}
         </nav>
 
-        <div style={{ padding: '16px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+        <div style={{ padding: '16px', borderTop: '1px solid rgba(255,255,255,0.1)', position: 'relative' }}>
+          {popoverOpen && (
+            <div
+              ref={popoverRef}
+              style={{
+                position: 'absolute', left: '16px', right: '16px', bottom: 'calc(100% + 8px)',
+                background: '#142654', border: '1px solid rgba(255,255,255,0.16)', borderRadius: '10px',
+                padding: '6px', boxShadow: '0 12px 28px rgba(0,0,0,0.35)', display: 'flex', flexDirection: 'column', zIndex: 30,
+              }}
+            >
+              {popoverItems.map(item => (
+                <button
+                  key={item.key}
+                  onClick={() => handlePopoverNav(item.key)}
+                  style={navButtonStyle(currentPage === item.key)}
+                >
+                  <span style={navIconStyle}>{item.icon}</span>
+                  <span>{item.label}</span>
+                </button>
+              ))}
+              <div style={{ borderTop: '1px solid rgba(255,255,255,0.16)', margin: '4px 6px' }} />
+              <button onClick={handlePopoverSignOut} style={navButtonStyle(false)}>
+                <span style={navIconStyle}>🚪</span>
+                <span>Sign out</span>
+              </button>
+            </div>
+          )}
+
+          <button
+            ref={triggerRef}
+            onClick={() => setPopoverOpen(o => !o)}
+            style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', background: 'none', border: 'none', padding: '4px', margin: '-4px -4px 10px -4px', borderRadius: '8px', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}
+          >
             {profile.photo_url ? (
               <img src={profile.photo_url} alt="" style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
             ) : (
@@ -228,27 +294,23 @@ export default function AdminDashboard({ profile }) {
                 {(profile.name || '?').split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase()}
               </div>
             )}
-            <div style={{ minWidth: 0 }}>
+            <div style={{ minWidth: 0, flex: 1 }}>
               <p style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: '#ffffff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{profile.name}</p>
               <p style={{ margin: 0, fontSize: '12px', color: 'rgba(255,255,255,0.6)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{profile.job_title}</p>
             </div>
-          </div>
+            <span style={{ flexShrink: 0, color: 'rgba(255,255,255,0.6)', fontSize: '11px', transform: popoverOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }}>▲</span>
+          </button>
+
           {pushNotificationsSupported() && (
             <button
               onClick={handleEnableNotifications}
               disabled={pushEnabled}
-              style={{ width: '100%', padding: '10px', borderRadius: '10px', border: 'none', background: 'rgba(255,255,255,0.1)', color: pushEnabled ? 'rgba(255,255,255,0.5)' : '#ffffff', fontWeight: 700, fontSize: '13px', cursor: pushEnabled ? 'default' : 'pointer', marginBottom: '8px' }}
+              style={{ width: '100%', padding: '10px', borderRadius: '10px', border: 'none', background: 'rgba(255,255,255,0.1)', color: pushEnabled ? 'rgba(255,255,255,0.5)' : '#ffffff', fontWeight: 700, fontSize: '13px', cursor: pushEnabled ? 'default' : 'pointer' }}
             >
               🔔 {pushEnabled ? 'Notifications: On' : 'Enable Notifications'}
             </button>
           )}
-          {pushError && <p style={{ margin: '0 0 8px 0', fontSize: '11px', color: '#fca5a5' }}>{pushError}</p>}
-          <button
-            onClick={handleSignOut}
-            style={{ width: '100%', padding: '10px', borderRadius: '10px', border: 'none', background: 'rgba(255,255,255,0.1)', color: '#ffffff', fontWeight: 700, fontSize: '13px', cursor: 'pointer' }}
-          >
-            Sign out
-          </button>
+          {pushError && <p style={{ margin: '8px 0 0 0', fontSize: '11px', color: '#fca5a5' }}>{pushError}</p>}
         </div>
       </>
     )
