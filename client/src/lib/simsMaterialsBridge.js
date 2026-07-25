@@ -28,6 +28,7 @@ export async function fetchAvailableMaterials() {
   // which is exactly what the real bridge function needs to fix.
   await new Promise(resolve => setTimeout(resolve, 150))
   return [
+    { id: '55c43d4e-ab18-43e9-8431-fb12c4d82388', name: 'testing for link', unit: 'litre', available_quantity: 3 },
     { id: '84931076-ec7b-40b5-bc8d-c8ef689dc75c', name: '15mm Compression Elbow', unit: 'each', available_quantity: 45 },
     { id: '03bead81-c899-42b2-a747-7fc5135c7879', name: '15mm Copper Pipe', unit: 'metre', available_quantity: 8 },
     { id: '6ef27ad6-2521-4212-a290-53aee30667f8', name: '50mm Wood Screws', unit: 'box', available_quantity: 34 },
