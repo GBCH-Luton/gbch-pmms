@@ -20,14 +20,20 @@
 // required -- the RPC itself needs to be SECURITY DEFINER to read
 // sims.items despite the caller having no sims.staff_roles row.
 export async function fetchAvailableMaterials() {
-  // STUB -- mock data standing in for the real SIMS catalog.
+  // STUB -- this is a static snapshot of sims.items (division='Maintenance'),
+  // pulled directly from the real SIMS sandbox data on 2026-07-22 so the
+  // prototype at least reflects the real catalog instead of invented
+  // placeholder items. Real ids preserved as-is. Still not a live query --
+  // won't reflect stock changes made in SIMS after this snapshot was taken,
+  // which is exactly what the real bridge function needs to fix.
   await new Promise(resolve => setTimeout(resolve, 150))
   return [
-    { id: 'stub-1', name: 'Radiator valve (15mm)', unit: 'each', available_quantity: 42 },
-    { id: 'stub-2', name: 'Copper pipe (15mm, 3m length)', unit: 'length', available_quantity: 18 },
-    { id: 'stub-3', name: 'PTFE tape', unit: 'roll', available_quantity: 120 },
-    { id: 'stub-4', name: 'Silicone sealant (white)', unit: 'tube', available_quantity: 30 },
-    { id: 'stub-5', name: 'Consumer unit MCB (32A)', unit: 'each', available_quantity: 9 },
+    { id: '84931076-ec7b-40b5-bc8d-c8ef689dc75c', name: '15mm Compression Elbow', unit: 'each', available_quantity: 45 },
+    { id: '03bead81-c899-42b2-a747-7fc5135c7879', name: '15mm Copper Pipe', unit: 'metre', available_quantity: 8 },
+    { id: '6ef27ad6-2521-4212-a290-53aee30667f8', name: '50mm Wood Screws', unit: 'box', available_quantity: 34 },
+    { id: '2f114fa7-ab65-429e-980f-61d2c241851f', name: 'Brilliant White Emulsion', unit: 'litre', available_quantity: 6 },
+    { id: '22f03459-5665-437b-b147-2140a085fc79', name: 'Hi-Vis Vest', unit: 'each', available_quantity: 25 },
+    { id: 'c3e14337-39a9-4514-afbf-8d7039f1662f', name: 'SDS Drill (Depreciation Demo)', unit: 'each', available_quantity: 0 },
   ]
 }
 
