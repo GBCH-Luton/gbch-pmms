@@ -777,43 +777,62 @@ async function attachStaffNames(rows) {
   return rows.map(r => ({ ...r, staff_name: nameById[r.staff_id] || null }))
 }
 
+// Collapsible, closed by default -- this list grew long enough that it
+// was pushing ErrorLogsPanel (and whatever comes after it) out of view.
+// Same expand/collapse treatment as ErrorLogsPanel below.
 function LoginActivityPanel({ events }) {
+  const [isOpen, setIsOpen] = useState(false)
+
   return (
-    <div style={{ background: '#fff', borderRadius: '16px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', marginTop: '16px' }}>
-      <p style={{ margin: '0 0 4px 0', fontSize: '14px', fontWeight: 800, color: '#0f172a' }}>Recent Login Activity</p>
-      <p style={{ margin: '0 0 12px 0', fontSize: '12px', color: '#94a3b8' }}>Most recent {LOGIN_EVENTS_LIMIT} sign-ins/sign-outs, newest first.</p>
-      {events.length === 0 ? (
-        <p style={{ margin: 0, fontSize: '13px', color: '#94a3b8', fontStyle: 'italic' }}>No login activity recorded yet.</p>
-      ) : (
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
-                <th style={thStyle}>Staff</th>
-                <th style={thStyle}>Event</th>
-                <th style={thStyle}>Time</th>
-                <th style={thStyle}>Device</th>
-              </tr>
-            </thead>
-            <tbody>
-              {events.map(e => (
-                <tr key={e.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                  <td style={tdStyle}>{e.staff_name || e.email}</td>
-                  <td style={tdStyle}>
-                    <span style={{
-                      fontSize: '11px', fontWeight: 700, padding: '3px 10px', borderRadius: '20px',
-                      color: e.event_type === 'Signed In' ? '#16a34a' : '#64748b',
-                      background: e.event_type === 'Signed In' ? '#dcfce7' : '#f1f5f9',
-                    }}>
-                      {e.event_type}
-                    </span>
-                  </td>
-                  <td style={tdStyle}>{formatUKDateTime(e.created_at)}</td>
-                  <td style={tdStyle}>{summarizeUserAgent(e.user_agent)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+    <div style={{ marginTop: '16px' }}>
+      <button
+        onClick={() => setIsOpen(prev => !prev)}
+        style={{
+          display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between', gap: '12px',
+          padding: '14px 20px', background: '#fff', border: 'none', borderRadius: '16px',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.06)', cursor: 'pointer', fontSize: '14px', fontWeight: 800, color: '#0f172a',
+        }}
+      >
+        <span>Recent Login Activity ({events.length})</span>
+        <span style={{ fontSize: '13px', fontWeight: 700, color: '#94a3b8' }}>{isOpen ? '▲ Collapse' : '▼ Expand'}</span>
+      </button>
+      {isOpen && (
+        <div style={{ background: '#fff', borderRadius: '16px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', marginTop: '10px' }}>
+          <p style={{ margin: '0 0 12px 0', fontSize: '12px', color: '#94a3b8' }}>Most recent {LOGIN_EVENTS_LIMIT} sign-ins/sign-outs, newest first.</p>
+          {events.length === 0 ? (
+            <p style={{ margin: 0, fontSize: '13px', color: '#94a3b8', fontStyle: 'italic' }}>No login activity recorded yet.</p>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+                    <th style={thStyle}>Staff</th>
+                    <th style={thStyle}>Event</th>
+                    <th style={thStyle}>Time</th>
+                    <th style={thStyle}>Device</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {events.map(e => (
+                    <tr key={e.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                      <td style={tdStyle}>{e.staff_name || e.email}</td>
+                      <td style={tdStyle}>
+                        <span style={{
+                          fontSize: '11px', fontWeight: 700, padding: '3px 10px', borderRadius: '20px',
+                          color: e.event_type === 'Signed In' ? '#16a34a' : '#64748b',
+                          background: e.event_type === 'Signed In' ? '#dcfce7' : '#f1f5f9',
+                        }}>
+                          {e.event_type}
+                        </span>
+                      </td>
+                      <td style={tdStyle}>{formatUKDateTime(e.created_at)}</td>
+                      <td style={tdStyle}>{summarizeUserAgent(e.user_agent)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
     </div>
