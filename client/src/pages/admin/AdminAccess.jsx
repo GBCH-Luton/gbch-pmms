@@ -355,9 +355,6 @@ function StaffFormModal({ staff, roleOptions, staffDirectory, onClose, onSaved }
       <div style={modalCardStyle}>
         <p style={modalTitleStyle}>{staff ? 'Edit Staff Member' : 'Add Staff Member'}</p>
 
-        <p style={modalLabelStyle}>Full Name</p>
-        <input type="text" value={form.name} onChange={(e) => set('name', e.target.value)} style={inputStyle} />
-
         <p style={modalLabelStyle}>Email</p>
         <input
           type="text"
@@ -377,6 +374,9 @@ function StaffFormModal({ staff, roleOptions, staffDirectory, onClose, onSaved }
             ✓ Found {matchedExisting.name} in the staff directory — this will assign the role to their existing account, not create a duplicate.
           </p>
         )}
+
+        <p style={modalLabelStyle}>Full Name</p>
+        <input type="text" value={form.name} onChange={(e) => set('name', e.target.value)} style={inputStyle} />
 
         <p style={modalLabelStyle}>Role</p>
         <select value={form.role} onChange={(e) => set('role', e.target.value)} style={inputStyle}>
