@@ -29,3 +29,29 @@ export async function attachProperties(rows, columns = 'address') {
 
   return rows.map(r => ({ ...r, property: propertyById[r.property_id] || null }))
 }
+
+// Builder-facing equivalent of attachProperties -- calls
+// pmms.builder_properties() (a SECURITY DEFINER function) instead of
+// selecting from pmms.properties directly. Builders have no direct
+// row-level SELECT access to the properties table at all (removed
+// 2026-07-22, see scripts/fix_builder_property_column_exposure.sql) --
+// this function only ever returns a fixed, safe column set (id, address,
+// high_vulnerability, layout_type, safeguards, electrical_shutoff,
+// gas_shutoff), so there's no `columns` argument to pass here, unlike
+// attachProperties.
+export async function attachBuilderSafeProperties(rows) {
+  const propertyIds = [...new Set(rows.map(r => r.property_id).filter(id => id != null))]
+
+  if (propertyIds.length === 0) {
+    return rows.map(r => ({ ...r, property: null }))
+  }
+
+  const { data: properties } = await supabase
+    .schema('pmms')
+    .rpc('builder_properties', { property_ids: propertyIds })
+
+  const propertyById = {}
+  ;(properties || []).forEach(p => { propertyById[p.id] = p })
+
+  return rows.map(r => ({ ...r, property: propertyById[r.property_id] || null }))
+}

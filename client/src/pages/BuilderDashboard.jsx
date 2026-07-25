@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase'
 import { getCurrentPositionSafe } from '../lib/geo'
 import { fetchComplianceCheckTypes } from '../lib/compliance'
 import { fetchMaintenanceCategories, fetchAllMaintenanceCategoryNames, sortedCategoryEntries } from '../lib/maintenanceCategories'
-import { attachProperties } from '../lib/properties'
+import { attachBuilderSafeProperties } from '../lib/properties'
 import { logLoginEvent } from '../lib/loginEvents'
 import { pushNotificationsSupported, hasActivePushSubscription, enablePushNotifications } from '../lib/pushNotifications'
 import { pushEmergencyAlert, priorityTierLabel, fetchPriorityThresholds } from './admin/shared'
@@ -234,7 +234,7 @@ export default function BuilderDashboard({ profile }) {
       .not('status', 'in', '("Archived","Cancelled")')
       .order('priority_score', { ascending: false })
 
-    if (!error) setTickets(await attachProperties(data, 'address, safeguards, electrical_shutoff, gas_shutoff, high_vulnerability'))
+    if (!error) setTickets(await attachBuilderSafeProperties(data))
     setLoading(false)
   }
 
@@ -261,7 +261,7 @@ export default function BuilderDashboard({ profile }) {
     }
 
     const { data, error } = await query
-    if (!error) setAvailableJobs(await attachProperties(data, 'address'))
+    if (!error) setAvailableJobs(await attachBuilderSafeProperties(data))
   }
 
   // The `.is('assigned_builder_id', null)` in the update itself is what
@@ -684,8 +684,7 @@ export default function BuilderDashboard({ profile }) {
   async function fetchTicketProperties() {
     const { data, error } = await supabase
       .schema('pmms')
-      .from('properties')
-      .select('id, address, high_vulnerability, layout_type')
+      .rpc('builder_properties')
       .order('address')
 
     if (!error) setTicketProperties(data)
@@ -701,7 +700,7 @@ export default function BuilderDashboard({ profile }) {
       .eq('raised_by', profile.id)
       .order('created_at', { ascending: false })
 
-    if (!error) setReportedTickets(await attachProperties(data, 'address'))
+    if (!error) setReportedTickets(await attachBuilderSafeProperties(data))
   }
 
   function handleTicketPhoto(e) {
