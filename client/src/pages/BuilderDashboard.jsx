@@ -7,12 +7,17 @@ import { attachBuilderSafeProperties } from '../lib/properties'
 import { logLoginEvent } from '../lib/loginEvents'
 import { pushNotificationsSupported, hasActivePushSubscription, enablePushNotifications } from '../lib/pushNotifications'
 import { pushEmergencyAlert, priorityTierLabel, fetchPriorityThresholds } from './admin/shared'
+import { fetchAvailableMaterials, logMaterialUsage } from '../lib/simsMaterialsBridge'
 import PropertySearchSelect from '../components/PropertySearchSelect'
 import gbchLogo from '../assets/gbch-logo.svg'
 
 // Hidden for now, not removed -- flip back to true to bring the builder's
 // self-serve "Log a Ticket" form back into the nav menu.
 const SHOW_LOG_TICKET_NAV = false
+
+// Sandbox-only prototype (see lib/simsMaterialsBridge.js) -- not
+// production-bound, not required for either PMMS or SIMS's launch.
+const SIMS_MATERIALS_PROTOTYPE_ENABLED = true
 
 export default function BuilderDashboard({ profile }) {
   const [tickets, setTickets] = useState([])
@@ -41,6 +46,10 @@ export default function BuilderDashboard({ profile }) {
   const [completePhotoPreview, setCompletePhotoPreview] = useState(null)
   const [completeSubmitting, setCompleteSubmitting] = useState(false)
   const [completeError, setCompleteError] = useState('')
+  // Sandbox-only SIMS materials-used prototype (see simsMaterialsBridge.js).
+  const [availableMaterials, setAvailableMaterials] = useState([])
+  const [materialsLoading, setMaterialsLoading] = useState(false)
+  const [materialRows, setMaterialRows] = useState([])
   const [routineVisitChecklistTemplate, setRoutineVisitChecklistTemplate] = useState([])
   const [checklistChecked, setChecklistChecked] = useState({})
   const [showNoAccessConfirm, setShowNoAccessConfirm] = useState(false)
@@ -383,6 +392,27 @@ export default function BuilderDashboard({ profile }) {
     setSelectedTicket(prev => ({ ...prev, status: 'In Progress' }))
   }
 
+  useEffect(() => {
+    if (!showCompleteConfirm || !SIMS_MATERIALS_PROTOTYPE_ENABLED) return
+    setMaterialsLoading(true)
+    fetchAvailableMaterials().then(items => {
+      setAvailableMaterials(items)
+      setMaterialsLoading(false)
+    })
+  }, [showCompleteConfirm])
+
+  function addMaterialRow() {
+    setMaterialRows(prev => [...prev, { itemId: '', quantity: '' }])
+  }
+
+  function updateMaterialRow(index, field, value) {
+    setMaterialRows(prev => prev.map((row, i) => i === index ? { ...row, [field]: value } : row))
+  }
+
+  function removeMaterialRow(index) {
+    setMaterialRows(prev => prev.filter((_, i) => i !== index))
+  }
+
   async function handleComplete(note, photoFile, checklistResponses) {
     setCompleteError('')
 
@@ -446,6 +476,16 @@ export default function BuilderDashboard({ profile }) {
     }
 
     await postAuditEvent(selectedTicket.id, 'Status Changed', `${previousStatus} → Completed — ${note.trim()}`)
+
+    // Sandbox-only SIMS materials-used prototype -- see
+    // lib/simsMaterialsBridge.js for what this is stubbing out to.
+    if (SIMS_MATERIALS_PROTOTYPE_ENABLED) {
+      const rowsToLog = materialRows.filter(row => row.itemId && Number(row.quantity) > 0)
+      for (const row of rowsToLog) {
+        await logMaterialUsage(selectedTicket.id, row.itemId, Number(row.quantity), profile.id)
+      }
+      setMaterialRows([])
+    }
 
     setCompleteSubmitting(false)
     await fetchTickets()
@@ -1538,7 +1578,7 @@ export default function BuilderDashboard({ profile }) {
         ))}
         {selectedTicket.status === 'In Progress' && !showPauseReasons && !showCompleteConfirm && !showNoAccessConfirm && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <button onClick={() => { setChecklistChecked({}); setShowCompleteConfirm(true) }} style={{ width: '100%', padding: '16px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: 700, cursor: 'pointer' }}>
+            <button onClick={() => { setChecklistChecked({}); setMaterialRows([]); setShowCompleteConfirm(true) }} style={{ width: '100%', padding: '16px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: 700, cursor: 'pointer' }}>
               ✓ Mark complete
             </button>
             <button onClick={() => setShowPauseReasons(true)} style={{ width: '100%', padding: '14px', background: '#fffbeb', color: '#92400e', border: '2px solid #fcd34d', borderRadius: '12px', fontSize: '14px', fontWeight: 700, cursor: 'pointer' }}>
@@ -1596,6 +1636,51 @@ export default function BuilderDashboard({ profile }) {
             </button>
             {completePhotoPreview && (
               <img src={completePhotoPreview} alt="Completed job preview" style={{ width: '100%', borderRadius: '10px', display: 'block' }} />
+            )}
+
+            {SIMS_MATERIALS_PROTOTYPE_ENABLED && (
+              <div>
+                <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Materials Used (optional)</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {materialRows.map((row, index) => (
+                    <div key={index} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <select
+                        value={row.itemId}
+                        onChange={(e) => updateMaterialRow(index, 'itemId', e.target.value)}
+                        style={{ flex: 1, padding: '10px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '13px', fontFamily: 'inherit', boxSizing: 'border-box' }}
+                      >
+                        <option value="">Select an item...</option>
+                        {availableMaterials.map(item => (
+                          <option key={item.id} value={item.id}>{item.name} ({item.unit})</option>
+                        ))}
+                      </select>
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={row.quantity}
+                        onChange={(e) => updateMaterialRow(index, 'quantity', e.target.value)}
+                        placeholder="Qty"
+                        style={{ width: '70px', padding: '10px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '13px', fontFamily: 'inherit', boxSizing: 'border-box' }}
+                      />
+                      <button
+                        onClick={() => removeMaterialRow(index)}
+                        aria-label="Remove"
+                        style={{ width: '36px', height: '36px', flexShrink: 0, border: 'none', background: '#fee2e2', color: '#dc2626', borderRadius: '8px', fontSize: '15px', cursor: 'pointer' }}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    onClick={addMaterialRow}
+                    disabled={materialsLoading}
+                    style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px dashed #cbd5e1', background: '#f8fafc', color: '#64748b', fontSize: '13px', fontWeight: 600, cursor: materialsLoading ? 'not-allowed' : 'pointer' }}
+                  >
+                    {materialsLoading ? 'Loading items...' : '+ Add material'}
+                  </button>
+                </div>
+              </div>
             )}
 
             {completeError && (
