@@ -3,13 +3,12 @@ import { supabase } from '../../lib/supabase'
 import { fetchAssignableStaffForCategory, builderOptionLabel, createNotification, sendPushNotification, pushEmergencyAlert, priorityTierLabel, fetchPriorityThresholds, EVENTS_FEATURE_ENABLED } from './shared'
 import { fetchComplianceCheckTypes } from '../../lib/compliance'
 import { fetchMaintenanceCategories, sortedCategoryEntries } from '../../lib/maintenanceCategories'
+import { fetchDivisions } from '../../lib/divisions'
 import PropertySearchSelect from '../../components/PropertySearchSelect'
 
 const ROOM_OPTIONS = ['Kitchen', 'Bathroom', 'Communal Area', 'Bedroom', 'Hallways / Stairs', 'Garden', 'Other Area...']
 
 const UNLISTED_MARKER_PREFIX = '__UNLISTED_FALLBACK__'
-
-const DEPARTMENTS = ['Residential', 'Supported Living', 'Administration', 'Maintenance']
 
 const isUnlistedTag = (tag) => typeof tag === 'string' && tag.startsWith(UNLISTED_MARKER_PREFIX)
 const unlistedTagFor = (category) => `${UNLISTED_MARKER_PREFIX}${category}`
@@ -104,6 +103,7 @@ export default function AdminRaiseTicket({ profile }) {
   const [sendPushOnAssign, setSendPushOnAssign] = useState(false)
   const [priorityOverride, setPriorityOverride] = useState('')
   const [department, setDepartment] = useState('')
+  const [departments, setDepartments] = useState([])
   const [p1Threshold, setP1Threshold] = useState(70)
   const [p2Threshold, setP2Threshold] = useState(40)
   const [openEvents, setOpenEvents] = useState([])
@@ -115,6 +115,7 @@ export default function AdminRaiseTicket({ profile }) {
     fetchMaintenanceCategories(profile.division).then(setMaintenanceCategories)
     fetchPriorityThresholds().then(({ p1, p2 }) => { setP1Threshold(p1); setP2Threshold(p2) })
     fetchOpenEvents()
+    fetchDivisions().then(setDepartments)
   }, [])
 
   // Any manager can tag a new ticket to an existing open Event at
@@ -693,7 +694,7 @@ export default function AdminRaiseTicket({ profile }) {
                 style={{ ...fieldSelectStyle, marginBottom: '14px' }}
               >
                 <option value="">Select a department...</option>
-                {DEPARTMENTS.map(d => (
+                {departments.map(d => (
                   <option key={d} value={d}>{d}</option>
                 ))}
               </select>
@@ -985,7 +986,7 @@ export default function AdminRaiseTicket({ profile }) {
                 style={{ ...fieldSelectStyle, marginBottom: '16px' }}
               >
                 <option value="">Select a department...</option>
-                {DEPARTMENTS.map(d => (
+                {departments.map(d => (
                   <option key={d} value={d}>{d}</option>
                 ))}
               </select>
