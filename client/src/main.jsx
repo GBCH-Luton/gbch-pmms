@@ -22,6 +22,17 @@ window.addEventListener('unhandledrejection', (event) => {
   })
 })
 
+// Registered unconditionally (not just when someone opts into push
+// notifications via enablePushNotifications()) so the app actually meets
+// browsers' "installable" criteria for everyone. Safe to call again there
+// too -- registering the same script twice just returns the existing
+// registration.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => { /* not fatal -- push opt-in will retry */ })
+  })
+}
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <ErrorBoundary>

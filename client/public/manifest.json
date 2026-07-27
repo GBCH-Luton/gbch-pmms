@@ -1,0 +1,13 @@
+{
+  "name": "GBCH PMMS",
+  "short_name": "PMMS",
+  "description": "Green Bridge Community Housing - Property Maintenance Management System",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0D1B3E",
+  "theme_color": "#0D1B3E",
+  "icons": [
+    { "src": "/favicon.svg", "type": "image/svg+xml", "sizes": "any", "purpose": "any" }
+  ]
+}

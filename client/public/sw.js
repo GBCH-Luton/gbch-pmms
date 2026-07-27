@@ -8,7 +8,7 @@ self.addEventListener('push', (event) => {
   event.waitUntil(
     self.registration.showNotification(data.title || 'PMMS', {
       body: data.body || '',
-      icon: '/icons.svg',
+      icon: '/favicon.svg',
     })
   )
 })
