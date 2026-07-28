@@ -9,8 +9,17 @@
 -- shape (phone/skills/gender columns already added).
 --
 -- Contents, in order: schema, extensions, tables (PK/UNIQUE/CHECK inline),
--- indexes, functions, foreign keys, sequence ownership, RLS enable, RLS
--- policies. No triggers exist in the sandbox pmms schema (checked, none found).
+-- indexes, functions, foreign keys, sequence ownership, grants, RLS enable,
+-- RLS policies. No triggers exist in the sandbox pmms schema (checked, none
+-- found).
+--
+-- IMPORTANT: table/schema-level GRANTs are a separate layer from RLS.
+-- PostgREST needs both the schema in the project's exposed-schemas list
+-- (a dashboard/API setting, not SQL) AND actual GRANTs on the schema and
+-- its tables to anon/authenticated/service_role -- RLS only narrows what's
+-- visible AFTER that base grant already allows access. The first
+-- production deploy of this file omitted the GRANTs section below, which
+-- surfaced as "permission denied for schema pmms" until it was added.
 -- =============================================================================
 
 -- =============================================================================
@@ -675,7 +684,21 @@ ALTER TABLE pmms.work_sessions ADD CONSTRAINT work_sessions_builder_id_fkey FORE
 ALTER TABLE pmms.work_sessions ADD CONSTRAINT work_sessions_ticket_id_fkey FOREIGN KEY (ticket_id) REFERENCES pmms.tickets(id);
 
 -- =============================================================================
--- 8. ENABLE ROW LEVEL SECURITY
+-- 8. GRANTS
+-- Separate from RLS -- these are the base privileges PostgREST needs before
+-- RLS gets a chance to narrow anything. Verified to match the sandbox's
+-- actual grants exactly (all 19 tables, ALL privilege, same 3 roles).
+-- Function EXECUTE needs no explicit grant: Postgres grants EXECUTE on new
+-- functions to PUBLIC by default, and nothing here revokes it.
+-- =============================================================================
+grant usage on schema pmms to anon, authenticated, service_role;
+grant all on all tables in schema pmms to anon, authenticated, service_role;
+grant all on all sequences in schema pmms to anon, authenticated, service_role;
+alter default privileges in schema pmms grant all on tables to anon, authenticated, service_role;
+alter default privileges in schema pmms grant all on sequences to anon, authenticated, service_role;
+
+-- =============================================================================
+-- 9. ENABLE ROW LEVEL SECURITY
 -- =============================================================================
 ALTER TABLE pmms.properties ENABLE ROW LEVEL SECURITY;
 ALTER TABLE pmms.events ENABLE ROW LEVEL SECURITY;
@@ -698,7 +721,7 @@ ALTER TABLE pmms.error_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE pmms.settings ENABLE ROW LEVEL SECURITY;
 
 -- =============================================================================
--- 9. RLS POLICIES
+-- 10. RLS POLICIES
 -- Copied verbatim from pg_policies (qual / with_check expressions untouched).
 -- =============================================================================
 
