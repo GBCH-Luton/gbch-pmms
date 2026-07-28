@@ -54,7 +54,7 @@ import { supabase } from '../../lib/supabase'
 import {
   actionBtnStyle, Avatar, thStyle, tdStyle, formatUKDateTime, filterSelectStyle,
   modalOverlayStyle, modalCardStyle, modalTitleStyle, modalLabelStyle, modalErrorStyle,
-  modalCancelBtnStyle, modalConfirmBtnStyle, autoReassignDepartingStaffTickets,
+  modalCancelBtnStyle, modalConfirmBtnStyle, autoReassignDepartingStaffTickets, extractFunctionError,
 } from './shared'
 
 const LOGIN_EVENTS_LIMIT = 50
@@ -84,19 +84,6 @@ function roleStyle(role) {
 const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '13px', fontFamily: 'inherit', boxSizing: 'border-box' }
 
 const emptyForm = { name: '', email: '', role: 'Builder', job_title: '', phone: '', skills: [] }
-
-// supabase-js resolves a non-2xx Edge Function response as `error`, with the
-// JSON body only reachable via error.context (a Response) -- this digs the
-// { error: "..." } message back out, falling back to the SDK's own message.
-async function extractFunctionError(error) {
-  try {
-    const parsed = await error.context?.json()
-    if (parsed?.error) return parsed.error
-  } catch {
-    // fall through to the generic message below
-  }
-  return error.message || 'Something went wrong. Please try again.'
-}
 
 // Shown once, right after a temp password is generated -- by a brand new
 // account (StaffFormModal) or a reset on an existing one (ResetPasswordModal).

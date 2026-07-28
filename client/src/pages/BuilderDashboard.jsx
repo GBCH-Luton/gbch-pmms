@@ -1300,7 +1300,7 @@ export default function BuilderDashboard({ profile }) {
       </div>
       {/* Job detail modal */}
 {selectedTicket && (
-  <div style={{ position: 'fixed', inset: 0, background: '#f1f5f9', zIndex: 50, overflowY: 'auto', fontFamily: 'system-ui, sans-serif' }}>
+  <div style={{ position: 'fixed', top: 'var(--pmms-banner-offset, 0px)', left: 0, right: 0, bottom: 0, background: '#f1f5f9', zIndex: 50, overflowY: 'auto', fontFamily: 'system-ui, sans-serif' }}>
 
     {/* Header */}
     <div style={{ position: 'sticky', top: 0, zIndex: 10 }}>
@@ -1885,7 +1885,7 @@ export default function BuilderDashboard({ profile }) {
 
       {/* My Mileage page */}
       {page === 'mileage' && (
-        <div style={{ position: 'fixed', inset: 0, background: '#f1f5f9', zIndex: 50, overflowY: 'auto', fontFamily: 'system-ui, sans-serif' }}>
+        <div style={{ position: 'fixed', top: 'var(--pmms-banner-offset, 0px)', left: 0, right: 0, bottom: 0, background: '#f1f5f9', zIndex: 50, overflowY: 'auto', fontFamily: 'system-ui, sans-serif' }}>
 
           {/* Header */}
           <div style={{ position: 'sticky', top: 0, zIndex: 10 }}>
@@ -2002,7 +2002,7 @@ export default function BuilderDashboard({ profile }) {
 
       {/* My Metrics page */}
       {page === 'metrics' && (
-        <div style={{ position: 'fixed', inset: 0, background: '#f1f5f9', zIndex: 50, overflowY: 'auto', fontFamily: 'system-ui, sans-serif' }}>
+        <div style={{ position: 'fixed', top: 'var(--pmms-banner-offset, 0px)', left: 0, right: 0, bottom: 0, background: '#f1f5f9', zIndex: 50, overflowY: 'auto', fontFamily: 'system-ui, sans-serif' }}>
 
           {/* Header */}
           <div style={{ position: 'sticky', top: 0, zIndex: 10 }}>
@@ -2143,7 +2143,7 @@ export default function BuilderDashboard({ profile }) {
 
       {/* Raise New Ticket page */}
       {page === 'new-ticket' && (
-        <div style={{ position: 'fixed', inset: 0, background: '#f1f5f9', zIndex: 50, overflowY: 'auto', fontFamily: 'system-ui, sans-serif' }}>
+        <div style={{ position: 'fixed', top: 'var(--pmms-banner-offset, 0px)', left: 0, right: 0, bottom: 0, background: '#f1f5f9', zIndex: 50, overflowY: 'auto', fontFamily: 'system-ui, sans-serif' }}>
 
           {/* Header */}
           <div style={{ position: 'sticky', top: 0, zIndex: 10 }}>
@@ -2711,7 +2711,7 @@ export default function BuilderDashboard({ profile }) {
 
       {/* My Reports page */}
       {page === 'my-reports' && (
-        <div style={{ position: 'fixed', inset: 0, background: '#f1f5f9', zIndex: 50, overflowY: 'auto', fontFamily: 'system-ui, sans-serif' }}>
+        <div style={{ position: 'fixed', top: 'var(--pmms-banner-offset, 0px)', left: 0, right: 0, bottom: 0, background: '#f1f5f9', zIndex: 50, overflowY: 'auto', fontFamily: 'system-ui, sans-serif' }}>
 
           {/* Header */}
           <div style={{ position: 'sticky', top: 0, zIndex: 10 }}>
@@ -2819,7 +2819,7 @@ export default function BuilderDashboard({ profile }) {
 
       {/* Available Jobs page */}
       {page === 'available-jobs' && (
-        <div style={{ position: 'fixed', inset: 0, background: '#f1f5f9', zIndex: 50, overflowY: 'auto', fontFamily: 'system-ui, sans-serif' }}>
+        <div style={{ position: 'fixed', top: 'var(--pmms-banner-offset, 0px)', left: 0, right: 0, bottom: 0, background: '#f1f5f9', zIndex: 50, overflowY: 'auto', fontFamily: 'system-ui, sans-serif' }}>
 
           {/* Header */}
           <div style={{ position: 'sticky', top: 0, zIndex: 10 }}>

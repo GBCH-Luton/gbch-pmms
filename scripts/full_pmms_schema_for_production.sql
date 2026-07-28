@@ -377,6 +377,20 @@ create table pmms.settings (
   CONSTRAINT settings_pkey PRIMARY KEY (setting_key)
 );
 
+-- impersonation_events: audit trail for the "View As" admin-impersonation
+-- feature (added 2026-07-28)
+create table pmms.impersonation_events (
+  id              uuid NOT NULL DEFAULT gen_random_uuid(),
+  admin_staff_id  uuid NOT NULL,
+  admin_name      text,
+  target_staff_id uuid NOT NULL,
+  target_name     text,
+  started_at      timestamp with time zone NOT NULL DEFAULT now(),
+  ended_at        timestamp with time zone,
+  user_agent      text,
+  CONSTRAINT impersonation_events_pkey PRIMARY KEY (id)
+);
+
 -- =============================================================================
 -- 5. INDEXES (explicit, non-PK/non-unique-constraint indexes)
 -- =============================================================================
@@ -651,6 +665,9 @@ ALTER TABLE pmms.events ADD CONSTRAINT events_property_id_fkey FOREIGN KEY (prop
 
 ALTER TABLE pmms.login_events ADD CONSTRAINT login_events_staff_id_fkey FOREIGN KEY (staff_id) REFERENCES staff(id);
 
+ALTER TABLE pmms.impersonation_events ADD CONSTRAINT impersonation_events_admin_staff_id_fkey FOREIGN KEY (admin_staff_id) REFERENCES staff(id);
+ALTER TABLE pmms.impersonation_events ADD CONSTRAINT impersonation_events_target_staff_id_fkey FOREIGN KEY (target_staff_id) REFERENCES staff(id);
+
 ALTER TABLE pmms.notifications ADD CONSTRAINT notifications_staff_id_fkey FOREIGN KEY (staff_id) REFERENCES staff(id) ON DELETE CASCADE;
 ALTER TABLE pmms.notifications ADD CONSTRAINT notifications_ticket_id_fkey FOREIGN KEY (ticket_id) REFERENCES pmms.tickets(id) ON DELETE CASCADE;
 
@@ -719,6 +736,7 @@ ALTER TABLE pmms.staff_roles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE pmms.work_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE pmms.error_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE pmms.settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE pmms.impersonation_events ENABLE ROW LEVEL SECURITY;
 
 -- =============================================================================
 -- 10. RLS POLICIES
@@ -784,6 +802,11 @@ CREATE POLICY "manager_read_and_link" ON pmms.events AS PERMISSIVE FOR SELECT TO
 CREATE POLICY "manager_update_any" ON pmms.events AS PERMISSIVE FOR UPDATE TO authenticated
   USING (pmms.is_admin_or_manager())
   WITH CHECK (pmms.is_admin_or_manager());
+
+-- impersonation_events
+CREATE POLICY "admin_full_access" ON pmms.impersonation_events AS PERMISSIVE FOR ALL TO authenticated
+  USING (pmms.current_access_level() = 'admin'::text)
+  WITH CHECK (pmms.current_access_level() = 'admin'::text);
 
 -- login_events
 CREATE POLICY "admin_read" ON pmms.login_events AS PERMISSIVE FOR SELECT TO authenticated

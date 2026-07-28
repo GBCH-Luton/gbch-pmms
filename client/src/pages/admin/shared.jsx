@@ -34,6 +34,19 @@ export const GARDEN_STATE_STYLES = {
   'Overgrown': { bg: '#fee2e2', color: '#dc2626' },
 }
 
+// supabase-js resolves a non-2xx Edge Function response as `error`, with the
+// JSON body only reachable via error.context (a Response) -- this digs the
+// { error: "..." } message back out, falling back to the SDK's own message.
+export async function extractFunctionError(error) {
+  try {
+    const parsed = await error.context?.json()
+    if (parsed?.error) return parsed.error
+  } catch {
+    // fall through to the generic message below
+  }
+  return error.message || 'Something went wrong. Please try again.'
+}
+
 export const STAFF_AVAILABILITY_OPTIONS = ['Available', 'On Leave', 'Sick']
 export const STAFF_AVAILABILITY_STYLES = {
   'Available': { bg: '#dcfce7', color: '#16a34a' },

@@ -19,6 +19,7 @@ import AdminAccess from './admin/AdminAccess'
 import AdminHelp from './admin/AdminHelp'
 import AdminHousekeeping from './admin/AdminHousekeeping'
 import AdminEvents from './admin/AdminEvents'
+import AdminViewAs from './admin/AdminViewAs'
 import { EVENTS_FEATURE_ENABLED, resolveStaffPhotoUrl } from './admin/shared'
 
 const NAV_ITEMS = [
@@ -45,10 +46,11 @@ const NAV_ITEMS = [
   // keep working as the single source of truth for routing + visibility.
   { key: 'settings', label: 'Settings', icon: '⚙️', Component: AdminSettings },
   { key: 'admin', label: 'Admin', icon: '🔐', Component: AdminAccess, adminOnly: true },
+  { key: 'view-as', label: 'View As...', icon: '👁️', Component: AdminViewAs, adminOnly: true },
   { key: 'help', label: 'Help & Guide', icon: '📖', Component: AdminHelp, adminOnly: true },
 ]
 
-const POPOVER_ITEM_KEYS = ['settings', 'admin', 'help']
+const POPOVER_ITEM_KEYS = ['settings', 'admin', 'view-as', 'help']
 
 // Visual grouping dividers in the main nav: Dashboard alone, then the
 // ticket lifecycle (Pipeline/Log a Ticket/Sign-Off), then property/
@@ -341,7 +343,7 @@ export default function AdminDashboard({ profile }) {
       {/* Desktop sidebar */}
       <div
         className="admin-sidebar-desktop"
-        style={{ width: '240px', minWidth: '240px', background: '#0D1B3E', display: 'flex', flexDirection: 'column', position: 'sticky', top: 0, height: '100vh' }}
+        style={{ width: '240px', minWidth: '240px', background: '#0D1B3E', display: 'flex', flexDirection: 'column', position: 'sticky', top: 'var(--pmms-banner-offset, 0px)', height: 'calc(100vh - var(--pmms-banner-offset, 0px))' }}
       >
         <SidebarContent />
       </div>
@@ -351,7 +353,7 @@ export default function AdminDashboard({ profile }) {
         {/* Mobile top bar */}
         <div
           className="admin-mobile-topbar"
-          style={{ alignItems: 'center', justifyContent: 'space-between', background: '#0D1B3E', padding: '14px 16px', position: 'sticky', top: 0, zIndex: 20 }}
+          style={{ alignItems: 'center', justifyContent: 'space-between', background: '#0D1B3E', padding: '14px 16px', position: 'sticky', top: 'var(--pmms-banner-offset, 0px)', zIndex: 20 }}
         >
           <button
             onClick={() => goToPage('dashboard')}

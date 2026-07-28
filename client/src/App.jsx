@@ -3,11 +3,13 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { supabase } from './lib/supabase'
 import { roleFromJobTitle, normalizeCustomRoles, accessLevelForRole, hideSettingsForRole, divisionForRole, canCreateEventsForRole } from './lib/roles'
 import { logLoginEvent } from './lib/loginEvents'
+import { consumeSuppressSignInLog } from './lib/impersonation'
 import Login from './pages/Login'
 import SetPassword from './pages/SetPassword'
 import AdminDashboard from './pages/AdminDashboard'
 import BuilderDashboard from './pages/BuilderDashboard'
 import SplashScreen from './pages/SplashScreen'
+import ImpersonationBanner from './components/ImpersonationBanner'
 
 export default function App() {
   const [session, setSession]   = useState(null)
@@ -52,8 +54,14 @@ export default function App() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session)
       if (session) {
+        // consumeSuppressSignInLog() must be called synchronously here,
+        // before fetchProfile's await -- it's what stops a "View As"
+        // session-swap (verifyOtp/setSession both fire SIGNED_IN, same as
+        // a real credentialed sign-in) from being logged as a genuine
+        // pmms.login_events row. See client/src/lib/impersonation.js.
+        const suppressLog = event === 'SIGNED_IN' && consumeSuppressSignInLog()
         fetchProfile(session.user.email).then(resolvedProfile => {
-          if (event === 'SIGNED_IN' && resolvedProfile) {
+          if (event === 'SIGNED_IN' && resolvedProfile && !suppressLog) {
             logLoginEvent(resolvedProfile, session.user.email, 'Signed In')
           }
         })
@@ -159,7 +167,9 @@ export default function App() {
   if (loading || !minSplashDone) return <SplashScreen />
 
   return (
-    <Routes>
+    <>
+      <ImpersonationBanner />
+      <Routes>
       <Route path="/login" element={!session ? <Login /> : <Navigate to={homeForRole()} replace />} />
       <Route path="/set-password" element={session ? <SetPassword profile={profile} onDone={() => fetchProfile(session.user.email)} /> : <Navigate to="/login" replace />} />
       <Route path="/admin" element={
@@ -183,6 +193,7 @@ export default function App() {
         </div>
       } />
       <Route path="*" element={<Navigate to={session ? homeForRole() : '/login'} replace />} />
-    </Routes>
+      </Routes>
+    </>
   )
 }
