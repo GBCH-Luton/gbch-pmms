@@ -342,6 +342,10 @@ function StaffFormModal({ staff, roleOptions, staffDirectory, onClose, onSaved }
       <div style={modalCardStyle}>
         <p style={modalTitleStyle}>{staff ? 'Edit Staff Member' : 'Add Staff Member'}</p>
 
+        <p style={{ margin: '0 0 16px 0', fontSize: '12px', color: '#92400e', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', padding: '8px 10px' }}>
+          Email, Full Name, Job Title, and Phone are shared with every other company system, not just PMMS. Editing them here is an interim measure until a dedicated IT/HR system takes over managing this data centrally.
+        </p>
+
         <p style={modalLabelStyle}>Email</p>
         <input
           type="text"
