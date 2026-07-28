@@ -18,7 +18,7 @@ select cron.schedule(
       url := 'https://hfubtfohtieglrvdgblc.functions.supabase.co/check-stuck-tickets',
       headers := jsonb_build_object(
         'Content-Type', 'application/json',
-        'x-cron-secret', '184285e4445895e8e690796857314ea8e3b90b290daaac6d2137b4832fa2efdd'
+        'x-cron-secret', 'YOUR_CRON_SECRET_HERE'
       ),
       body := '{}'::jsonb
     )
