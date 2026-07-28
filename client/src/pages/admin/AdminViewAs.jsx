@@ -15,7 +15,8 @@ export default function AdminViewAs({ profile }) {
   const [staffList, setStaffList] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [busyId, setBusyId] = useState(null)
+  const [selectedId, setSelectedId] = useState(null)
+  const [switching, setSwitching] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -57,18 +58,30 @@ export default function AdminViewAs({ profile }) {
     return s.name.toLowerCase().includes(q) || s.role.toLowerCase().includes(q) || (s.job_title || '').toLowerCase().includes(q)
   })
 
-  async function handleViewAs(staff) {
+  const selected = eligible.find(s => s.id === selectedId) || null
+
+  function handleSelectRow(staffId) {
     setError('')
-    setBusyId(staff.id)
-    const { data, error: fnError } = await supabase.functions.invoke('impersonate-staff', { body: { staffId: staff.id } })
+    setSelectedId(prev => prev === staffId ? null : staffId)
+  }
+
+  // Selecting a row just highlights it -- switching only happens from the
+  // explicit confirm button below, since a single click-to-act button per
+  // row was too easy to misclick (found live: clicked "View As" on a
+  // builder while meaning to pick a manager one row down).
+  async function handleConfirmViewAs() {
+    if (!selected) return
+    setError('')
+    setSwitching(true)
+    const { data, error: fnError } = await supabase.functions.invoke('impersonate-staff', { body: { staffId: selected.id } })
     if (fnError) {
       setError(await extractFunctionError(fnError))
-      setBusyId(null)
+      setSwitching(false)
       return
     }
     if (data?.error) {
       setError(data.error)
-      setBusyId(null)
+      setSwitching(false)
       return
     }
     const { error: swapError } = await startImpersonation({
@@ -78,7 +91,7 @@ export default function AdminViewAs({ profile }) {
     })
     if (swapError) {
       setError(swapError)
-      setBusyId(null)
+      setSwitching(false)
     }
     // On success, App.jsx's auth listener takes over and routing redirects
     // to the target's dashboard -- no navigation call needed here.
@@ -112,29 +125,26 @@ export default function AdminViewAs({ profile }) {
               <th style={thStyle}>Name</th>
               <th style={thStyle}>Role</th>
               <th style={thStyle}>Job Title</th>
-              <th style={thStyle}></th>
             </tr>
           </thead>
           <tbody>
             {filtered.map(s => (
-              <tr key={s.id} style={{ borderTop: '1px solid #f1f5f9' }}>
+              <tr
+                key={s.id}
+                onClick={() => handleSelectRow(s.id)}
+                style={{
+                  borderTop: '1px solid #f1f5f9', cursor: 'pointer',
+                  background: selectedId === s.id ? '#eff6ff' : 'transparent',
+                }}
+              >
                 <td style={tdStyle}>{s.name}</td>
                 <td style={tdStyle}>{s.role}</td>
                 <td style={tdStyle}>{s.job_title || '—'}</td>
-                <td style={{ ...tdStyle, textAlign: 'right' }}>
-                  <button
-                    onClick={() => handleViewAs(s)}
-                    disabled={busyId === s.id}
-                    style={actionBtnStyle}
-                  >
-                    {busyId === s.id ? 'Switching...' : 'View As'}
-                  </button>
-                </td>
               </tr>
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={4} style={{ ...tdStyle, textAlign: 'center', color: '#94a3b8', padding: '24px' }}>
+                <td colSpan={3} style={{ ...tdStyle, textAlign: 'center', color: '#94a3b8', padding: '24px' }}>
                   No eligible staff members found.
                 </td>
               </tr>
@@ -142,6 +152,25 @@ export default function AdminViewAs({ profile }) {
           </tbody>
         </table>
       </div>
+
+      {selected && (
+        <div style={{
+          position: 'sticky', bottom: '16px', marginTop: '16px', background: '#0f172a', color: '#fff',
+          borderRadius: '10px', padding: '12px 16px', display: 'flex', alignItems: 'center',
+          justifyContent: 'space-between', gap: '12px', boxShadow: '0 8px 20px rgba(0,0,0,0.15)',
+        }}>
+          <span style={{ fontSize: '13px', fontWeight: 600 }}>
+            Selected: {selected.name} ({selected.role})
+          </span>
+          <button
+            onClick={handleConfirmViewAs}
+            disabled={switching}
+            style={actionBtnStyle}
+          >
+            {switching ? 'Switching...' : `View As ${selected.name}`}
+          </button>
+        </div>
+      )}
     </div>
   )
 }

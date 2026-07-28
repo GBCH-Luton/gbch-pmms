@@ -168,7 +168,10 @@ export default function App() {
 
   return (
     <>
-      <ImpersonationBanner />
+      {/* AdminDashboard's own sidebar has a "Return to my account" button
+          (guaranteed visible, no z-index/layout fights); BuilderDashboard
+          has no equivalent chrome yet, so it still needs the banner. */}
+      {profile?.role === 'builder' && <ImpersonationBanner />}
       <Routes>
       <Route path="/login" element={!session ? <Login /> : <Navigate to={homeForRole()} replace />} />
       <Route path="/set-password" element={session ? <SetPassword profile={profile} onDone={() => fetchProfile(session.user.email)} /> : <Navigate to="/login" replace />} />
