@@ -54,16 +54,32 @@ export async function startImpersonation({ hashedToken, targetName, impersonatio
   return { error: null }
 }
 
+// Supabase-js's internal auth calls are serialized behind a lock (the Web
+// Locks API where available); if verifyOtp()/setSession() ever leaves that
+// lock in a bad state, a later auth call can hang indefinitely -- neither
+// resolving nor rejecting, so a plain try/catch never fires. Racing against
+// a timeout is the only way to guarantee this can't hang the UI forever.
+function withTimeout(promise, ms, timeoutMessage) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(timeoutMessage)), ms)),
+  ])
+}
+
 export async function returnToAdmin() {
   const marker = getImpersonationMarker()
   if (!marker) return { error: null }
 
   try {
     sessionStorage.setItem(SUPPRESS_KEY, '1')
-    const { error } = await supabase.auth.setSession({
-      access_token: marker.adminAccessToken,
-      refresh_token: marker.adminRefreshToken,
-    })
+    const { error } = await withTimeout(
+      supabase.auth.setSession({
+        access_token: marker.adminAccessToken,
+        refresh_token: marker.adminRefreshToken,
+      }),
+      8000,
+      'Timed out returning to your account.'
+    )
     localStorage.removeItem(MARKER_KEY)
 
     if (error) {
@@ -71,7 +87,7 @@ export async function returnToAdmin() {
       // was left open long enough for the refresh token to expire) --
       // fall back to a clean sign-out rather than leaving the browser
       // stuck looking like the target with a broken "Return" button.
-      await supabase.auth.signOut().catch(() => {})
+      await forceSignOutAndReload()
       return { error: error.message }
     }
 
@@ -86,13 +102,29 @@ export async function returnToAdmin() {
 
     return { error: null }
   } catch (err) {
-    // setSession() throwing outright (as opposed to returning {error}) was
-    // previously left completely unhandled here, leaving the marker intact
-    // and the banner's button stuck on "Returning..." forever with no
-    // feedback. Clear the marker and force a clean sign-out so the admin
-    // always ends up somewhere recoverable.
+    // setSession() either threw outright or (more likely, based on live
+    // testing) hung indefinitely without resolving or rejecting -- a known
+    // failure mode of supabase-js's internal auth lock if a prior call
+    // left it in a bad state. A plain retry through the same client would
+    // risk hanging the exact same way, so this falls back to clearing
+    // Supabase's own session storage directly and reloading the page --
+    // a fresh page load can't inherit a stuck in-memory/Web-Lock state.
     localStorage.removeItem(MARKER_KEY)
-    await supabase.auth.signOut().catch(() => {})
+    await forceSignOutAndReload()
     return { error: err?.message || 'Something went wrong returning to your account. Please sign in again.' }
   }
+}
+
+async function forceSignOutAndReload() {
+  try {
+    await withTimeout(supabase.auth.signOut(), 3000, 'signOut timed out')
+  } catch {
+    // signOut() itself hung/failed -- clear Supabase's own localStorage
+    // session key directly rather than trying another auth-client call
+    // that could hang the same way.
+    Object.keys(localStorage)
+      .filter(k => k.startsWith('sb-') && k.endsWith('-auth-token'))
+      .forEach(k => localStorage.removeItem(k))
+  }
+  window.location.href = '/login'
 }

@@ -21,6 +21,7 @@ import AdminHousekeeping from './admin/AdminHousekeeping'
 import AdminEvents from './admin/AdminEvents'
 import AdminViewAs from './admin/AdminViewAs'
 import { EVENTS_FEATURE_ENABLED, resolveStaffPhotoUrl } from './admin/shared'
+import { getImpersonationMarker, returnToAdmin } from '../lib/impersonation'
 
 const NAV_ITEMS = [
   // Grouped by what they're actually for: core ticket lifecycle first,
@@ -190,7 +191,16 @@ export default function AdminDashboard({ profile }) {
   // the two without any extra work.
   function SidebarContent() {
     const [popoverOpen, setPopoverOpen] = useState(false)
+    const [returning, setReturning] = useState(false)
+    const impersonationMarker = getImpersonationMarker()
     const popoverRef = useRef(null)
+
+    async function handleReturnToAdmin() {
+      setReturning(true)
+      await returnToAdmin()
+      // App.jsx's onAuthStateChange (SIGNED_IN, suppressed) resolves the
+      // admin's own profile again; routing redirects to /admin on its own.
+    }
     const triggerRef = useRef(null)
 
     // Same click-outside pattern as PropertySearchSelect.jsx.
@@ -226,6 +236,24 @@ export default function AdminDashboard({ profile }) {
           <img src={gbchLogo} alt="GBCH" style={{ height: '32px' }} />
           <span style={{ fontSize: '15px', fontWeight: 800, color: '#ffffff' }}>PMMS</span>
         </button>
+
+        {impersonationMarker && (
+          <div style={{ padding: '10px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+            <p style={{ margin: '0 0 6px', fontSize: '12px', color: 'rgba(255,255,255,0.7)', fontWeight: 600 }}>
+              Viewing as {impersonationMarker.targetName}
+            </p>
+            <button
+              onClick={handleReturnToAdmin}
+              disabled={returning}
+              style={{
+                width: '100%', background: '#b45309', color: '#fff', border: 'none', borderRadius: '8px',
+                padding: '8px 12px', fontSize: '13px', fontWeight: 700, cursor: returning ? 'default' : 'pointer',
+              }}
+            >
+              {returning ? 'Returning…' : 'Return to my account'}
+            </button>
+          </div>
+        )}
 
         <nav style={{ flex: 1, padding: '10px', overflowY: 'auto' }}>
           {mainNavItems.map(item => (
@@ -348,7 +376,7 @@ export default function AdminDashboard({ profile }) {
         <SidebarContent />
       </div>
 
-      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', paddingTop: 'var(--pmms-banner-offset, 0px)' }}>
 
         {/* Mobile top bar */}
         <div
@@ -393,7 +421,7 @@ export default function AdminDashboard({ profile }) {
 
       {/* Mobile drawer */}
       {sidebarOpen && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex' }}>
+        <div style={{ position: 'fixed', top: 'var(--pmms-banner-offset, 0px)', left: 0, right: 0, bottom: 0, zIndex: 100, display: 'flex' }}>
           <div style={{ width: '260px', maxWidth: '80vw', background: '#0D1B3E', height: '100%', display: 'flex', flexDirection: 'column' }}>
             <SidebarContent />
           </div>
