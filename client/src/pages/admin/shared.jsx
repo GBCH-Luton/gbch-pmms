@@ -41,13 +41,25 @@ export const STAFF_AVAILABILITY_STYLES = {
   'Sick': { bg: '#fee2e2', color: '#dc2626' },
 }
 
+// public.staff is a company-wide table other systems also write to, and
+// they don't all store photo_url the same way -- PMMS's own uploads always
+// write a full https:// URL (via storage.getPublicUrl()), but at least one
+// other system stores just a bare filename in a shared "staff-photos"
+// bucket and reconstructs the full URL itself elsewhere. Resolving through
+// getPublicUrl() here handles both: passing an already-absolute URL
+// through unchanged, or turning a bare filename into a real URL.
+export function resolveStaffPhotoUrl(photoUrl) {
+  if (!photoUrl) return null
+  if (/^https?:\/\//i.test(photoUrl)) return photoUrl
+  return supabase.storage.from('staff-photos').getPublicUrl(photoUrl).data.publicUrl
+}
+
 // Circular staff photo, falling back to initials-on-a-grey-circle when
-// photo_url is null/empty (nobody has one set yet in the sandbox, but
-// public.staff is the same company-wide table other systems also write to,
-// so this reads whatever's there rather than needing its own upload path).
+// photo_url is null/empty.
 export function Avatar({ name, photoUrl, size = 36 }) {
-  if (photoUrl) {
-    return <img src={photoUrl} alt="" style={{ width: `${size}px`, height: `${size}px`, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+  const resolvedUrl = resolveStaffPhotoUrl(photoUrl)
+  if (resolvedUrl) {
+    return <img src={resolvedUrl} alt="" style={{ width: `${size}px`, height: `${size}px`, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
   }
   const initials = (name || '?').split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase()
   return (

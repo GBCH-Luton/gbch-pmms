@@ -19,7 +19,7 @@ import AdminAccess from './admin/AdminAccess'
 import AdminHelp from './admin/AdminHelp'
 import AdminHousekeeping from './admin/AdminHousekeeping'
 import AdminEvents from './admin/AdminEvents'
-import { EVENTS_FEATURE_ENABLED } from './admin/shared'
+import { EVENTS_FEATURE_ENABLED, resolveStaffPhotoUrl } from './admin/shared'
 
 const NAV_ITEMS = [
   // Grouped by what they're actually for: core ticket lifecycle first,
@@ -297,8 +297,8 @@ export default function AdminDashboard({ profile }) {
             onClick={() => setPopoverOpen(o => !o)}
             style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', background: 'none', border: 'none', padding: '4px', margin: '-4px -4px 10px -4px', borderRadius: '8px', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}
           >
-            {profile.photo_url ? (
-              <img src={profile.photo_url} alt="" style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+            {resolveStaffPhotoUrl(profile.photo_url) ? (
+              <img src={resolveStaffPhotoUrl(profile.photo_url)} alt="" style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
             ) : (
               <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'rgba(255,255,255,0.15)', color: '#ffffff', fontSize: '13px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 {(profile.name || '?').split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase()}
