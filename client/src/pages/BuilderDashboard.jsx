@@ -8,7 +8,9 @@ import { logLoginEvent } from '../lib/loginEvents'
 import { pushNotificationsSupported, hasActivePushSubscription, enablePushNotifications } from '../lib/pushNotifications'
 import { pushEmergencyAlert, priorityTierLabel, fetchPriorityThresholds } from './admin/shared'
 import { fetchAvailableMaterials, logMaterialUsage } from '../lib/simsMaterialsBridge'
+import { fetchChannelMessages, subscribeToChannel, postMessage, markChannelRead, countUnreadMentions, colorForSender } from '../lib/chat'
 import PropertySearchSelect from '../components/PropertySearchSelect'
+import ChatComposer from '../components/ChatComposer'
 import gbchLogo from '../assets/gbch-logo.svg'
 
 // Hidden for now, not removed -- flip back to true to bring the builder's
@@ -26,6 +28,16 @@ export default function BuilderDashboard({ profile }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [statusFilter, setStatusFilter] = useState('ALL')
   const [page, setPage] = useState('jobs')
+  // Builder devision -- no channel picker at all here, unlike the
+  // Admin/Manager view, since a builder always belongs to exactly one
+  // channel. Built-in Builder role resolves profile.division as null
+  // (see pmms.current_division()'s own behaviour), which defaults to
+  // 'Maintenance' -- same convention used everywhere else in this app.
+  const chatDivision = profile.division || 'Maintenance'
+  const [chatMessages, setChatMessages] = useState([])
+  const [chatMembers, setChatMembers] = useState([])
+  const [chatSending, setChatSending] = useState(false)
+  const [unreadMentions, setUnreadMentions] = useState(0)
   const [fromLocation, setFromLocation] = useState(null)
   const [customLocation, setCustomLocation] = useState('')
   const [miles, setMiles] = useState(0)
@@ -111,13 +123,20 @@ export default function BuilderDashboard({ profile }) {
     // browser can report "granted" with nothing ever subscribed) -- this
     // is the real check for whether the button should offer to enable.
     hasActivePushSubscription().then(setPushEnabled)
+    countUnreadMentions(chatDivision, profile.id).then(setUnreadMentions)
     // Polled rather than pushed -- notifications are created by an admin
     // action elsewhere, so this is the only way this session finds out
     // about a new one without the builder manually refreshing. Available
     // jobs are polled the same way, for the same reason -- no realtime
     // infrastructure exists anywhere in this app, so this is how a job
     // someone else claimed disappears from here without a manual refresh.
-    const interval = setInterval(() => { fetchNotifications(); fetchAvailableJobs() }, 45000)
+    // The unread-mentions badge (Team Chat) is polled here too rather
+    // than via its own Realtime subscription, since it needs to update
+    // even while the chat view itself isn't open.
+    const interval = setInterval(() => {
+      fetchNotifications(); fetchAvailableJobs()
+      countUnreadMentions(chatDivision, profile.id).then(setUnreadMentions)
+    }, 45000)
     return () => clearInterval(interval)
   }, [])
 
@@ -131,7 +150,39 @@ export default function BuilderDashboard({ profile }) {
     if (page === 'my-reports') {
       fetchReportedTickets()
     }
+    if (page === 'team-chat') {
+      fetchChannelMessages(chatDivision).then(setChatMessages)
+      fetchChatMembers()
+      markChannelRead(chatDivision)
+      setUnreadMentions(0)
+      const unsubscribe = subscribeToChannel(chatDivision, (newMessage) => {
+        setChatMessages(prev => [...prev, newMessage])
+        markChannelRead(chatDivision)
+        if ((newMessage.mentioned_staff_ids || []).includes(profile.id)) setUnreadMentions(0)
+      })
+      return unsubscribe
+    }
   }, [page])
+
+  async function fetchChatMembers() {
+    // Builders can only SELECT their own row in public.staff -- this
+    // SECURITY DEFINER function (pmms.chat_channel_members()) is what
+    // lets a builder caller get the id/name list the @mention picker
+    // needs, without loosening public.staff's RLS itself. Scoped to this
+    // builder's own channel (chatDivision) -- so only people who could
+    // actually see/respond here show up, not the whole company.
+    const { data } = await supabase.schema('pmms').rpc('chat_channel_members', { target_division: chatDivision })
+    setChatMembers(data || [])
+  }
+
+  async function handleSendChatMessage(body, mentionedIds) {
+    setChatSending(true)
+    await postMessage({
+      division: chatDivision, senderId: profile.id, senderName: profile.name,
+      body, mentionedStaffIds: mentionedIds,
+    })
+    setChatSending(false)
+  }
 
   useEffect(() => {
     setFromLocation(null)
@@ -1193,6 +1244,15 @@ export default function BuilderDashboard({ profile }) {
               >
                 📊 My Metrics
               </button>
+              <button
+                onClick={() => { setPage('team-chat'); setMenuOpen(false) }}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
+              >
+                <span>💬 Team Chat</span>
+                {unreadMentions > 0 && (
+                  <span style={{ background: '#dc2626', color: '#fff', fontSize: '11px', fontWeight: 800, padding: '2px 8px', borderRadius: '999px' }}>{unreadMentions}</span>
+                )}
+              </button>
               {pushNotificationsSupported() && (
                 <button
                   onClick={handleEnableNotifications}
@@ -1350,6 +1410,15 @@ export default function BuilderDashboard({ profile }) {
               style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
             >
               📊 My Metrics
+            </button>
+            <button
+              onClick={() => { setPage('team-chat'); setMenuOpen(false) }}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
+            >
+              <span>💬 Team Chat</span>
+              {unreadMentions > 0 && (
+                <span style={{ background: '#dc2626', color: '#fff', fontSize: '11px', fontWeight: 800, padding: '2px 8px', borderRadius: '999px' }}>{unreadMentions}</span>
+              )}
             </button>
             <button
               onClick={handleSignOut}
@@ -1947,6 +2016,15 @@ export default function BuilderDashboard({ profile }) {
                     📊 My Metrics
                   </button>
                   <button
+                    onClick={() => { setPage('team-chat'); setMenuOpen(false) }}
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
+                  >
+                    <span>💬 Team Chat</span>
+                    {unreadMentions > 0 && (
+                      <span style={{ background: '#dc2626', color: '#fff', fontSize: '11px', fontWeight: 800, padding: '2px 8px', borderRadius: '999px' }}>{unreadMentions}</span>
+                    )}
+                  </button>
+                  <button
                     onClick={handleSignOut}
                     style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
                   >
@@ -2064,6 +2142,15 @@ export default function BuilderDashboard({ profile }) {
                     📊 My Metrics
                   </button>
                   <button
+                    onClick={() => { setPage('team-chat'); setMenuOpen(false) }}
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
+                  >
+                    <span>💬 Team Chat</span>
+                    {unreadMentions > 0 && (
+                      <span style={{ background: '#dc2626', color: '#fff', fontSize: '11px', fontWeight: 800, padding: '2px 8px', borderRadius: '999px' }}>{unreadMentions}</span>
+                    )}
+                  </button>
+                  <button
                     onClick={handleSignOut}
                     style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
                   >
@@ -2141,6 +2228,63 @@ export default function BuilderDashboard({ profile }) {
         </div>
       )}
 
+      {/* Team Chat -- no channel/division picker, unlike the Admin/Manager
+          view: a builder only ever has one channel (their resolved
+          division, defaulting to Maintenance), so there's nothing to
+          pick between. Realtime, not polling -- this app's first use of
+          Supabase Realtime (see lib/chat.js). */}
+      {page === 'team-chat' && (
+        <div style={{ position: 'fixed', top: 'var(--pmms-banner-offset, 0px)', left: 0, right: 0, bottom: 0, background: '#f1f5f9', zIndex: 50, display: 'flex', flexDirection: 'column', fontFamily: 'system-ui, sans-serif' }}>
+
+          {/* Header */}
+          <div style={{ background: '#ffffff', borderBottom: '1px solid #e2e8f0', padding: '14px 20px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <button onClick={() => setPage('jobs')} style={{ background: '#f1f5f9', border: 'none', borderRadius: '8px', padding: '8px 14px', fontSize: '13px', fontWeight: 700, color: '#64748b', cursor: 'pointer' }}>
+              ← Back
+            </button>
+            <div>
+              <p style={{ margin: 0, fontSize: '15px', fontWeight: 800, color: '#0f172a' }}>💬 {chatDivision} Team Chat</p>
+            </div>
+          </div>
+
+          {/* Messages */}
+          <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {chatMessages.length === 0 && (
+              <p style={{ margin: 'auto', color: '#94a3b8', fontSize: '13px' }}>No messages yet -- say hello 👋</p>
+            )}
+            {chatMessages.map(m => {
+              const isMine = m.sender_id === profile.id
+              return (
+                <div key={m.id} style={{ alignSelf: isMine ? 'flex-end' : 'flex-start', maxWidth: '80%' }}>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'baseline', flexDirection: isMine ? 'row-reverse' : 'row' }}>
+                    <span style={{ fontSize: '12px', fontWeight: 800, color: isMine ? '#0f172a' : colorForSender(m.sender_id) }}>{isMine ? 'You' : m.sender_name}</span>
+                    <span style={{ fontSize: '11px', color: '#94a3b8' }}>{formatUKDateTime(m.created_at)}</span>
+                  </div>
+                  <div style={{
+                    marginTop: '2px', padding: '8px 12px', fontSize: '13.5px', lineHeight: 1.4,
+                    background: isMine ? '#19562e' : '#ffffff', color: isMine ? '#fff' : '#374151',
+                    border: isMine ? 'none' : '1px solid #e2e8f0',
+                    borderRadius: isMine ? '12px 4px 12px 12px' : '4px 12px 12px 12px',
+                  }}>
+                    {m.body}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Composer */}
+          <div style={{ background: '#ffffff', borderTop: '1px solid #e2e8f0', padding: '10px 14px 14px' }}>
+            <ChatComposer
+              members={chatMembers.filter(m => m.id !== profile.id)}
+              onSend={handleSendChatMessage}
+              sending={chatSending}
+              inputStyle={{ flex: 1, padding: '10px 14px', borderRadius: '20px', border: '1px solid #e2e8f0', fontSize: '13.5px', fontFamily: 'inherit' }}
+              sendButtonStyle={{ width: '40px', height: '40px', borderRadius: '50%', border: 'none', background: '#19562e', color: '#fff', fontSize: '14px', fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
+            />
+          </div>
+        </div>
+      )}
+
       {/* Raise New Ticket page */}
       {page === 'new-ticket' && (
         <div style={{ position: 'fixed', top: 'var(--pmms-banner-offset, 0px)', left: 0, right: 0, bottom: 0, background: '#f1f5f9', zIndex: 50, overflowY: 'auto', fontFamily: 'system-ui, sans-serif' }}>
@@ -2203,6 +2347,15 @@ export default function BuilderDashboard({ profile }) {
                     style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
                   >
                     📊 My Metrics
+                  </button>
+                  <button
+                    onClick={() => { setPage('team-chat'); setMenuOpen(false) }}
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
+                  >
+                    <span>💬 Team Chat</span>
+                    {unreadMentions > 0 && (
+                      <span style={{ background: '#dc2626', color: '#fff', fontSize: '11px', fontWeight: 800, padding: '2px 8px', borderRadius: '999px' }}>{unreadMentions}</span>
+                    )}
                   </button>
                   <button
                     onClick={handleSignOut}
@@ -2771,6 +2924,15 @@ export default function BuilderDashboard({ profile }) {
                     style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
                   >
                     📊 My Metrics
+                  </button>
+                  <button
+                    onClick={() => { setPage('team-chat'); setMenuOpen(false) }}
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
+                  >
+                    <span>💬 Team Chat</span>
+                    {unreadMentions > 0 && (
+                      <span style={{ background: '#dc2626', color: '#fff', fontSize: '11px', fontWeight: 800, padding: '2px 8px', borderRadius: '999px' }}>{unreadMentions}</span>
+                    )}
                   </button>
                   <button
                     onClick={handleSignOut}

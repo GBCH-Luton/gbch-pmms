@@ -20,6 +20,7 @@ import AdminHelp from './admin/AdminHelp'
 import AdminHousekeeping from './admin/AdminHousekeeping'
 import AdminEvents from './admin/AdminEvents'
 import AdminViewAs from './admin/AdminViewAs'
+import AdminTeamChat from './admin/AdminTeamChat'
 import { EVENTS_FEATURE_ENABLED, resolveStaffPhotoUrl } from './admin/shared'
 import { getImpersonationMarker, returnToAdmin } from '../lib/impersonation'
 
@@ -28,6 +29,10 @@ const NAV_ITEMS = [
   // then property/division monitoring, then people-ops, then stock, then
   // reports/config at the bottom (2026-07-22 reorder).
   { key: 'dashboard', label: 'Dashboard', icon: '🏠', Component: AdminDashboardPage },
+  // RLS on pmms.chat_messages is the real restriction (division-scoped),
+  // not this nav item -- visible to any admin/manager, no divisions/
+  // divisionOnly gating needed here.
+  { key: 'team-chat', label: 'Team Chat', icon: '💬', Component: AdminTeamChat },
   { key: 'pipeline', label: 'Pipeline', icon: '🛠️', Component: AdminPipeline },
   { key: 'raise-ticket', label: 'Log a Ticket', icon: '📝', Component: AdminRaiseTicket },
   { key: 'sign-off', label: 'Sign-Off', icon: '✅', Component: AdminSignOff },
@@ -57,7 +62,7 @@ const POPOVER_ITEM_KEYS = ['settings', 'admin', 'view-as', 'help']
 // ticket lifecycle (Pipeline/Log a Ticket/Sign-Off), then property/
 // division monitoring (Properties/Voids/Compliance/Housekeeping), then
 // people-ops (Staff/Clocking), then Stock/Reports.
-const DIVIDER_AFTER_KEYS = ['dashboard', 'sign-off', 'housekeeping', 'clocking']
+const DIVIDER_AFTER_KEYS = ['team-chat', 'sign-off', 'housekeeping', 'clocking']
 
 const PENDING_SIGN_OFF_POLL_MS = 20000
 

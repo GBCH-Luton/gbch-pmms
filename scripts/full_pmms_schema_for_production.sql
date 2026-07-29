@@ -391,6 +391,18 @@ create table pmms.impersonation_events (
   CONSTRAINT impersonation_events_pkey PRIMARY KEY (id)
 );
 
+-- chat_messages: Team Chat, one channel per division (added 2026-07-29)
+create table pmms.chat_messages (
+  id                  uuid NOT NULL DEFAULT gen_random_uuid(),
+  division            text NOT NULL,
+  sender_id           uuid NOT NULL,
+  sender_name         text NOT NULL,
+  body                text NOT NULL,
+  mentioned_staff_ids uuid[] NOT NULL DEFAULT '{}',
+  created_at          timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT chat_messages_pkey PRIMARY KEY (id)
+);
+
 -- =============================================================================
 -- 5. INDEXES (explicit, non-PK/non-unique-constraint indexes)
 -- =============================================================================
@@ -631,6 +643,72 @@ begin
 end;
 $function$;
 
+-- Mirrors pmms.current_access_level()'s exact branching, but for an
+-- arbitrary target_staff_id -- the same relationship pmms.staff_division()
+-- already has to pmms.current_division(). Added for Team Chat's @mention
+-- picker (chat_channel_members below), which needs to know whether an
+-- OTHER person is an Admin/unscoped-manager (sees every channel).
+CREATE OR REPLACE FUNCTION pmms.staff_access_level(target_staff_id uuid)
+ RETURNS text
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public', 'pmms'
+AS $function$
+  with target as (
+    select id, active from public.staff where id = target_staff_id
+  ),
+  target_role as (
+    select sr.role from pmms.staff_roles sr, target
+    where sr.staff_id = target.id
+    order by sr.role
+    limit 1
+  ),
+  custom_roles as (
+    select
+      case jsonb_typeof(elem) when 'string' then elem #>> '{}' else elem ->> 'name' end as name,
+      case jsonb_typeof(elem) when 'string' then 'none' else coalesce(elem ->> 'accessLevel', 'none') end as access_level
+    from pmms.settings s,
+      lateral jsonb_array_elements(coalesce(s.setting_value, '[]'::jsonb)) elem
+    where s.setting_key = 'custom_roles'
+  )
+  select
+    case
+      when target.active = false then null
+      when target_role.role = 'Admin' then 'admin'
+      when target_role.role = 'Builder' then 'builder'
+      when target_role.role in ('Cleaner', 'Support Worker') then null
+      when cr.access_level = 'manager' then 'manager'
+      when cr.access_level = 'builder' then 'builder'
+      else null
+    end
+  from target
+  left join target_role on true
+  left join custom_roles cr on cr.name = target_role.role
+$function$;
+
+-- Builders can only SELECT their own row in public.staff, so Team Chat's
+-- @mention picker needs a SECURITY DEFINER function to list who's
+-- actually in a given channel (Admins/unscoped managers always included,
+-- since they can see every channel; everyone else only if their own
+-- resolved division matches THIS one, defaulting built-in Builder to
+-- 'Maintenance' same as everywhere else in this app).
+CREATE OR REPLACE FUNCTION pmms.chat_channel_members(target_division text)
+ RETURNS TABLE(id uuid, name text)
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public', 'pmms'
+AS $function$
+  select s.id, s.name
+  from public.staff s
+  join pmms.staff_roles sr on sr.staff_id = s.id
+  where s.active = true
+    and (
+      pmms.staff_access_level(s.id) = 'admin'
+      or (pmms.staff_access_level(s.id) = 'manager' and pmms.staff_division(s.id) is null)
+      or coalesce(pmms.staff_division(s.id), 'Maintenance') = target_division
+    )
+$function$;
+
 -- error_logs: client-side error log capture
 -- (created here, after the functions, because its staff_id column DEFAULT
 -- calls pmms.current_staff_id())
@@ -656,6 +734,8 @@ create table pmms.error_logs (
 
 ALTER TABLE pmms.audit_events ADD CONSTRAINT audit_events_actor_id_fkey FOREIGN KEY (actor_id) REFERENCES staff(id);
 ALTER TABLE pmms.audit_events ADD CONSTRAINT audit_events_ticket_id_fkey FOREIGN KEY (ticket_id) REFERENCES pmms.tickets(id);
+
+ALTER TABLE pmms.chat_messages ADD CONSTRAINT chat_messages_sender_id_fkey FOREIGN KEY (sender_id) REFERENCES staff(id);
 
 ALTER TABLE pmms.comments ADD CONSTRAINT comments_author_id_fkey FOREIGN KEY (author_id) REFERENCES staff(id);
 ALTER TABLE pmms.comments ADD CONSTRAINT comments_ticket_id_fkey FOREIGN KEY (ticket_id) REFERENCES pmms.tickets(id);
@@ -714,6 +794,11 @@ grant all on all sequences in schema pmms to anon, authenticated, service_role;
 alter default privileges in schema pmms grant all on tables to anon, authenticated, service_role;
 alter default privileges in schema pmms grant all on sequences to anon, authenticated, service_role;
 
+-- Team Chat's first requirement: Supabase Realtime (this app's first use
+-- of it anywhere -- everything else "live" is setInterval polling). RLS
+-- applies to the underlying feed the same as any normal query.
+alter publication supabase_realtime add table pmms.chat_messages;
+
 -- =============================================================================
 -- 9. ENABLE ROW LEVEL SECURITY
 -- =============================================================================
@@ -737,6 +822,7 @@ ALTER TABLE pmms.work_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE pmms.error_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE pmms.settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE pmms.impersonation_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE pmms.chat_messages ENABLE ROW LEVEL SECURITY;
 
 -- =============================================================================
 -- 10. RLS POLICIES
@@ -759,6 +845,20 @@ CREATE POLICY "manager_division_scoped_access" ON pmms.audit_events AS PERMISSIV
 CREATE POLICY "manager_unscoped_full_access" ON pmms.audit_events AS PERMISSIVE FOR ALL TO authenticated
   USING ((pmms.current_access_level() = 'manager'::text) AND (pmms.current_division() IS NULL))
   WITH CHECK ((pmms.current_access_level() = 'manager'::text) AND (pmms.current_division() IS NULL));
+
+-- chat_messages
+CREATE POLICY "admin_full_access" ON pmms.chat_messages AS PERMISSIVE FOR ALL TO authenticated
+  USING (pmms.current_access_level() = 'admin'::text)
+  WITH CHECK (pmms.current_access_level() = 'admin'::text);
+CREATE POLICY "manager_unscoped_access" ON pmms.chat_messages AS PERMISSIVE FOR ALL TO authenticated
+  USING ((pmms.current_access_level() = 'manager'::text) AND (pmms.current_division() IS NULL))
+  WITH CHECK ((pmms.current_access_level() = 'manager'::text) AND (pmms.current_division() IS NULL) AND (sender_id = pmms.current_staff_id()));
+CREATE POLICY "manager_division_scoped_access" ON pmms.chat_messages AS PERMISSIVE FOR ALL TO authenticated
+  USING ((pmms.current_access_level() = 'manager'::text) AND (pmms.current_division() = division))
+  WITH CHECK ((pmms.current_access_level() = 'manager'::text) AND (pmms.current_division() = division) AND (sender_id = pmms.current_staff_id()));
+CREATE POLICY "builder_division_access" ON pmms.chat_messages AS PERMISSIVE FOR ALL TO authenticated
+  USING ((pmms.current_access_level() = 'builder'::text) AND (coalesce(pmms.current_division(), 'Maintenance'::text) = division))
+  WITH CHECK ((pmms.current_access_level() = 'builder'::text) AND (coalesce(pmms.current_division(), 'Maintenance'::text) = division) AND (sender_id = pmms.current_staff_id()));
 
 -- comments
 CREATE POLICY "admin_full_access" ON pmms.comments AS PERMISSIVE FOR ALL TO authenticated
