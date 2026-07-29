@@ -12,6 +12,7 @@ import { fetchAllMaintenanceCategoryNames } from '../../lib/maintenanceCategorie
 import {
   formatDuration, filterSelectStyle, thStyle, tdStyle,
   fetchAssignableBuilders, fetchAssignableStaffForDivision, resolveCategoryDivision, computeAvgTurnaroundMs, computeAvgResponseMs, buildWeeklyTrend,
+  isoDateNDaysAgo, todayIso,
 } from './shared'
 import SimpleBarChart from '../../components/SimpleBarChart'
 
@@ -21,16 +22,6 @@ const tileValueStyle = { margin: 0, fontSize: '26px', fontWeight: 800, color: '#
 const cardStyle = { background: '#fff', borderRadius: '16px', padding: '18px 20px', marginBottom: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }
 const cardLabelStyle = { margin: '0 0 12px 0', fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }
 const filterLabelStyle = { display: 'block', fontSize: '11px', fontWeight: 700, color: '#94a3b8', marginBottom: '4px' }
-
-function isoDateNDaysAgo(n) {
-  const d = new Date()
-  d.setDate(d.getDate() - n)
-  return d.toISOString().slice(0, 10)
-}
-
-function todayIso() {
-  return new Date().toISOString().slice(0, 10)
-}
 
 function avgMsLabel(ms) {
   if (ms == null) return 'N/A'

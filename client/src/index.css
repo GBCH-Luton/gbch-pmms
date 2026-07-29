@@ -57,3 +57,26 @@ body {
     display: flex !important;
   }
 }
+
+/* PrintableTicketReport.jsx: the standard "print only this element" trick --
+   hides literally everything in the page except .pmms-print-area, regardless
+   of z-index/overlay stacking elsewhere in the app, then re-hides the
+   report's own on-screen-only toolbar (.pmms-no-print) within it. */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .pmms-print-area,
+  .pmms-print-area * {
+    visibility: visible;
+  }
+  .pmms-print-area {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+  }
+  .pmms-print-area .pmms-no-print {
+    display: none !important;
+  }
+}

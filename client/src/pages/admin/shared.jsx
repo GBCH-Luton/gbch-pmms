@@ -9,6 +9,19 @@ import { attachProperties } from '../../lib/properties'
 
 const DEFAULT_CLOCK_DISTANCE_THRESHOLD_M = 250
 
+// Shared by AdminReports.jsx (date-range trend view) and AdminPipeline.jsx
+// (Print/Export date-range filter) -- both need the same type="date"
+// input value formatting.
+export function isoDateNDaysAgo(n) {
+  const d = new Date()
+  d.setDate(d.getDate() - n)
+  return d.toISOString().slice(0, 10)
+}
+
+export function todayIso() {
+  return new Date().toISOString().slice(0, 10)
+}
+
 // Paused 2026-07-22 -- the managers want to settle how Compliance/Landlord
 // Liaison division access should work before revisiting cross-division
 // ticket coordination. The Events table, RLS, and page all still exist

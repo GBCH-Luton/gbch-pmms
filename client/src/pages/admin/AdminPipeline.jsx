@@ -4,6 +4,8 @@ import { attachProperties } from '../../lib/properties'
 import BuilderProfileModal from './BuilderProfileModal'
 import PropertySearchSelect from '../../components/PropertySearchSelect'
 import { fetchAllMaintenanceCategoryNames } from '../../lib/maintenanceCategories'
+import { fetchDivisions } from '../../lib/divisions'
+import PrintableTicketReport from '../../components/PrintableTicketReport'
 import {
   priorityTierLabel, priorityBadgeStyle, statusColour, statusLabel, formatUKDate, formatUKDateTime, formatDurationDays, formatDuration,
   filterSelectStyle, thStyle, tdStyle, actionBtnStyle,
@@ -42,6 +44,17 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
   const [ticketNumberSearch, setTicketNumberSearch] = useState('')
   const [stuckOnlyFilter, setStuckOnlyFilter] = useState(false)
   const [stuckThresholds, setStuckThresholds] = useState(null)
+  // Division filter/print-export additions -- default 'All'/'' (not a
+  // 30-day default like AdminReports.jsx) since Pipeline is a live
+  // day-to-day view where old Pending/On-Hold tickets still need to stay
+  // visible unless a manager deliberately narrows the range.
+  const [divisionOptions, setDivisionOptions] = useState([])
+  const [divisionFilter, setDivisionFilter] = useState('All')
+  const [categoriesSettingsRow, setCategoriesSettingsRow] = useState(null)
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
+  const [reportOpen, setReportOpen] = useState(false)
+  const [reportSectionOpen, setReportSectionOpen] = useState(false)
   const [p1Threshold, setP1Threshold] = useState(70)
   const [p2Threshold, setP2Threshold] = useState(40)
 
@@ -99,6 +112,9 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
     fetchStuckThresholds()
     fetchPriorityThresholds().then(({ p1, p2 }) => { setP1Threshold(p1); setP2Threshold(p2) })
     fetchAllMaintenanceCategoryNames(profile.division).then(setCategoryOptions)
+    fetchDivisions().then(setDivisionOptions)
+    supabase.schema('pmms').from('settings').select('setting_value').eq('setting_key', 'maintenance_categories').maybeSingle()
+      .then(({ data }) => setCategoriesSettingsRow(data))
     if (initialStatusFilter) setStatusFilter(initialStatusFilter)
     if (initialPriorityFilter) setPriorityFilter(initialPriorityFilter)
     if (initialStuckFilter) setStuckOnlyFilter(true)
@@ -490,10 +506,13 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
     if (statusFilter !== 'All' && t.status !== statusFilter) return false
     if (propertyFilter && String(t.property_id) !== String(propertyFilter)) return false
     if (categoryFilter !== 'All' && t.category !== categoryFilter) return false
+    if (divisionFilter !== 'All' && resolveCategoryDivision(t.category, categoriesSettingsRow) !== divisionFilter) return false
     if (builderFilter !== 'All' && t.assigned_builder_id !== builderFilter) return false
     if (priorityFilter !== 'All' && effectiveTier(t) !== priorityFilter) return false
     if (ticketNumberSearch.trim() && !String(t.ticket_number).includes(ticketNumberSearch.trim())) return false
     if (stuckOnlyFilter && !isTicketStuck(t, stuckThresholds, Date.now(), p1Threshold, p2Threshold)) return false
+    if (fromDate && new Date(t.created_at).getTime() < new Date(fromDate).getTime()) return false
+    if (toDate && new Date(t.created_at).getTime() > new Date(toDate).getTime() + 86400000 - 1) return false
     return true
   })
 
@@ -537,10 +556,13 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
     setStatusFilter('All')
     setPropertyFilter('')
     setCategoryFilter('All')
+    setDivisionFilter('All')
     setBuilderFilter('All')
     setPriorityFilter('All')
     setTicketNumberSearch('')
     setStuckOnlyFilter(false)
+    setFromDate('')
+    setToDate('')
   }
 
   // Mirrors the dashboard's "Ticket Pipeline" tiles exactly -- counts are
@@ -578,8 +600,12 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
 
       <KpiTiles kpis={kpis} onTileClick={applyKpiFilter} />
 
-      {/* Pipeline filters */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
+      {/* Pipeline filters -- the day-to-day triage filters a manager uses
+          constantly stay in their own row; Division/date range/export are a
+          distinct "generate a report" action, not something reached for on
+          every visit, so they get their own labeled section below rather
+          than being crammed into the same row. */}
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
         <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={filterSelectStyle}>
           <option value="All">All Statuses</option>
           <option value="Pending">Unassigned</option>
@@ -626,6 +652,61 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
           Clear filters
         </button>
       </div>
+
+      <div style={{ marginBottom: '16px' }}>
+        <button
+          onClick={() => setReportSectionOpen(prev => !prev)}
+          style={{
+            display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between', gap: '12px',
+            padding: '10px 16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px',
+            cursor: 'pointer', fontSize: '11px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em',
+          }}
+        >
+          <span>📋 Generate a report</span>
+          <span style={{ fontSize: '13px', fontWeight: 700, color: '#94a3b8', textTransform: 'none', letterSpacing: 0 }}>
+            {reportSectionOpen ? '▲ Collapse' : '▼ Expand'}
+          </span>
+        </button>
+        {reportSectionOpen && (
+          <div style={{
+            display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'flex-end',
+            marginTop: '8px', padding: '12px 16px', borderRadius: '12px',
+            border: '1px solid #e2e8f0', background: '#f8fafc',
+          }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#94a3b8', marginBottom: '4px' }}>Division</label>
+              <select value={divisionFilter} onChange={(e) => setDivisionFilter(e.target.value)} style={filterSelectStyle}>
+                <option value="All">All Divisions</option>
+                {divisionOptions.map(d => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#94a3b8', marginBottom: '4px' }}>Raised from</label>
+              <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} style={filterSelectStyle} />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#94a3b8', marginBottom: '4px' }}>Raised to</label>
+              <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} style={filterSelectStyle} />
+            </div>
+            <button onClick={() => setReportOpen(true)} style={{ padding: '9px 16px', borderRadius: '10px', border: 'none', background: '#0f172a', color: '#fff', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
+              🖨️ Print / Export
+            </button>
+          </div>
+        )}
+      </div>
+
+      {reportOpen && (
+        <PrintableTicketReport
+          tickets={filteredTickets}
+          categoriesSettingsRow={categoriesSettingsRow}
+          divisionLabel={divisionFilter === 'All' ? 'All Divisions' : divisionFilter}
+          fromDate={fromDate}
+          toDate={toDate}
+          onClose={() => setReportOpen(false)}
+        />
+      )}
 
       {selectedTicketIds.size > 0 && (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '10px', padding: '10px 16px', marginBottom: '16px', flexWrap: 'wrap' }}>
