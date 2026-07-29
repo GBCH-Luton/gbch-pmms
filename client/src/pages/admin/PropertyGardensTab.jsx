@@ -14,6 +14,7 @@
 import { useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { modalLabelStyle, modalErrorStyle, GARDEN_STATE_OPTIONS, GARDEN_STATE_STYLES, formatUKDate } from './shared'
+import { compressImage } from '../../lib/imageCompression'
 
 const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '13px', fontFamily: 'inherit', boxSizing: 'border-box', marginBottom: '14px' }
 const readRowStyle = { display: 'flex', justifyContent: 'space-between', gap: '12px', padding: '8px 0' }
@@ -81,8 +82,9 @@ export default function PropertyGardensTab({ property, onFieldsSaved }) {
     setUploading(true)
     setPhotoError('')
 
-    const path = `${property.id}/garden-${side}-${Date.now()}-${file.name}`
-    const { error: uploadError } = await supabase.storage.from('property-photos').upload(path, file)
+    const compressed = await compressImage(file)
+    const path = `${property.id}/garden-${side}-${Date.now()}-${compressed.name}`
+    const { error: uploadError } = await supabase.storage.from('property-photos').upload(path, compressed)
 
     if (uploadError) {
       setUploading(false)

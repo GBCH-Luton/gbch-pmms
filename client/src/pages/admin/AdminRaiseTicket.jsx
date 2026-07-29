@@ -4,6 +4,7 @@ import { fetchAssignableStaffForCategory, builderOptionLabel, createNotification
 import { fetchComplianceCheckTypes } from '../../lib/compliance'
 import { fetchMaintenanceCategories, sortedCategoryEntries } from '../../lib/maintenanceCategories'
 import { fetchDivisions } from '../../lib/divisions'
+import { compressImage } from '../../lib/imageCompression'
 import PropertySearchSelect from '../../components/PropertySearchSelect'
 
 const ROOM_OPTIONS = ['Kitchen', 'Bathroom', 'Communal Area', 'Bedroom', 'Hallways / Stairs', 'Garden', 'Other Area...']
@@ -242,10 +243,11 @@ export default function AdminRaiseTicket({ profile }) {
 
     let photoUrl = null
     if (ticketPhotoFile) {
-      const path = `${profile.id}/${Date.now()}-${ticketPhotoFile.name}`
+      const compressedTicketPhoto = await compressImage(ticketPhotoFile)
+      const path = `${profile.id}/${Date.now()}-${compressedTicketPhoto.name}`
       const { error: uploadError } = await supabase.storage
         .from('ticket-photos')
-        .upload(path, ticketPhotoFile)
+        .upload(path, compressedTicketPhoto)
 
       if (uploadError) {
         setTicketSubmitting(false)
@@ -356,8 +358,11 @@ export default function AdminRaiseTicket({ profile }) {
 
       let photoUrl = null
       if (failedItem.mediaFile) {
-        const path = `${profile.id}/${Date.now()}-${failedItem.mediaFile.name}`
-        const { error: uploadError } = await supabase.storage.from('ticket-photos').upload(path, failedItem.mediaFile)
+        // compressImage() is a no-op pass-through for video -- this field
+        // can be either a photo or a video, per the input's accept attr.
+        const compressedMedia = await compressImage(failedItem.mediaFile)
+        const path = `${profile.id}/${Date.now()}-${compressedMedia.name}`
+        const { error: uploadError } = await supabase.storage.from('ticket-photos').upload(path, compressedMedia)
         if (uploadError) {
           setComplianceSubmitting(false)
           setTicketError(`Media upload failed: ${uploadError.message}`)

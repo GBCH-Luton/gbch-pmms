@@ -31,6 +31,7 @@ import {
   modalOverlayStyle, modalCardStyle, modalTitleStyle, modalLabelStyle, modalErrorStyle,
   modalCancelBtnStyle, modalConfirmBtnStyle, formatUKDate,
 } from './shared'
+import { compressImage } from '../../lib/imageCompression'
 
 const ASSET_CATEGORIES = ['Boiler', 'Fire Alarm', 'Electrical Panel', 'Lift', 'Hot Water Tank', 'Ventilation', 'Plumbing', 'Door Entry', 'CCTV', 'Other']
 const CURRENT_STATUSES = ['Operational', 'Needs Repair', 'End of Life']
@@ -111,8 +112,9 @@ function AssetFormModal({ property, asset, onClose, onSaved, onDeleted }) {
 
     setUploading(true)
     setError('')
-    const path = `${property.id}/assets/${Date.now()}-${file.name}`
-    const { error: uploadError } = await supabase.storage.from('property-docs').upload(path, file)
+    const compressed = await compressImage(file)
+    const path = `${property.id}/assets/${Date.now()}-${compressed.name}`
+    const { error: uploadError } = await supabase.storage.from('property-docs').upload(path, compressed)
     setUploading(false)
 
     if (uploadError) { setError(`Photo upload failed: ${uploadError.message}`); return }

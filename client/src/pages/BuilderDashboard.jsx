@@ -9,8 +9,10 @@ import { pushNotificationsSupported, hasActivePushSubscription, enablePushNotifi
 import { pushEmergencyAlert, priorityTierLabel, fetchPriorityThresholds } from './admin/shared'
 import { fetchAvailableMaterials, logMaterialUsage } from '../lib/simsMaterialsBridge'
 import { fetchChannelMessages, subscribeToChannel, postMessage, markChannelRead, countUnreadMentions, colorForSender } from '../lib/chat'
+import { compressImage } from '../lib/imageCompression'
 import PropertySearchSelect from '../components/PropertySearchSelect'
 import ChatComposer from '../components/ChatComposer'
+import PhotoLightbox from '../components/PhotoLightbox'
 import gbchLogo from '../assets/gbch-logo.svg'
 
 // Hidden for now, not removed -- flip back to true to bring the builder's
@@ -38,6 +40,7 @@ export default function BuilderDashboard({ profile }) {
   const [chatMembers, setChatMembers] = useState([])
   const [chatSending, setChatSending] = useState(false)
   const [unreadMentions, setUnreadMentions] = useState(0)
+  const [chatLightboxUrl, setChatLightboxUrl] = useState(null)
   const [fromLocation, setFromLocation] = useState(null)
   const [customLocation, setCustomLocation] = useState('')
   const [miles, setMiles] = useState(0)
@@ -175,11 +178,11 @@ export default function BuilderDashboard({ profile }) {
     setChatMembers(data || [])
   }
 
-  async function handleSendChatMessage(body, mentionedIds) {
+  async function handleSendChatMessage(body, mentionedIds, photoFile) {
     setChatSending(true)
     await postMessage({
       division: chatDivision, senderId: profile.id, senderName: profile.name,
-      body, mentionedStaffIds: mentionedIds,
+      body, mentionedStaffIds: mentionedIds, photoFile,
     })
     setChatSending(false)
   }
@@ -476,8 +479,9 @@ export default function BuilderDashboard({ profile }) {
 
     let photoUrl = null
     if (photoFile) {
-      const path = `${profile.id}/${Date.now()}-${photoFile.name}`
-      const { error: uploadError } = await supabase.storage.from('ticket-photos').upload(path, photoFile)
+      const compressed = await compressImage(photoFile)
+      const path = `${profile.id}/${Date.now()}-${compressed.name}`
+      const { error: uploadError } = await supabase.storage.from('ticket-photos').upload(path, compressed)
       if (uploadError) {
         setCompleteSubmitting(false)
         setCompleteError(`Photo upload failed: ${uploadError.message}`)
@@ -639,8 +643,9 @@ export default function BuilderDashboard({ profile }) {
 
     let photoUrl = null
     if (photoFile) {
-      const path = `${profile.id}/${Date.now()}-${photoFile.name}`
-      const { error: uploadError } = await supabase.storage.from('ticket-photos').upload(path, photoFile)
+      const compressed = await compressImage(photoFile)
+      const path = `${profile.id}/${Date.now()}-${compressed.name}`
+      const { error: uploadError } = await supabase.storage.from('ticket-photos').upload(path, compressed)
       if (uploadError) {
         setNoAccessSubmitting(false)
         setNoAccessError(`Photo upload failed: ${uploadError.message}`)
@@ -861,10 +866,11 @@ export default function BuilderDashboard({ profile }) {
 
     let photoUrl = null
     if (ticketPhotoFile) {
-      const path = `${profile.id}/${Date.now()}-${ticketPhotoFile.name}`
+      const compressedTicketPhoto = await compressImage(ticketPhotoFile)
+      const path = `${profile.id}/${Date.now()}-${compressedTicketPhoto.name}`
       const { error: uploadError } = await supabase.storage
         .from('ticket-photos')
-        .upload(path, ticketPhotoFile)
+        .upload(path, compressedTicketPhoto)
 
       if (uploadError) {
         setTicketSubmitting(false)
@@ -961,8 +967,11 @@ export default function BuilderDashboard({ profile }) {
 
       let photoUrl = null
       if (failedItem.mediaFile) {
-        const path = `${profile.id}/${Date.now()}-${failedItem.mediaFile.name}`
-        const { error: uploadError } = await supabase.storage.from('ticket-photos').upload(path, failedItem.mediaFile)
+        // compressImage() is a no-op pass-through for video -- this field
+        // can be either a photo or a video, per the input's accept attr.
+        const compressedMedia = await compressImage(failedItem.mediaFile)
+        const path = `${profile.id}/${Date.now()}-${compressedMedia.name}`
+        const { error: uploadError } = await supabase.storage.from('ticket-photos').upload(path, compressedMedia)
         if (uploadError) {
           setComplianceSubmitting(false)
           setTicketError(`Media upload failed: ${uploadError.message}`)
@@ -2259,14 +2268,24 @@ export default function BuilderDashboard({ profile }) {
                     <span style={{ fontSize: '12px', fontWeight: 800, color: isMine ? '#0f172a' : colorForSender(m.sender_id) }}>{isMine ? 'You' : m.sender_name}</span>
                     <span style={{ fontSize: '11px', color: '#94a3b8' }}>{formatUKDateTime(m.created_at)}</span>
                   </div>
-                  <div style={{
-                    marginTop: '2px', padding: '8px 12px', fontSize: '13.5px', lineHeight: 1.4,
-                    background: isMine ? '#19562e' : '#ffffff', color: isMine ? '#fff' : '#374151',
-                    border: isMine ? 'none' : '1px solid #e2e8f0',
-                    borderRadius: isMine ? '12px 4px 12px 12px' : '4px 12px 12px 12px',
-                  }}>
-                    {m.body}
-                  </div>
+                  {m.body && (
+                    <div style={{
+                      marginTop: '2px', padding: '8px 12px', fontSize: '13.5px', lineHeight: 1.4,
+                      background: isMine ? '#19562e' : '#ffffff', color: isMine ? '#fff' : '#374151',
+                      border: isMine ? 'none' : '1px solid #e2e8f0',
+                      borderRadius: isMine ? '12px 4px 12px 12px' : '4px 12px 12px 12px',
+                    }}>
+                      {m.body}
+                    </div>
+                  )}
+                  {m.photo_url && (
+                    <img
+                      src={m.photo_url}
+                      alt=""
+                      onClick={() => setChatLightboxUrl(m.photo_url)}
+                      style={{ marginTop: '4px', maxWidth: '200px', maxHeight: '200px', borderRadius: '10px', border: '1px solid #e2e8f0', display: 'block', cursor: 'pointer' }}
+                    />
+                  )}
                 </div>
               )
             })}
@@ -2282,6 +2301,8 @@ export default function BuilderDashboard({ profile }) {
               sendButtonStyle={{ width: '40px', height: '40px', borderRadius: '50%', border: 'none', background: '#19562e', color: '#fff', fontSize: '14px', fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
             />
           </div>
+
+          <PhotoLightbox url={chatLightboxUrl} onClose={() => setChatLightboxUrl(null)} />
         </div>
       )}
 

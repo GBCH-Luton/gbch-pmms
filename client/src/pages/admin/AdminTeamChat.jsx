@@ -11,6 +11,7 @@ import { fetchDivisions } from '../../lib/divisions'
 import { fetchChannelMessages, subscribeToChannel, postMessage, markChannelRead, colorForSender } from '../../lib/chat'
 import { Avatar, formatUKDateTime } from './shared'
 import ChatComposer from '../../components/ChatComposer'
+import PhotoLightbox from '../../components/PhotoLightbox'
 
 export default function AdminTeamChat({ profile }) {
   const [divisions, setDivisions] = useState([])
@@ -18,6 +19,7 @@ export default function AdminTeamChat({ profile }) {
   const [members, setMembers] = useState([])
   const [messages, setMessages] = useState([])
   const [sending, setSending] = useState(false)
+  const [lightboxUrl, setLightboxUrl] = useState(null)
   const listRef = useRef(null)
 
   const isUnscoped = !profile.division
@@ -65,11 +67,11 @@ export default function AdminTeamChat({ profile }) {
     return data || []
   }
 
-  async function handleSend(body, mentionedIds) {
+  async function handleSend(body, mentionedIds, photoFile) {
     setSending(true)
     await postMessage({
       division: activeDivision, senderId: profile.id, senderName: profile.name,
-      body, mentionedStaffIds: mentionedIds,
+      body, mentionedStaffIds: mentionedIds, photoFile,
     })
     setSending(false)
   }
@@ -116,7 +118,15 @@ export default function AdminTeamChat({ profile }) {
                   <span style={{ fontSize: '13px', fontWeight: 800, color: colorForSender(m.sender_id) }}>{m.sender_name}</span>
                   <span style={{ fontSize: '11px', color: '#94a3b8' }}>{formatUKDateTime(m.created_at)}</span>
                 </div>
-                <p style={{ margin: '2px 0 0', fontSize: '13.5px', color: '#374151' }}>{m.body}</p>
+                {m.body && <p style={{ margin: '2px 0 0', fontSize: '13.5px', color: '#374151' }}>{m.body}</p>}
+                {m.photo_url && (
+                  <img
+                    src={m.photo_url}
+                    alt=""
+                    onClick={() => setLightboxUrl(m.photo_url)}
+                    style={{ marginTop: '6px', maxWidth: '220px', maxHeight: '220px', borderRadius: '10px', border: '1px solid #e2e8f0', display: 'block', cursor: 'pointer' }}
+                  />
+                )}
               </div>
             </div>
           ))}
@@ -132,6 +142,8 @@ export default function AdminTeamChat({ profile }) {
           />
         </div>
       </div>
+
+      <PhotoLightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />
     </div>
   )
 }

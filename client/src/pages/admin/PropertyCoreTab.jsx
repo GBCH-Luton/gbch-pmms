@@ -15,6 +15,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { modalLabelStyle, modalErrorStyle, fetchAssignableStaffForCategory } from './shared'
+import { compressImage } from '../../lib/imageCompression'
 
 const PROPERTY_TYPES = ['House', 'Flat', 'HMO', 'Specialist Supported Living', 'Commercial', 'Other']
 const TENURE_TYPES = ['Freehold', 'Leasehold', 'Rented']
@@ -369,8 +370,9 @@ export default function PropertyCoreTab({ property, onFieldsSaved, profile }) {
     setPhotoUploading(true)
     setPhotoError('')
 
-    const path = `${property.id}/${Date.now()}-${file.name}`
-    const { error: uploadError } = await supabase.storage.from('property-photos').upload(path, file)
+    const compressed = await compressImage(file)
+    const path = `${property.id}/${Date.now()}-${compressed.name}`
+    const { error: uploadError } = await supabase.storage.from('property-photos').upload(path, compressed)
 
     if (uploadError) {
       setPhotoUploading(false)

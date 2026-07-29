@@ -25,6 +25,7 @@
 import { useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { modalLabelStyle, modalErrorStyle } from './shared'
+import { compressImage } from '../../lib/imageCompression'
 
 const LEASE_TYPES = ['Fixed Term', 'Rolling', 'Assured Shorthold', 'Other']
 const LEASE_STATUSES = ['Active', 'Expiring', 'Renewed', 'Terminated']
@@ -196,8 +197,11 @@ function DocUpload({ label, urlKey, property, onSave, bucketFolder }) {
 
     setUploading(true)
     setError('')
-    const path = `${property.id}/${bucketFolder}/${Date.now()}-${file.name}`
-    const { error: uploadError } = await supabase.storage.from('property-docs').upload(path, file)
+    // compressImage() is a no-op pass-through for PDFs -- lease/legal docs
+    // can be either a scanned PDF or a photo, per the input's accept attr.
+    const compressed = await compressImage(file)
+    const path = `${property.id}/${bucketFolder}/${Date.now()}-${compressed.name}`
+    const { error: uploadError } = await supabase.storage.from('property-docs').upload(path, compressed)
 
     if (uploadError) {
       setUploading(false)

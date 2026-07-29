@@ -8,7 +8,24 @@ export default function ChatComposer({ members, onSend, sending, placeholder, se
   const [text, setText] = useState('')
   const [pendingMentions, setPendingMentions] = useState([])
   const [mentionQuery, setMentionQuery] = useState(null) // null = picker closed
+  const [photoFile, setPhotoFile] = useState(null)
+  const [photoPreview, setPhotoPreview] = useState(null)
   const inputRef = useRef(null)
+  const photoInputRef = useRef(null)
+
+  function handlePhotoPick(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setPhotoFile(file)
+    setPhotoPreview(URL.createObjectURL(file))
+    e.target.value = '' // lets picking the same file again re-trigger onChange
+  }
+
+  function removePhoto() {
+    if (photoPreview) URL.revokeObjectURL(photoPreview)
+    setPhotoFile(null)
+    setPhotoPreview(null)
+  }
 
   function handleChange(e) {
     const value = e.target.value
@@ -49,14 +66,17 @@ export default function ChatComposer({ members, onSend, sending, placeholder, se
 
   function handleSend() {
     const body = text.trim()
-    if (!body) return
+    if (!body && !photoFile) return
     // Only mention people whose "@Name" actually still appears in the text --
     // if someone picked a mention then deleted it, don't notify them.
     const mentionedIds = pendingMentions.filter(m => body.includes(`@${m.name}`)).map(m => m.id)
-    onSend(body, mentionedIds)
+    onSend(body, mentionedIds, photoFile)
     setText('')
     setPendingMentions([])
     setMentionQuery(null)
+    if (photoPreview) URL.revokeObjectURL(photoPreview)
+    setPhotoFile(null)
+    setPhotoPreview(null)
   }
 
   const matches = mentionQuery === null
@@ -86,7 +106,27 @@ export default function ChatComposer({ members, onSend, sending, placeholder, se
           ))}
         </div>
       )}
+      {photoPreview && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+          <img src={photoPreview} alt="" style={{ width: '48px', height: '48px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
+          <button
+            onClick={removePhoto}
+            aria-label="Remove photo"
+            style={{ background: '#f1f5f9', border: 'none', borderRadius: '999px', width: '22px', height: '22px', fontSize: '12px', color: '#64748b', cursor: 'pointer' }}
+          >
+            ✕
+          </button>
+        </div>
+      )}
       <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <input ref={photoInputRef} type="file" accept="image/*" onChange={handlePhotoPick} style={{ display: 'none' }} />
+        <button
+          onClick={() => photoInputRef.current?.click()}
+          aria-label="Attach photo"
+          style={{ background: 'none', border: 'none', fontSize: '18px', cursor: 'pointer', flexShrink: 0, padding: '4px' }}
+        >
+          📷
+        </button>
         <input
           ref={inputRef}
           type="text"
@@ -96,7 +136,7 @@ export default function ChatComposer({ members, onSend, sending, placeholder, se
           placeholder={placeholder || 'Message... (type @ to mention someone)'}
           style={inputStyle}
         />
-        <button onClick={handleSend} disabled={sending || !text.trim()} style={sendButtonStyle} aria-label="Send">
+        <button onClick={handleSend} disabled={sending || (!text.trim() && !photoFile)} style={sendButtonStyle} aria-label="Send">
           {sending ? '⋯' : '➤'}
         </button>
       </div>

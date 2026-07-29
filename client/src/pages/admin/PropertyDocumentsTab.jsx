@@ -26,6 +26,7 @@ import {
   modalOverlayStyle, modalCardStyle, modalTitleStyle, modalLabelStyle, modalErrorStyle,
   modalCancelBtnStyle, modalConfirmBtnStyle, formatUKDate,
 } from './shared'
+import { compressImage } from '../../lib/imageCompression'
 
 const CATEGORIES = ['Safety', 'Maintenance', 'Legal', 'Tenant', 'Other']
 const FILTER_TABS = ['All', ...CATEGORIES]
@@ -91,8 +92,11 @@ function DocumentFormModal({ property, profile, doc, onClose, onSaved }) {
 
     setUploading(true)
     setError('')
-    const path = `${property.id}/documents/${Date.now()}-${file.name}`
-    const { error: uploadError } = await supabase.storage.from('property-docs').upload(path, file)
+    // compressImage() is a no-op pass-through for anything non-image --
+    // this field accepts any file type, not just photos.
+    const compressed = await compressImage(file)
+    const path = `${property.id}/documents/${Date.now()}-${compressed.name}`
+    const { error: uploadError } = await supabase.storage.from('property-docs').upload(path, compressed)
     setUploading(false)
 
     if (uploadError) { setError(`Upload failed: ${uploadError.message}`); return }

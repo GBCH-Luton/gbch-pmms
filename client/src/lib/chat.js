@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { compressImage } from './imageCompression'
 
 const LAST_READ_PREFIX = 'pmms_chat_last_read_'
 const MESSAGE_LIMIT = 200
@@ -26,7 +27,7 @@ export async function fetchChannelMessages(division) {
   const { data, error } = await supabase
     .schema('pmms')
     .from('chat_messages')
-    .select('id, division, sender_id, sender_name, body, mentioned_staff_ids, created_at')
+    .select('id, division, sender_id, sender_name, body, photo_url, mentioned_staff_ids, created_at')
     .eq('division', division)
     .order('created_at', { ascending: true })
     .limit(MESSAGE_LIMIT)
@@ -58,12 +59,21 @@ export function subscribeToChannel(division, onInsert) {
 // far more reliable than matching "@Name" strings against the staff list
 // after the fact. The push-on-mention call is fire-and-forget: a push
 // failing must never block the message itself from having been sent.
-export async function postMessage({ division, senderId, senderName, body, mentionedStaffIds }) {
+export async function postMessage({ division, senderId, senderName, body, mentionedStaffIds, photoFile }) {
+  let photoUrl = null
+  if (photoFile) {
+    const compressed = await compressImage(photoFile)
+    const path = `${senderId}/${Date.now()}-${compressed.name}`
+    const { error: uploadError } = await supabase.storage.from('chat-photos').upload(path, compressed)
+    if (uploadError) return { error: `Photo upload failed: ${uploadError.message}` }
+    photoUrl = supabase.storage.from('chat-photos').getPublicUrl(path).data.publicUrl
+  }
+
   const { data, error } = await supabase
     .schema('pmms')
     .from('chat_messages')
     .insert({
-      division, sender_id: senderId, sender_name: senderName, body,
+      division, sender_id: senderId, sender_name: senderName, body, photo_url: photoUrl,
       mentioned_staff_ids: mentionedStaffIds || [],
     })
     .select('id')

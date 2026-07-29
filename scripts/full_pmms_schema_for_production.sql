@@ -400,6 +400,7 @@ create table pmms.chat_messages (
   body                text NOT NULL,
   mentioned_staff_ids uuid[] NOT NULL DEFAULT '{}',
   created_at          timestamp with time zone NOT NULL DEFAULT now(),
+  photo_url           text,
   CONSTRAINT chat_messages_pkey PRIMARY KEY (id)
 );
 
