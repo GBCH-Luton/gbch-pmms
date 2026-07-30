@@ -145,3 +145,29 @@ export async function countUnreadMentions(division, myStaffId) {
   const { count } = await query
   return count || 0
 }
+
+// Unlike countUnreadMentions (mentions-only, localStorage watermark --
+// what drives the mentions-only push), this counts EVERY new message
+// in a division against the shared server-side watermark
+// (pmms.chat_channel_reads). For an admin/manager overseeing a
+// division's channel, any new message matters, not just ones that
+// mention them.
+export async function countUnreadMessages(division, myStaffId) {
+  const { data: readRow } = await supabase
+    .schema('pmms')
+    .from('chat_channel_reads')
+    .select('last_read_at')
+    .eq('division', division)
+    .eq('staff_id', myStaffId)
+    .maybeSingle()
+
+  let query = supabase
+    .schema('pmms')
+    .from('chat_messages')
+    .select('id', { count: 'exact', head: true })
+    .eq('division', division)
+  if (readRow?.last_read_at) query = query.gt('created_at', readRow.last_read_at)
+
+  const { count } = await query
+  return count || 0
+}

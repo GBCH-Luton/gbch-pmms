@@ -23,6 +23,8 @@ import AdminViewAs from './admin/AdminViewAs'
 import AdminTeamChat from './admin/AdminTeamChat'
 import { EVENTS_FEATURE_ENABLED, resolveStaffPhotoUrl } from './admin/shared'
 import { getImpersonationMarker, returnToAdmin } from '../lib/impersonation'
+import { countUnreadMessages } from '../lib/chat'
+import { fetchDivisions } from '../lib/divisions'
 
 const NAV_ITEMS = [
   // Grouped by what they're actually for: core ticket lifecycle first,
@@ -97,6 +99,7 @@ export default function AdminDashboard({ profile }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [pendingSignOffCount, setPendingSignOffCount] = useState(0)
   const [totalTicketsCount, setTotalTicketsCount] = useState(0)
+  const [chatUnreadTotal, setChatUnreadTotal] = useState(0)
   const [pipelineInitialFilter, setPipelineInitialFilter] = useState(null)
   const [pipelineInitialPriorityFilter, setPipelineInitialPriorityFilter] = useState(null)
   const [pipelineInitialStuckFilter, setPipelineInitialStuckFilter] = useState(null)
@@ -139,9 +142,15 @@ export default function AdminDashboard({ profile }) {
     setTotalTicketsCount(count || 0)
   }, [])
 
+  const fetchChatUnreadTotal = useCallback(async () => {
+    const divs = profile.division ? [profile.division] : await fetchDivisions()
+    const counts = await Promise.all(divs.map(d => countUnreadMessages(d, profile.id)))
+    setChatUnreadTotal(counts.reduce((a, b) => a + b, 0))
+  }, [profile.division, profile.id])
+
   const refreshCounts = useCallback(async () => {
-    await Promise.all([fetchPendingSignOffCount(), fetchTotalTicketsCount()])
-  }, [fetchPendingSignOffCount, fetchTotalTicketsCount])
+    await Promise.all([fetchPendingSignOffCount(), fetchTotalTicketsCount(), fetchChatUnreadTotal()])
+  }, [fetchPendingSignOffCount, fetchTotalTicketsCount, fetchChatUnreadTotal])
 
   useEffect(() => {
     refreshCounts()
@@ -288,6 +297,16 @@ export default function AdminDashboard({ profile }) {
                       }}
                     >
                       {totalTicketsCount}
+                    </span>
+                  )}
+                  {item.key === 'team-chat' && chatUnreadTotal > 0 && (
+                    <span
+                      style={{
+                        background: '#dc2626', color: '#ffffff', fontSize: '11px', fontWeight: 800,
+                        borderRadius: '999px', padding: '1px 8px', marginLeft: '8px', minWidth: '20px', textAlign: 'center', flexShrink: 0,
+                      }}
+                    >
+                      {chatUnreadTotal}
                     </span>
                   )}
                 </span>

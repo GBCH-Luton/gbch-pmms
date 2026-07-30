@@ -8,10 +8,12 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import { fetchDivisions } from '../../lib/divisions'
-import { fetchChannelMessages, subscribeToChannel, postMessage, markChannelRead, markChannelReadRemote, fetchChannelReads, colorForSender } from '../../lib/chat'
+import { fetchChannelMessages, subscribeToChannel, postMessage, markChannelRead, markChannelReadRemote, fetchChannelReads, countUnreadMessages, colorForSender } from '../../lib/chat'
 import { Avatar, formatUKDateTime } from './shared'
 import ChatComposer from '../../components/ChatComposer'
 import PhotoLightbox from '../../components/PhotoLightbox'
+
+const UNREAD_POLL_MS = 20000
 
 export default function AdminTeamChat({ profile }) {
   const [divisions, setDivisions] = useState([])
@@ -19,6 +21,7 @@ export default function AdminTeamChat({ profile }) {
   const [members, setMembers] = useState([])
   const [messages, setMessages] = useState([])
   const [channelReads, setChannelReads] = useState({})
+  const [unreadByDivision, setUnreadByDivision] = useState({})
   const [sending, setSending] = useState(false)
   const [lightboxUrl, setLightboxUrl] = useState(null)
   const listRef = useRef(null)
@@ -33,6 +36,23 @@ export default function AdminTeamChat({ profile }) {
       })
     }
   }, [])
+
+  // Per-channel unread counts for the picker -- only meaningful when
+  // there's more than one channel to pick between (isUnscoped). Polled
+  // rather than pushed, same as every other count in this app.
+  useEffect(() => {
+    if (!isUnscoped || divisions.length === 0) return
+    let cancelled = false
+
+    async function refreshUnreadCounts() {
+      const entries = await Promise.all(divisions.map(async d => [d, await countUnreadMessages(d, profile.id)]))
+      if (!cancelled) setUnreadByDivision(Object.fromEntries(entries))
+    }
+
+    refreshUnreadCounts()
+    const interval = setInterval(refreshUnreadCounts, UNREAD_POLL_MS)
+    return () => { cancelled = true; clearInterval(interval) }
+  }, [isUnscoped, divisions, profile.id])
 
   useEffect(() => {
     if (!activeDivision) return
@@ -96,16 +116,29 @@ export default function AdminTeamChat({ profile }) {
           {divisions.map(d => (
             <button
               key={d}
-              onClick={() => setActiveDivision(d)}
+              onClick={() => {
+                setActiveDivision(d)
+                setUnreadByDivision(prev => ({ ...prev, [d]: 0 }))
+              }}
               style={{
-                display: 'block', width: '100%', textAlign: 'left', padding: '10px 16px',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', textAlign: 'left', padding: '10px 16px',
                 background: activeDivision === d ? '#f0fdf4' : 'none', border: 'none',
                 borderLeft: activeDivision === d ? '3px solid #19562e' : '3px solid transparent',
                 fontSize: '13px', fontWeight: activeDivision === d ? 800 : 600,
                 color: activeDivision === d ? '#19562e' : '#0f172a', cursor: 'pointer',
               }}
             >
-              💬 {d}
+              <span>💬 {d}</span>
+              {unreadByDivision[d] > 0 && (
+                <span
+                  style={{
+                    background: '#dc2626', color: '#ffffff', fontSize: '11px', fontWeight: 800,
+                    borderRadius: '999px', padding: '1px 8px', minWidth: '20px', textAlign: 'center', flexShrink: 0,
+                  }}
+                >
+                  {unreadByDivision[d]}
+                </span>
+              )}
             </button>
           ))}
         </div>
