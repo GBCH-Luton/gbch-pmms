@@ -415,6 +415,11 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
     filterMode === 'gardensOverdue' ? 'Gardens' :
     null
 
+  // Combines the KPI-tile filter and the town filter into one label so the
+  // existing "Showing: ... (count)" banner also covers a town selection,
+  // instead of adding a second separate count display next to the dropdown.
+  const activeFilterLabel = [filterModeLabel, townFilter].filter(Boolean).join(' · ') || null
+
   // Same 4 metrics/colours as the dashboard's Properties tiles, computed
   // client-side from the already-fetched `properties` list instead of
   // separate count queries, since the full list is already in memory here.
@@ -681,11 +686,11 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
         )}
       </div>
 
-      {filterModeLabel && (
+      {activeFilterLabel && (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', background: '#f0fdfa', border: '1px solid #99f6e4', borderRadius: '10px', padding: '10px 16px', marginBottom: '16px', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: '13px', fontWeight: 700, color: '#0f766e' }}>Showing: {filterModeLabel} ({filteredProperties.length})</span>
+          <span style={{ fontSize: '13px', fontWeight: 700, color: '#0f766e' }}>Showing: {activeFilterLabel} ({filteredProperties.length})</span>
           <button
-            onClick={() => setFilterMode('all')}
+            onClick={() => { setFilterMode('all'); setTownFilter('') }}
             style={{ background: 'none', border: 'none', color: '#0f766e', fontSize: '13px', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}
           >
             Clear filter
