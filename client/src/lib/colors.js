@@ -29,6 +29,10 @@ export const COLORS = {
   stone200: '#e7e5e4',
   stone600: '#57534e',
 
+  // Gray (Tailwind's neutral "gray" scale, distinct from the blue-tinted
+  // "slate" scale above -- a few call sites use this one instead)
+  gray700: '#374151',
+
   // Red (danger / expired / errors)
   red50: '#fef2f2',
   red100: '#fee2e2',
@@ -84,6 +88,7 @@ export const COLORS = {
   purple100: '#f3e8ff',
   purple600: '#9333ea',
   violet100: '#ede9fe',
+  violet500: '#8b5cf6',
   violet600: '#7c3aed',
   indigo100: '#e0e7ff',
   indigo700: '#4338ca',

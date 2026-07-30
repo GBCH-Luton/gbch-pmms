@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { COLORS } from '../lib/colors'
 import { getCurrentPositionSafe } from '../lib/geo'
 import { fetchComplianceCheckTypes } from '../lib/compliance'
 import { fetchMaintenanceCategories, fetchAllMaintenanceCategoryNames, sortedCategoryEntries } from '../lib/maintenanceCategories'
@@ -743,9 +744,9 @@ export default function BuilderDashboard({ profile }) {
       height: '44px',
       padding: '0 14px',
       borderRadius: '10px',
-      border: active ? '2px solid #0f766e' : '1px solid #e2e8f0',
-      background: active ? '#0f766e' : '#ffffff',
-      color: active ? '#ffffff' : '#0f172a',
+      border: active ? `2px solid ${COLORS.teal700}` : `1px solid ${COLORS.slate200}`,
+      background: active ? COLORS.teal700 : COLORS.white,
+      color: active ? COLORS.white : COLORS.slate900,
       fontSize: '13px',
       fontWeight: 600,
       fontFamily: 'inherit',
@@ -761,7 +762,7 @@ export default function BuilderDashboard({ profile }) {
     }
   }
 
-  const SECTION_BG = ['#ffffff', '#f8fafc']
+  const SECTION_BG = [COLORS.white, COLORS.slate50]
 
   function resetTicketForm() {
     setLoggingMode('maintenance')
@@ -1036,11 +1037,11 @@ export default function BuilderDashboard({ profile }) {
   }
 
   const statusColour = (status) => {
-    if (status === 'Pending')     return '#dc2626'
-    if (status === 'In Progress') return '#0d9488'
-    if (status === 'On Hold')     return '#d97706'
-    if (status === 'Completed')   return '#16a34a'
-    return '#3b82f6'
+    if (status === 'Pending')     return COLORS.red600
+    if (status === 'In Progress') return COLORS.teal600
+    if (status === 'On Hold')     return COLORS.amber600
+    if (status === 'Completed')   return COLORS.green600
+    return COLORS.blue500
   }
 
   // Display-only -- see admin/shared.jsx's statusLabel for why this is
@@ -1148,24 +1149,24 @@ export default function BuilderDashboard({ profile }) {
   const ticketStep4Complete = !!ticketIssueTag && (!isUnlistedTag(ticketIssueTag) || !!ticketIssueOther.trim())
 
   if (loading) return (
-    <div style={{ minHeight: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f1f5f9' }}>
-      <p style={{ color: '#94a3b8', fontWeight: 600, fontFamily: 'system-ui' }}>Loading your jobs...</p>
+    <div style={{ minHeight: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: COLORS.slate100 }}>
+      <p style={{ color: COLORS.slate400, fontWeight: 600, fontFamily: 'system-ui' }}>Loading your jobs...</p>
     </div>
   )
 
   return (
-    <div style={{ minHeight: '100%', background: '#f1f5f9', fontFamily: 'system-ui, sans-serif' }}>
+    <div style={{ minHeight: '100%', background: COLORS.slate100, fontFamily: 'system-ui, sans-serif' }}>
 
       {/* Header */}
       <div style={{ position: 'sticky', top: 0, zIndex: 10 }}>
-        <div style={{ background: '#ffffff', borderBottom: '1px solid #e2e8f0', padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ background: COLORS.white, borderBottom: `1px solid ${COLORS.slate200}`, padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <button
             onClick={goHome}
             aria-label="Go to home"
             style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
           >
             <img src={gbchLogo} alt="GBCH" style={{ height: '36px' }} />
-            <span style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a' }}>PMMS</span>
+            <span style={{ fontSize: '16px', fontWeight: 800, color: COLORS.slate900 }}>PMMS</span>
           </button>
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
             <button
@@ -1177,7 +1178,7 @@ export default function BuilderDashboard({ profile }) {
               {notifications.some(n => !n.read) && (
                 <span style={{
                   position: 'absolute', top: '4px', right: '4px', minWidth: '16px', height: '16px', padding: '0 3px',
-                  borderRadius: '999px', background: '#dc2626', color: '#fff', fontSize: '10px', fontWeight: 800,
+                  borderRadius: '999px', background: COLORS.red600, color: COLORS.white, fontSize: '10px', fontWeight: 800,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}>
                   {notifications.filter(n => !n.read).length}
@@ -1189,17 +1190,17 @@ export default function BuilderDashboard({ profile }) {
               aria-label="Menu"
               style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '4px', background: 'none', border: 'none', padding: '8px', cursor: 'pointer' }}
             >
-              <span style={{ width: '22px', height: '2px', background: '#0f172a', borderRadius: '2px' }} />
-              <span style={{ width: '22px', height: '2px', background: '#0f172a', borderRadius: '2px' }} />
-              <span style={{ width: '22px', height: '2px', background: '#0f172a', borderRadius: '2px' }} />
+              <span style={{ width: '22px', height: '2px', background: COLORS.slate900, borderRadius: '2px' }} />
+              <span style={{ width: '22px', height: '2px', background: COLORS.slate900, borderRadius: '2px' }} />
+              <span style={{ width: '22px', height: '2px', background: COLORS.slate900, borderRadius: '2px' }} />
             </button>
           </div>
         </div>
 
         {notifPanelOpen && (
-          <div style={{ background: '#fff', borderBottom: '1px solid #e2e8f0', maxHeight: '320px', overflowY: 'auto' }}>
+          <div style={{ background: COLORS.white, borderBottom: `1px solid ${COLORS.slate200}`, maxHeight: '320px', overflowY: 'auto' }}>
             {notifications.length === 0 ? (
-              <p style={{ margin: 0, padding: '20px', fontSize: '13px', color: '#94a3b8', fontStyle: 'italic', textAlign: 'center' }}>No notifications yet.</p>
+              <p style={{ margin: 0, padding: '20px', fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic', textAlign: 'center' }}>No notifications yet.</p>
             ) : (
               notifications.map(n => (
                 <button
@@ -1211,12 +1212,12 @@ export default function BuilderDashboard({ profile }) {
                     setNotifPanelOpen(false)
                   }}
                   style={{
-                    display: 'block', width: '100%', textAlign: 'left', padding: '12px 20px', border: 'none', borderBottom: '1px solid #f1f5f9',
-                    background: n.read ? '#fff' : '#eff6ff', cursor: 'pointer',
+                    display: 'block', width: '100%', textAlign: 'left', padding: '12px 20px', border: 'none', borderBottom: `1px solid ${COLORS.slate100}`,
+                    background: n.read ? COLORS.white : COLORS.blue50, cursor: 'pointer',
                   }}
                 >
-                  <p style={{ margin: '0 0 2px 0', fontSize: '13px', fontWeight: n.read ? 500 : 700, color: '#0f172a' }}>{n.message}</p>
-                  <p style={{ margin: 0, fontSize: '11px', color: '#94a3b8' }}>{new Date(n.created_at).toLocaleString('en-GB')}</p>
+                  <p style={{ margin: '0 0 2px 0', fontSize: '13px', fontWeight: n.read ? 500 : 700, color: COLORS.slate900 }}>{n.message}</p>
+                  <p style={{ margin: 0, fontSize: '11px', color: COLORS.slate400 }}>{new Date(n.created_at).toLocaleString('en-GB')}</p>
                 </button>
               ))
             )}
@@ -1224,72 +1225,72 @@ export default function BuilderDashboard({ profile }) {
         )}
 
         {menuOpen && (
-          <div style={{ background: '#19562e', padding: '20px' }}>
-            <p style={{ margin: '0 0 2px 0', fontSize: '16px', fontWeight: 800, color: '#ffffff' }}>{profile.name}</p>
-            <p style={{ margin: '0 0 18px 0', fontSize: '13px', fontWeight: 500, color: '#ffffff', opacity: 0.8 }}>{profile.job_title}</p>
+          <div style={{ background: COLORS.greenDark, padding: '20px' }}>
+            <p style={{ margin: '0 0 2px 0', fontSize: '16px', fontWeight: 800, color: COLORS.white }}>{profile.name}</p>
+            <p style={{ margin: '0 0 18px 0', fontSize: '13px', fontWeight: 500, color: COLORS.white, opacity: 0.8 }}>{profile.job_title}</p>
 
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               {SHOW_LOG_TICKET_NAV && (
                 <button
                   onClick={() => { setPage('new-ticket'); setMenuOpen(false) }}
-                  style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: COLORS.white, cursor: 'pointer', textAlign: 'left' }}
                 >
                   📝 Log a Ticket
                 </button>
               )}
               <button
                 onClick={() => { setPage('available-jobs'); setMenuOpen(false) }}
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: COLORS.white, cursor: 'pointer', textAlign: 'left' }}
               >
                 <span>🧰 Available Jobs</span>
                 {availableJobs.length > 0 && (
-                  <span style={{ background: '#dc2626', color: '#fff', fontSize: '11px', fontWeight: 800, padding: '2px 8px', borderRadius: '999px' }}>{availableJobs.length}</span>
+                  <span style={{ background: COLORS.red600, color: COLORS.white, fontSize: '11px', fontWeight: 800, padding: '2px 8px', borderRadius: '999px' }}>{availableJobs.length}</span>
                 )}
               </button>
               <button
                 onClick={() => { setPage('my-reports'); setMenuOpen(false) }}
-                style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
+                style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: COLORS.white, cursor: 'pointer', textAlign: 'left' }}
               >
                 📋 My Reports
               </button>
               <button
                 onClick={() => { setPage('mileage'); setMenuOpen(false) }}
-                style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
+                style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: COLORS.white, cursor: 'pointer', textAlign: 'left' }}
               >
                 🕐 My Mileage
               </button>
               <button
                 onClick={() => { setPage('metrics'); setMenuOpen(false) }}
-                style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
+                style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: COLORS.white, cursor: 'pointer', textAlign: 'left' }}
               >
                 📊 My Metrics
               </button>
               <button
                 onClick={() => { setPage('team-chat'); setMenuOpen(false) }}
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: COLORS.white, cursor: 'pointer', textAlign: 'left' }}
               >
                 <span>💬 Team Chat</span>
                 {unreadMentions > 0 && (
-                  <span style={{ background: '#dc2626', color: '#fff', fontSize: '11px', fontWeight: 800, padding: '2px 8px', borderRadius: '999px' }}>{unreadMentions}</span>
+                  <span style={{ background: COLORS.red600, color: COLORS.white, fontSize: '11px', fontWeight: 800, padding: '2px 8px', borderRadius: '999px' }}>{unreadMentions}</span>
                 )}
               </button>
               {pushNotificationsSupported() && (
                 <button
                   onClick={handleEnableNotifications}
                   disabled={pushEnabled}
-                  style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: pushEnabled ? 'rgba(255,255,255,0.6)' : '#ffffff', cursor: pushEnabled ? 'default' : 'pointer', textAlign: 'left' }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: pushEnabled ? 'rgba(255,255,255,0.6)' : COLORS.white, cursor: pushEnabled ? 'default' : 'pointer', textAlign: 'left' }}
                 >
                   🔔 {pushEnabled ? 'Notifications: On' : 'Enable Notifications'}
                 </button>
               )}
               <button
                 onClick={handleSignOut}
-                style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
+                style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: COLORS.white, cursor: 'pointer', textAlign: 'left' }}
               >
                 🚪 Sign out
               </button>
             </div>
-            {pushError && <p style={{ margin: '8px 4px 0 4px', fontSize: '12px', color: '#fca5a5' }}>{pushError}</p>}
+            {pushError && <p style={{ margin: '8px 4px 0 4px', fontSize: '12px', color: COLORS.red300 }}>{pushError}</p>}
           </div>
         )}
       </div>
@@ -1298,42 +1299,42 @@ export default function BuilderDashboard({ profile }) {
       <div style={{ padding: '16px 16px 0 16px', maxWidth: '600px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '10px' }}>
         <button
           onClick={() => setStatusFilter('WORKING')}
-          style={{ width: '100%', padding: '14px', background: '#0d9488', color: '#fff', border: 'none', borderRadius: '12px', cursor: 'pointer', textAlign: 'center' }}
+          style={{ width: '100%', padding: '14px', background: COLORS.teal600, color: COLORS.white, border: 'none', borderRadius: '12px', cursor: 'pointer', textAlign: 'center' }}
         >
           <div style={{ fontSize: '28px', fontWeight: 800 }}>{inProgressTickets.length}</div>
           <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Working On Now</div>
         </button>
         <button
           onClick={() => setStatusFilter('URGENT')}
-          style={{ width: '100%', padding: '14px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: '12px', cursor: 'pointer', textAlign: 'center' }}
+          style={{ width: '100%', padding: '14px', background: COLORS.red500, color: COLORS.white, border: 'none', borderRadius: '12px', cursor: 'pointer', textAlign: 'center' }}
         >
           <div style={{ fontSize: '28px', fontWeight: 800 }}>{urgentTickets.length}</div>
           <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Urgent</div>
         </button>
         <button
           onClick={() => setPage('available-jobs')}
-          style={{ width: '100%', padding: '14px', background: '#8b5cf6', color: '#fff', border: 'none', borderRadius: '12px', cursor: 'pointer', textAlign: 'center' }}
+          style={{ width: '100%', padding: '14px', background: COLORS.violet500, color: COLORS.white, border: 'none', borderRadius: '12px', cursor: 'pointer', textAlign: 'center' }}
         >
           <div style={{ fontSize: '28px', fontWeight: 800 }}>{availableJobs.length}</div>
           <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Available Jobs</div>
         </button>
         <button
           onClick={() => setStatusFilter('TODO')}
-          style={{ width: '100%', padding: '14px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '12px', cursor: 'pointer', textAlign: 'center' }}
+          style={{ width: '100%', padding: '14px', background: COLORS.blue500, color: COLORS.white, border: 'none', borderRadius: '12px', cursor: 'pointer', textAlign: 'center' }}
         >
           <div style={{ fontSize: '28px', fontWeight: 800 }}>{toDoTickets.length}</div>
           <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>To do</div>
         </button>
         <button
           onClick={() => setStatusFilter('HOLD')}
-          style={{ width: '100%', padding: '14px', background: '#f59e0b', color: '#fff', border: 'none', borderRadius: '12px', cursor: 'pointer', textAlign: 'center' }}
+          style={{ width: '100%', padding: '14px', background: COLORS.amber500, color: COLORS.white, border: 'none', borderRadius: '12px', cursor: 'pointer', textAlign: 'center' }}
         >
           <div style={{ fontSize: '28px', fontWeight: 800 }}>{onHoldTickets.length}</div>
           <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>On hold</div>
         </button>
         <button
           onClick={() => setStatusFilter('DONE')}
-          style={{ width: '100%', padding: '14px', background: '#64748b', color: '#fff', border: 'none', borderRadius: '12px', cursor: 'pointer', textAlign: 'center' }}
+          style={{ width: '100%', padding: '14px', background: COLORS.slate500, color: COLORS.white, border: 'none', borderRadius: '12px', cursor: 'pointer', textAlign: 'center' }}
         >
           <div style={{ fontSize: '28px', fontWeight: 800 }}>{doneTickets.length}</div>
           <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Done</div>
@@ -1342,7 +1343,7 @@ export default function BuilderDashboard({ profile }) {
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', border: '1px solid #e2e8f0', background: '#f8fafc', fontSize: '14px', fontWeight: 700, color: '#0f172a', boxSizing: 'border-box', cursor: 'pointer' }}
+          style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', border: `1px solid ${COLORS.slate200}`, background: COLORS.slate50, fontSize: '14px', fontWeight: 700, color: COLORS.slate900, boxSizing: 'border-box', cursor: 'pointer' }}
         >
           <option value="ALL">All jobs</option>
           <option value="WORKING">🔧 Working now</option>
@@ -1356,21 +1357,21 @@ export default function BuilderDashboard({ profile }) {
       {/* Job list */}
       <div style={{ padding: '16px', maxWidth: '600px', margin: '0 auto' }}>
         {filteredTickets.length === 0 && (
-          <div style={{ background: '#fff', borderRadius: '16px', padding: '40px', textAlign: 'center' }}>
-            <p style={{ color: '#94a3b8', fontWeight: 600 }}>No jobs assigned to you.</p>
+          <div style={{ background: COLORS.white, borderRadius: '16px', padding: '40px', textAlign: 'center' }}>
+            <p style={{ color: COLORS.slate400, fontWeight: 600 }}>No jobs assigned to you.</p>
           </div>
         )}
         {filteredTickets.map(t => (
-          <div key={t.id} style={{ background: '#ffffff', borderRadius: '16px', marginBottom: '12px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+          <div key={t.id} style={{ background: COLORS.white, borderRadius: '16px', marginBottom: '12px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
             <div style={{ height: '4px', background: statusColour(t.status) }} />
             <div style={{ padding: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <span style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Job #{t.ticket_number} · {t.category}</span>
+                <span style={{ fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Job #{t.ticket_number} · {t.category}</span>
                 <span style={{ fontSize: '11px', fontWeight: 700, color: statusColour(t.status), background: statusColour(t.status) + '18', padding: '3px 10px', borderRadius: '20px' }}>{statusLabel(t.status)}</span>
               </div>
-              <p style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: 700, color: '#0f172a' }}>{t.property?.address}</p>
-              <p style={{ margin: '0 0 12px 0', fontSize: '13px', color: '#64748b' }}>{t.description}{t.room ? ` — ${t.room}` : ''}</p>
-              <button onClick={() => setSelectedTicket(t)} style={{ width: '100%', padding: '12px', background: statusColour(t.status), color: '#fff', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: 700, cursor: 'pointer' }}>
+              <p style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: 700, color: COLORS.slate900 }}>{t.property?.address}</p>
+              <p style={{ margin: '0 0 12px 0', fontSize: '13px', color: COLORS.slate500 }}>{t.description}{t.room ? ` — ${t.room}` : ''}</p>
+              <button onClick={() => setSelectedTicket(t)} style={{ width: '100%', padding: '12px', background: statusColour(t.status), color: COLORS.white, border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: 700, cursor: 'pointer' }}>
   View job
 </button>
 
@@ -1380,12 +1381,12 @@ export default function BuilderDashboard({ profile }) {
       </div>
       {/* Job detail modal */}
 {selectedTicket && (
-  <div style={{ position: 'fixed', top: 'var(--pmms-banner-offset, 0px)', left: 0, right: 0, bottom: 0, background: '#f1f5f9', zIndex: 50, overflowY: 'auto', fontFamily: 'system-ui, sans-serif' }}>
+  <div style={{ position: 'fixed', top: 'var(--pmms-banner-offset, 0px)', left: 0, right: 0, bottom: 0, background: COLORS.slate100, zIndex: 50, overflowY: 'auto', fontFamily: 'system-ui, sans-serif' }}>
 
     {/* Header */}
     <div style={{ position: 'sticky', top: 0, zIndex: 10 }}>
-      <div style={{ background: '#ffffff', borderBottom: '1px solid #e2e8f0', padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <button onClick={() => setSelectedTicket(null)} style={{ background: '#f1f5f9', border: 'none', borderRadius: '8px', padding: '8px 14px', fontSize: '13px', fontWeight: 700, color: '#64748b', cursor: 'pointer' }}>
+      <div style={{ background: COLORS.white, borderBottom: `1px solid ${COLORS.slate200}`, padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <button onClick={() => setSelectedTicket(null)} style={{ background: COLORS.slate100, border: 'none', borderRadius: '8px', padding: '8px 14px', fontSize: '13px', fontWeight: 700, color: COLORS.slate500, cursor: 'pointer' }}>
           ← Back
         </button>
         <button
@@ -1393,56 +1394,56 @@ export default function BuilderDashboard({ profile }) {
           aria-label="Menu"
           style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '4px', background: 'none', border: 'none', padding: '8px', cursor: 'pointer' }}
         >
-          <span style={{ width: '22px', height: '2px', background: '#0f172a', borderRadius: '2px' }} />
-          <span style={{ width: '22px', height: '2px', background: '#0f172a', borderRadius: '2px' }} />
-          <span style={{ width: '22px', height: '2px', background: '#0f172a', borderRadius: '2px' }} />
+          <span style={{ width: '22px', height: '2px', background: COLORS.slate900, borderRadius: '2px' }} />
+          <span style={{ width: '22px', height: '2px', background: COLORS.slate900, borderRadius: '2px' }} />
+          <span style={{ width: '22px', height: '2px', background: COLORS.slate900, borderRadius: '2px' }} />
         </button>
       </div>
 
       {menuOpen && (
-        <div style={{ background: '#19562e', padding: '20px' }}>
-          <p style={{ margin: '0 0 2px 0', fontSize: '16px', fontWeight: 800, color: '#ffffff' }}>{profile.name}</p>
-          <p style={{ margin: '0 0 18px 0', fontSize: '13px', fontWeight: 500, color: '#ffffff', opacity: 0.8 }}>{profile.job_title}</p>
+        <div style={{ background: COLORS.greenDark, padding: '20px' }}>
+          <p style={{ margin: '0 0 2px 0', fontSize: '16px', fontWeight: 800, color: COLORS.white }}>{profile.name}</p>
+          <p style={{ margin: '0 0 18px 0', fontSize: '13px', fontWeight: 500, color: COLORS.white, opacity: 0.8 }}>{profile.job_title}</p>
 
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             {SHOW_LOG_TICKET_NAV && (
               <button
                 onClick={() => { setPage('new-ticket'); setMenuOpen(false) }}
-                style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
+                style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: COLORS.white, cursor: 'pointer', textAlign: 'left' }}
               >
                 📝 Log a Ticket
               </button>
             )}
             <button
               onClick={() => { setPage('my-reports'); setMenuOpen(false) }}
-              style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
+              style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: COLORS.white, cursor: 'pointer', textAlign: 'left' }}
             >
               📋 My Reports
             </button>
             <button
               onClick={() => { setPage('mileage'); setMenuOpen(false) }}
-              style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
+              style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: COLORS.white, cursor: 'pointer', textAlign: 'left' }}
             >
               🕐 My Mileage
             </button>
             <button
               onClick={() => { setPage('metrics'); setMenuOpen(false) }}
-              style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
+              style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: COLORS.white, cursor: 'pointer', textAlign: 'left' }}
             >
               📊 My Metrics
             </button>
             <button
               onClick={() => { setPage('team-chat'); setMenuOpen(false) }}
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: COLORS.white, cursor: 'pointer', textAlign: 'left' }}
             >
               <span>💬 Team Chat</span>
               {unreadMentions > 0 && (
-                <span style={{ background: '#dc2626', color: '#fff', fontSize: '11px', fontWeight: 800, padding: '2px 8px', borderRadius: '999px' }}>{unreadMentions}</span>
+                <span style={{ background: COLORS.red600, color: COLORS.white, fontSize: '11px', fontWeight: 800, padding: '2px 8px', borderRadius: '999px' }}>{unreadMentions}</span>
               )}
             </button>
             <button
               onClick={handleSignOut}
-              style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
+              style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: COLORS.white, cursor: 'pointer', textAlign: 'left' }}
             >
               🚪 Sign out
             </button>
@@ -1454,41 +1455,41 @@ export default function BuilderDashboard({ profile }) {
     <div style={{ padding: '16px', maxWidth: '600px', margin: '0 auto' }}>
 
       {/* Property */}
-      <div style={{ background: '#fff', borderRadius: '16px', overflow: 'hidden', marginBottom: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+      <div style={{ background: COLORS.white, borderRadius: '16px', overflow: 'hidden', marginBottom: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
         <div style={{ height: '4px', background: statusColour(selectedTicket.status) }} />
         <div style={{ padding: '20px' }}>
-          <p style={{ margin: '0 0 4px 0', fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{selectedTicket.category}</p>
-          <p style={{ margin: '0 0 6px 0', fontSize: '18px', fontWeight: 800, color: '#0f172a' }}>{selectedTicket.property?.address}</p>
+          <p style={{ margin: '0 0 4px 0', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{selectedTicket.category}</p>
+          <p style={{ margin: '0 0 6px 0', fontSize: '18px', fontWeight: 800, color: COLORS.slate900 }}>{selectedTicket.property?.address}</p>
           {selectedTicket.property?.high_vulnerability && (
-            <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px', padding: '10px 14px', marginBottom: '8px' }}>
-              <p style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: '#dc2626' }}>⚠ Vulnerable Occupant — handle with care</p>
+            <div style={{ background: COLORS.red50, border: `1px solid ${COLORS.red200}`, borderRadius: '10px', padding: '10px 14px', marginBottom: '8px' }}>
+              <p style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: COLORS.red600 }}>⚠ Vulnerable Occupant — handle with care</p>
             </div>
           )}
           {selectedTicket.priority_score >= p1Threshold && (
-            <div style={{ background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: '10px', padding: '10px 14px', marginBottom: '8px' }}>
-              <p style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: '#92400e' }}>🔴 Urgent Priority</p>
+            <div style={{ background: COLORS.amber50, border: `1px solid ${COLORS.amber300}`, borderRadius: '10px', padding: '10px 14px', marginBottom: '8px' }}>
+              <p style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: COLORS.amber800 }}>🔴 Urgent Priority</p>
             </div>
           )}
-          <p style={{ margin: 0, fontSize: '14px', color: '#64748b' }}>{selectedTicket.description}{selectedTicket.room ? ` — ${selectedTicket.room}` : ''}</p>
+          <p style={{ margin: 0, fontSize: '14px', color: COLORS.slate500 }}>{selectedTicket.description}{selectedTicket.room ? ` — ${selectedTicket.room}` : ''}</p>
         </div>
       </div>
 
       {/* Access & Safety */}
       {(selectedTicket.property?.safeguards || selectedTicket.property?.electrical_shutoff || selectedTicket.property?.gas_shutoff) && (
-        <div style={{ background: '#fff', borderRadius: '16px', padding: '20px', marginBottom: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-          <p style={{ margin: '0 0 14px 0', fontSize: '11px', fontWeight: 700, color: '#d97706', textTransform: 'uppercase', letterSpacing: '0.06em' }}>🔑 Access & Safety</p>
-          {selectedTicket.property?.safeguards && <p style={{ margin: '0 0 12px 0', fontSize: '14px', color: '#374151' }}>{selectedTicket.property.safeguards}</p>}
+        <div style={{ background: COLORS.white, borderRadius: '16px', padding: '20px', marginBottom: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+          <p style={{ margin: '0 0 14px 0', fontSize: '11px', fontWeight: 700, color: COLORS.amber600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>🔑 Access & Safety</p>
+          {selectedTicket.property?.safeguards && <p style={{ margin: '0 0 12px 0', fontSize: '14px', color: COLORS.gray700 }}>{selectedTicket.property.safeguards}</p>}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {selectedTicket.property?.electrical_shutoff && (
-              <div style={{ background: '#fffbeb', borderRadius: '10px', padding: '12px 16px' }}>
-                <p style={{ margin: '0 0 2px 0', fontSize: '11px', fontWeight: 700, color: '#d97706' }}>⚡ Electric shutoff</p>
-                <p style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#0f172a' }}>{selectedTicket.property.electrical_shutoff}</p>
+              <div style={{ background: COLORS.amber50, borderRadius: '10px', padding: '12px 16px' }}>
+                <p style={{ margin: '0 0 2px 0', fontSize: '11px', fontWeight: 700, color: COLORS.amber600 }}>⚡ Electric shutoff</p>
+                <p style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: COLORS.slate900 }}>{selectedTicket.property.electrical_shutoff}</p>
               </div>
             )}
             {selectedTicket.property?.gas_shutoff && (
-              <div style={{ background: '#fffbeb', borderRadius: '10px', padding: '12px 16px' }}>
-                <p style={{ margin: '0 0 2px 0', fontSize: '11px', fontWeight: 700, color: '#d97706' }}>🔥 Gas shutoff</p>
-                <p style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#0f172a' }}>{selectedTicket.property.gas_shutoff}</p>
+              <div style={{ background: COLORS.amber50, borderRadius: '10px', padding: '12px 16px' }}>
+                <p style={{ margin: '0 0 2px 0', fontSize: '11px', fontWeight: 700, color: COLORS.amber600 }}>🔥 Gas shutoff</p>
+                <p style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: COLORS.slate900 }}>{selectedTicket.property.gas_shutoff}</p>
               </div>
             )}
           </div>
@@ -1497,37 +1498,37 @@ export default function BuilderDashboard({ profile }) {
 
       {/* Photo */}
       {selectedTicket.photo_url && (
-        <div style={{ background: '#fff', borderRadius: '16px', padding: '20px', marginBottom: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-          <p style={{ margin: '0 0 14px 0', fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Photo</p>
+        <div style={{ background: COLORS.white, borderRadius: '16px', padding: '20px', marginBottom: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+          <p style={{ margin: '0 0 14px 0', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Photo</p>
           <img src={selectedTicket.photo_url} alt="Ticket attachment" style={{ width: '100%', borderRadius: '10px', display: 'block' }} />
         </div>
       )}
 
       {/* Clock running banner */}
       {selectedTicket.status === 'In Progress' && (
-        <div style={{ background: '#0d9488', borderRadius: '16px', padding: '18px 20px', marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+        <div style={{ background: COLORS.teal600, borderRadius: '16px', padding: '18px 20px', marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ width: '16px', height: '16px', borderRadius: '50%', border: '2px solid rgba(255,255,255,0.4)', borderTopColor: '#ffffff', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
-            <span style={{ fontSize: '11px', fontWeight: 700, color: '#ffffff', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Clock running</span>
+            <div style={{ width: '16px', height: '16px', borderRadius: '50%', border: '2px solid rgba(255,255,255,0.4)', borderTopColor: COLORS.white, animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
+            <span style={{ fontSize: '11px', fontWeight: 700, color: COLORS.white, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Clock running</span>
           </div>
-          <span style={{ fontSize: '24px', fontWeight: 800, color: '#ffffff', fontFamily: 'monospace' }}>{formatElapsed(elapsed)}</span>
+          <span style={{ fontSize: '24px', fontWeight: 800, color: COLORS.white, fontFamily: 'monospace' }}>{formatElapsed(elapsed)}</span>
         </div>
       )}
 
       {/* Actions */}
-      <div style={{ background: '#fff', borderRadius: '16px', padding: '20px', marginBottom: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-        <p style={{ margin: '0 0 14px 0', fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Actions</p>
+      <div style={{ background: COLORS.white, borderRadius: '16px', padding: '20px', marginBottom: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+        <p style={{ margin: '0 0 14px 0', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Actions</p>
         {selectedTicket.status === 'Assigned' && (activeTicket ? (
-          <div style={{ padding: '14px', borderRadius: '10px', background: '#fffbeb', border: '1px solid #fcd34d' }}>
-            <p style={{ margin: '0 0 4px 0', fontSize: '11px', fontWeight: 700, color: '#92400e', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Job in progress</p>
-            <p style={{ margin: 0, fontSize: '14px', color: '#78350f' }}>
+          <div style={{ padding: '14px', borderRadius: '10px', background: COLORS.amber50, border: `1px solid ${COLORS.amber300}` }}>
+            <p style={{ margin: '0 0 4px 0', fontSize: '11px', fontWeight: 700, color: COLORS.amber800, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Job in progress</p>
+            <p style={{ margin: 0, fontSize: '14px', color: COLORS.amber900 }}>
               Finish or hold Job #{activeTicket.ticket_number} before starting another job.
             </p>
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div>
-              <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Coming from</p>
+              <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: COLORS.slate500, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Coming from</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {[
                   { key: 'Home', icon: '🏠' },
@@ -1543,9 +1544,9 @@ export default function BuilderDashboard({ profile }) {
                         width: '100%',
                         padding: '12px',
                         borderRadius: '10px',
-                        border: active ? '2px solid #0d9488' : '1px solid #e2e8f0',
-                        background: active ? '#0d948814' : '#f8fafc',
-                        color: '#0f172a',
+                        border: active ? `2px solid ${COLORS.teal600}` : `1px solid ${COLORS.slate200}`,
+                        background: active ? `${COLORS.teal600}14` : COLORS.slate50,
+                        color: COLORS.slate900,
                         fontSize: '14px',
                         fontWeight: 700,
                         cursor: 'pointer',
@@ -1563,17 +1564,17 @@ export default function BuilderDashboard({ profile }) {
                   value={customLocation}
                   onChange={(e) => setCustomLocation(e.target.value)}
                   placeholder="Type location..."
-                  style={{ width: '100%', marginTop: '8px', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '14px', boxSizing: 'border-box' }}
+                  style={{ width: '100%', marginTop: '8px', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '14px', boxSizing: 'border-box' }}
                 />
               )}
             </div>
 
             <div>
-              <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Miles driven to get here</p>
+              <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: COLORS.slate500, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Miles driven to get here</p>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', overflow: 'hidden' }}>
                 <button
                   onClick={() => setMiles(m => Math.max(0, m - 0.5))}
-                  style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#64748b', color: '#fff', border: 'none', fontSize: '18px', fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
+                  style={{ width: '40px', height: '40px', borderRadius: '50%', background: COLORS.slate500, color: COLORS.white, border: 'none', fontSize: '18px', fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
                 >
                   −
                 </button>
@@ -1582,11 +1583,11 @@ export default function BuilderDashboard({ profile }) {
                   step="0.5"
                   value={miles}
                   onChange={(e) => setMiles(parseFloat(e.target.value) || 0)}
-                  style={{ flex: 1, minWidth: 0, textAlign: 'center', padding: '10px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '16px', fontWeight: 700, boxSizing: 'border-box' }}
+                  style={{ flex: 1, minWidth: 0, textAlign: 'center', padding: '10px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '16px', fontWeight: 700, boxSizing: 'border-box' }}
                 />
                 <button
                   onClick={() => setMiles(m => m + 0.5)}
-                  style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#64748b', color: '#fff', border: 'none', fontSize: '18px', fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
+                  style={{ width: '40px', height: '40px', borderRadius: '50%', background: COLORS.slate500, color: COLORS.white, border: 'none', fontSize: '18px', fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
                 >
                   +
                 </button>
@@ -1595,24 +1596,24 @@ export default function BuilderDashboard({ profile }) {
 
             <button
               onClick={() => handleClockIn(fromLocation === 'Somewhere else' ? customLocation : fromLocation, miles)}
-              style={{ width: '100%', padding: '16px', background: '#0d9488', color: '#fff', border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: 700, cursor: 'pointer' }}
+              style={{ width: '100%', padding: '16px', background: COLORS.teal600, color: COLORS.white, border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: 700, cursor: 'pointer' }}
             >
               ✓ I've arrived — start work
             </button>
 
             {isRoutineVisit && (
               selectedTicket.delay_reason_status === 'pending' ? (
-                <div style={{ padding: '14px', borderRadius: '10px', background: '#fffbeb', border: '1px solid #fcd34d' }}>
-                  <p style={{ margin: '0 0 4px 0', fontSize: '11px', fontWeight: 700, color: '#92400e', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Delay reason submitted</p>
-                  <p style={{ margin: 0, fontSize: '14px', color: '#78350f' }}>
+                <div style={{ padding: '14px', borderRadius: '10px', background: COLORS.amber50, border: `1px solid ${COLORS.amber300}` }}>
+                  <p style={{ margin: '0 0 4px 0', fontSize: '11px', fontWeight: 700, color: COLORS.amber800, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Delay reason submitted</p>
+                  <p style={{ margin: 0, fontSize: '14px', color: COLORS.amber900 }}>
                     {selectedTicket.delay_reason}{selectedTicket.delay_reason_note ? ` — ${selectedTicket.delay_reason_note}` : ''} — awaiting manager review.
                   </p>
                 </div>
               ) : showDelayReasonForm ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '14px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '14px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}` }}>
                   <div>
-                    <p style={{ margin: '0 0 2px 0', fontSize: '14px', fontWeight: 800, color: '#0f172a' }}>Why can't this be done on time?</p>
-                    <p style={{ margin: 0, fontSize: '12px', color: '#64748b' }}>A manager will review this before it's accepted</p>
+                    <p style={{ margin: '0 0 2px 0', fontSize: '14px', fontWeight: 800, color: COLORS.slate900 }}>Why can't this be done on time?</p>
+                    <p style={{ margin: 0, fontSize: '12px', color: COLORS.slate500 }}>A manager will review this before it's accepted</p>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     {['Couldn\'t get access', 'Ran out of time today', 'Property not ready for cleaning', 'Other'].map(reason => {
@@ -1623,9 +1624,9 @@ export default function BuilderDashboard({ profile }) {
                           onClick={() => setDelayReason(reason)}
                           style={{
                             width: '100%', padding: '12px', borderRadius: '10px',
-                            border: active ? '2px solid #d97706' : '1px solid #e2e8f0',
-                            background: active ? '#d9770614' : '#f8fafc',
-                            color: '#0f172a', fontSize: '14px', fontWeight: 700, cursor: 'pointer', textAlign: 'left',
+                            border: active ? `2px solid ${COLORS.amber600}` : `1px solid ${COLORS.slate200}`,
+                            background: active ? `${COLORS.amber600}14` : COLORS.slate50,
+                            color: COLORS.slate900, fontSize: '14px', fontWeight: 700, cursor: 'pointer', textAlign: 'left',
                           }}
                         >
                           {reason}
@@ -1638,18 +1639,18 @@ export default function BuilderDashboard({ profile }) {
                     onChange={(e) => setDelayReasonNote(e.target.value)}
                     placeholder="Add a note (optional)"
                     rows={3}
-                    style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '14px', fontFamily: 'inherit', boxSizing: 'border-box', resize: 'vertical' }}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '14px', fontFamily: 'inherit', boxSizing: 'border-box', resize: 'vertical' }}
                   />
                   <button
                     onClick={() => handleReportDelay(delayReason, delayReasonNote)}
                     disabled={!delayReason || delayReasonSubmitting}
-                    style={{ width: '100%', padding: '14px', background: '#d97706', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: 700, cursor: (!delayReason || delayReasonSubmitting) ? 'not-allowed' : 'pointer', opacity: (!delayReason || delayReasonSubmitting) ? 0.6 : 1 }}
+                    style={{ width: '100%', padding: '14px', background: COLORS.amber600, color: COLORS.white, border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: 700, cursor: (!delayReason || delayReasonSubmitting) ? 'not-allowed' : 'pointer', opacity: (!delayReason || delayReasonSubmitting) ? 0.6 : 1 }}
                   >
                     {delayReasonSubmitting ? 'Submitting...' : 'Submit for review'}
                   </button>
                   <button
                     onClick={() => { setShowDelayReasonForm(false); setDelayReason(null); setDelayReasonNote('') }}
-                    style={{ width: '100%', padding: '8px', background: 'none', border: 'none', color: '#64748b', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}
+                    style={{ width: '100%', padding: '8px', background: 'none', border: 'none', color: COLORS.slate500, fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}
                   >
                     Cancel
                   </button>
@@ -1657,7 +1658,7 @@ export default function BuilderDashboard({ profile }) {
               ) : (
                 <button
                   onClick={() => setShowDelayReasonForm(true)}
-                  style={{ width: '100%', padding: '12px', background: 'none', color: '#92400e', border: '1px dashed #fcd34d', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}
+                  style={{ width: '100%', padding: '12px', background: 'none', color: COLORS.amber800, border: `1px dashed ${COLORS.amber300}`, borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}
                 >
                   ⚠ Can't do this on time? Report a delay
                 </button>
@@ -1667,13 +1668,13 @@ export default function BuilderDashboard({ profile }) {
         ))}
         {selectedTicket.status === 'In Progress' && !showPauseReasons && !showCompleteConfirm && !showNoAccessConfirm && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <button onClick={() => { setChecklistChecked({}); setMaterialRows([]); setShowCompleteConfirm(true) }} style={{ width: '100%', padding: '16px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: 700, cursor: 'pointer' }}>
+            <button onClick={() => { setChecklistChecked({}); setMaterialRows([]); setShowCompleteConfirm(true) }} style={{ width: '100%', padding: '16px', background: COLORS.green600, color: COLORS.white, border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: 700, cursor: 'pointer' }}>
               ✓ Mark complete
             </button>
-            <button onClick={() => setShowPauseReasons(true)} style={{ width: '100%', padding: '14px', background: '#fffbeb', color: '#92400e', border: '2px solid #fcd34d', borderRadius: '12px', fontSize: '14px', fontWeight: 700, cursor: 'pointer' }}>
+            <button onClick={() => setShowPauseReasons(true)} style={{ width: '100%', padding: '14px', background: COLORS.amber50, color: COLORS.amber800, border: `2px solid ${COLORS.amber300}`, borderRadius: '12px', fontSize: '14px', fontWeight: 700, cursor: 'pointer' }}>
               ⏸ Pause / put on hold
             </button>
-            <button onClick={() => setShowNoAccessConfirm(true)} style={{ width: '100%', padding: '14px', background: '#f8fafc', color: '#64748b', border: '1px solid #e2e8f0', borderRadius: '12px', fontSize: '14px', fontWeight: 700, cursor: 'pointer' }}>
+            <button onClick={() => setShowNoAccessConfirm(true)} style={{ width: '100%', padding: '14px', background: COLORS.slate50, color: COLORS.slate500, border: `1px solid ${COLORS.slate200}`, borderRadius: '12px', fontSize: '14px', fontWeight: 700, cursor: 'pointer' }}>
               🚪 Couldn't get access
             </button>
           </div>
@@ -1681,27 +1682,27 @@ export default function BuilderDashboard({ profile }) {
         {selectedTicket.status === 'In Progress' && showCompleteConfirm && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div>
-              <p style={{ margin: '0 0 2px 0', fontSize: '16px', fontWeight: 800, color: '#0f172a' }}>Confirm job complete</p>
-              <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>
+              <p style={{ margin: '0 0 2px 0', fontSize: '16px', fontWeight: 800, color: COLORS.slate900 }}>Confirm job complete</p>
+              <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate500 }}>
                 {isRoutineVisit ? 'Work through the checklist, then add a note and a photo if you have one' : 'Add a note on the work done, and a photo if you have one'}
               </p>
             </div>
 
             {isRoutineVisit && (
               <div>
-                <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Checklist</p>
+                <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: COLORS.slate500, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Checklist</p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {routineVisitChecklistTemplate.map(item => (
                     <label
                       key={item}
-                      style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', background: checklistChecked[item] ? '#f0fdf4' : '#f8fafc', cursor: 'pointer' }}
+                      style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, background: checklistChecked[item] ? COLORS.green50 : COLORS.slate50, cursor: 'pointer' }}
                     >
                       <input
                         type="checkbox"
                         checked={!!checklistChecked[item]}
                         onChange={(e) => setChecklistChecked(prev => ({ ...prev, [item]: e.target.checked }))}
                       />
-                      <span style={{ fontSize: '13px', fontWeight: 600, color: '#0f172a' }}>{item}</span>
+                      <span style={{ fontSize: '13px', fontWeight: 600, color: COLORS.slate900 }}>{item}</span>
                     </label>
                   ))}
                 </div>
@@ -1713,13 +1714,13 @@ export default function BuilderDashboard({ profile }) {
               onChange={(e) => setCompleteNote(e.target.value)}
               placeholder="Describe the work completed..."
               rows={3}
-              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '14px', fontFamily: 'inherit', boxSizing: 'border-box', resize: 'vertical' }}
+              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '14px', fontFamily: 'inherit', boxSizing: 'border-box', resize: 'vertical' }}
             />
 
             <input type="file" accept="image/*" capture="environment" id="complete-photo-input" onChange={handleCompletePhoto} style={{ display: 'none' }} />
             <button
               onClick={() => document.getElementById('complete-photo-input').click()}
-              style={{ width: '100%', height: '44px', borderRadius: '10px', border: '2px dashed #cbd5e1', background: '#ffffff', color: '#64748b', fontSize: '13px', fontWeight: 600, cursor: 'pointer', boxSizing: 'border-box' }}
+              style={{ width: '100%', height: '44px', borderRadius: '10px', border: `2px dashed ${COLORS.slate300}`, background: COLORS.white, color: COLORS.slate500, fontSize: '13px', fontWeight: 600, cursor: 'pointer', boxSizing: 'border-box' }}
             >
               {completePhotoFile ? 'Change photo' : 'Add a photo (optional)'}
             </button>
@@ -1729,14 +1730,14 @@ export default function BuilderDashboard({ profile }) {
 
             {SIMS_MATERIALS_PROTOTYPE_ENABLED && (
               <div>
-                <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Materials Used (optional)</p>
+                <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: COLORS.slate500, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Materials Used (optional)</p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {materialRows.map((row, index) => (
                     <div key={index} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                       <select
                         value={row.itemId}
                         onChange={(e) => updateMaterialRow(index, 'itemId', e.target.value)}
-                        style={{ flex: 1, padding: '10px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '13px', fontFamily: 'inherit', boxSizing: 'border-box' }}
+                        style={{ flex: 1, padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', fontFamily: 'inherit', boxSizing: 'border-box' }}
                       >
                         <option value="">Select an item...</option>
                         {availableMaterials.map(item => (
@@ -1750,12 +1751,12 @@ export default function BuilderDashboard({ profile }) {
                         value={row.quantity}
                         onChange={(e) => updateMaterialRow(index, 'quantity', e.target.value)}
                         placeholder="Qty"
-                        style={{ width: '70px', padding: '10px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '13px', fontFamily: 'inherit', boxSizing: 'border-box' }}
+                        style={{ width: '70px', padding: '10px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', fontFamily: 'inherit', boxSizing: 'border-box' }}
                       />
                       <button
                         onClick={() => removeMaterialRow(index)}
                         aria-label="Remove"
-                        style={{ width: '36px', height: '36px', flexShrink: 0, border: 'none', background: '#fee2e2', color: '#dc2626', borderRadius: '8px', fontSize: '15px', cursor: 'pointer' }}
+                        style={{ width: '36px', height: '36px', flexShrink: 0, border: 'none', background: COLORS.red100, color: COLORS.red600, borderRadius: '8px', fontSize: '15px', cursor: 'pointer' }}
                       >
                         ✕
                       </button>
@@ -1764,7 +1765,7 @@ export default function BuilderDashboard({ profile }) {
                   <button
                     onClick={addMaterialRow}
                     disabled={materialsLoading}
-                    style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px dashed #cbd5e1', background: '#f8fafc', color: '#64748b', fontSize: '13px', fontWeight: 600, cursor: materialsLoading ? 'not-allowed' : 'pointer' }}
+                    style={{ width: '100%', padding: '10px', borderRadius: '10px', border: `1px dashed ${COLORS.slate300}`, background: COLORS.slate50, color: COLORS.slate500, fontSize: '13px', fontWeight: 600, cursor: materialsLoading ? 'not-allowed' : 'pointer' }}
                   >
                     {materialsLoading ? 'Loading items...' : '+ Add material'}
                   </button>
@@ -1773,22 +1774,22 @@ export default function BuilderDashboard({ profile }) {
             )}
 
             {completeError && (
-              <p style={{ margin: 0, fontSize: '13px', color: '#ef4444' }}>{completeError}</p>
+              <p style={{ margin: 0, fontSize: '13px', color: COLORS.red500 }}>{completeError}</p>
             )}
 
             {checklistIncomplete && (
-              <p style={{ margin: 0, fontSize: '12px', color: '#d97706' }}>Complete every checklist item before confirming.</p>
+              <p style={{ margin: 0, fontSize: '12px', color: COLORS.amber600 }}>Complete every checklist item before confirming.</p>
             )}
             <button
               onClick={() => handleComplete(completeNote, completePhotoFile, isRoutineVisit ? routineVisitChecklistTemplate.map(label => ({ label, checked: !!checklistChecked[label] })) : undefined)}
               disabled={completeSubmitting || checklistIncomplete}
-              style={{ width: '100%', padding: '16px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: 700, cursor: (completeSubmitting || checklistIncomplete) ? 'not-allowed' : 'pointer', opacity: (completeSubmitting || checklistIncomplete) ? 0.6 : 1 }}
+              style={{ width: '100%', padding: '16px', background: COLORS.green600, color: COLORS.white, border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: 700, cursor: (completeSubmitting || checklistIncomplete) ? 'not-allowed' : 'pointer', opacity: (completeSubmitting || checklistIncomplete) ? 0.6 : 1 }}
             >
               {completeSubmitting ? 'Submitting...' : '✓ Confirm complete'}
             </button>
             <button
               onClick={() => setShowCompleteConfirm(false)}
-              style={{ width: '100%', padding: '10px', background: 'none', border: 'none', color: '#64748b', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}
+              style={{ width: '100%', padding: '10px', background: 'none', border: 'none', color: COLORS.slate500, fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}
             >
               Cancel
             </button>
@@ -1797,8 +1798,8 @@ export default function BuilderDashboard({ profile }) {
         {selectedTicket.status === 'In Progress' && showNoAccessConfirm && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div>
-              <p style={{ margin: '0 0 2px 0', fontSize: '16px', fontWeight: 800, color: '#0f172a' }}>Confirm couldn't get access</p>
-              <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>Add a note explaining what happened, and a photo if you have one</p>
+              <p style={{ margin: '0 0 2px 0', fontSize: '16px', fontWeight: 800, color: COLORS.slate900 }}>Confirm couldn't get access</p>
+              <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate500 }}>Add a note explaining what happened, and a photo if you have one</p>
             </div>
 
             <textarea
@@ -1806,13 +1807,13 @@ export default function BuilderDashboard({ profile }) {
               onChange={(e) => setNoAccessNote(e.target.value)}
               placeholder="e.g. No answer at the door after 3 attempts..."
               rows={3}
-              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '14px', fontFamily: 'inherit', boxSizing: 'border-box', resize: 'vertical' }}
+              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '14px', fontFamily: 'inherit', boxSizing: 'border-box', resize: 'vertical' }}
             />
 
             <input type="file" accept="image/*" capture="environment" id="no-access-photo-input" onChange={handleNoAccessPhoto} style={{ display: 'none' }} />
             <button
               onClick={() => document.getElementById('no-access-photo-input').click()}
-              style={{ width: '100%', height: '44px', borderRadius: '10px', border: '2px dashed #cbd5e1', background: '#ffffff', color: '#64748b', fontSize: '13px', fontWeight: 600, cursor: 'pointer', boxSizing: 'border-box' }}
+              style={{ width: '100%', height: '44px', borderRadius: '10px', border: `2px dashed ${COLORS.slate300}`, background: COLORS.white, color: COLORS.slate500, fontSize: '13px', fontWeight: 600, cursor: 'pointer', boxSizing: 'border-box' }}
             >
               {noAccessPhotoFile ? 'Change photo' : 'Add a photo (optional)'}
             </button>
@@ -1821,19 +1822,19 @@ export default function BuilderDashboard({ profile }) {
             )}
 
             {noAccessError && (
-              <p style={{ margin: 0, fontSize: '13px', color: '#ef4444' }}>{noAccessError}</p>
+              <p style={{ margin: 0, fontSize: '13px', color: COLORS.red500 }}>{noAccessError}</p>
             )}
 
             <button
               onClick={() => handleNoAccess(noAccessNote, noAccessPhotoFile)}
               disabled={noAccessSubmitting}
-              style={{ width: '100%', padding: '16px', background: '#64748b', color: '#fff', border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: 700, cursor: noAccessSubmitting ? 'not-allowed' : 'pointer', opacity: noAccessSubmitting ? 0.6 : 1 }}
+              style={{ width: '100%', padding: '16px', background: COLORS.slate500, color: COLORS.white, border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: 700, cursor: noAccessSubmitting ? 'not-allowed' : 'pointer', opacity: noAccessSubmitting ? 0.6 : 1 }}
             >
               {noAccessSubmitting ? 'Submitting...' : "🚪 Confirm couldn't get access"}
             </button>
             <button
               onClick={() => setShowNoAccessConfirm(false)}
-              style={{ width: '100%', padding: '10px', background: 'none', border: 'none', color: '#64748b', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}
+              style={{ width: '100%', padding: '10px', background: 'none', border: 'none', color: COLORS.slate500, fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}
             >
               Cancel
             </button>
@@ -1842,8 +1843,8 @@ export default function BuilderDashboard({ profile }) {
         {selectedTicket.status === 'In Progress' && showPauseReasons && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div>
-              <p style={{ margin: '0 0 2px 0', fontSize: '16px', fontWeight: 800, color: '#0f172a' }}>Why are you pausing?</p>
-              <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>This is shown to the office</p>
+              <p style={{ margin: '0 0 2px 0', fontSize: '16px', fontWeight: 800, color: COLORS.slate900 }}>Why are you pausing?</p>
+              <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate500 }}>This is shown to the office</p>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -1864,9 +1865,9 @@ export default function BuilderDashboard({ profile }) {
                       width: '100%',
                       padding: '12px',
                       borderRadius: '10px',
-                      border: active ? '2px solid #d97706' : '1px solid #e2e8f0',
-                      background: active ? '#d9770614' : '#f8fafc',
-                      color: '#0f172a',
+                      border: active ? `2px solid ${COLORS.amber600}` : `1px solid ${COLORS.slate200}`,
+                      background: active ? `${COLORS.amber600}14` : COLORS.slate50,
+                      color: COLORS.slate900,
                       fontSize: '14px',
                       fontWeight: 700,
                       cursor: 'pointer',
@@ -1884,18 +1885,18 @@ export default function BuilderDashboard({ profile }) {
               onChange={(e) => setPauseNote(e.target.value)}
               placeholder="Add a note (optional)"
               rows={3}
-              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '14px', fontFamily: 'inherit', boxSizing: 'border-box', resize: 'vertical' }}
+              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '14px', fontFamily: 'inherit', boxSizing: 'border-box', resize: 'vertical' }}
             />
 
             <button
               onClick={() => handlePause(pauseReason, pauseNote)}
-              style={{ width: '100%', padding: '16px', background: '#d97706', color: '#fff', border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: 700, cursor: 'pointer' }}
+              style={{ width: '100%', padding: '16px', background: COLORS.amber600, color: COLORS.white, border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: 700, cursor: 'pointer' }}
             >
               Confirm pause
             </button>
             <button
               onClick={() => setShowPauseReasons(false)}
-              style={{ width: '100%', padding: '10px', background: 'none', border: 'none', color: '#64748b', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}
+              style={{ width: '100%', padding: '10px', background: 'none', border: 'none', color: COLORS.slate500, fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}
             >
               Cancel
             </button>
@@ -1904,24 +1905,24 @@ export default function BuilderDashboard({ profile }) {
         {selectedTicket.status === 'On Hold' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             {(selectedTicket.hold_reason || selectedTicket.hold_note) && (
-              <div style={{ padding: '14px', borderRadius: '10px', background: '#fffbeb', border: '1px solid #fcd34d' }}>
-                <p style={{ margin: '0 0 4px 0', fontSize: '11px', fontWeight: 700, color: '#92400e', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Why this job is paused</p>
-                <p style={{ margin: 0, fontSize: '14px', color: '#78350f' }}>
+              <div style={{ padding: '14px', borderRadius: '10px', background: COLORS.amber50, border: `1px solid ${COLORS.amber300}` }}>
+                <p style={{ margin: '0 0 4px 0', fontSize: '11px', fontWeight: 700, color: COLORS.amber800, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Why this job is paused</p>
+                <p style={{ margin: 0, fontSize: '14px', color: COLORS.amber900 }}>
                   {selectedTicket.hold_reason}{selectedTicket.hold_note ? ` — ${selectedTicket.hold_note}` : ''}
                 </p>
               </div>
             )}
             {activeTicket ? (
-              <div style={{ padding: '14px', borderRadius: '10px', background: '#fffbeb', border: '1px solid #fcd34d' }}>
-                <p style={{ margin: '0 0 4px 0', fontSize: '11px', fontWeight: 700, color: '#92400e', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Job in progress</p>
-                <p style={{ margin: 0, fontSize: '14px', color: '#78350f' }}>
+              <div style={{ padding: '14px', borderRadius: '10px', background: COLORS.amber50, border: `1px solid ${COLORS.amber300}` }}>
+                <p style={{ margin: '0 0 4px 0', fontSize: '11px', fontWeight: 700, color: COLORS.amber800, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Job in progress</p>
+                <p style={{ margin: 0, fontSize: '14px', color: COLORS.amber900 }}>
                   Finish or hold Job #{activeTicket.ticket_number} before starting another job.
                 </p>
               </div>
             ) : (
               <button
                 onClick={handleResumeWork}
-                style={{ width: '100%', padding: '16px', background: '#0d9488', color: '#fff', border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: 700, cursor: 'pointer' }}
+                style={{ width: '100%', padding: '16px', background: COLORS.teal600, color: COLORS.white, border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: 700, cursor: 'pointer' }}
               >
                 ✓ Back on site — restart work
               </button>
@@ -1931,21 +1932,21 @@ export default function BuilderDashboard({ profile }) {
       </div>
 
       {/* Comments */}
-      <div style={{ background: '#fff', borderRadius: '16px', padding: '20px', marginBottom: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-        <p style={{ margin: '0 0 14px 0', fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Comments</p>
+      <div style={{ background: COLORS.white, borderRadius: '16px', padding: '20px', marginBottom: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+        <p style={{ margin: '0 0 14px 0', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Comments</p>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '16px' }}>
           {comments.length === 0 && (
-            <p style={{ margin: 0, fontSize: '13px', color: '#94a3b8' }}>No comments yet.</p>
+            <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate400 }}>No comments yet.</p>
           )}
           {comments.map(c => (
-            <div key={c.id} style={{ borderBottom: '1px solid #f1f5f9', paddingBottom: '12px' }}>
+            <div key={c.id} style={{ borderBottom: `1px solid ${COLORS.slate100}`, paddingBottom: '12px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                <span style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>{c.author_name}</span>
-                <span style={{ fontSize: '10px', fontWeight: 700, color: '#64748b', background: '#f1f5f9', padding: '2px 8px', borderRadius: '10px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{c.role}</span>
-                <span style={{ fontSize: '11px', color: '#94a3b8', marginLeft: 'auto' }}>{formatUKDateTime(c.created_at)}</span>
+                <span style={{ fontSize: '13px', fontWeight: 700, color: COLORS.slate900 }}>{c.author_name}</span>
+                <span style={{ fontSize: '10px', fontWeight: 700, color: COLORS.slate500, background: COLORS.slate100, padding: '2px 8px', borderRadius: '10px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{c.role}</span>
+                <span style={{ fontSize: '11px', color: COLORS.slate400, marginLeft: 'auto' }}>{formatUKDateTime(c.created_at)}</span>
               </div>
-              <p style={{ margin: 0, fontSize: '14px', color: '#374151' }}>{c.body}</p>
+              <p style={{ margin: 0, fontSize: '14px', color: COLORS.gray700 }}>{c.body}</p>
             </div>
           ))}
         </div>
@@ -1955,14 +1956,14 @@ export default function BuilderDashboard({ profile }) {
           onChange={(e) => setCommentText(e.target.value)}
           placeholder="Add a comment..."
           rows={3}
-          style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '14px', fontFamily: 'inherit', boxSizing: 'border-box', resize: 'vertical', marginBottom: '10px' }}
+          style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '14px', fontFamily: 'inherit', boxSizing: 'border-box', resize: 'vertical', marginBottom: '10px' }}
         />
         {commentError && (
-          <p style={{ margin: '0 0 10px 0', fontSize: '13px', color: '#ef4444' }}>{commentError}</p>
+          <p style={{ margin: '0 0 10px 0', fontSize: '13px', color: COLORS.red500 }}>{commentError}</p>
         )}
         <button
           onClick={handlePostComment}
-          style={{ width: '100%', padding: '14px', background: '#0d9488', color: '#fff', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: 700, cursor: 'pointer' }}
+          style={{ width: '100%', padding: '14px', background: COLORS.teal600, color: COLORS.white, border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: 700, cursor: 'pointer' }}
         >
           Post comment
         </button>
@@ -1974,13 +1975,13 @@ export default function BuilderDashboard({ profile }) {
 
       {/* My Mileage page */}
       {page === 'mileage' && (
-        <div style={{ position: 'fixed', top: 'var(--pmms-banner-offset, 0px)', left: 0, right: 0, bottom: 0, background: '#f1f5f9', zIndex: 50, overflowY: 'auto', fontFamily: 'system-ui, sans-serif' }}>
+        <div style={{ position: 'fixed', top: 'var(--pmms-banner-offset, 0px)', left: 0, right: 0, bottom: 0, background: COLORS.slate100, zIndex: 50, overflowY: 'auto', fontFamily: 'system-ui, sans-serif' }}>
 
           {/* Header */}
           <div style={{ position: 'sticky', top: 0, zIndex: 10 }}>
-            <div style={{ background: '#ffffff', borderBottom: '1px solid #e2e8f0', padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ background: COLORS.white, borderBottom: `1px solid ${COLORS.slate200}`, padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <button onClick={() => setPage('jobs')} style={{ background: '#f1f5f9', border: 'none', borderRadius: '8px', padding: '8px 14px', fontSize: '13px', fontWeight: 700, color: '#64748b', cursor: 'pointer' }}>
+                <button onClick={() => setPage('jobs')} style={{ background: COLORS.slate100, border: 'none', borderRadius: '8px', padding: '8px 14px', fontSize: '13px', fontWeight: 700, color: COLORS.slate500, cursor: 'pointer' }}>
                   ← Back
                 </button>
                 <button
@@ -1989,7 +1990,7 @@ export default function BuilderDashboard({ profile }) {
                   style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
                 >
                   <img src={gbchLogo} alt="GBCH" style={{ height: '36px' }} />
-                  <span style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a' }}>PMMS</span>
+                  <span style={{ fontSize: '16px', fontWeight: 800, color: COLORS.slate900 }}>PMMS</span>
                 </button>
               </div>
               <button
@@ -1997,56 +1998,56 @@ export default function BuilderDashboard({ profile }) {
                 aria-label="Menu"
                 style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '4px', background: 'none', border: 'none', padding: '8px', cursor: 'pointer' }}
               >
-                <span style={{ width: '22px', height: '2px', background: '#0f172a', borderRadius: '2px' }} />
-                <span style={{ width: '22px', height: '2px', background: '#0f172a', borderRadius: '2px' }} />
-                <span style={{ width: '22px', height: '2px', background: '#0f172a', borderRadius: '2px' }} />
+                <span style={{ width: '22px', height: '2px', background: COLORS.slate900, borderRadius: '2px' }} />
+                <span style={{ width: '22px', height: '2px', background: COLORS.slate900, borderRadius: '2px' }} />
+                <span style={{ width: '22px', height: '2px', background: COLORS.slate900, borderRadius: '2px' }} />
               </button>
             </div>
 
             {menuOpen && (
-              <div style={{ background: '#19562e', padding: '20px' }}>
-                <p style={{ margin: '0 0 2px 0', fontSize: '16px', fontWeight: 800, color: '#ffffff' }}>{profile.name}</p>
-                <p style={{ margin: '0 0 18px 0', fontSize: '13px', fontWeight: 500, color: '#ffffff', opacity: 0.8 }}>{profile.job_title}</p>
+              <div style={{ background: COLORS.greenDark, padding: '20px' }}>
+                <p style={{ margin: '0 0 2px 0', fontSize: '16px', fontWeight: 800, color: COLORS.white }}>{profile.name}</p>
+                <p style={{ margin: '0 0 18px 0', fontSize: '13px', fontWeight: 500, color: COLORS.white, opacity: 0.8 }}>{profile.job_title}</p>
 
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                   {SHOW_LOG_TICKET_NAV && (
                     <button
                       onClick={() => { setPage('new-ticket'); setMenuOpen(false) }}
-                      style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
+                      style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: COLORS.white, cursor: 'pointer', textAlign: 'left' }}
                     >
                       📝 Log a Ticket
                     </button>
                   )}
                   <button
                     onClick={() => { setPage('my-reports'); setMenuOpen(false) }}
-                    style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: COLORS.white, cursor: 'pointer', textAlign: 'left' }}
                   >
                     📋 My Reports
                   </button>
                   <button
                     onClick={() => { setPage('mileage'); setMenuOpen(false) }}
-                    style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: COLORS.white, cursor: 'pointer', textAlign: 'left' }}
                   >
                     🕐 My Mileage
                   </button>
                   <button
                     onClick={() => { setPage('metrics'); setMenuOpen(false) }}
-                    style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: COLORS.white, cursor: 'pointer', textAlign: 'left' }}
                   >
                     📊 My Metrics
                   </button>
                   <button
                     onClick={() => { setPage('team-chat'); setMenuOpen(false) }}
-                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: COLORS.white, cursor: 'pointer', textAlign: 'left' }}
                   >
                     <span>💬 Team Chat</span>
                     {unreadMentions > 0 && (
-                      <span style={{ background: '#dc2626', color: '#fff', fontSize: '11px', fontWeight: 800, padding: '2px 8px', borderRadius: '999px' }}>{unreadMentions}</span>
+                      <span style={{ background: COLORS.red600, color: COLORS.white, fontSize: '11px', fontWeight: 800, padding: '2px 8px', borderRadius: '999px' }}>{unreadMentions}</span>
                     )}
                   </button>
                   <button
                     onClick={handleSignOut}
-                    style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: COLORS.white, cursor: 'pointer', textAlign: 'left' }}
                   >
                     🚪 Sign out
                   </button>
@@ -2059,37 +2060,37 @@ export default function BuilderDashboard({ profile }) {
 
             {/* Title */}
             <div style={{ marginBottom: '16px' }}>
-              <h1 style={{ margin: '0 0 4px 0', fontSize: '20px', fontWeight: 800, color: '#0f172a' }}>My Mileage</h1>
-              <p style={{ margin: 0, fontSize: '14px', color: '#64748b' }}>{profile.name}</p>
+              <h1 style={{ margin: '0 0 4px 0', fontSize: '20px', fontWeight: 800, color: COLORS.slate900 }}>My Mileage</h1>
+              <p style={{ margin: 0, fontSize: '14px', color: COLORS.slate500 }}>{profile.name}</p>
             </div>
 
             {/* Summary tiles */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '16px' }}>
-              <div style={{ width: '100%', background: '#fff', borderRadius: '16px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', boxSizing: 'border-box' }}>
-                <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Total miles</p>
-                <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: '#3b82f6' }}>{totalMiles}</p>
+              <div style={{ width: '100%', background: COLORS.white, borderRadius: '16px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', boxSizing: 'border-box' }}>
+                <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Total miles</p>
+                <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: COLORS.blue500 }}>{totalMiles}</p>
               </div>
-              <div style={{ width: '100%', background: '#fff', borderRadius: '16px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', boxSizing: 'border-box' }}>
-                <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>This month</p>
-                <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: '#64748b' }}>{monthMiles}</p>
+              <div style={{ width: '100%', background: COLORS.white, borderRadius: '16px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', boxSizing: 'border-box' }}>
+                <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }}>This month</p>
+                <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: COLORS.slate500 }}>{monthMiles}</p>
               </div>
             </div>
 
             {/* Trip list */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {mileageTickets.length === 0 && (
-                <div style={{ background: '#fff', borderRadius: '16px', padding: '40px', textAlign: 'center' }}>
-                  <p style={{ color: '#94a3b8', fontWeight: 600 }}>No trips logged yet.</p>
+                <div style={{ background: COLORS.white, borderRadius: '16px', padding: '40px', textAlign: 'center' }}>
+                  <p style={{ color: COLORS.slate400, fontWeight: 600 }}>No trips logged yet.</p>
                 </div>
               )}
               {mileageTickets.map(t => (
-                <div key={t.id} style={{ background: '#ffffff', borderRadius: '16px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                <div key={t.id} style={{ background: COLORS.white, borderRadius: '16px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
                   <div>
-                    <p style={{ margin: '0 0 4px 0', fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>{t.property?.address}</p>
-                    <p style={{ margin: '0 0 2px 0', fontSize: '13px', color: '#64748b' }}>{t.transit_start}</p>
-                    <p style={{ margin: 0, fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Job #{t.ticket_number}</p>
+                    <p style={{ margin: '0 0 4px 0', fontSize: '14px', fontWeight: 700, color: COLORS.slate900 }}>{t.property?.address}</p>
+                    <p style={{ margin: '0 0 2px 0', fontSize: '13px', color: COLORS.slate500 }}>{t.transit_start}</p>
+                    <p style={{ margin: 0, fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Job #{t.ticket_number}</p>
                   </div>
-                  <p style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: '#3b82f6', flexShrink: 0 }}>{t.mileage_logged}</p>
+                  <p style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: COLORS.blue500, flexShrink: 0 }}>{t.mileage_logged}</p>
                 </div>
               ))}
             </div>
@@ -2100,13 +2101,13 @@ export default function BuilderDashboard({ profile }) {
 
       {/* My Metrics page */}
       {page === 'metrics' && (
-        <div style={{ position: 'fixed', top: 'var(--pmms-banner-offset, 0px)', left: 0, right: 0, bottom: 0, background: '#f1f5f9', zIndex: 50, overflowY: 'auto', fontFamily: 'system-ui, sans-serif' }}>
+        <div style={{ position: 'fixed', top: 'var(--pmms-banner-offset, 0px)', left: 0, right: 0, bottom: 0, background: COLORS.slate100, zIndex: 50, overflowY: 'auto', fontFamily: 'system-ui, sans-serif' }}>
 
           {/* Header */}
           <div style={{ position: 'sticky', top: 0, zIndex: 10 }}>
-            <div style={{ background: '#ffffff', borderBottom: '1px solid #e2e8f0', padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ background: COLORS.white, borderBottom: `1px solid ${COLORS.slate200}`, padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <button onClick={() => setPage('jobs')} style={{ background: '#f1f5f9', border: 'none', borderRadius: '8px', padding: '8px 14px', fontSize: '13px', fontWeight: 700, color: '#64748b', cursor: 'pointer' }}>
+                <button onClick={() => setPage('jobs')} style={{ background: COLORS.slate100, border: 'none', borderRadius: '8px', padding: '8px 14px', fontSize: '13px', fontWeight: 700, color: COLORS.slate500, cursor: 'pointer' }}>
                   ← Back
                 </button>
                 <button
@@ -2115,7 +2116,7 @@ export default function BuilderDashboard({ profile }) {
                   style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
                 >
                   <img src={gbchLogo} alt="GBCH" style={{ height: '36px' }} />
-                  <span style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a' }}>PMMS</span>
+                  <span style={{ fontSize: '16px', fontWeight: 800, color: COLORS.slate900 }}>PMMS</span>
                 </button>
               </div>
               <button
@@ -2123,56 +2124,56 @@ export default function BuilderDashboard({ profile }) {
                 aria-label="Menu"
                 style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '4px', background: 'none', border: 'none', padding: '8px', cursor: 'pointer' }}
               >
-                <span style={{ width: '22px', height: '2px', background: '#0f172a', borderRadius: '2px' }} />
-                <span style={{ width: '22px', height: '2px', background: '#0f172a', borderRadius: '2px' }} />
-                <span style={{ width: '22px', height: '2px', background: '#0f172a', borderRadius: '2px' }} />
+                <span style={{ width: '22px', height: '2px', background: COLORS.slate900, borderRadius: '2px' }} />
+                <span style={{ width: '22px', height: '2px', background: COLORS.slate900, borderRadius: '2px' }} />
+                <span style={{ width: '22px', height: '2px', background: COLORS.slate900, borderRadius: '2px' }} />
               </button>
             </div>
 
             {menuOpen && (
-              <div style={{ background: '#19562e', padding: '20px' }}>
-                <p style={{ margin: '0 0 2px 0', fontSize: '16px', fontWeight: 800, color: '#ffffff' }}>{profile.name}</p>
-                <p style={{ margin: '0 0 18px 0', fontSize: '13px', fontWeight: 500, color: '#ffffff', opacity: 0.8 }}>{profile.job_title}</p>
+              <div style={{ background: COLORS.greenDark, padding: '20px' }}>
+                <p style={{ margin: '0 0 2px 0', fontSize: '16px', fontWeight: 800, color: COLORS.white }}>{profile.name}</p>
+                <p style={{ margin: '0 0 18px 0', fontSize: '13px', fontWeight: 500, color: COLORS.white, opacity: 0.8 }}>{profile.job_title}</p>
 
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                   {SHOW_LOG_TICKET_NAV && (
                     <button
                       onClick={() => { setPage('new-ticket'); setMenuOpen(false) }}
-                      style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
+                      style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: COLORS.white, cursor: 'pointer', textAlign: 'left' }}
                     >
                       📝 Log a Ticket
                     </button>
                   )}
                   <button
                     onClick={() => { setPage('my-reports'); setMenuOpen(false) }}
-                    style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: COLORS.white, cursor: 'pointer', textAlign: 'left' }}
                   >
                     📋 My Reports
                   </button>
                   <button
                     onClick={() => { setPage('mileage'); setMenuOpen(false) }}
-                    style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: COLORS.white, cursor: 'pointer', textAlign: 'left' }}
                   >
                     🕐 My Mileage
                   </button>
                   <button
                     onClick={() => { setPage('metrics'); setMenuOpen(false) }}
-                    style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: COLORS.white, cursor: 'pointer', textAlign: 'left' }}
                   >
                     📊 My Metrics
                   </button>
                   <button
                     onClick={() => { setPage('team-chat'); setMenuOpen(false) }}
-                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: COLORS.white, cursor: 'pointer', textAlign: 'left' }}
                   >
                     <span>💬 Team Chat</span>
                     {unreadMentions > 0 && (
-                      <span style={{ background: '#dc2626', color: '#fff', fontSize: '11px', fontWeight: 800, padding: '2px 8px', borderRadius: '999px' }}>{unreadMentions}</span>
+                      <span style={{ background: COLORS.red600, color: COLORS.white, fontSize: '11px', fontWeight: 800, padding: '2px 8px', borderRadius: '999px' }}>{unreadMentions}</span>
                     )}
                   </button>
                   <button
                     onClick={handleSignOut}
-                    style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: COLORS.white, cursor: 'pointer', textAlign: 'left' }}
                   >
                     🚪 Sign out
                   </button>
@@ -2185,61 +2186,61 @@ export default function BuilderDashboard({ profile }) {
 
             {/* Title */}
             <div style={{ marginBottom: '16px' }}>
-              <h1 style={{ margin: '0 0 4px 0', fontSize: '20px', fontWeight: 800, color: '#0f172a' }}>My Metrics</h1>
-              <p style={{ margin: 0, fontSize: '14px', color: '#64748b' }}>{profile.name}</p>
+              <h1 style={{ margin: '0 0 4px 0', fontSize: '20px', fontWeight: 800, color: COLORS.slate900 }}>My Metrics</h1>
+              <p style={{ margin: 0, fontSize: '14px', color: COLORS.slate500 }}>{profile.name}</p>
             </div>
 
             {/* Jobs completed */}
-            <p style={{ margin: '0 0 8px 0', fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Jobs completed</p>
+            <p style={{ margin: '0 0 8px 0', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Jobs completed</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
-              <div style={{ width: '100%', background: '#fff', borderRadius: '16px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', boxSizing: 'border-box' }}>
-                <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Today</p>
-                <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: '#16a34a' }}>{completedTodayCount}</p>
+              <div style={{ width: '100%', background: COLORS.white, borderRadius: '16px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', boxSizing: 'border-box' }}>
+                <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Today</p>
+                <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: COLORS.green600 }}>{completedTodayCount}</p>
               </div>
-              <div style={{ width: '100%', background: '#fff', borderRadius: '16px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', boxSizing: 'border-box' }}>
-                <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>This week</p>
-                <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: '#16a34a' }}>{completedWeekCount}</p>
+              <div style={{ width: '100%', background: COLORS.white, borderRadius: '16px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', boxSizing: 'border-box' }}>
+                <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }}>This week</p>
+                <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: COLORS.green600 }}>{completedWeekCount}</p>
               </div>
-              <div style={{ width: '100%', background: '#fff', borderRadius: '16px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', boxSizing: 'border-box' }}>
-                <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>This month</p>
-                <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: '#16a34a' }}>{completedMonthCount}</p>
+              <div style={{ width: '100%', background: COLORS.white, borderRadius: '16px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', boxSizing: 'border-box' }}>
+                <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }}>This month</p>
+                <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: COLORS.green600 }}>{completedMonthCount}</p>
               </div>
             </div>
 
             {/* Overall snapshot */}
-            <p style={{ margin: '0 0 8px 0', fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Overall snapshot</p>
+            <p style={{ margin: '0 0 8px 0', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Overall snapshot</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
-              <div style={{ width: '100%', background: '#fff', borderRadius: '16px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', boxSizing: 'border-box' }}>
-                <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Total completed</p>
-                <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: '#16a34a' }}>{doneTickets.length}</p>
+              <div style={{ width: '100%', background: COLORS.white, borderRadius: '16px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', boxSizing: 'border-box' }}>
+                <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Total completed</p>
+                <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: COLORS.green600 }}>{doneTickets.length}</p>
               </div>
-              <div style={{ width: '100%', background: '#fff', borderRadius: '16px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', boxSizing: 'border-box' }}>
-                <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Total assigned</p>
-                <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: '#64748b' }}>{totalAssignedCount}</p>
+              <div style={{ width: '100%', background: COLORS.white, borderRadius: '16px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', boxSizing: 'border-box' }}>
+                <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Total assigned</p>
+                <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: COLORS.slate500 }}>{totalAssignedCount}</p>
               </div>
-              <div style={{ width: '100%', background: '#fff', borderRadius: '16px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', boxSizing: 'border-box' }}>
-                <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>In progress now</p>
-                <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: '#0d9488' }}>{inProgressTickets.length}</p>
+              <div style={{ width: '100%', background: COLORS.white, borderRadius: '16px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', boxSizing: 'border-box' }}>
+                <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }}>In progress now</p>
+                <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: COLORS.teal600 }}>{inProgressTickets.length}</p>
               </div>
-              <div style={{ width: '100%', background: '#fff', borderRadius: '16px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', boxSizing: 'border-box' }}>
-                <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>On hold</p>
-                <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: '#d97706' }}>{onHoldTickets.length}</p>
+              <div style={{ width: '100%', background: COLORS.white, borderRadius: '16px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', boxSizing: 'border-box' }}>
+                <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }}>On hold</p>
+                <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: COLORS.amber600 }}>{onHoldTickets.length}</p>
               </div>
             </div>
 
             {/* Recently completed */}
-            <p style={{ margin: '0 0 8px 0', fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Recently completed</p>
+            <p style={{ margin: '0 0 8px 0', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Recently completed</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {recentlyCompleted.length === 0 && (
-                <div style={{ background: '#fff', borderRadius: '16px', padding: '40px', textAlign: 'center' }}>
-                  <p style={{ color: '#94a3b8', fontWeight: 600 }}>No completed jobs yet.</p>
+                <div style={{ background: COLORS.white, borderRadius: '16px', padding: '40px', textAlign: 'center' }}>
+                  <p style={{ color: COLORS.slate400, fontWeight: 600 }}>No completed jobs yet.</p>
                 </div>
               )}
               {recentlyCompleted.map(t => (
-                <div key={t.id} style={{ background: '#ffffff', borderRadius: '16px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-                  <p style={{ margin: '0 0 4px 0', fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>{t.property?.address}</p>
-                  <p style={{ margin: '0 0 6px 0', fontSize: '13px', color: '#64748b' }}>{t.description}</p>
-                  <p style={{ margin: 0, fontSize: '11px', fontWeight: 700, color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Completed {formatUKDate(t.completed_at)}</p>
+                <div key={t.id} style={{ background: COLORS.white, borderRadius: '16px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+                  <p style={{ margin: '0 0 4px 0', fontSize: '14px', fontWeight: 700, color: COLORS.slate900 }}>{t.property?.address}</p>
+                  <p style={{ margin: '0 0 6px 0', fontSize: '13px', color: COLORS.slate500 }}>{t.description}</p>
+                  <p style={{ margin: 0, fontSize: '11px', fontWeight: 700, color: COLORS.green600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Completed {formatUKDate(t.completed_at)}</p>
                 </div>
               ))}
             </div>
@@ -2254,22 +2255,22 @@ export default function BuilderDashboard({ profile }) {
           pick between. Realtime, not polling -- this app's first use of
           Supabase Realtime (see lib/chat.js). */}
       {page === 'team-chat' && (
-        <div style={{ position: 'fixed', top: 'var(--pmms-banner-offset, 0px)', left: 0, right: 0, bottom: 0, background: '#f1f5f9', zIndex: 50, display: 'flex', flexDirection: 'column', fontFamily: 'system-ui, sans-serif' }}>
+        <div style={{ position: 'fixed', top: 'var(--pmms-banner-offset, 0px)', left: 0, right: 0, bottom: 0, background: COLORS.slate100, zIndex: 50, display: 'flex', flexDirection: 'column', fontFamily: 'system-ui, sans-serif' }}>
 
           {/* Header */}
-          <div style={{ background: '#ffffff', borderBottom: '1px solid #e2e8f0', padding: '14px 20px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <button onClick={() => setPage('jobs')} style={{ background: '#f1f5f9', border: 'none', borderRadius: '8px', padding: '8px 14px', fontSize: '13px', fontWeight: 700, color: '#64748b', cursor: 'pointer' }}>
+          <div style={{ background: COLORS.white, borderBottom: `1px solid ${COLORS.slate200}`, padding: '14px 20px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <button onClick={() => setPage('jobs')} style={{ background: COLORS.slate100, border: 'none', borderRadius: '8px', padding: '8px 14px', fontSize: '13px', fontWeight: 700, color: COLORS.slate500, cursor: 'pointer' }}>
               ← Back
             </button>
             <div>
-              <p style={{ margin: 0, fontSize: '15px', fontWeight: 800, color: '#0f172a' }}>💬 {chatDivision} Team Chat</p>
+              <p style={{ margin: 0, fontSize: '15px', fontWeight: 800, color: COLORS.slate900 }}>💬 {chatDivision} Team Chat</p>
             </div>
           </div>
 
           {/* Messages */}
           <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {chatMessages.length === 0 && (
-              <p style={{ margin: 'auto', color: '#94a3b8', fontSize: '13px' }}>No messages yet -- say hello 👋</p>
+              <p style={{ margin: 'auto', color: COLORS.slate400, fontSize: '13px' }}>No messages yet -- say hello 👋</p>
             )}
             {chatMessages.map((m, i) => {
               const isMine = m.sender_id === profile.id
@@ -2281,14 +2282,14 @@ export default function BuilderDashboard({ profile }) {
               return (
                 <div key={m.id} style={{ alignSelf: isMine ? 'flex-end' : 'flex-start', maxWidth: '80%' }}>
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'baseline', flexDirection: isMine ? 'row-reverse' : 'row' }}>
-                    <span style={{ fontSize: '12px', fontWeight: 800, color: isMine ? '#0f172a' : colorForSender(m.sender_id) }}>{isMine ? 'You' : m.sender_name}</span>
-                    <span style={{ fontSize: '11px', color: '#94a3b8' }}>{formatUKDateTime(m.created_at)}</span>
+                    <span style={{ fontSize: '12px', fontWeight: 800, color: isMine ? COLORS.slate900 : colorForSender(m.sender_id) }}>{isMine ? 'You' : m.sender_name}</span>
+                    <span style={{ fontSize: '11px', color: COLORS.slate400 }}>{formatUKDateTime(m.created_at)}</span>
                   </div>
                   {m.body && (
                     <div style={{
                       marginTop: '2px', padding: '8px 12px', fontSize: '13.5px', lineHeight: 1.4,
-                      background: isMine ? '#19562e' : '#ffffff', color: isMine ? '#fff' : '#374151',
-                      border: isMine ? 'none' : '1px solid #e2e8f0',
+                      background: isMine ? COLORS.greenDark : COLORS.white, color: isMine ? COLORS.white : COLORS.gray700,
+                      border: isMine ? 'none' : `1px solid ${COLORS.slate200}`,
                       borderRadius: isMine ? '12px 4px 12px 12px' : '4px 12px 12px 12px',
                     }}>
                       {m.body}
@@ -2299,11 +2300,11 @@ export default function BuilderDashboard({ profile }) {
                       src={m.photo_url}
                       alt=""
                       onClick={() => setChatLightboxUrl(m.photo_url)}
-                      style={{ marginTop: '4px', maxWidth: '200px', maxHeight: '200px', borderRadius: '10px', border: '1px solid #e2e8f0', display: 'block', cursor: 'pointer' }}
+                      style={{ marginTop: '4px', maxWidth: '200px', maxHeight: '200px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, display: 'block', cursor: 'pointer' }}
                     />
                   )}
                   {seenBy.length > 0 && (
-                    <p style={{ margin: '4px 0 0', fontSize: '11px', color: '#94a3b8', textAlign: isMine ? 'right' : 'left' }}>Seen by {seenBy.join(', ')}</p>
+                    <p style={{ margin: '4px 0 0', fontSize: '11px', color: COLORS.slate400, textAlign: isMine ? 'right' : 'left' }}>Seen by {seenBy.join(', ')}</p>
                   )}
                 </div>
               )
@@ -2311,13 +2312,13 @@ export default function BuilderDashboard({ profile }) {
           </div>
 
           {/* Composer */}
-          <div style={{ background: '#ffffff', borderTop: '1px solid #e2e8f0', padding: '10px 14px 14px' }}>
+          <div style={{ background: COLORS.white, borderTop: `1px solid ${COLORS.slate200}`, padding: '10px 14px 14px' }}>
             <ChatComposer
               members={chatMembers.filter(m => m.id !== profile.id)}
               onSend={handleSendChatMessage}
               sending={chatSending}
-              inputStyle={{ flex: 1, padding: '10px 14px', borderRadius: '20px', border: '1px solid #e2e8f0', fontSize: '13.5px', fontFamily: 'inherit' }}
-              sendButtonStyle={{ width: '40px', height: '40px', borderRadius: '50%', border: 'none', background: '#19562e', color: '#fff', fontSize: '14px', fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
+              inputStyle={{ flex: 1, padding: '10px 14px', borderRadius: '20px', border: `1px solid ${COLORS.slate200}`, fontSize: '13.5px', fontFamily: 'inherit' }}
+              sendButtonStyle={{ width: '40px', height: '40px', borderRadius: '50%', border: 'none', background: COLORS.greenDark, color: COLORS.white, fontSize: '14px', fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
             />
           </div>
 
@@ -2327,13 +2328,13 @@ export default function BuilderDashboard({ profile }) {
 
       {/* Raise New Ticket page */}
       {page === 'new-ticket' && (
-        <div style={{ position: 'fixed', top: 'var(--pmms-banner-offset, 0px)', left: 0, right: 0, bottom: 0, background: '#f1f5f9', zIndex: 50, overflowY: 'auto', fontFamily: 'system-ui, sans-serif' }}>
+        <div style={{ position: 'fixed', top: 'var(--pmms-banner-offset, 0px)', left: 0, right: 0, bottom: 0, background: COLORS.slate100, zIndex: 50, overflowY: 'auto', fontFamily: 'system-ui, sans-serif' }}>
 
           {/* Header */}
           <div style={{ position: 'sticky', top: 0, zIndex: 10 }}>
-            <div style={{ background: '#ffffff', borderBottom: '1px solid #e2e8f0', padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ background: COLORS.white, borderBottom: `1px solid ${COLORS.slate200}`, padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <button onClick={() => setPage('jobs')} style={{ background: '#f1f5f9', border: 'none', borderRadius: '8px', padding: '8px 14px', fontSize: '13px', fontWeight: 700, color: '#64748b', cursor: 'pointer' }}>
+                <button onClick={() => setPage('jobs')} style={{ background: COLORS.slate100, border: 'none', borderRadius: '8px', padding: '8px 14px', fontSize: '13px', fontWeight: 700, color: COLORS.slate500, cursor: 'pointer' }}>
                   ← Back
                 </button>
                 <button
@@ -2342,7 +2343,7 @@ export default function BuilderDashboard({ profile }) {
                   style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
                 >
                   <img src={gbchLogo} alt="GBCH" style={{ height: '36px' }} />
-                  <span style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a' }}>PMMS</span>
+                  <span style={{ fontSize: '16px', fontWeight: 800, color: COLORS.slate900 }}>PMMS</span>
                 </button>
               </div>
               <button
@@ -2350,56 +2351,56 @@ export default function BuilderDashboard({ profile }) {
                 aria-label="Menu"
                 style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '4px', background: 'none', border: 'none', padding: '8px', cursor: 'pointer' }}
               >
-                <span style={{ width: '22px', height: '2px', background: '#0f172a', borderRadius: '2px' }} />
-                <span style={{ width: '22px', height: '2px', background: '#0f172a', borderRadius: '2px' }} />
-                <span style={{ width: '22px', height: '2px', background: '#0f172a', borderRadius: '2px' }} />
+                <span style={{ width: '22px', height: '2px', background: COLORS.slate900, borderRadius: '2px' }} />
+                <span style={{ width: '22px', height: '2px', background: COLORS.slate900, borderRadius: '2px' }} />
+                <span style={{ width: '22px', height: '2px', background: COLORS.slate900, borderRadius: '2px' }} />
               </button>
             </div>
 
             {menuOpen && (
-              <div style={{ background: '#19562e', padding: '20px' }}>
-                <p style={{ margin: '0 0 2px 0', fontSize: '16px', fontWeight: 800, color: '#ffffff' }}>{profile.name}</p>
-                <p style={{ margin: '0 0 18px 0', fontSize: '13px', fontWeight: 500, color: '#ffffff', opacity: 0.8 }}>{profile.job_title}</p>
+              <div style={{ background: COLORS.greenDark, padding: '20px' }}>
+                <p style={{ margin: '0 0 2px 0', fontSize: '16px', fontWeight: 800, color: COLORS.white }}>{profile.name}</p>
+                <p style={{ margin: '0 0 18px 0', fontSize: '13px', fontWeight: 500, color: COLORS.white, opacity: 0.8 }}>{profile.job_title}</p>
 
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                   {SHOW_LOG_TICKET_NAV && (
                     <button
                       onClick={() => { setPage('new-ticket'); setMenuOpen(false) }}
-                      style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
+                      style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: COLORS.white, cursor: 'pointer', textAlign: 'left' }}
                     >
                       📝 Log a Ticket
                     </button>
                   )}
                   <button
                     onClick={() => { setPage('my-reports'); setMenuOpen(false) }}
-                    style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: COLORS.white, cursor: 'pointer', textAlign: 'left' }}
                   >
                     📋 My Reports
                   </button>
                   <button
                     onClick={() => { setPage('mileage'); setMenuOpen(false) }}
-                    style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: COLORS.white, cursor: 'pointer', textAlign: 'left' }}
                   >
                     🕐 My Mileage
                   </button>
                   <button
                     onClick={() => { setPage('metrics'); setMenuOpen(false) }}
-                    style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: COLORS.white, cursor: 'pointer', textAlign: 'left' }}
                   >
                     📊 My Metrics
                   </button>
                   <button
                     onClick={() => { setPage('team-chat'); setMenuOpen(false) }}
-                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: COLORS.white, cursor: 'pointer', textAlign: 'left' }}
                   >
                     <span>💬 Team Chat</span>
                     {unreadMentions > 0 && (
-                      <span style={{ background: '#dc2626', color: '#fff', fontSize: '11px', fontWeight: 800, padding: '2px 8px', borderRadius: '999px' }}>{unreadMentions}</span>
+                      <span style={{ background: COLORS.red600, color: COLORS.white, fontSize: '11px', fontWeight: 800, padding: '2px 8px', borderRadius: '999px' }}>{unreadMentions}</span>
                     )}
                   </button>
                   <button
                     onClick={handleSignOut}
-                    style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: COLORS.white, cursor: 'pointer', textAlign: 'left' }}
                   >
                     🚪 Sign out
                   </button>
@@ -2412,13 +2413,13 @@ export default function BuilderDashboard({ profile }) {
 
             <button
               onClick={() => setPage('jobs')}
-              style={{ background: 'none', border: 'none', padding: 0, marginBottom: '16px', color: '#64748b', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}
+              style={{ background: 'none', border: 'none', padding: 0, marginBottom: '16px', color: COLORS.slate500, fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}
             >
               ← Cancel
             </button>
 
-            <h1 style={{ margin: '0 0 4px 0', fontSize: '18px', fontWeight: 700, color: '#0f172a' }}>Log a Ticket</h1>
-            <p style={{ margin: '0 0 16px 0', fontSize: '13px', fontWeight: 400, color: '#64748b' }}>Calculates priority instantly based on the property and issue you select.</p>
+            <h1 style={{ margin: '0 0 4px 0', fontSize: '18px', fontWeight: 700, color: COLORS.slate900 }}>Log a Ticket</h1>
+            <p style={{ margin: '0 0 16px 0', fontSize: '13px', fontWeight: 400, color: COLORS.slate500 }}>Calculates priority instantly based on the property and issue you select.</p>
 
             {/* Mode toggle */}
             <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
@@ -2426,9 +2427,9 @@ export default function BuilderDashboard({ profile }) {
                 onClick={() => setLoggingMode('maintenance')}
                 style={{
                   flex: 1, height: '44px', borderRadius: '10px', boxSizing: 'border-box',
-                  border: loggingMode === 'maintenance' ? '2px solid #0f766e' : '1px solid #e2e8f0',
-                  background: loggingMode === 'maintenance' ? '#0f766e' : '#ffffff',
-                  color: loggingMode === 'maintenance' ? '#ffffff' : '#0f172a',
+                  border: loggingMode === 'maintenance' ? `2px solid ${COLORS.teal700}` : `1px solid ${COLORS.slate200}`,
+                  background: loggingMode === 'maintenance' ? COLORS.teal700 : COLORS.white,
+                  color: loggingMode === 'maintenance' ? COLORS.white : COLORS.slate900,
                   fontSize: '13px', fontWeight: 600, cursor: 'pointer',
                 }}
               >
@@ -2438,9 +2439,9 @@ export default function BuilderDashboard({ profile }) {
                 onClick={() => setLoggingMode('compliance')}
                 style={{
                   flex: 1, height: '44px', borderRadius: '10px', boxSizing: 'border-box',
-                  border: loggingMode === 'compliance' ? '2px solid #0f766e' : '1px solid #e2e8f0',
-                  background: loggingMode === 'compliance' ? '#0f766e' : '#ffffff',
-                  color: loggingMode === 'compliance' ? '#ffffff' : '#0f172a',
+                  border: loggingMode === 'compliance' ? `2px solid ${COLORS.teal700}` : `1px solid ${COLORS.slate200}`,
+                  background: loggingMode === 'compliance' ? COLORS.teal700 : COLORS.white,
+                  color: loggingMode === 'compliance' ? COLORS.white : COLORS.slate900,
                   fontSize: '13px', fontWeight: 600, cursor: 'pointer',
                 }}
               >
@@ -2453,7 +2454,7 @@ export default function BuilderDashboard({ profile }) {
 
                 {/* Step 1: Target Property */}
                 <div style={{ background: SECTION_BG[0], padding: '20px', borderBottom: ticketPropertyId ? '1px solid rgba(15,23,42,0.06)' : 'none' }}>
-                  <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: '#0f172a' }}>1. Target Property</p>
+                  <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: COLORS.slate900 }}>1. Target Property</p>
                   <PropertySearchSelect
                     properties={ticketProperties}
                     value={ticketPropertyId}
@@ -2468,7 +2469,7 @@ export default function BuilderDashboard({ profile }) {
                 {/* Step 2: Room / Area */}
                 {ticketPropertyId && (
                   <div style={{ background: SECTION_BG[1], padding: '20px', borderBottom: ticketStep2Complete ? '1px solid rgba(15,23,42,0.06)' : 'none' }}>
-                    <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: '#0f172a' }}>2. Room / Area</p>
+                    <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: COLORS.slate900 }}>2. Room / Area</p>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                       {ROOM_OPTIONS.map(room => {
                         const active = ticketRoom === room
@@ -2491,8 +2492,8 @@ export default function BuilderDashboard({ profile }) {
                     </div>
 
                     {ticketRoom && ticketRoom !== 'Other Area...' && ticketRoom !== 'Garden' && (
-                      <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px dashed #e2e8f0' }}>
-                        <p style={{ margin: '0 0 8px 0', fontSize: '11px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                      <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: `1px dashed ${COLORS.slate200}` }}>
+                        <p style={{ margin: '0 0 8px 0', fontSize: '11px', fontWeight: 600, color: COLORS.slate500, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                           {floorContextLabel(selectedTicketProperty)}
                         </p>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
@@ -2513,8 +2514,8 @@ export default function BuilderDashboard({ profile }) {
                     )}
 
                     {ticketRoom === 'Bedroom' && (
-                      <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px dashed #e2e8f0' }}>
-                        <p style={{ margin: '0 0 8px 0', fontSize: '11px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                      <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: `1px dashed ${COLORS.slate200}` }}>
+                        <p style={{ margin: '0 0 8px 0', fontSize: '11px', fontWeight: 600, color: COLORS.slate500, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                           Room number (optional)
                         </p>
                         <input
@@ -2522,14 +2523,14 @@ export default function BuilderDashboard({ profile }) {
                           value={ticketRoomCode}
                           onChange={(e) => setTicketRoomCode(e.target.value)}
                           placeholder="e.g. Room 12C"
-                          style={{ width: '100%', height: '44px', padding: '0 12px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '13px', boxSizing: 'border-box' }}
+                          style={{ width: '100%', height: '44px', padding: '0 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', boxSizing: 'border-box' }}
                         />
                       </div>
                     )}
 
                     {ticketRoom === 'Other Area...' && (
-                      <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px dashed #e2e8f0' }}>
-                        <p style={{ margin: '0 0 8px 0', fontSize: '11px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                      <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: `1px dashed ${COLORS.slate200}` }}>
+                        <p style={{ margin: '0 0 8px 0', fontSize: '11px', fontWeight: 600, color: COLORS.slate500, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                           Describe the area
                         </p>
                         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
@@ -2538,7 +2539,7 @@ export default function BuilderDashboard({ profile }) {
                             value={ticketOtherArea}
                             onChange={(e) => setTicketOtherArea(e.target.value)}
                             placeholder="e.g. Back garden boundary wall"
-                            style={{ flex: 1, height: '44px', padding: '0 12px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '13px', boxSizing: 'border-box' }}
+                            style={{ flex: 1, height: '44px', padding: '0 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', boxSizing: 'border-box' }}
                           />
                           <VoiceInputButton onResult={(text) => setTicketOtherArea(prev => prev ? `${prev} ${text}` : text)} />
                         </div>
@@ -2550,7 +2551,7 @@ export default function BuilderDashboard({ profile }) {
                 {/* Step 3: Main Category */}
                 {ticketStep2Complete && (
                   <div style={{ background: SECTION_BG[0], padding: '20px', borderBottom: ticketCategory ? '1px solid rgba(15,23,42,0.06)' : 'none' }}>
-                    <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: '#0f172a' }}>3. Main Category</p>
+                    <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: COLORS.slate900 }}>3. Main Category</p>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                       {sortedCategoryEntries(maintenanceCategories).map(([key]) => {
                         const active = ticketCategory === key
@@ -2571,7 +2572,7 @@ export default function BuilderDashboard({ profile }) {
                 {/* Step 4: Issue Tag */}
                 {ticketCategory && (
                   <div style={{ background: SECTION_BG[1], padding: '20px', borderBottom: ticketStep4Complete ? '1px solid rgba(15,23,42,0.06)' : 'none' }}>
-                    <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: '#0f172a' }}>4. Standardized Diagnostic Issue Tag</p>
+                    <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: COLORS.slate900 }}>4. Standardized Diagnostic Issue Tag</p>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                       {(maintenanceCategories[ticketCategory]?.subCategories || []).map(sub => {
                         const tag = sub.label
@@ -2594,8 +2595,8 @@ export default function BuilderDashboard({ profile }) {
                             onClick={() => { setTicketIssueTag(marker); setTicketDuplicateWarning(null) }}
                             style={{
                               ...choiceButtonStyle(active, 'left'),
-                              border: active ? '2px solid #0f766e' : '1px dashed #cbd5e1',
-                              color: active ? '#ffffff' : '#64748b',
+                              border: active ? `2px solid ${COLORS.teal700}` : `1px dashed ${COLORS.slate300}`,
+                              color: active ? COLORS.white : COLORS.slate500,
                             }}
                           >
                             {unlistedLabelFor(ticketCategory)}
@@ -2611,7 +2612,7 @@ export default function BuilderDashboard({ profile }) {
                           value={ticketIssueOther}
                           onChange={(e) => setTicketIssueOther(e.target.value)}
                           placeholder={`Describe the unlisted ${ticketCategory} issue (defaults to a baseline ${maintenanceCategories[ticketCategory]?.weight ?? 15}-point score)`}
-                          style={{ flex: 1, height: '44px', padding: '0 12px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '13px', boxSizing: 'border-box' }}
+                          style={{ flex: 1, height: '44px', padding: '0 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', boxSizing: 'border-box' }}
                         />
                         <VoiceInputButton onResult={(text) => setTicketIssueOther(prev => prev ? `${prev} ${text}` : text)} />
                       </div>
@@ -2623,21 +2624,21 @@ export default function BuilderDashboard({ profile }) {
                       const total = baseScore + vulnBonus
                       const isP1 = total >= p1Threshold
                       return (
-                        <div style={{ marginTop: '12px', padding: '14px', borderRadius: '10px', background: '#ffffff', border: '1px solid #e2e8f0' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', paddingBottom: '8px', borderBottom: '1px solid #e2e8f0' }}>
-                            <span style={{ fontSize: '12px', fontWeight: 600, color: '#0f172a' }}>Real-time Priority Engine</span>
-                            <span style={{ fontSize: '12px', fontWeight: 700, fontFamily: 'monospace', color: '#fff', background: isP1 ? '#dc2626' : '#475569', padding: '4px 10px', borderRadius: '6px' }}>{total} Points</span>
+                        <div style={{ marginTop: '12px', padding: '14px', borderRadius: '10px', background: COLORS.white, border: `1px solid ${COLORS.slate200}` }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', paddingBottom: '8px', borderBottom: `1px solid ${COLORS.slate200}` }}>
+                            <span style={{ fontSize: '12px', fontWeight: 600, color: COLORS.slate900 }}>Real-time Priority Engine</span>
+                            <span style={{ fontSize: '12px', fontWeight: 700, fontFamily: 'monospace', color: COLORS.white, background: isP1 ? COLORS.red600 : COLORS.slate600, padding: '4px 10px', borderRadius: '6px' }}>{total} Points</span>
                           </div>
-                          <p style={{ margin: '0 0 8px 0', fontSize: '11px', fontWeight: 700, color: isP1 ? '#dc2626' : '#475569', textTransform: 'uppercase' }}>
+                          <p style={{ margin: '0 0 8px 0', fontSize: '11px', fontWeight: 700, color: isP1 ? COLORS.red600 : COLORS.slate600, textTransform: 'uppercase' }}>
                             {isP1 ? '⚠ P1 Critical — will trigger emergency escalation' : 'Routine severity tier'}
                           </p>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#64748b', marginBottom: '4px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: COLORS.slate500, marginBottom: '4px' }}>
                             <span>{isUnlistedTag(ticketIssueTag) ? 'Unlisted issue fallback baseline' : 'Diagnostic baseline score'}</span>
-                            <strong style={{ color: '#0f172a', fontFamily: 'monospace', fontWeight: 600 }}>{baseScore} pts</strong>
+                            <strong style={{ color: COLORS.slate900, fontFamily: 'monospace', fontWeight: 600 }}>{baseScore} pts</strong>
                           </div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#64748b' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: COLORS.slate500 }}>
                             <span>Property vulnerability adjustment</span>
-                            <strong style={{ color: '#0f172a', fontFamily: 'monospace', fontWeight: 600 }}>+{vulnBonus} pts</strong>
+                            <strong style={{ color: COLORS.slate900, fontFamily: 'monospace', fontWeight: 600 }}>+{vulnBonus} pts</strong>
                           </div>
                         </div>
                       )
@@ -2648,7 +2649,7 @@ export default function BuilderDashboard({ profile }) {
                 {/* Step 5: Photo + Submit */}
                 {ticketStep4Complete && (
                   <div style={{ background: SECTION_BG[0], padding: '20px' }}>
-                    <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: '#0f172a' }}>5. Photo &amp; Submit</p>
+                    <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: COLORS.slate900 }}>5. Photo &amp; Submit</p>
 
                     <input
                       type="file"
@@ -2660,7 +2661,7 @@ export default function BuilderDashboard({ profile }) {
                     />
                     <button
                       onClick={() => document.getElementById('ticket-photo-input').click()}
-                      style={{ width: '100%', height: '44px', borderRadius: '10px', border: '2px dashed #cbd5e1', background: '#ffffff', color: '#64748b', fontSize: '13px', fontWeight: 600, cursor: 'pointer', boxSizing: 'border-box' }}
+                      style={{ width: '100%', height: '44px', borderRadius: '10px', border: `2px dashed ${COLORS.slate300}`, background: COLORS.white, color: COLORS.slate500, fontSize: '13px', fontWeight: 600, cursor: 'pointer', boxSizing: 'border-box' }}
                     >
                       Add a photo
                     </button>
@@ -2670,30 +2671,30 @@ export default function BuilderDashboard({ profile }) {
                     )}
 
                     <div style={{ marginTop: '16px' }}>
-                      <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Reported by</p>
+                      <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 600, color: COLORS.slate500, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Reported by</p>
                       <input
                         type="text"
                         value={profile.name}
                         disabled
-                        style={{ width: '100%', height: '44px', padding: '0 12px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '13px', boxSizing: 'border-box', background: '#f1f5f9', color: '#64748b' }}
+                        style={{ width: '100%', height: '44px', padding: '0 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', boxSizing: 'border-box', background: COLORS.slate100, color: COLORS.slate500 }}
                       />
                     </div>
 
                     {ticketDuplicateWarning ? (
-                      <div style={{ marginTop: '16px', padding: '16px', borderRadius: '10px', background: '#fffbeb', border: '1px solid #fcd34d' }}>
-                        <p style={{ margin: '0 0 8px 0', fontSize: '13px', fontWeight: 700, color: '#92400e' }}>⚠ Possible duplicate</p>
-                        <p style={{ margin: '0 0 12px 0', fontSize: '13px', fontWeight: 400, color: '#78350f' }}>
+                      <div style={{ marginTop: '16px', padding: '16px', borderRadius: '10px', background: COLORS.amber50, border: `1px solid ${COLORS.amber300}` }}>
+                        <p style={{ margin: '0 0 8px 0', fontSize: '13px', fontWeight: 700, color: COLORS.amber800 }}>⚠ Possible duplicate</p>
+                        <p style={{ margin: '0 0 12px 0', fontSize: '13px', fontWeight: 400, color: COLORS.amber900 }}>
                           There's already an open ticket at this property for {ticketDuplicateWarning.matchKind}: Job #{ticketDuplicateWarning.ticket.ticket_number} — {ticketDuplicateWarning.ticket.issue_tag} ({ticketDuplicateWarning.ticket.status}). Is this a duplicate, or a genuinely separate fault?
                         </p>
                         <button
                           onClick={() => setTicketDuplicateWarning(null)}
-                          style={{ width: '100%', height: '44px', marginBottom: '8px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '10px', color: '#0f172a', fontSize: '13px', fontWeight: 600, cursor: 'pointer', boxSizing: 'border-box' }}
+                          style={{ width: '100%', height: '44px', marginBottom: '8px', background: COLORS.white, border: `1px solid ${COLORS.slate200}`, borderRadius: '10px', color: COLORS.slate900, fontSize: '13px', fontWeight: 600, cursor: 'pointer', boxSizing: 'border-box' }}
                         >
                           Cancel — it's a duplicate
                         </button>
                         <button
                           onClick={() => handleSubmitTicket(true)}
-                          style={{ width: '100%', height: '44px', background: '#d97706', border: 'none', borderRadius: '10px', color: '#fff', fontSize: '13px', fontWeight: 600, cursor: 'pointer', boxSizing: 'border-box' }}
+                          style={{ width: '100%', height: '44px', background: COLORS.amber600, border: 'none', borderRadius: '10px', color: COLORS.white, fontSize: '13px', fontWeight: 600, cursor: 'pointer', boxSizing: 'border-box' }}
                         >
                           It's separate — log it anyway
                         </button>
@@ -2701,10 +2702,10 @@ export default function BuilderDashboard({ profile }) {
                     ) : (
                       <>
                         {ticketError && (
-                          <p style={{ margin: '16px 0 0 0', fontSize: '13px', color: '#ef4444' }}>{ticketError}</p>
+                          <p style={{ margin: '16px 0 0 0', fontSize: '13px', color: COLORS.red500 }}>{ticketError}</p>
                         )}
                         {ticketSuccess && (
-                          <p style={{ margin: '16px 0 0 0', fontSize: '13px', color: '#16a34a', fontWeight: 600 }}>✓ Ticket submitted successfully</p>
+                          <p style={{ margin: '16px 0 0 0', fontSize: '13px', color: COLORS.green600, fontWeight: 600 }}>✓ Ticket submitted successfully</p>
                         )}
                         <button
                           onClick={() => handleSubmitTicket(false)}
@@ -2713,8 +2714,8 @@ export default function BuilderDashboard({ profile }) {
                             width: '100%',
                             height: '48px',
                             marginTop: '16px',
-                            background: '#1e3a8a',
-                            color: '#fff',
+                            background: COLORS.blue900,
+                            color: COLORS.white,
                             border: 'none',
                             borderRadius: '12px',
                             fontSize: '14px',
@@ -2739,7 +2740,7 @@ export default function BuilderDashboard({ profile }) {
 
                 {/* Step 1: Target Property */}
                 <div style={{ background: SECTION_BG[0], padding: '20px', borderBottom: '1px solid rgba(15,23,42,0.06)' }}>
-                  <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: '#0f172a' }}>1. Target Property</p>
+                  <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: COLORS.slate900 }}>1. Target Property</p>
                   <PropertySearchSelect
                     properties={ticketProperties}
                     value={ticketPropertyId}
@@ -2749,10 +2750,10 @@ export default function BuilderDashboard({ profile }) {
 
                 {/* Step 2: Select Check Type */}
                 <div style={{ background: SECTION_BG[1], padding: '20px', borderBottom: complianceCheckType ? '1px solid rgba(15,23,42,0.06)' : 'none' }}>
-                  <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: '#0f172a' }}>2. Select Check Type</p>
+                  <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: COLORS.slate900 }}>2. Select Check Type</p>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                     {complianceCheckTypes.length === 0 && (
-                      <p style={{ margin: 0, fontSize: '13px', color: '#94a3b8', fontStyle: 'italic', gridColumn: '1 / -1' }}>
+                      <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic', gridColumn: '1 / -1' }}>
                         No compliance check types configured yet -- ask your admin to add some.
                       </p>
                     )}
@@ -2774,18 +2775,18 @@ export default function BuilderDashboard({ profile }) {
                 {/* Step 3: Walk through each item */}
                 {complianceCheckType && (
                   <div style={{ background: SECTION_BG[0], padding: '20px' }}>
-                    <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: '#0f172a' }}>3. Walk Through Each Item</p>
+                    <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: COLORS.slate900 }}>3. Walk Through Each Item</p>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
                       {(complianceCheckTypes.find(t => t.name === complianceCheckType)?.items || []).map((item, idx) => {
                         const vulnBonus = selectedTicketProperty?.high_vulnerability ? 30 : 0
                         const effectiveScore = item.score + vulnBonus
                         const tier = priorityTierLabel(effectiveScore, p1Threshold, p2Threshold)
-                        const tierColour = effectiveScore >= p1Threshold ? '#dc2626' : effectiveScore >= p2Threshold ? '#d97706' : '#64748b'
+                        const tierColour = effectiveScore >= p1Threshold ? COLORS.red600 : effectiveScore >= p2Threshold ? COLORS.amber600 : COLORS.slate500
                         const result = complianceResults[idx]
                         return (
-                          <div key={item.label} style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '12px', background: '#ffffff' }}>
+                          <div key={item.label} style={{ border: `1px solid ${COLORS.slate200}`, borderRadius: '10px', padding: '12px', background: COLORS.white }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px', marginBottom: '8px' }}>
-                              <span style={{ fontSize: '13px', fontWeight: 600, color: '#0f172a' }}>{item.label}</span>
+                              <span style={{ fontSize: '13px', fontWeight: 600, color: COLORS.slate900 }}>{item.label}</span>
                               <span style={{ fontSize: '10px', fontWeight: 700, color: tierColour, flexShrink: 0 }}>{tier} if failed</span>
                             </div>
                             <div style={{ display: 'flex', gap: '8px' }}>
@@ -2793,9 +2794,9 @@ export default function BuilderDashboard({ profile }) {
                                 onClick={() => setComplianceItemResult(idx, 'Pass')}
                                 style={{
                                   flex: 1, height: '40px', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', boxSizing: 'border-box',
-                                  border: result === 'Pass' ? '1px solid #16a34a' : '1px solid #e2e8f0',
-                                  background: result === 'Pass' ? '#16a34a' : '#fff',
-                                  color: result === 'Pass' ? '#fff' : '#64748b',
+                                  border: result === 'Pass' ? `1px solid ${COLORS.green600}` : `1px solid ${COLORS.slate200}`,
+                                  background: result === 'Pass' ? COLORS.green600 : COLORS.white,
+                                  color: result === 'Pass' ? COLORS.white : COLORS.slate500,
                                 }}
                               >
                                 Pass
@@ -2804,9 +2805,9 @@ export default function BuilderDashboard({ profile }) {
                                 onClick={() => setComplianceItemResult(idx, 'Fail')}
                                 style={{
                                   flex: 1, height: '40px', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', boxSizing: 'border-box',
-                                  border: result === 'Fail' ? '1px solid #dc2626' : '1px solid #e2e8f0',
-                                  background: result === 'Fail' ? '#dc2626' : '#fff',
-                                  color: result === 'Fail' ? '#fff' : '#64748b',
+                                  border: result === 'Fail' ? `1px solid ${COLORS.red600}` : `1px solid ${COLORS.slate200}`,
+                                  background: result === 'Fail' ? COLORS.red600 : COLORS.white,
+                                  color: result === 'Fail' ? COLORS.white : COLORS.slate500,
                                 }}
                               >
                                 Fail
@@ -2819,7 +2820,7 @@ export default function BuilderDashboard({ profile }) {
                                   value={complianceNotes[idx] || ''}
                                   onChange={(e) => setComplianceNotes(prev => prev.map((n, i) => i === idx ? e.target.value : n))}
                                   placeholder="Describe what's wrong (used on the auto-created ticket)..."
-                                  style={{ width: '100%', marginTop: '8px', height: '40px', padding: '0 10px', borderRadius: '8px', border: '1px solid #fcd34d', fontSize: '13px', boxSizing: 'border-box' }}
+                                  style={{ width: '100%', marginTop: '8px', height: '40px', padding: '0 10px', borderRadius: '8px', border: `1px solid ${COLORS.amber300}`, fontSize: '13px', boxSizing: 'border-box' }}
                                 />
 
                                 <input
@@ -2839,7 +2840,7 @@ export default function BuilderDashboard({ profile }) {
                                     )}
                                     <button
                                       onClick={() => removeComplianceMedia(idx)}
-                                      style={{ marginTop: '6px', padding: '6px 12px', background: '#fff', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
+                                      style={{ marginTop: '6px', padding: '6px 12px', background: COLORS.white, color: COLORS.red600, border: `1px solid ${COLORS.red200}`, borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
                                     >
                                       ✕ Remove media
                                     </button>
@@ -2847,7 +2848,7 @@ export default function BuilderDashboard({ profile }) {
                                 ) : (
                                   <button
                                     onClick={() => document.getElementById(`compliance-media-${idx}`).click()}
-                                    style={{ width: '100%', marginTop: '8px', height: '40px', borderRadius: '8px', border: '2px dashed #cbd5e1', background: '#ffffff', color: '#64748b', fontSize: '12px', fontWeight: 600, cursor: 'pointer', boxSizing: 'border-box' }}
+                                    style={{ width: '100%', marginTop: '8px', height: '40px', borderRadius: '8px', border: `2px dashed ${COLORS.slate300}`, background: COLORS.white, color: COLORS.slate500, fontSize: '12px', fontWeight: 600, cursor: 'pointer', boxSizing: 'border-box' }}
                                   >
                                     📷 Add a photo or video (optional)
                                   </button>
@@ -2864,19 +2865,19 @@ export default function BuilderDashboard({ profile }) {
                       const total = complianceResults.length
                       const failed = complianceResults.filter(r => r === 'Fail').length
                       if (answered < total) {
-                        return <p style={{ margin: '0 0 16px 0', fontSize: '13px', fontWeight: 600, color: '#64748b', padding: '12px', background: '#f8fafc', borderRadius: '10px' }}>{answered} / {total} items marked.</p>
+                        return <p style={{ margin: '0 0 16px 0', fontSize: '13px', fontWeight: 600, color: COLORS.slate500, padding: '12px', background: COLORS.slate50, borderRadius: '10px' }}>{answered} / {total} items marked.</p>
                       }
                       if (failed === 0) {
-                        return <p style={{ margin: '0 0 16px 0', fontSize: '13px', fontWeight: 700, color: '#16a34a', padding: '12px', background: '#f0fdf4', borderRadius: '10px' }}>✓ All {total} items passed. No maintenance tickets will be created.</p>
+                        return <p style={{ margin: '0 0 16px 0', fontSize: '13px', fontWeight: 700, color: COLORS.green600, padding: '12px', background: COLORS.green50, borderRadius: '10px' }}>✓ All {total} items passed. No maintenance tickets will be created.</p>
                       }
-                      return <p style={{ margin: '0 0 16px 0', fontSize: '13px', fontWeight: 700, color: '#92400e', padding: '12px', background: '#fffbeb', borderRadius: '10px' }}>⚠ {failed} of {total} item(s) failed — {failed} ticket(s) will be created.</p>
+                      return <p style={{ margin: '0 0 16px 0', fontSize: '13px', fontWeight: 700, color: COLORS.amber800, padding: '12px', background: COLORS.amber50, borderRadius: '10px' }}>⚠ {failed} of {total} item(s) failed — {failed} ticket(s) will be created.</p>
                     })()}
 
                     {ticketError && (
-                      <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: '#ef4444' }}>{ticketError}</p>
+                      <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: COLORS.red500 }}>{ticketError}</p>
                     )}
                     {complianceSuccess && (
-                      <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: '#16a34a', fontWeight: 600 }}>✓ {complianceSuccess}</p>
+                      <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: COLORS.green600, fontWeight: 600 }}>✓ {complianceSuccess}</p>
                     )}
 
                     <button
@@ -2885,8 +2886,8 @@ export default function BuilderDashboard({ profile }) {
                       style={{
                         width: '100%',
                         height: '48px',
-                        background: '#0f172a',
-                        color: '#fff',
+                        background: COLORS.slate900,
+                        color: COLORS.white,
                         border: 'none',
                         borderRadius: '12px',
                         fontSize: '14px',
@@ -2910,13 +2911,13 @@ export default function BuilderDashboard({ profile }) {
 
       {/* My Reports page */}
       {page === 'my-reports' && (
-        <div style={{ position: 'fixed', top: 'var(--pmms-banner-offset, 0px)', left: 0, right: 0, bottom: 0, background: '#f1f5f9', zIndex: 50, overflowY: 'auto', fontFamily: 'system-ui, sans-serif' }}>
+        <div style={{ position: 'fixed', top: 'var(--pmms-banner-offset, 0px)', left: 0, right: 0, bottom: 0, background: COLORS.slate100, zIndex: 50, overflowY: 'auto', fontFamily: 'system-ui, sans-serif' }}>
 
           {/* Header */}
           <div style={{ position: 'sticky', top: 0, zIndex: 10 }}>
-            <div style={{ background: '#ffffff', borderBottom: '1px solid #e2e8f0', padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ background: COLORS.white, borderBottom: `1px solid ${COLORS.slate200}`, padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <button onClick={() => setPage('jobs')} style={{ background: '#f1f5f9', border: 'none', borderRadius: '8px', padding: '8px 14px', fontSize: '13px', fontWeight: 700, color: '#64748b', cursor: 'pointer' }}>
+                <button onClick={() => setPage('jobs')} style={{ background: COLORS.slate100, border: 'none', borderRadius: '8px', padding: '8px 14px', fontSize: '13px', fontWeight: 700, color: COLORS.slate500, cursor: 'pointer' }}>
                   ← Back
                 </button>
                 <button
@@ -2925,7 +2926,7 @@ export default function BuilderDashboard({ profile }) {
                   style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
                 >
                   <img src={gbchLogo} alt="GBCH" style={{ height: '36px' }} />
-                  <span style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a' }}>PMMS</span>
+                  <span style={{ fontSize: '16px', fontWeight: 800, color: COLORS.slate900 }}>PMMS</span>
                 </button>
               </div>
               <button
@@ -2933,56 +2934,56 @@ export default function BuilderDashboard({ profile }) {
                 aria-label="Menu"
                 style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '4px', background: 'none', border: 'none', padding: '8px', cursor: 'pointer' }}
               >
-                <span style={{ width: '22px', height: '2px', background: '#0f172a', borderRadius: '2px' }} />
-                <span style={{ width: '22px', height: '2px', background: '#0f172a', borderRadius: '2px' }} />
-                <span style={{ width: '22px', height: '2px', background: '#0f172a', borderRadius: '2px' }} />
+                <span style={{ width: '22px', height: '2px', background: COLORS.slate900, borderRadius: '2px' }} />
+                <span style={{ width: '22px', height: '2px', background: COLORS.slate900, borderRadius: '2px' }} />
+                <span style={{ width: '22px', height: '2px', background: COLORS.slate900, borderRadius: '2px' }} />
               </button>
             </div>
 
             {menuOpen && (
-              <div style={{ background: '#19562e', padding: '20px' }}>
-                <p style={{ margin: '0 0 2px 0', fontSize: '16px', fontWeight: 800, color: '#ffffff' }}>{profile.name}</p>
-                <p style={{ margin: '0 0 18px 0', fontSize: '13px', fontWeight: 500, color: '#ffffff', opacity: 0.8 }}>{profile.job_title}</p>
+              <div style={{ background: COLORS.greenDark, padding: '20px' }}>
+                <p style={{ margin: '0 0 2px 0', fontSize: '16px', fontWeight: 800, color: COLORS.white }}>{profile.name}</p>
+                <p style={{ margin: '0 0 18px 0', fontSize: '13px', fontWeight: 500, color: COLORS.white, opacity: 0.8 }}>{profile.job_title}</p>
 
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
                   {SHOW_LOG_TICKET_NAV && (
                     <button
                       onClick={() => { setPage('new-ticket'); setMenuOpen(false) }}
-                      style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
+                      style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: COLORS.white, cursor: 'pointer', textAlign: 'left' }}
                     >
                       📝 Log a Ticket
                     </button>
                   )}
                   <button
                     onClick={() => { setPage('my-reports'); setMenuOpen(false) }}
-                    style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: COLORS.white, cursor: 'pointer', textAlign: 'left' }}
                   >
                     📋 My Reports
                   </button>
                   <button
                     onClick={() => { setPage('mileage'); setMenuOpen(false) }}
-                    style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: COLORS.white, cursor: 'pointer', textAlign: 'left' }}
                   >
                     🕐 My Mileage
                   </button>
                   <button
                     onClick={() => { setPage('metrics'); setMenuOpen(false) }}
-                    style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: COLORS.white, cursor: 'pointer', textAlign: 'left' }}
                   >
                     📊 My Metrics
                   </button>
                   <button
                     onClick={() => { setPage('team-chat'); setMenuOpen(false) }}
-                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: COLORS.white, cursor: 'pointer', textAlign: 'left' }}
                   >
                     <span>💬 Team Chat</span>
                     {unreadMentions > 0 && (
-                      <span style={{ background: '#dc2626', color: '#fff', fontSize: '11px', fontWeight: 800, padding: '2px 8px', borderRadius: '999px' }}>{unreadMentions}</span>
+                      <span style={{ background: COLORS.red600, color: COLORS.white, fontSize: '11px', fontWeight: 800, padding: '2px 8px', borderRadius: '999px' }}>{unreadMentions}</span>
                     )}
                   </button>
                   <button
                     onClick={handleSignOut}
-                    style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: '#ffffff', cursor: 'pointer', textAlign: 'left' }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: COLORS.white, cursor: 'pointer', textAlign: 'left' }}
                   >
                     🚪 Sign out
                   </button>
@@ -2994,26 +2995,26 @@ export default function BuilderDashboard({ profile }) {
           <div style={{ padding: '16px', maxWidth: '600px', margin: '0 auto' }}>
 
             <div style={{ marginBottom: '16px' }}>
-              <h1 style={{ margin: '0 0 4px 0', fontSize: '18px', fontWeight: 700, color: '#0f172a' }}>My Reports</h1>
-              <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>Tickets you've personally raised, regardless of who they're assigned to.</p>
+              <h1 style={{ margin: '0 0 4px 0', fontSize: '18px', fontWeight: 700, color: COLORS.slate900 }}>My Reports</h1>
+              <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate500 }}>Tickets you've personally raised, regardless of who they're assigned to.</p>
             </div>
 
             {reportedTickets.length === 0 && (
-              <div style={{ background: '#fff', borderRadius: '16px', padding: '40px', textAlign: 'center' }}>
-                <p style={{ color: '#94a3b8', fontWeight: 600 }}>You haven't raised any tickets yet.</p>
+              <div style={{ background: COLORS.white, borderRadius: '16px', padding: '40px', textAlign: 'center' }}>
+                <p style={{ color: COLORS.slate400, fontWeight: 600 }}>You haven't raised any tickets yet.</p>
               </div>
             )}
 
             {reportedTickets.map(t => (
-              <div key={t.id} style={{ background: '#ffffff', borderRadius: '16px', marginBottom: '12px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+              <div key={t.id} style={{ background: COLORS.white, borderRadius: '16px', marginBottom: '12px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
                 <div style={{ height: '4px', background: statusColour(t.status) }} />
                 <div style={{ padding: '16px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                    <span style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Job #{t.ticket_number} · {t.category}</span>
+                    <span style={{ fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Job #{t.ticket_number} · {t.category}</span>
                     <span style={{ fontSize: '11px', fontWeight: 700, color: statusColour(t.status), background: statusColour(t.status) + '18', padding: '3px 10px', borderRadius: '20px' }}>{statusLabel(t.status)}</span>
                   </div>
-                  <p style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: 700, color: '#0f172a' }}>{t.property?.address}</p>
-                  <p style={{ margin: '0 0 12px 0', fontSize: '13px', color: '#64748b' }}>{t.description}{t.room ? ` — ${t.room}` : ''}</p>
+                  <p style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: 700, color: COLORS.slate900 }}>{t.property?.address}</p>
+                  <p style={{ margin: '0 0 12px 0', fontSize: '13px', color: COLORS.slate500 }}>{t.description}{t.room ? ` — ${t.room}` : ''}</p>
                   {t.photo_url && (
                     <img src={t.photo_url} alt="Ticket attachment" style={{ width: '100%', borderRadius: '10px', display: 'block' }} />
                   )}
@@ -3027,13 +3028,13 @@ export default function BuilderDashboard({ profile }) {
 
       {/* Available Jobs page */}
       {page === 'available-jobs' && (
-        <div style={{ position: 'fixed', top: 'var(--pmms-banner-offset, 0px)', left: 0, right: 0, bottom: 0, background: '#f1f5f9', zIndex: 50, overflowY: 'auto', fontFamily: 'system-ui, sans-serif' }}>
+        <div style={{ position: 'fixed', top: 'var(--pmms-banner-offset, 0px)', left: 0, right: 0, bottom: 0, background: COLORS.slate100, zIndex: 50, overflowY: 'auto', fontFamily: 'system-ui, sans-serif' }}>
 
           {/* Header */}
           <div style={{ position: 'sticky', top: 0, zIndex: 10 }}>
-            <div style={{ background: '#ffffff', borderBottom: '1px solid #e2e8f0', padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ background: COLORS.white, borderBottom: `1px solid ${COLORS.slate200}`, padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <button onClick={() => setPage('jobs')} style={{ background: '#f1f5f9', border: 'none', borderRadius: '8px', padding: '8px 14px', fontSize: '13px', fontWeight: 700, color: '#64748b', cursor: 'pointer' }}>
+                <button onClick={() => setPage('jobs')} style={{ background: COLORS.slate100, border: 'none', borderRadius: '8px', padding: '8px 14px', fontSize: '13px', fontWeight: 700, color: COLORS.slate500, cursor: 'pointer' }}>
                   ← Back
                 </button>
                 <button
@@ -3042,7 +3043,7 @@ export default function BuilderDashboard({ profile }) {
                   style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
                 >
                   <img src={gbchLogo} alt="GBCH" style={{ height: '36px' }} />
-                  <span style={{ fontSize: '16px', fontWeight: 800, color: '#0f172a' }}>PMMS</span>
+                  <span style={{ fontSize: '16px', fontWeight: 800, color: COLORS.slate900 }}>PMMS</span>
                 </button>
               </div>
             </div>
@@ -3051,37 +3052,37 @@ export default function BuilderDashboard({ profile }) {
           <div style={{ padding: '16px', maxWidth: '600px', margin: '0 auto' }}>
 
             <div style={{ marginBottom: '16px' }}>
-              <h1 style={{ margin: '0 0 4px 0', fontSize: '18px', fontWeight: 700, color: '#0f172a' }}>Available Jobs</h1>
-              <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>
+              <h1 style={{ margin: '0 0 4px 0', fontSize: '18px', fontWeight: 700, color: COLORS.slate900 }}>Available Jobs</h1>
+              <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate500 }}>
                 Unassigned jobs matching your skills. First to claim gets it.
               </p>
             </div>
 
             {claimError && (
-              <div style={{ background: '#fee2e2', border: '1px solid #fecaca', borderRadius: '10px', padding: '12px 16px', marginBottom: '12px' }}>
-                <p style={{ margin: 0, fontSize: '13px', color: '#dc2626', fontWeight: 600 }}>{claimError}</p>
+              <div style={{ background: COLORS.red100, border: `1px solid ${COLORS.red200}`, borderRadius: '10px', padding: '12px 16px', marginBottom: '12px' }}>
+                <p style={{ margin: 0, fontSize: '13px', color: COLORS.red600, fontWeight: 600 }}>{claimError}</p>
               </div>
             )}
 
             {availableJobs.length === 0 && (
-              <div style={{ background: '#fff', borderRadius: '16px', padding: '40px', textAlign: 'center' }}>
-                <p style={{ color: '#94a3b8', fontWeight: 600 }}>No unclaimed jobs matching your skills right now.</p>
+              <div style={{ background: COLORS.white, borderRadius: '16px', padding: '40px', textAlign: 'center' }}>
+                <p style={{ color: COLORS.slate400, fontWeight: 600 }}>No unclaimed jobs matching your skills right now.</p>
               </div>
             )}
 
             {availableJobs.map(t => (
-              <div key={t.id} style={{ background: '#ffffff', borderRadius: '16px', marginBottom: '12px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+              <div key={t.id} style={{ background: COLORS.white, borderRadius: '16px', marginBottom: '12px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
                 <div style={{ height: '4px', background: statusColour(t.status) }} />
                 <div style={{ padding: '16px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                    <span style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Job #{t.ticket_number} · {t.category}</span>
+                    <span style={{ fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Job #{t.ticket_number} · {t.category}</span>
                   </div>
-                  <p style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: 700, color: '#0f172a' }}>{t.property?.address}</p>
-                  <p style={{ margin: '0 0 12px 0', fontSize: '13px', color: '#64748b' }}>{t.description}{t.room ? ` — ${t.room}` : ''}</p>
+                  <p style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: 700, color: COLORS.slate900 }}>{t.property?.address}</p>
+                  <p style={{ margin: '0 0 12px 0', fontSize: '13px', color: COLORS.slate500 }}>{t.description}{t.room ? ` — ${t.room}` : ''}</p>
                   <button
                     onClick={() => handleClaimJob(t)}
                     disabled={claimingId === t.id}
-                    style={{ width: '100%', padding: '12px', background: '#19562e', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: 700, cursor: claimingId === t.id ? 'not-allowed' : 'pointer', opacity: claimingId === t.id ? 0.6 : 1 }}
+                    style={{ width: '100%', padding: '12px', background: COLORS.greenDark, color: COLORS.white, border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: 700, cursor: claimingId === t.id ? 'not-allowed' : 'pointer', opacity: claimingId === t.id ? 0.6 : 1 }}
                   >
                     {claimingId === t.id ? 'Claiming...' : 'Claim Job'}
                   </button>
