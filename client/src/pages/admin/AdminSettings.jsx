@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
+import { COLORS } from '../../lib/colors'
 import { DEFAULT_COMPLIANCE_CHECK_TYPES } from '../../lib/compliance'
 import { DEFAULT_MAINTENANCE_CATEGORIES, migrateLegacyArrayShape, sortedCategoryEntries } from '../../lib/maintenanceCategories'
 import { DEFAULT_DIVISIONS } from '../../lib/divisions'
@@ -20,18 +21,18 @@ const DEFAULT_STUCK_THRESHOLDS = {
   'On Hold':     { 'P1 Critical': { value: 1, unit: 'days' },  'P2 Urgent': { value: 3, unit: 'days' },  'P3 Routine': { value: 7, unit: 'days' } },
 }
 
-const cardStyle = { background: '#fff', borderRadius: '16px', padding: '20px', marginBottom: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }
-const cardHeadingStyle = { margin: '0 0 4px 0', fontSize: '15px', fontWeight: 800, color: '#0f172a' }
-const cardSubtextStyle = { margin: '0 0 16px 0', fontSize: '13px', color: '#64748b' }
-const fieldLabelStyle = { display: 'block', margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }
-const inputStyle = { width: '100%', height: '40px', padding: '0 12px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '13px', boxSizing: 'border-box' }
-const saveBtnStyle = { padding: '10px 20px', background: '#1d4ed8', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }
-const savedTagStyle = { marginLeft: '10px', fontSize: '12px', fontWeight: 700, color: '#16a34a' }
-const stickyAddBtnStyle = { padding: '8px 16px', background: '#0d9488', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }
-const countChipStyle = { fontSize: '11px', fontWeight: 700, color: '#64748b', background: '#f1f5f9', padding: '3px 10px', borderRadius: '20px', flexShrink: 0, whiteSpace: 'nowrap' }
-const expandToggleBtnStyle = { width: '32px', height: '32px', borderRadius: '8px', border: '1px solid #e2e8f0', background: '#fff', color: '#475569', fontSize: '13px', fontWeight: 700, cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }
-const orderInputStyle = { width: '40px', height: '32px', padding: 0, borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '13px', fontWeight: 700, color: '#475569', textAlign: 'center', boxSizing: 'border-box', flexShrink: 0 }
-const removeBtnStyle = { padding: '8px 14px', background: '#fff', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', flexShrink: 0, marginLeft: 'auto' }
+const cardStyle = { background: COLORS.white, borderRadius: '16px', padding: '20px', marginBottom: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }
+const cardHeadingStyle = { margin: '0 0 4px 0', fontSize: '15px', fontWeight: 800, color: COLORS.slate900 }
+const cardSubtextStyle = { margin: '0 0 16px 0', fontSize: '13px', color: COLORS.slate500 }
+const fieldLabelStyle = { display: 'block', margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }
+const inputStyle = { width: '100%', height: '40px', padding: '0 12px', borderRadius: '8px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', boxSizing: 'border-box' }
+const saveBtnStyle = { padding: '10px 20px', background: COLORS.blue700, color: COLORS.white, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }
+const savedTagStyle = { marginLeft: '10px', fontSize: '12px', fontWeight: 700, color: COLORS.green600 }
+const stickyAddBtnStyle = { padding: '8px 16px', background: COLORS.teal600, color: COLORS.white, border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }
+const countChipStyle = { fontSize: '11px', fontWeight: 700, color: COLORS.slate500, background: COLORS.slate100, padding: '3px 10px', borderRadius: '20px', flexShrink: 0, whiteSpace: 'nowrap' }
+const expandToggleBtnStyle = { width: '32px', height: '32px', borderRadius: '8px', border: `1px solid ${COLORS.slate200}`, background: COLORS.white, color: COLORS.slate600, fontSize: '13px', fontWeight: 700, cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }
+const orderInputStyle = { width: '40px', height: '32px', padding: 0, borderRadius: '8px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', fontWeight: 700, color: COLORS.slate600, textAlign: 'center', boxSizing: 'border-box', flexShrink: 0 }
+const removeBtnStyle = { padding: '8px 14px', background: COLORS.white, color: COLORS.red600, border: `1px solid ${COLORS.red200}`, borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', flexShrink: 0, marginLeft: 'auto' }
 
 const SECTION_IDS = ['priority-thresholds', 'issue-scores', 'compliance-types', 'clocking-rules', 'stuck-ticket-alerts', 'compliance-alerts', 'on-call-roster', 'dashboard-metrics']
 
@@ -47,7 +48,7 @@ function SettingsSection({ title, subtitle, headerExtra, open, onToggle, childre
             <p style={cardHeadingStyle}>{title}</p>
             <p style={{ ...cardSubtextStyle, marginBottom: open ? '16px' : 0 }}>{subtitle}</p>
           </div>
-          <span style={{ fontSize: '13px', color: '#94a3b8', fontWeight: 700, flexShrink: 0, whiteSpace: 'nowrap' }}>
+          <span style={{ fontSize: '13px', color: COLORS.slate400, fontWeight: 700, flexShrink: 0, whiteSpace: 'nowrap' }}>
             {open ? '▲ Collapse' : '▼ Expand'}
           </span>
         </button>
@@ -366,9 +367,9 @@ export default function AdminSettings() {
 
   function categoryTierForScore(score) {
     const n = Number(score)
-    if (n >= Number(p1Threshold)) return { label: 'P1 Critical', color: '#dc2626' }
-    if (n >= Number(p2Threshold)) return { label: 'P2 Urgent', color: '#d97706' }
-    return { label: 'P3 Routine', color: '#64748b' }
+    if (n >= Number(p1Threshold)) return { label: 'P1 Critical', color: COLORS.red600 }
+    if (n >= Number(p2Threshold)) return { label: 'P2 Urgent', color: COLORS.amber600 }
+    return { label: 'P3 Routine', color: COLORS.slate500 }
   }
 
   useEffect(() => {
@@ -518,9 +519,9 @@ export default function AdminSettings() {
 
   function tierForScore(score) {
     const n = Number(score)
-    if (n >= Number(p1Threshold)) return { label: 'P1 Critical', color: '#dc2626' }
-    if (n >= Number(p2Threshold)) return { label: 'P2 Urgent', color: '#d97706' }
-    return { label: 'P3 Routine', color: '#64748b' }
+    if (n >= Number(p1Threshold)) return { label: 'P1 Critical', color: COLORS.red600 }
+    if (n >= Number(p2Threshold)) return { label: 'P2 Urgent', color: COLORS.amber600 }
+    return { label: 'P3 Routine', color: COLORS.slate500 }
   }
 
   useEffect(() => {
@@ -675,7 +676,7 @@ export default function AdminSettings() {
 
   if (loading) return (
     <div style={{ minHeight: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <p style={{ color: '#94a3b8', fontWeight: 600, fontFamily: 'system-ui' }}>Loading settings...</p>
+      <p style={{ color: COLORS.slate400, fontWeight: 600, fontFamily: 'system-ui' }}>Loading settings...</p>
     </div>
   )
 
@@ -683,14 +684,14 @@ export default function AdminSettings() {
     <div style={{ width: '100%' }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
         <div>
-          <h1 style={{ margin: '0 0 4px 0', fontSize: '18px', fontWeight: 800, color: '#0f172a' }}>Settings</h1>
-          <p style={{ margin: '0 0 20px 0', fontSize: '13px', color: '#64748b' }}>Calibrate how the system scores, escalates, and tracks work across the whole team.</p>
+          <h1 style={{ margin: '0 0 4px 0', fontSize: '18px', fontWeight: 800, color: COLORS.slate900 }}>Settings</h1>
+          <p style={{ margin: '0 0 20px 0', fontSize: '13px', color: COLORS.slate500 }}>Calibrate how the system scores, escalates, and tracks work across the whole team.</p>
         </div>
         <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
-          <button onClick={expandAll} style={{ padding: '8px 14px', borderRadius: '10px', border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
+          <button onClick={expandAll} style={{ padding: '8px 14px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, background: COLORS.white, color: COLORS.slate500, fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
             Expand all
           </button>
-          <button onClick={collapseAll} style={{ padding: '8px 14px', borderRadius: '10px', border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
+          <button onClick={collapseAll} style={{ padding: '8px 14px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, background: COLORS.white, color: COLORS.slate500, fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
             Collapse all
           </button>
         </div>
@@ -712,7 +713,7 @@ export default function AdminSettings() {
               onChange={(e) => setP1Threshold(e.target.value)}
               style={inputStyle}
             />
-            <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: '#94a3b8' }}>Tickets scoring this or above trigger emergency escalation. Currently <strong style={{ color: '#dc2626' }}>{p1Threshold}</strong>.</p>
+            <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: COLORS.slate400 }}>Tickets scoring this or above trigger emergency escalation. Currently <strong style={{ color: COLORS.red600 }}>{p1Threshold}</strong>.</p>
           </div>
           <div style={{ flex: '1 1 200px' }}>
             <label style={fieldLabelStyle}>P2 Urgent threshold</label>
@@ -722,7 +723,7 @@ export default function AdminSettings() {
               onChange={(e) => setP2Threshold(e.target.value)}
               style={inputStyle}
             />
-            <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: '#94a3b8' }}>Tickets scoring this or above (but below P1) are flagged urgent. Currently <strong style={{ color: '#d97706' }}>{p2Threshold}</strong>.</p>
+            <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: COLORS.slate400 }}>Tickets scoring this or above (but below P1) are flagged urgent. Currently <strong style={{ color: COLORS.amber600 }}>{p2Threshold}</strong>.</p>
           </div>
         </div>
 
@@ -745,7 +746,7 @@ export default function AdminSettings() {
         }
       >
         {Object.keys(maintenanceCategories).length === 0 && (
-          <p style={{ margin: 0, fontSize: '13px', color: '#94a3b8', fontStyle: 'italic' }}>No maintenance categories yet.</p>
+          <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>No maintenance categories yet.</p>
         )}
 
         {sortedCategoryEntries(maintenanceCategories).map(([key, category], idx) => {
@@ -769,7 +770,7 @@ export default function AdminSettings() {
           return (
             <div
               key={key}
-              style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px', marginBottom: '12px', background: category.enabled ? '#ffffff' : '#f8fafc' }}
+              style={{ border: `1px solid ${COLORS.slate200}`, borderRadius: '12px', padding: '16px', marginBottom: '12px', background: category.enabled ? COLORS.white : COLORS.slate50 }}
             >
 
               {isExpanded ? (
@@ -787,7 +788,7 @@ export default function AdminSettings() {
                     title={category.enabled ? 'Enabled — click to disable' : 'Disabled — click to enable'}
                     style={{
                       width: '36px', height: '36px', borderRadius: '8px', border: 'none', cursor: 'pointer', flexShrink: 0,
-                      background: category.enabled ? '#0d9488' : '#cbd5e1', color: '#ffffff', fontSize: '16px',
+                      background: category.enabled ? COLORS.teal600 : COLORS.slate300, color: COLORS.white, fontSize: '16px',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                     }}
                   >
@@ -799,7 +800,7 @@ export default function AdminSettings() {
                     value={categoryRenameDrafts[key] ?? key}
                     onChange={(e) => handleCategoryNameChange(key, e.target.value)}
                     onBlur={() => handleCategoryNameBlur(key)}
-                    style={{ flex: '2 1 220px', height: '36px', padding: '0 10px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '13px', fontWeight: 700, color: '#0f172a', boxSizing: 'border-box' }}
+                    style={{ flex: '2 1 220px', height: '36px', padding: '0 10px', borderRadius: '8px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', fontWeight: 700, color: COLORS.slate900, boxSizing: 'border-box' }}
                   />
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
                     <input
@@ -809,7 +810,7 @@ export default function AdminSettings() {
                       value={category.weight}
                       onChange={(e) => handleCategoryWeightChange(key, e.target.value)}
                       onBlur={handleCategoryFieldBlur}
-                      style={{ width: '80px', height: '36px', padding: '0 8px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '13px', textAlign: 'center', boxSizing: 'border-box' }}
+                      style={{ width: '80px', height: '36px', padding: '0 8px', borderRadius: '8px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', textAlign: 'center', boxSizing: 'border-box' }}
                     />
                     <span style={{ fontSize: '10px', fontWeight: 700, color: weightTier.color, marginTop: '3px', whiteSpace: 'nowrap' }}>{weightTier.label}</span>
                   </div>
@@ -817,7 +818,7 @@ export default function AdminSettings() {
                     value={category.division || DEFAULT_DIVISIONS[0]}
                     onChange={(e) => handleCategoryDivisionChange(key, e.target.value)}
                     title="Which division this category belongs to -- scopes what a division-tagged manager can see/reassign"
-                    style={{ height: '36px', padding: '0 8px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '12px', fontWeight: 700, color: '#475569', background: '#fff', flexShrink: 0, cursor: 'pointer' }}
+                    style={{ height: '36px', padding: '0 8px', borderRadius: '8px', border: `1px solid ${COLORS.slate200}`, fontSize: '12px', fontWeight: 700, color: COLORS.slate600, background: COLORS.white, flexShrink: 0, cursor: 'pointer' }}
                   >
                     {divisions.map(d => <option key={d} value={d}>{d}</option>)}
                   </select>
@@ -846,15 +847,15 @@ export default function AdminSettings() {
                     title={category.enabled ? 'Enabled — click to disable' : 'Disabled — click to enable'}
                     style={{
                       width: '36px', height: '36px', borderRadius: '8px', border: 'none', cursor: 'pointer', flexShrink: 0,
-                      background: category.enabled ? '#0d9488' : '#cbd5e1', color: '#ffffff', fontSize: '16px',
+                      background: category.enabled ? COLORS.teal600 : COLORS.slate300, color: COLORS.white, fontSize: '16px',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                     }}
                   >
                     👁
                   </button>
-                  <span style={{ flex: '2 1 220px', fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>{key}</span>
+                  <span style={{ flex: '2 1 220px', fontSize: '13px', fontWeight: 700, color: COLORS.slate900 }}>{key}</span>
                   <span style={{ fontSize: '12px', fontWeight: 700, color: weightTier.color, flexShrink: 0 }}>{category.weight} pts · {weightTier.label}</span>
-                  <span style={{ fontSize: '11px', fontWeight: 700, color: '#1e3a8a', background: '#dbeafe', padding: '3px 10px', borderRadius: '20px', flexShrink: 0, whiteSpace: 'nowrap' }}>{category.division || DEFAULT_DIVISIONS[0]}</span>
+                  <span style={{ fontSize: '11px', fontWeight: 700, color: COLORS.blue900, background: COLORS.blue100, padding: '3px 10px', borderRadius: '20px', flexShrink: 0, whiteSpace: 'nowrap' }}>{category.division || DEFAULT_DIVISIONS[0]}</span>
                   <span style={countChipStyle}>{category.subCategories.length} item{category.subCategories.length === 1 ? '' : 's'}</span>
                   <button
                     onClick={(e) => { e.stopPropagation(); requestRemoveCategory(key) }}
@@ -869,21 +870,21 @@ export default function AdminSettings() {
                 <>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '10px' }}>
                     {category.subCategories.length === 0 && (
-                      <p style={{ margin: 0, fontSize: '12px', color: '#94a3b8', fontStyle: 'italic' }}>No sub-categories yet.</p>
+                      <p style={{ margin: 0, fontSize: '12px', color: COLORS.slate400, fontStyle: 'italic' }}>No sub-categories yet.</p>
                     )}
                     {category.subCategories.map((sub, idx) => {
                       const subKey = `${key}::${idx}`
                       const tier = categoryTierForScore(sub.score)
                       return (
                         <div key={subKey} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                          <span style={{ width: '18px', fontSize: '12px', color: '#94a3b8', flexShrink: 0, marginTop: '10px' }}>{idx + 1}.</span>
+                          <span style={{ width: '18px', fontSize: '12px', color: COLORS.slate400, flexShrink: 0, marginTop: '10px' }}>{idx + 1}.</span>
                           <input
                             ref={(el) => { subCategoryInputRefs.current[subKey] = el }}
                             type="text"
                             value={sub.label}
                             onChange={(e) => updateSubCategoryLabel(key, idx, e.target.value)}
                             onBlur={handleCategoryFieldBlur}
-                            style={{ flex: 1, height: '36px', padding: '0 10px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '13px', boxSizing: 'border-box' }}
+                            style={{ flex: 1, height: '36px', padding: '0 10px', borderRadius: '8px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', boxSizing: 'border-box' }}
                           />
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
                             <input
@@ -893,13 +894,13 @@ export default function AdminSettings() {
                               value={sub.score}
                               onChange={(e) => updateSubCategoryScore(key, idx, e.target.value)}
                               onBlur={handleCategoryFieldBlur}
-                              style={{ width: '70px', height: '36px', padding: '0 8px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '13px', textAlign: 'center', boxSizing: 'border-box' }}
+                              style={{ width: '70px', height: '36px', padding: '0 8px', borderRadius: '8px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', textAlign: 'center', boxSizing: 'border-box' }}
                             />
                             <span style={{ fontSize: '10px', fontWeight: 700, color: tier.color, marginTop: '3px', whiteSpace: 'nowrap' }}>{tier.label}</span>
                           </div>
                           <button
                             onClick={() => removeSubCategory(key, idx)}
-                            style={{ width: '32px', height: '36px', background: '#fff', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', flexShrink: 0 }}
+                            style={{ width: '32px', height: '36px', background: COLORS.white, color: COLORS.red600, border: `1px solid ${COLORS.red200}`, borderRadius: '8px', fontSize: '13px', cursor: 'pointer', flexShrink: 0 }}
                           >
                             ✕
                           </button>
@@ -910,7 +911,7 @@ export default function AdminSettings() {
 
                   <button
                     onClick={() => addSubCategory(key)}
-                    style={{ width: '100%', padding: '10px', border: '2px dashed #cbd5e1', background: 'none', color: '#64748b', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}
+                    style={{ width: '100%', padding: '10px', border: `2px dashed ${COLORS.slate300}`, background: 'none', color: COLORS.slate500, borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}
                   >
                     ＋ Add sub-category
                   </button>
@@ -934,7 +935,7 @@ export default function AdminSettings() {
         }
       >
         {addingType && (
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '16px', padding: '12px', background: '#f0fdfa', border: '1px solid #99f6e4', borderRadius: '10px' }}>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '16px', padding: '12px', background: COLORS.teal50, border: `1px solid ${COLORS.teal300}`, borderRadius: '10px' }}>
             <input
               type="text"
               autoFocus
@@ -944,13 +945,13 @@ export default function AdminSettings() {
               placeholder="New check type name..."
               style={{ ...inputStyle, flex: 1 }}
             />
-            <button onClick={confirmAddType} style={{ padding: '10px 16px', background: '#0d9488', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>Create</button>
-            <button onClick={cancelAddType} style={{ padding: '10px 16px', background: '#fff', color: '#64748b', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>Cancel</button>
+            <button onClick={confirmAddType} style={{ padding: '10px 16px', background: COLORS.teal600, color: COLORS.white, border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>Create</button>
+            <button onClick={cancelAddType} style={{ padding: '10px 16px', background: COLORS.white, color: COLORS.slate500, border: `1px solid ${COLORS.slate200}`, borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>Cancel</button>
           </div>
         )}
 
         {complianceTypes.length === 0 && (
-          <p style={{ margin: 0, fontSize: '13px', color: '#94a3b8', fontStyle: 'italic' }}>No compliance check types yet.</p>
+          <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>No compliance check types yet.</p>
         )}
 
         {complianceTypes.map((type, idx) => {
@@ -973,7 +974,7 @@ export default function AdminSettings() {
           return (
           <div
             key={type.id}
-            style={{ border: '1px solid #e2e8f0', borderRadius: '12px', padding: '16px', marginBottom: '12px', background: type.enabled ? '#ffffff' : '#f8fafc' }}
+            style={{ border: `1px solid ${COLORS.slate200}`, borderRadius: '12px', padding: '16px', marginBottom: '12px', background: type.enabled ? COLORS.white : COLORS.slate50 }}
           >
 
             {isExpanded ? (
@@ -991,7 +992,7 @@ export default function AdminSettings() {
                   title={type.enabled ? 'Enabled — click to disable' : 'Disabled — click to enable'}
                   style={{
                     width: '36px', height: '36px', borderRadius: '8px', border: 'none', cursor: 'pointer', flexShrink: 0,
-                    background: type.enabled ? '#0d9488' : '#cbd5e1', color: '#ffffff', fontSize: '16px',
+                    background: type.enabled ? COLORS.teal600 : COLORS.slate300, color: COLORS.white, fontSize: '16px',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                   }}
                 >
@@ -1002,12 +1003,12 @@ export default function AdminSettings() {
                   value={type.name}
                   onChange={(e) => updateCheckTypeName(type.id, e.target.value)}
                   onBlur={handleCheckTypeNameBlur}
-                  style={{ flex: '2 1 220px', height: '36px', padding: '0 10px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '13px', fontWeight: 700, color: '#0f172a', boxSizing: 'border-box' }}
+                  style={{ flex: '2 1 220px', height: '36px', padding: '0 10px', borderRadius: '8px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', fontWeight: 700, color: COLORS.slate900, boxSizing: 'border-box' }}
                 />
                 <select
                   value={type.category}
                   onChange={(e) => updateCheckTypeCategory(type.id, e.target.value)}
-                  style={{ flex: '1 1 170px', height: '36px', padding: '0 10px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '13px', boxSizing: 'border-box', background: '#fff' }}
+                  style={{ flex: '1 1 170px', height: '36px', padding: '0 10px', borderRadius: '8px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', boxSizing: 'border-box', background: COLORS.white }}
                 >
                   {CATEGORY_OPTIONS.map(c => (
                     <option key={c} value={c}>{c}</option>
@@ -1038,14 +1039,14 @@ export default function AdminSettings() {
                   title={type.enabled ? 'Enabled — click to disable' : 'Disabled — click to enable'}
                   style={{
                     width: '36px', height: '36px', borderRadius: '8px', border: 'none', cursor: 'pointer', flexShrink: 0,
-                    background: type.enabled ? '#0d9488' : '#cbd5e1', color: '#ffffff', fontSize: '16px',
+                    background: type.enabled ? COLORS.teal600 : COLORS.slate300, color: COLORS.white, fontSize: '16px',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                   }}
                 >
                   👁
                 </button>
-                <span style={{ flex: '2 1 220px', fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>{type.name}</span>
-                <span style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', flexShrink: 0 }}>{type.category}</span>
+                <span style={{ flex: '2 1 220px', fontSize: '13px', fontWeight: 700, color: COLORS.slate900 }}>{type.name}</span>
+                <span style={{ fontSize: '11px', fontWeight: 700, color: COLORS.slate500, flexShrink: 0 }}>{type.category}</span>
                 <span style={countChipStyle}>{type.items.length} item{type.items.length === 1 ? '' : 's'}</span>
                 <button
                   onClick={(e) => { e.stopPropagation(); requestRemoveType(type.id) }}
@@ -1060,20 +1061,20 @@ export default function AdminSettings() {
               <>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '10px', marginTop: '14px' }}>
                   {type.items.length === 0 && (
-                    <p style={{ margin: 0, fontSize: '12px', color: '#94a3b8', fontStyle: 'italic' }}>No checklist items yet.</p>
+                    <p style={{ margin: 0, fontSize: '12px', color: COLORS.slate400, fontStyle: 'italic' }}>No checklist items yet.</p>
                   )}
                   {type.items.map((item, idx) => {
                     const tier = tierForScore(item.score)
                     return (
                       <div key={item.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                        <span style={{ width: '18px', fontSize: '12px', color: '#94a3b8', flexShrink: 0, marginTop: '10px' }}>{idx + 1}.</span>
+                        <span style={{ width: '18px', fontSize: '12px', color: COLORS.slate400, flexShrink: 0, marginTop: '10px' }}>{idx + 1}.</span>
                         <input
                           ref={(el) => { itemInputRefs.current[item.id] = el }}
                           type="text"
                           value={item.label}
                           onChange={(e) => updateItemLabel(type.id, item.id, e.target.value)}
                           onBlur={handleItemLabelBlur}
-                          style={{ flex: 1, height: '36px', padding: '0 10px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '13px', boxSizing: 'border-box' }}
+                          style={{ flex: 1, height: '36px', padding: '0 10px', borderRadius: '8px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', boxSizing: 'border-box' }}
                         />
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
                           <input
@@ -1082,13 +1083,13 @@ export default function AdminSettings() {
                             max={150}
                             value={item.score}
                             onChange={(e) => updateItemScore(type.id, item.id, e.target.value)}
-                            style={{ width: '70px', height: '36px', padding: '0 8px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '13px', textAlign: 'center', boxSizing: 'border-box' }}
+                            style={{ width: '70px', height: '36px', padding: '0 8px', borderRadius: '8px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', textAlign: 'center', boxSizing: 'border-box' }}
                           />
                           <span style={{ fontSize: '10px', fontWeight: 700, color: tier.color, marginTop: '3px', whiteSpace: 'nowrap' }}>{tier.label}</span>
                         </div>
                         <button
                           onClick={() => removeChecklistItem(type.id, item.id)}
-                          style={{ width: '32px', height: '36px', background: '#fff', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', flexShrink: 0 }}
+                          style={{ width: '32px', height: '36px', background: COLORS.white, color: COLORS.red600, border: `1px solid ${COLORS.red200}`, borderRadius: '8px', fontSize: '13px', cursor: 'pointer', flexShrink: 0 }}
                         >
                           ✕
                         </button>
@@ -1099,7 +1100,7 @@ export default function AdminSettings() {
 
                 <button
                   onClick={() => addChecklistItem(type.id)}
-                  style={{ width: '100%', padding: '10px', border: '2px dashed #cbd5e1', background: 'none', color: '#64748b', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}
+                  style={{ width: '100%', padding: '10px', border: `2px dashed ${COLORS.slate300}`, background: 'none', color: COLORS.slate500, borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}
                 >
                   ＋ Add checklist item
                 </button>
@@ -1126,7 +1127,7 @@ export default function AdminSettings() {
               onChange={(e) => setClockOverrunHours(e.target.value)}
               style={inputStyle}
             />
-            <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: '#94a3b8' }}>How long before a clocked-in job shows the overrun warning.</p>
+            <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: COLORS.slate400 }}>How long before a clocked-in job shows the overrun warning.</p>
           </div>
           <div style={{ flex: '1 1 200px' }}>
             <label style={fieldLabelStyle}>Done window (hours)</label>
@@ -1136,7 +1137,7 @@ export default function AdminSettings() {
               onChange={(e) => setDoneWindowHours(e.target.value)}
               style={inputStyle}
             />
-            <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: '#94a3b8' }}>How long completed jobs remain visible to builders.</p>
+            <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: COLORS.slate400 }}>How long completed jobs remain visible to builders.</p>
           </div>
           <div style={{ flex: '1 1 200px' }}>
             <label style={fieldLabelStyle}>Clock-in distance threshold (metres)</label>
@@ -1146,7 +1147,7 @@ export default function AdminSettings() {
               onChange={(e) => setClockDistanceThresholdM(e.target.value)}
               style={inputStyle}
             />
-            <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: '#94a3b8' }}>Clock-in/out points further than this from the property are flagged on the Clocking page.</p>
+            <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: COLORS.slate400 }}>Clock-in/out points further than this from the property are flagged on the Clocking page.</p>
           </div>
         </div>
 
@@ -1167,16 +1168,16 @@ export default function AdminSettings() {
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '520px' }}>
             <thead>
               <tr>
-                <th style={{ textAlign: 'left', padding: '0 12px 8px 0', fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Status</th>
+                <th style={{ textAlign: 'left', padding: '0 12px 8px 0', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Status</th>
                 {STUCK_TIERS.map(tier => (
-                  <th key={tier} style={{ textAlign: 'left', padding: '0 12px 8px 0', fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{tier}</th>
+                  <th key={tier} style={{ textAlign: 'left', padding: '0 12px 8px 0', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{tier}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {STUCK_STATUSES.map(status => (
                 <tr key={status}>
-                  <td style={{ padding: '6px 12px 6px 0', fontSize: '13px', fontWeight: 700, color: '#0f172a', whiteSpace: 'nowrap' }}>{statusLabel(status)}</td>
+                  <td style={{ padding: '6px 12px 6px 0', fontSize: '13px', fontWeight: 700, color: COLORS.slate900, whiteSpace: 'nowrap' }}>{statusLabel(status)}</td>
                   {STUCK_TIERS.map(tier => {
                     const cell = stuckThresholds[status]?.[tier] || { value: '', unit: 'hours' }
                     return (
@@ -1206,7 +1207,7 @@ export default function AdminSettings() {
           </table>
         </div>
 
-        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: 600, color: '#0f172a', marginBottom: '16px' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: 600, color: COLORS.slate900, marginBottom: '16px' }}>
           <input type="checkbox" checked={stuckAlertsEnabled} onChange={(e) => setStuckAlertsEnabled(e.target.checked)} />
           Send push notifications for stuck tickets
         </label>
@@ -1234,7 +1235,7 @@ export default function AdminSettings() {
           />
         </div>
 
-        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: 600, color: '#0f172a', marginBottom: '16px' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: 600, color: COLORS.slate900, marginBottom: '16px' }}>
           <input type="checkbox" checked={complianceAlertsEnabled} onChange={(e) => setComplianceAlertsEnabled(e.target.checked)} />
           Send push notifications when a certificate expires
         </label>
@@ -1262,7 +1263,7 @@ export default function AdminSettings() {
           />
         </div>
 
-        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: 600, color: '#0f172a', marginBottom: '16px' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: 600, color: COLORS.slate900, marginBottom: '16px' }}>
           <input type="checkbox" checked={voidAlertsEnabled} onChange={(e) => setVoidAlertsEnabled(e.target.checked)} />
           Send push notifications when a void passes the threshold
         </label>
@@ -1290,7 +1291,7 @@ export default function AdminSettings() {
           />
         </div>
 
-        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: 600, color: '#0f172a', marginBottom: '16px' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: 600, color: COLORS.slate900, marginBottom: '16px' }}>
           <input type="checkbox" checked={routineVisitAlertsEnabled} onChange={(e) => setRoutineVisitAlertsEnabled(e.target.checked)} />
           Automatically create routine visit jobs
         </label>
@@ -1318,7 +1319,7 @@ export default function AdminSettings() {
           />
         </div>
 
-        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: 600, color: '#0f172a', marginBottom: '16px' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: 600, color: COLORS.slate900, marginBottom: '16px' }}>
           <input type="checkbox" checked={gardenReviewAlertsEnabled} onChange={(e) => setGardenReviewAlertsEnabled(e.target.checked)} />
           Flag overdue gardens on the dashboard
         </label>
@@ -1337,16 +1338,16 @@ export default function AdminSettings() {
         onToggle={() => toggleSection('routine-visit-checklist')}
       >
         {routineVisitChecklist.length === 0 && (
-          <p style={{ margin: '0 0 10px 0', fontSize: '13px', color: '#94a3b8', fontStyle: 'italic' }}>No checklist items yet.</p>
+          <p style={{ margin: '0 0 10px 0', fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>No checklist items yet.</p>
         )}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '12px' }}>
           {routineVisitChecklist.map(item => (
-            <div key={item} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', padding: '8px 12px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px' }}>
-              <span style={{ fontSize: '13px', fontWeight: 600, color: '#0f172a' }}>{item}</span>
+            <div key={item} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', padding: '8px 12px', background: COLORS.slate50, border: `1px solid ${COLORS.slate200}`, borderRadius: '10px' }}>
+              <span style={{ fontSize: '13px', fontWeight: 600, color: COLORS.slate900 }}>{item}</span>
               <button
                 onClick={() => handleDeleteChecklistItem(item)}
-                style={{ background: 'none', border: 'none', color: '#dc2626', fontSize: '12px', fontWeight: 800, cursor: 'pointer', padding: '0 2px', flexShrink: 0 }}
+                style={{ background: 'none', border: 'none', color: COLORS.red600, fontSize: '12px', fontWeight: 800, cursor: 'pointer', padding: '0 2px', flexShrink: 0 }}
               >
                 ✕
               </button>
@@ -1365,7 +1366,7 @@ export default function AdminSettings() {
           <button
             onClick={handleAddChecklistItem}
             disabled={checklistSaving}
-            style={{ padding: '10px 20px', background: '#1e3a8a', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: checklistSaving ? 'not-allowed' : 'pointer', opacity: checklistSaving ? 0.6 : 1 }}
+            style={{ padding: '10px 20px', background: COLORS.blue900, color: COLORS.white, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: checklistSaving ? 'not-allowed' : 'pointer', opacity: checklistSaving ? 0.6 : 1 }}
           >
             {checklistSaving ? 'Saving...' : '+ Add Item'}
           </button>
@@ -1381,17 +1382,17 @@ export default function AdminSettings() {
         onToggle={() => toggleSection('towns-areas')}
       >
         {towns.length === 0 && (
-          <p style={{ margin: '0 0 10px 0', fontSize: '13px', color: '#94a3b8', fontStyle: 'italic' }}>No towns added yet.</p>
+          <p style={{ margin: '0 0 10px 0', fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>No towns added yet.</p>
         )}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '12px' }}>
           {towns.map(town => (
-            <div key={town} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', padding: '8px 12px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px' }}>
-              <span style={{ fontSize: '13px', fontWeight: 600, color: '#0f172a' }}>{town}</span>
+            <div key={town} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', padding: '8px 12px', background: COLORS.slate50, border: `1px solid ${COLORS.slate200}`, borderRadius: '10px' }}>
+              <span style={{ fontSize: '13px', fontWeight: 600, color: COLORS.slate900 }}>{town}</span>
               <button
                 onClick={() => handleDeleteTown(town)}
                 title="Remove from the picklist -- properties already tagged with this town keep it, they just won't be able to change to it again unless it's re-added"
-                style={{ background: 'none', border: 'none', color: '#dc2626', fontSize: '12px', fontWeight: 800, cursor: 'pointer', padding: '0 2px', flexShrink: 0 }}
+                style={{ background: 'none', border: 'none', color: COLORS.red600, fontSize: '12px', fontWeight: 800, cursor: 'pointer', padding: '0 2px', flexShrink: 0 }}
               >
                 ✕
               </button>
@@ -1410,7 +1411,7 @@ export default function AdminSettings() {
           <button
             onClick={handleAddTown}
             disabled={townSaving}
-            style={{ padding: '10px 20px', background: '#1e3a8a', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: townSaving ? 'not-allowed' : 'pointer', opacity: townSaving ? 0.6 : 1 }}
+            style={{ padding: '10px 20px', background: COLORS.blue900, color: COLORS.white, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: townSaving ? 'not-allowed' : 'pointer', opacity: townSaving ? 0.6 : 1 }}
           >
             {townSaving ? 'Saving...' : '+ Add Town'}
           </button>
@@ -1426,7 +1427,7 @@ export default function AdminSettings() {
         onToggle={() => toggleSection('on-call-roster')}
       >
         {roster.length === 0 && (
-          <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: '#94a3b8', fontStyle: 'italic' }}>No on-call contacts added yet.</p>
+          <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>No on-call contacts added yet.</p>
         )}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
@@ -1455,7 +1456,7 @@ export default function AdminSettings() {
               />
               <button
                 onClick={() => removeRosterContact(contact.id)}
-                style={{ padding: '10px 14px', background: '#fff', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
+                style={{ padding: '10px 14px', background: COLORS.white, color: COLORS.red600, border: `1px solid ${COLORS.red200}`, borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
               >
                 Delete
               </button>
@@ -1466,7 +1467,7 @@ export default function AdminSettings() {
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           <button
             onClick={addRosterContact}
-            style={{ padding: '10px 20px', background: '#fff', color: '#1d4ed8', border: '1px solid #bfdbfe', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}
+            style={{ padding: '10px 20px', background: COLORS.white, color: COLORS.blue700, border: `1px solid ${COLORS.blue200}`, borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}
           >
             + Add new contact
           </button>
@@ -1496,7 +1497,7 @@ export default function AdminSettings() {
             <option value={168}>7 days</option>
             <option value={720}>30 days</option>
           </select>
-          <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: '#94a3b8' }}>Properties added within this window count toward the "New Properties" dashboard tile.</p>
+          <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: COLORS.slate400 }}>Properties added within this window count toward the "New Properties" dashboard tile.</p>
         </div>
 
         <div style={{ marginBottom: '16px' }}>
@@ -1512,7 +1513,7 @@ export default function AdminSettings() {
             <option value="year">This Year</option>
             <option value="all_time">All Time</option>
           </select>
-          <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: '#94a3b8' }}>Controls what the "Total Tickets" dashboard tile counts, so it doesn't grow into an unwieldy all-time number.</p>
+          <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: COLORS.slate400 }}>Controls what the "Total Tickets" dashboard tile counts, so it doesn't grow into an unwieldy all-time number.</p>
         </div>
 
         <button onClick={saveDashboardMetrics} disabled={dashboardMetricsSaving} style={{ ...saveBtnStyle, opacity: dashboardMetricsSaving ? 0.6 : 1, cursor: dashboardMetricsSaving ? 'not-allowed' : 'pointer' }}>
@@ -1532,7 +1533,7 @@ export default function AdminSettings() {
             </p>
             <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
               <button onClick={() => setPendingRemoval(null)} style={modalCancelBtnStyle}>Cancel</button>
-              <button onClick={confirmPendingRemoval} style={{ ...modalConfirmBtnStyle, background: '#dc2626' }}>✕ Remove</button>
+              <button onClick={confirmPendingRemoval} style={{ ...modalConfirmBtnStyle, background: COLORS.red600 }}>✕ Remove</button>
             </div>
           </div>
         </div>

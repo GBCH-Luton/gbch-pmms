@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
+import { COLORS } from '../../lib/colors'
 import { fetchAssignableStaffForCategory, builderOptionLabel, createNotification, sendPushNotification, pushEmergencyAlert, priorityTierLabel, fetchPriorityThresholds, EVENTS_FEATURE_ENABLED } from './shared'
 import { fetchComplianceCheckTypes } from '../../lib/compliance'
 import { fetchMaintenanceCategories, sortedCategoryEntries } from '../../lib/maintenanceCategories'
@@ -47,9 +48,9 @@ function choiceButtonStyle(active, align = 'left') {
     height: '44px',
     padding: '0 14px',
     borderRadius: '10px',
-    border: active ? '2px solid #0f766e' : '1px solid #e2e8f0',
-    background: active ? '#0f766e' : '#ffffff',
-    color: active ? '#ffffff' : '#0f172a',
+    border: active ? `2px solid ${COLORS.teal700}` : `1px solid ${COLORS.slate200}`,
+    background: active ? COLORS.teal700 : COLORS.white,
+    color: active ? COLORS.white : COLORS.slate900,
     fontSize: '13px',
     fontWeight: 600,
     fontFamily: 'inherit',
@@ -65,10 +66,10 @@ function choiceButtonStyle(active, align = 'left') {
   }
 }
 
-const SECTION_BG = ['#ffffff', '#f8fafc']
+const SECTION_BG = [COLORS.white, COLORS.slate50]
 
-const fieldSelectStyle = { width: '100%', height: '44px', padding: '0 12px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '13px', fontWeight: 500, boxSizing: 'border-box', background: '#ffffff' }
-const fieldLabelStyle = { margin: '0 0 8px 0', fontSize: '11px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em' }
+const fieldSelectStyle = { width: '100%', height: '44px', padding: '0 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', fontWeight: 500, boxSizing: 'border-box', background: COLORS.white }
+const fieldLabelStyle = { margin: '0 0 8px 0', fontSize: '11px', fontWeight: 600, color: COLORS.slate500, textTransform: 'uppercase', letterSpacing: '0.06em' }
 
 export default function AdminRaiseTicket({ profile }) {
   const [loggingMode, setLoggingMode] = useState('maintenance') // 'maintenance' | 'compliance'
@@ -440,8 +441,8 @@ export default function AdminRaiseTicket({ profile }) {
   return (
     <div style={{ maxWidth: '720px' }}>
 
-      <h1 style={{ margin: '0 0 4px 0', fontSize: '18px', fontWeight: 700, color: '#0f172a' }}>Raise Ticket</h1>
-      <p style={{ margin: '0 0 16px 0', fontSize: '13px', fontWeight: 400, color: '#64748b' }}>Calculates priority instantly based on the property and issue you select.</p>
+      <h1 style={{ margin: '0 0 4px 0', fontSize: '18px', fontWeight: 700, color: COLORS.slate900 }}>Raise Ticket</h1>
+      <p style={{ margin: '0 0 16px 0', fontSize: '13px', fontWeight: 400, color: COLORS.slate500 }}>Calculates priority instantly based on the property and issue you select.</p>
 
       {/* Mode toggle */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
@@ -449,9 +450,9 @@ export default function AdminRaiseTicket({ profile }) {
           onClick={() => setLoggingMode('maintenance')}
           style={{
             flex: 1, height: '44px', borderRadius: '10px', boxSizing: 'border-box',
-            border: loggingMode === 'maintenance' ? '2px solid #0f766e' : '1px solid #e2e8f0',
-            background: loggingMode === 'maintenance' ? '#0f766e' : '#ffffff',
-            color: loggingMode === 'maintenance' ? '#ffffff' : '#0f172a',
+            border: loggingMode === 'maintenance' ? `2px solid ${COLORS.teal700}` : `1px solid ${COLORS.slate200}`,
+            background: loggingMode === 'maintenance' ? COLORS.teal700 : COLORS.white,
+            color: loggingMode === 'maintenance' ? COLORS.white : COLORS.slate900,
             fontSize: '13px', fontWeight: 600, cursor: 'pointer',
           }}
         >
@@ -461,9 +462,9 @@ export default function AdminRaiseTicket({ profile }) {
           onClick={() => setLoggingMode('compliance')}
           style={{
             flex: 1, height: '44px', borderRadius: '10px', boxSizing: 'border-box',
-            border: loggingMode === 'compliance' ? '2px solid #0f766e' : '1px solid #e2e8f0',
-            background: loggingMode === 'compliance' ? '#0f766e' : '#ffffff',
-            color: loggingMode === 'compliance' ? '#ffffff' : '#0f172a',
+            border: loggingMode === 'compliance' ? `2px solid ${COLORS.teal700}` : `1px solid ${COLORS.slate200}`,
+            background: loggingMode === 'compliance' ? COLORS.teal700 : COLORS.white,
+            color: loggingMode === 'compliance' ? COLORS.white : COLORS.slate900,
             fontSize: '13px', fontWeight: 600, cursor: 'pointer',
           }}
         >
@@ -476,7 +477,7 @@ export default function AdminRaiseTicket({ profile }) {
 
           {/* Step 1: Target Property */}
           <div style={{ background: SECTION_BG[0], padding: '20px', borderBottom: ticketPropertyId ? '1px solid rgba(15,23,42,0.06)' : 'none' }}>
-            <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: '#0f172a' }}>1. Target Property</p>
+            <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: COLORS.slate900 }}>1. Target Property</p>
             <PropertySearchSelect
               properties={ticketProperties}
               value={ticketPropertyId}
@@ -491,7 +492,7 @@ export default function AdminRaiseTicket({ profile }) {
           {/* Step 2: Room / Area */}
           {ticketPropertyId && (
             <div style={{ background: SECTION_BG[1], padding: '20px', borderBottom: ticketStep2Complete ? '1px solid rgba(15,23,42,0.06)' : 'none' }}>
-              <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: '#0f172a' }}>2. Room / Area</p>
+              <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: COLORS.slate900 }}>2. Room / Area</p>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                 {ROOM_OPTIONS.map(room => {
                   const active = ticketRoom === room
@@ -514,8 +515,8 @@ export default function AdminRaiseTicket({ profile }) {
               </div>
 
               {ticketRoom && ticketRoom !== 'Other Area...' && ticketRoom !== 'Garden' && (
-                <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px dashed #e2e8f0' }}>
-                  <p style={{ margin: '0 0 8px 0', fontSize: '11px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: `1px dashed ${COLORS.slate200}` }}>
+                  <p style={{ margin: '0 0 8px 0', fontSize: '11px', fontWeight: 600, color: COLORS.slate500, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                     {floorContextLabel(selectedTicketProperty)}
                   </p>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
@@ -536,20 +537,20 @@ export default function AdminRaiseTicket({ profile }) {
               )}
 
               {ticketRoom === 'Bedroom' && (
-                <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px dashed #e2e8f0' }}>
+                <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: `1px dashed ${COLORS.slate200}` }}>
                   <p style={fieldLabelStyle}>Room number (optional)</p>
                   <input
                     type="text"
                     value={ticketRoomCode}
                     onChange={(e) => setTicketRoomCode(e.target.value)}
                     placeholder="e.g. Room 12C"
-                    style={{ width: '100%', height: '44px', padding: '0 12px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '13px', boxSizing: 'border-box' }}
+                    style={{ width: '100%', height: '44px', padding: '0 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', boxSizing: 'border-box' }}
                   />
                 </div>
               )}
 
               {ticketRoom === 'Other Area...' && (
-                <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px dashed #e2e8f0' }}>
+                <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: `1px dashed ${COLORS.slate200}` }}>
                   <p style={fieldLabelStyle}>Describe the area</p>
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                     <input
@@ -557,7 +558,7 @@ export default function AdminRaiseTicket({ profile }) {
                       value={ticketOtherArea}
                       onChange={(e) => setTicketOtherArea(e.target.value)}
                       placeholder="e.g. Back garden boundary wall"
-                      style={{ flex: 1, height: '44px', padding: '0 12px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '13px', boxSizing: 'border-box' }}
+                      style={{ flex: 1, height: '44px', padding: '0 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', boxSizing: 'border-box' }}
                     />
                     <VoiceInputButton onResult={(text) => setTicketOtherArea(prev => prev ? `${prev} ${text}` : text)} />
                   </div>
@@ -569,7 +570,7 @@ export default function AdminRaiseTicket({ profile }) {
           {/* Step 3: Main Category */}
           {ticketStep2Complete && (
             <div style={{ background: SECTION_BG[0], padding: '20px', borderBottom: ticketCategory ? '1px solid rgba(15,23,42,0.06)' : 'none' }}>
-              <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: '#0f172a' }}>3. Main Category</p>
+              <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: COLORS.slate900 }}>3. Main Category</p>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                 {sortedCategoryEntries(maintenanceCategories).map(([key]) => {
                   const active = ticketCategory === key
@@ -590,7 +591,7 @@ export default function AdminRaiseTicket({ profile }) {
           {/* Step 4: Issue Tag */}
           {ticketCategory && (
             <div style={{ background: SECTION_BG[1], padding: '20px', borderBottom: ticketStep4Complete ? '1px solid rgba(15,23,42,0.06)' : 'none' }}>
-              <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: '#0f172a' }}>4. Standardized Diagnostic Issue Tag</p>
+              <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: COLORS.slate900 }}>4. Standardized Diagnostic Issue Tag</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {(maintenanceCategories[ticketCategory]?.subCategories || []).map(sub => {
                   const tag = sub.label
@@ -613,8 +614,8 @@ export default function AdminRaiseTicket({ profile }) {
                       onClick={() => { setTicketIssueTag(marker); setTicketDuplicateWarning(null) }}
                       style={{
                         ...choiceButtonStyle(active, 'left'),
-                        border: active ? '2px solid #0f766e' : '1px dashed #cbd5e1',
-                        color: active ? '#ffffff' : '#64748b',
+                        border: active ? `2px solid ${COLORS.teal700}` : `1px dashed ${COLORS.slate300}`,
+                        color: active ? COLORS.white : COLORS.slate500,
                       }}
                     >
                       {unlistedLabelFor(ticketCategory)}
@@ -630,7 +631,7 @@ export default function AdminRaiseTicket({ profile }) {
                     value={ticketIssueOther}
                     onChange={(e) => setTicketIssueOther(e.target.value)}
                     placeholder={`Describe the unlisted ${ticketCategory} issue (defaults to a baseline ${maintenanceCategories[ticketCategory]?.weight ?? 15}-point score)`}
-                    style={{ flex: 1, height: '44px', padding: '0 12px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '13px', boxSizing: 'border-box' }}
+                    style={{ flex: 1, height: '44px', padding: '0 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', boxSizing: 'border-box' }}
                   />
                   <VoiceInputButton onResult={(text) => setTicketIssueOther(prev => prev ? `${prev} ${text}` : text)} />
                 </div>
@@ -642,21 +643,21 @@ export default function AdminRaiseTicket({ profile }) {
                 const total = baseScore + vulnBonus
                 const isP1 = total >= p1Threshold
                 return (
-                  <div style={{ marginTop: '12px', padding: '14px', borderRadius: '10px', background: '#ffffff', border: '1px solid #e2e8f0' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', paddingBottom: '8px', borderBottom: '1px solid #e2e8f0' }}>
-                      <span style={{ fontSize: '12px', fontWeight: 600, color: '#0f172a' }}>Real-time Priority Engine</span>
-                      <span style={{ fontSize: '12px', fontWeight: 700, fontFamily: 'monospace', color: '#fff', background: isP1 ? '#dc2626' : '#475569', padding: '4px 10px', borderRadius: '6px' }}>{total} Points</span>
+                  <div style={{ marginTop: '12px', padding: '14px', borderRadius: '10px', background: COLORS.white, border: `1px solid ${COLORS.slate200}` }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', paddingBottom: '8px', borderBottom: `1px solid ${COLORS.slate200}` }}>
+                      <span style={{ fontSize: '12px', fontWeight: 600, color: COLORS.slate900 }}>Real-time Priority Engine</span>
+                      <span style={{ fontSize: '12px', fontWeight: 700, fontFamily: 'monospace', color: COLORS.white, background: isP1 ? COLORS.red600 : COLORS.slate600, padding: '4px 10px', borderRadius: '6px' }}>{total} Points</span>
                     </div>
-                    <p style={{ margin: '0 0 8px 0', fontSize: '11px', fontWeight: 700, color: isP1 ? '#dc2626' : '#475569', textTransform: 'uppercase' }}>
+                    <p style={{ margin: '0 0 8px 0', fontSize: '11px', fontWeight: 700, color: isP1 ? COLORS.red600 : COLORS.slate600, textTransform: 'uppercase' }}>
                       {isP1 ? '⚠ P1 Critical — will trigger emergency escalation' : 'Routine severity tier'}
                     </p>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#64748b', marginBottom: '4px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: COLORS.slate500, marginBottom: '4px' }}>
                       <span>{isUnlistedTag(ticketIssueTag) ? 'Unlisted issue fallback baseline' : 'Diagnostic baseline score'}</span>
-                      <strong style={{ color: '#0f172a', fontFamily: 'monospace', fontWeight: 600 }}>{baseScore} pts</strong>
+                      <strong style={{ color: COLORS.slate900, fontFamily: 'monospace', fontWeight: 600 }}>{baseScore} pts</strong>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#64748b' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: COLORS.slate500 }}>
                       <span>Property vulnerability adjustment</span>
-                      <strong style={{ color: '#0f172a', fontFamily: 'monospace', fontWeight: 600 }}>+{vulnBonus} pts</strong>
+                      <strong style={{ color: COLORS.slate900, fontFamily: 'monospace', fontWeight: 600 }}>+{vulnBonus} pts</strong>
                     </div>
                   </div>
                 )
@@ -667,7 +668,7 @@ export default function AdminRaiseTicket({ profile }) {
           {/* Step 5: Assignment & Details (admin-only) */}
           {ticketStep4Complete && (
             <div style={{ background: SECTION_BG[0], padding: '20px', borderBottom: '1px solid rgba(15,23,42,0.06)' }}>
-              <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: '#0f172a' }}>5. Assignment &amp; Details</p>
+              <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: COLORS.slate900 }}>5. Assignment &amp; Details</p>
 
               <p style={fieldLabelStyle}>Assign to builder</p>
               <select
@@ -677,11 +678,11 @@ export default function AdminRaiseTicket({ profile }) {
               >
                 <option value="">Auto-assign based on skills</option>
                 {builders.map(b => (
-                  <option key={b.id} value={b.id} style={b.availability !== 'Available' ? { color: '#94a3b8' } : undefined}>{builderOptionLabel(b)}</option>
+                  <option key={b.id} value={b.id} style={b.availability !== 'Available' ? { color: COLORS.slate400 } : undefined}>{builderOptionLabel(b)}</option>
                 ))}
               </select>
               {assignedBuilderId && (
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 14px 0', fontSize: '13px', fontWeight: 600, color: '#0f172a', cursor: 'pointer' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 14px 0', fontSize: '13px', fontWeight: 600, color: COLORS.slate900, cursor: 'pointer' }}>
                   <input type="checkbox" checked={sendPushOnAssign} onChange={(e) => setSendPushOnAssign(e.target.checked)} />
                   Also send a push notification
                 </label>
@@ -732,7 +733,7 @@ export default function AdminRaiseTicket({ profile }) {
           {/* Step 6: Photo + Submit */}
           {ticketStep4Complete && (
             <div style={{ background: SECTION_BG[1], padding: '20px' }}>
-              <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: '#0f172a' }}>6. Photo &amp; Submit</p>
+              <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: COLORS.slate900 }}>6. Photo &amp; Submit</p>
 
               <input
                 type="file"
@@ -743,7 +744,7 @@ export default function AdminRaiseTicket({ profile }) {
               />
               <button
                 onClick={() => document.getElementById('admin-ticket-photo-input').click()}
-                style={{ width: '100%', height: '44px', borderRadius: '10px', border: '2px dashed #cbd5e1', background: '#ffffff', color: '#64748b', fontSize: '13px', fontWeight: 600, cursor: 'pointer', boxSizing: 'border-box' }}
+                style={{ width: '100%', height: '44px', borderRadius: '10px', border: `2px dashed ${COLORS.slate300}`, background: COLORS.white, color: COLORS.slate500, fontSize: '13px', fontWeight: 600, cursor: 'pointer', boxSizing: 'border-box' }}
               >
                 Add a photo
               </button>
@@ -758,25 +759,25 @@ export default function AdminRaiseTicket({ profile }) {
                   type="text"
                   value={profile.name}
                   disabled
-                  style={{ width: '100%', height: '44px', padding: '0 12px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '13px', boxSizing: 'border-box', background: '#f1f5f9', color: '#64748b' }}
+                  style={{ width: '100%', height: '44px', padding: '0 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', boxSizing: 'border-box', background: COLORS.slate100, color: COLORS.slate500 }}
                 />
               </div>
 
               {ticketDuplicateWarning ? (
-                <div style={{ marginTop: '16px', padding: '16px', borderRadius: '10px', background: '#fffbeb', border: '1px solid #fcd34d' }}>
-                  <p style={{ margin: '0 0 8px 0', fontSize: '13px', fontWeight: 700, color: '#92400e' }}>⚠ Possible duplicate</p>
-                  <p style={{ margin: '0 0 12px 0', fontSize: '13px', fontWeight: 400, color: '#78350f' }}>
+                <div style={{ marginTop: '16px', padding: '16px', borderRadius: '10px', background: COLORS.amber50, border: `1px solid ${COLORS.amber300}` }}>
+                  <p style={{ margin: '0 0 8px 0', fontSize: '13px', fontWeight: 700, color: COLORS.amber800 }}>⚠ Possible duplicate</p>
+                  <p style={{ margin: '0 0 12px 0', fontSize: '13px', fontWeight: 400, color: COLORS.amber900 }}>
                     There's already an open ticket at this property for {ticketDuplicateWarning.matchKind}: Job #{ticketDuplicateWarning.ticket.ticket_number} — {ticketDuplicateWarning.ticket.issue_tag} ({ticketDuplicateWarning.ticket.status}). Is this a duplicate, or a genuinely separate fault?
                   </p>
                   <button
                     onClick={() => setTicketDuplicateWarning(null)}
-                    style={{ width: '100%', height: '44px', marginBottom: '8px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '10px', color: '#0f172a', fontSize: '13px', fontWeight: 600, cursor: 'pointer', boxSizing: 'border-box' }}
+                    style={{ width: '100%', height: '44px', marginBottom: '8px', background: COLORS.white, border: `1px solid ${COLORS.slate200}`, borderRadius: '10px', color: COLORS.slate900, fontSize: '13px', fontWeight: 600, cursor: 'pointer', boxSizing: 'border-box' }}
                   >
                     Cancel — it's a duplicate
                   </button>
                   <button
                     onClick={() => handleSubmitTicket(true)}
-                    style={{ width: '100%', height: '44px', background: '#d97706', border: 'none', borderRadius: '10px', color: '#fff', fontSize: '13px', fontWeight: 600, cursor: 'pointer', boxSizing: 'border-box' }}
+                    style={{ width: '100%', height: '44px', background: COLORS.amber600, border: 'none', borderRadius: '10px', color: COLORS.white, fontSize: '13px', fontWeight: 600, cursor: 'pointer', boxSizing: 'border-box' }}
                   >
                     It's separate — log it anyway
                   </button>
@@ -784,10 +785,10 @@ export default function AdminRaiseTicket({ profile }) {
               ) : (
                 <>
                   {ticketError && (
-                    <p style={{ margin: '16px 0 0 0', fontSize: '13px', color: '#ef4444' }}>{ticketError}</p>
+                    <p style={{ margin: '16px 0 0 0', fontSize: '13px', color: COLORS.red500 }}>{ticketError}</p>
                   )}
                   {ticketSuccess && (
-                    <p style={{ margin: '16px 0 0 0', fontSize: '13px', color: '#16a34a', fontWeight: 600 }}>{ticketSuccess}</p>
+                    <p style={{ margin: '16px 0 0 0', fontSize: '13px', color: COLORS.green600, fontWeight: 600 }}>{ticketSuccess}</p>
                   )}
                   <button
                     onClick={() => handleSubmitTicket(false)}
@@ -796,8 +797,8 @@ export default function AdminRaiseTicket({ profile }) {
                       width: '100%',
                       height: '48px',
                       marginTop: '16px',
-                      background: '#1e3a8a',
-                      color: '#fff',
+                      background: COLORS.blue900,
+                      color: COLORS.white,
                       border: 'none',
                       borderRadius: '12px',
                       fontSize: '14px',
@@ -822,7 +823,7 @@ export default function AdminRaiseTicket({ profile }) {
 
           {/* Step 1: Target Property */}
           <div style={{ background: SECTION_BG[0], padding: '20px', borderBottom: '1px solid rgba(15,23,42,0.06)' }}>
-            <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: '#0f172a' }}>1. Target Property</p>
+            <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: COLORS.slate900 }}>1. Target Property</p>
             <PropertySearchSelect
               properties={ticketProperties}
               value={ticketPropertyId}
@@ -832,10 +833,10 @@ export default function AdminRaiseTicket({ profile }) {
 
           {/* Step 2: Select Check Type */}
           <div style={{ background: SECTION_BG[1], padding: '20px', borderBottom: complianceCheckType ? '1px solid rgba(15,23,42,0.06)' : 'none' }}>
-            <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: '#0f172a' }}>2. Select Check Type</p>
+            <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: COLORS.slate900 }}>2. Select Check Type</p>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
               {complianceCheckTypes.length === 0 && (
-                <p style={{ margin: 0, fontSize: '13px', color: '#94a3b8', fontStyle: 'italic', gridColumn: '1 / -1' }}>
+                <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic', gridColumn: '1 / -1' }}>
                   No compliance check types configured yet -- add some on the Settings page.
                 </p>
               )}
@@ -857,18 +858,18 @@ export default function AdminRaiseTicket({ profile }) {
           {/* Step 3: Walk through each item */}
           {complianceCheckType && (
             <div style={{ background: SECTION_BG[0], padding: '20px', borderBottom: '1px solid rgba(15,23,42,0.06)' }}>
-              <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: '#0f172a' }}>3. Walk Through Each Item</p>
+              <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: COLORS.slate900 }}>3. Walk Through Each Item</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
                 {(complianceCheckTypes.find(t => t.name === complianceCheckType)?.items || []).map((item, idx) => {
                   const vulnBonus = selectedTicketProperty?.high_vulnerability ? 30 : 0
                   const effectiveScore = item.score + vulnBonus
                   const tier = priorityTierLabel(effectiveScore, p1Threshold, p2Threshold)
-                  const tierColour = effectiveScore >= p1Threshold ? '#dc2626' : effectiveScore >= p2Threshold ? '#d97706' : '#64748b'
+                  const tierColour = effectiveScore >= p1Threshold ? COLORS.red600 : effectiveScore >= p2Threshold ? COLORS.amber600 : COLORS.slate500
                   const result = complianceResults[idx]
                   return (
-                    <div key={item.label} style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '12px', background: '#ffffff' }}>
+                    <div key={item.label} style={{ border: `1px solid ${COLORS.slate200}`, borderRadius: '10px', padding: '12px', background: COLORS.white }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px', marginBottom: '8px' }}>
-                        <span style={{ fontSize: '13px', fontWeight: 600, color: '#0f172a' }}>{item.label}</span>
+                        <span style={{ fontSize: '13px', fontWeight: 600, color: COLORS.slate900 }}>{item.label}</span>
                         <span style={{ fontSize: '10px', fontWeight: 700, color: tierColour, flexShrink: 0 }}>{tier} if failed</span>
                       </div>
                       <div style={{ display: 'flex', gap: '8px' }}>
@@ -876,9 +877,9 @@ export default function AdminRaiseTicket({ profile }) {
                           onClick={() => setComplianceItemResult(idx, 'Pass')}
                           style={{
                             flex: 1, height: '40px', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', boxSizing: 'border-box',
-                            border: result === 'Pass' ? '1px solid #16a34a' : '1px solid #e2e8f0',
-                            background: result === 'Pass' ? '#16a34a' : '#fff',
-                            color: result === 'Pass' ? '#fff' : '#64748b',
+                            border: result === 'Pass' ? `1px solid ${COLORS.green600}` : `1px solid ${COLORS.slate200}`,
+                            background: result === 'Pass' ? COLORS.green600 : COLORS.white,
+                            color: result === 'Pass' ? COLORS.white : COLORS.slate500,
                           }}
                         >
                           Pass
@@ -887,9 +888,9 @@ export default function AdminRaiseTicket({ profile }) {
                           onClick={() => setComplianceItemResult(idx, 'Fail')}
                           style={{
                             flex: 1, height: '40px', borderRadius: '8px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', boxSizing: 'border-box',
-                            border: result === 'Fail' ? '1px solid #dc2626' : '1px solid #e2e8f0',
-                            background: result === 'Fail' ? '#dc2626' : '#fff',
-                            color: result === 'Fail' ? '#fff' : '#64748b',
+                            border: result === 'Fail' ? `1px solid ${COLORS.red600}` : `1px solid ${COLORS.slate200}`,
+                            background: result === 'Fail' ? COLORS.red600 : COLORS.white,
+                            color: result === 'Fail' ? COLORS.white : COLORS.slate500,
                           }}
                         >
                           Fail
@@ -902,7 +903,7 @@ export default function AdminRaiseTicket({ profile }) {
                             value={complianceNotes[idx] || ''}
                             onChange={(e) => setComplianceNotes(prev => prev.map((n, i) => i === idx ? e.target.value : n))}
                             placeholder="Describe what's wrong (used on the auto-created ticket)..."
-                            style={{ width: '100%', marginTop: '8px', height: '40px', padding: '0 10px', borderRadius: '8px', border: '1px solid #fcd34d', fontSize: '13px', boxSizing: 'border-box' }}
+                            style={{ width: '100%', marginTop: '8px', height: '40px', padding: '0 10px', borderRadius: '8px', border: `1px solid ${COLORS.amber300}`, fontSize: '13px', boxSizing: 'border-box' }}
                           />
 
                           <input
@@ -921,7 +922,7 @@ export default function AdminRaiseTicket({ profile }) {
                               )}
                               <button
                                 onClick={() => removeComplianceMedia(idx)}
-                                style={{ marginTop: '6px', padding: '6px 12px', background: '#fff', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
+                                style={{ marginTop: '6px', padding: '6px 12px', background: COLORS.white, color: COLORS.red600, border: `1px solid ${COLORS.red200}`, borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
                               >
                                 ✕ Remove media
                               </button>
@@ -929,7 +930,7 @@ export default function AdminRaiseTicket({ profile }) {
                           ) : (
                             <button
                               onClick={() => document.getElementById(`compliance-media-${idx}`).click()}
-                              style={{ width: '100%', marginTop: '8px', height: '40px', borderRadius: '8px', border: '2px dashed #cbd5e1', background: '#ffffff', color: '#64748b', fontSize: '12px', fontWeight: 600, cursor: 'pointer', boxSizing: 'border-box' }}
+                              style={{ width: '100%', marginTop: '8px', height: '40px', borderRadius: '8px', border: `2px dashed ${COLORS.slate300}`, background: COLORS.white, color: COLORS.slate500, fontSize: '12px', fontWeight: 600, cursor: 'pointer', boxSizing: 'border-box' }}
                             >
                               📷 Add a photo or video (optional)
                             </button>
@@ -946,12 +947,12 @@ export default function AdminRaiseTicket({ profile }) {
                 const total = complianceResults.length
                 const failed = complianceResults.filter(r => r === 'Fail').length
                 if (answered < total) {
-                  return <p style={{ margin: '0 0 16px 0', fontSize: '13px', fontWeight: 600, color: '#64748b', padding: '12px', background: '#f8fafc', borderRadius: '10px' }}>{answered} / {total} items marked.</p>
+                  return <p style={{ margin: '0 0 16px 0', fontSize: '13px', fontWeight: 600, color: COLORS.slate500, padding: '12px', background: COLORS.slate50, borderRadius: '10px' }}>{answered} / {total} items marked.</p>
                 }
                 if (failed === 0) {
-                  return <p style={{ margin: '0 0 16px 0', fontSize: '13px', fontWeight: 700, color: '#16a34a', padding: '12px', background: '#f0fdf4', borderRadius: '10px' }}>✓ All {total} items passed. No maintenance tickets will be created.</p>
+                  return <p style={{ margin: '0 0 16px 0', fontSize: '13px', fontWeight: 700, color: COLORS.green600, padding: '12px', background: COLORS.green50, borderRadius: '10px' }}>✓ All {total} items passed. No maintenance tickets will be created.</p>
                 }
-                return <p style={{ margin: '0 0 16px 0', fontSize: '13px', fontWeight: 700, color: '#92400e', padding: '12px', background: '#fffbeb', borderRadius: '10px' }}>⚠ {failed} of {total} item(s) failed — {failed} ticket(s) will be created.</p>
+                return <p style={{ margin: '0 0 16px 0', fontSize: '13px', fontWeight: 700, color: COLORS.amber800, padding: '12px', background: COLORS.amber50, borderRadius: '10px' }}>⚠ {failed} of {total} item(s) failed — {failed} ticket(s) will be created.</p>
               })()}
             </div>
           )}
@@ -959,7 +960,7 @@ export default function AdminRaiseTicket({ profile }) {
           {/* Step 4: Assignment & Details (admin-only) */}
           {complianceCheckType && complianceResults.length > 0 && !complianceResults.some(r => r === null) && (
             <div style={{ background: SECTION_BG[1], padding: '20px' }}>
-              <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: '#0f172a' }}>4. Assignment, Details &amp; Submit</p>
+              <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: COLORS.slate900 }}>4. Assignment, Details &amp; Submit</p>
 
               <p style={fieldLabelStyle}>Assign to builder</p>
               <select
@@ -969,11 +970,11 @@ export default function AdminRaiseTicket({ profile }) {
               >
                 <option value="">Auto-assign based on skills</option>
                 {builders.map(b => (
-                  <option key={b.id} value={b.id} style={b.availability !== 'Available' ? { color: '#94a3b8' } : undefined}>{builderOptionLabel(b)}</option>
+                  <option key={b.id} value={b.id} style={b.availability !== 'Available' ? { color: COLORS.slate400 } : undefined}>{builderOptionLabel(b)}</option>
                 ))}
               </select>
               {assignedBuilderId && (
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 14px 0', fontSize: '13px', fontWeight: 600, color: '#0f172a', cursor: 'pointer' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 14px 0', fontSize: '13px', fontWeight: 600, color: COLORS.slate900, cursor: 'pointer' }}>
                   <input type="checkbox" checked={sendPushOnAssign} onChange={(e) => setSendPushOnAssign(e.target.checked)} />
                   Also send a push notification
                 </label>
@@ -1004,10 +1005,10 @@ export default function AdminRaiseTicket({ profile }) {
               </select>
 
               {ticketError && (
-                <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: '#ef4444' }}>{ticketError}</p>
+                <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: COLORS.red500 }}>{ticketError}</p>
               )}
               {complianceSuccess && (
-                <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: '#16a34a', fontWeight: 600 }}>{complianceSuccess}</p>
+                <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: COLORS.green600, fontWeight: 600 }}>{complianceSuccess}</p>
               )}
 
               <button
@@ -1016,8 +1017,8 @@ export default function AdminRaiseTicket({ profile }) {
                 style={{
                   width: '100%',
                   height: '48px',
-                  background: '#0f172a',
-                  color: '#fff',
+                  background: COLORS.slate900,
+                  color: COLORS.white,
                   border: 'none',
                   borderRadius: '12px',
                   fontSize: '14px',

@@ -1,5 +1,6 @@
 import { useState, useEffect, Fragment } from 'react'
 import { supabase } from '../../lib/supabase'
+import { COLORS } from '../../lib/colors'
 import { attachProperties } from '../../lib/properties'
 import BuilderProfileModal from './BuilderProfileModal'
 import PropertySearchSelect from '../../components/PropertySearchSelect'
@@ -16,10 +17,10 @@ import {
   EVENTS_FEATURE_ENABLED,
 } from './shared'
 
-const expandLabelStyle = { margin: '0 0 2px 0', fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em' }
-const expandValueStyle = { margin: '0 0 10px 0', fontSize: '13px', fontWeight: 600, color: '#0f172a' }
-const expandSectionStyle = { background: '#fff', borderRadius: '12px', padding: '16px', border: '1px solid #e2e8f0' }
-const expandSectionTitleStyle = { margin: '0 0 12px 0', fontSize: '11px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }
+const expandLabelStyle = { margin: '0 0 2px 0', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.04em' }
+const expandValueStyle = { margin: '0 0 10px 0', fontSize: '13px', fontWeight: 600, color: COLORS.slate900 }
+const expandSectionStyle = { background: COLORS.white, borderRadius: '12px', padding: '16px', border: `1px solid ${COLORS.slate200}` }
+const expandSectionTitleStyle = { margin: '0 0 12px 0', fontSize: '11px', fontWeight: 800, color: COLORS.slate500, textTransform: 'uppercase', letterSpacing: '0.05em' }
 
 export default function AdminPipeline({ profile, onTicketsChanged, initialStatusFilter, initialPriorityFilter, initialStuckFilter, onInitialFilterConsumed }) {
   const [tickets, setTickets] = useState([])
@@ -570,13 +571,13 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
   // so every tile stays a stable shortcut to that category regardless of
   // whatever filter combination happens to be applied right now.
   const kpis = [
-    { label: 'Total tickets', value: tickets.length, colour: '#64748b', statusFilter: 'All' },
-    { label: 'Unassigned', value: tickets.filter(t => t.status === 'Pending').length, colour: '#dc2626', statusFilter: 'Pending' },
-    { label: 'In Progress', value: tickets.filter(t => t.status === 'In Progress').length, colour: '#0d9488', statusFilter: 'In Progress' },
-    { label: 'On Hold', value: tickets.filter(t => t.status === 'On Hold').length, colour: '#f59e0b', statusFilter: 'On Hold' },
-    { label: 'Completed', value: tickets.filter(t => t.status === 'Completed').length, colour: '#16a34a', statusFilter: 'Completed' },
-    { label: 'P1 Critical', value: tickets.filter(t => effectiveTier(t) === 'P1 Critical').length, colour: '#dc2626', statusFilter: 'All', priorityFilter: 'P1 Critical' },
-    { label: 'Stuck', value: tickets.filter(t => isTicketStuck(t, stuckThresholds, Date.now(), p1Threshold, p2Threshold)).length, colour: '#dc2626', statusFilter: 'All', stuckOnly: true },
+    { label: 'Total tickets', value: tickets.length, colour: COLORS.slate500, statusFilter: 'All' },
+    { label: 'Unassigned', value: tickets.filter(t => t.status === 'Pending').length, colour: COLORS.red600, statusFilter: 'Pending' },
+    { label: 'In Progress', value: tickets.filter(t => t.status === 'In Progress').length, colour: COLORS.teal600, statusFilter: 'In Progress' },
+    { label: 'On Hold', value: tickets.filter(t => t.status === 'On Hold').length, colour: COLORS.amber500, statusFilter: 'On Hold' },
+    { label: 'Completed', value: tickets.filter(t => t.status === 'Completed').length, colour: COLORS.green600, statusFilter: 'Completed' },
+    { label: 'P1 Critical', value: tickets.filter(t => effectiveTier(t) === 'P1 Critical').length, colour: COLORS.red600, statusFilter: 'All', priorityFilter: 'P1 Critical' },
+    { label: 'Stuck', value: tickets.filter(t => isTicketStuck(t, stuckThresholds, Date.now(), p1Threshold, p2Threshold)).length, colour: COLORS.red600, statusFilter: 'All', stuckOnly: true },
   ]
 
   // Clicking a tile is a "jump to this category" shortcut, same as
@@ -591,7 +592,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
 
   if (loading) return (
     <div style={{ minHeight: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <p style={{ color: '#94a3b8', fontWeight: 600, fontFamily: 'system-ui' }}>Loading tickets...</p>
+      <p style={{ color: COLORS.slate400, fontWeight: 600, fontFamily: 'system-ui' }}>Loading tickets...</p>
     </div>
   )
 
@@ -644,11 +645,11 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
           <option value="P2 Urgent">P2 Urgent</option>
           <option value="P3 Routine">P3 Routine</option>
         </select>
-        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 12px', borderRadius: '10px', border: '1px solid #fde68a', background: '#fffbeb', color: '#92400e', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 12px', borderRadius: '10px', border: `1px solid ${COLORS.amber200}`, background: COLORS.amber50, color: COLORS.amber800, fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
           <input type="checkbox" checked={stuckOnlyFilter} onChange={(e) => setStuckOnlyFilter(e.target.checked)} />
           ⚠ Stuck only
         </label>
-        <button onClick={clearFilters} style={{ padding: '8px 14px', borderRadius: '10px', border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
+        <button onClick={clearFilters} style={{ padding: '8px 14px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, background: COLORS.white, color: COLORS.slate500, fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
           Clear filters
         </button>
       </div>
@@ -658,12 +659,12 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
           onClick={() => setReportSectionOpen(prev => !prev)}
           style={{
             display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between', gap: '12px',
-            padding: '10px 16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px',
-            cursor: 'pointer', fontSize: '11px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em',
+            padding: '10px 16px', background: COLORS.slate50, border: `1px solid ${COLORS.slate200}`, borderRadius: '12px',
+            cursor: 'pointer', fontSize: '11px', fontWeight: 800, color: COLORS.slate500, textTransform: 'uppercase', letterSpacing: '0.05em',
           }}
         >
           <span>📋 Generate a report</span>
-          <span style={{ fontSize: '13px', fontWeight: 700, color: '#94a3b8', textTransform: 'none', letterSpacing: 0 }}>
+          <span style={{ fontSize: '13px', fontWeight: 700, color: COLORS.slate400, textTransform: 'none', letterSpacing: 0 }}>
             {reportSectionOpen ? '▲ Collapse' : '▼ Expand'}
           </span>
         </button>
@@ -671,10 +672,10 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
           <div style={{
             display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'flex-end',
             marginTop: '8px', padding: '12px 16px', borderRadius: '12px',
-            border: '1px solid #e2e8f0', background: '#f8fafc',
+            border: `1px solid ${COLORS.slate200}`, background: COLORS.slate50,
           }}>
             <div>
-              <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#94a3b8', marginBottom: '4px' }}>Division</label>
+              <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, marginBottom: '4px' }}>Division</label>
               <select value={divisionFilter} onChange={(e) => setDivisionFilter(e.target.value)} style={filterSelectStyle}>
                 <option value="All">All Divisions</option>
                 {divisionOptions.map(d => (
@@ -683,14 +684,14 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
               </select>
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#94a3b8', marginBottom: '4px' }}>Raised from</label>
+              <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, marginBottom: '4px' }}>Raised from</label>
               <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} style={filterSelectStyle} />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#94a3b8', marginBottom: '4px' }}>Raised to</label>
+              <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, marginBottom: '4px' }}>Raised to</label>
               <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} style={filterSelectStyle} />
             </div>
-            <button onClick={() => setReportOpen(true)} style={{ padding: '9px 16px', borderRadius: '10px', border: 'none', background: '#0f172a', color: '#fff', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
+            <button onClick={() => setReportOpen(true)} style={{ padding: '9px 16px', borderRadius: '10px', border: 'none', background: COLORS.slate900, color: COLORS.white, fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
               🖨️ Print / Export
             </button>
           </div>
@@ -709,15 +710,15 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
       )}
 
       {selectedTicketIds.size > 0 && (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '10px', padding: '10px 16px', marginBottom: '16px', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: '13px', fontWeight: 700, color: '#1d4ed8' }}>{selectedTicketIds.size} ticket{selectedTicketIds.size === 1 ? '' : 's'} selected</span>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', background: COLORS.blue50, border: `1px solid ${COLORS.blue200}`, borderRadius: '10px', padding: '10px 16px', marginBottom: '16px', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '13px', fontWeight: 700, color: COLORS.blue700 }}>{selectedTicketIds.size} ticket{selectedTicketIds.size === 1 ? '' : 's'} selected</span>
           <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
-            <button onClick={openBulkReassignModal} style={{ padding: '8px 16px', background: '#1d4ed8', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
+            <button onClick={openBulkReassignModal} style={{ padding: '8px 16px', background: COLORS.blue700, color: COLORS.white, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
               Bulk Reassign
             </button>
             <button
               onClick={() => setSelectedTicketIds(new Set())}
-              style={{ background: 'none', border: 'none', color: '#1d4ed8', fontSize: '13px', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}
+              style={{ background: 'none', border: 'none', color: COLORS.blue700, fontSize: '13px', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}
             >
               Clear selection
             </button>
@@ -726,11 +727,11 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
       )}
 
       {/* Pipeline table */}
-      <div style={{ background: '#fff', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', marginBottom: '20px' }}>
+      <div style={{ background: COLORS.white, borderRadius: '16px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', marginBottom: '20px' }}>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
-              <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+              <tr style={{ background: COLORS.slate50, borderBottom: `1px solid ${COLORS.slate200}` }}>
                 <th style={{ ...thStyle, width: '32px' }}>
                   <input
                     type="checkbox"
@@ -757,7 +758,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
             <tbody>
               {sortedTickets.length === 0 && (
                 <tr>
-                  <td colSpan={8} style={{ padding: '32px', textAlign: 'center', color: '#94a3b8', fontWeight: 600 }}>
+                  <td colSpan={8} style={{ padding: '32px', textAlign: 'center', color: COLORS.slate400, fontWeight: 600 }}>
                     No tickets match these filters.
                   </td>
                 </tr>
@@ -774,9 +775,9 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
                     <tr
                       onClick={() => setExpandedTicketId(isExpanded ? null : t.id)}
                       style={{
-                        borderBottom: isExpanded ? 'none' : '1px solid #f1f5f9', cursor: 'pointer',
-                        background: isExpanded ? '#fef2f2' : isSelected ? '#eff6ff' : stuck ? '#fffbeb' : undefined,
-                        boxShadow: isExpanded ? 'inset 4px 0 0 #dc2626' : stuck ? 'inset 4px 0 0 #d97706' : undefined,
+                        borderBottom: isExpanded ? 'none' : `1px solid ${COLORS.slate100}`, cursor: 'pointer',
+                        background: isExpanded ? COLORS.red50 : isSelected ? COLORS.blue50 : stuck ? COLORS.amber50 : undefined,
+                        boxShadow: isExpanded ? `inset 4px 0 0 ${COLORS.red600}` : stuck ? `inset 4px 0 0 ${COLORS.amber600}` : undefined,
                       }}
                     >
                       <td style={tdStyle} onClick={(e) => e.stopPropagation()}>
@@ -794,15 +795,15 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
                         />
                       </td>
                       <td style={tdStyle}>
-                        <span style={{ color: '#475569', fontWeight: 600 }}>{t.ticket_number}</span>
+                        <span style={{ color: COLORS.slate600, fontWeight: 600 }}>{t.ticket_number}</span>
                       </td>
                       <td style={tdStyle}>
-                        <span style={{ display: 'block', fontWeight: 700, color: '#0f172a' }}>
+                        <span style={{ display: 'block', fontWeight: 700, color: COLORS.slate900 }}>
                           {t.property?.address}
                         </span>
                       </td>
                       <td style={tdStyle}>
-                        <span style={{ color: '#475569' }}>{t.room || '—'}</span>
+                        <span style={{ color: COLORS.slate600 }}>{t.room || '—'}</span>
                       </td>
                       <td style={tdStyle}>
                         <span style={{ display: 'inline-block', fontSize: '11px', fontWeight: 800, color: tierStyle.color, background: tierStyle.bg, padding: '3px 10px', borderRadius: '20px' }}>
@@ -820,24 +821,24 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
                           {statusLabel(t.status)}
                         </span>
                         {t.status === 'On Hold' && t.hold_reason && (
-                          <span style={{ display: 'block', fontSize: '10px', color: '#d97706', fontWeight: 700, marginTop: '3px' }}>{t.hold_reason}</span>
+                          <span style={{ display: 'block', fontSize: '10px', color: COLORS.amber600, fontWeight: 700, marginTop: '3px' }}>{t.hold_reason}</span>
                         )}
                         {stuck && (
-                          <span style={{ display: 'block', fontSize: '10px', color: '#b45309', fontWeight: 800, marginTop: '3px' }}>
+                          <span style={{ display: 'block', fontSize: '10px', color: COLORS.amber700, fontWeight: 800, marginTop: '3px' }}>
                             ⚠ Stuck {formatDurationDays(Date.now() - new Date(t.status_changed_at || t.created_at).getTime())}
                           </span>
                         )}
                       </td>
                       <td style={tdStyle}>
-                        <span style={{ color: '#475569' }}>{formatUKDate(t.created_at)}</span>
+                        <span style={{ color: COLORS.slate600 }}>{formatUKDate(t.created_at)}</span>
                       </td>
-                      <td style={{ ...tdStyle, textAlign: 'center', color: '#94a3b8', fontWeight: 700 }}>
+                      <td style={{ ...tdStyle, textAlign: 'center', color: COLORS.slate400, fontWeight: 700 }}>
                         {isExpanded ? '▲' : '▼'}
                       </td>
                     </tr>
                     {isExpanded && (
-                      <tr style={{ borderBottom: '2px solid #dc2626' }}>
-                        <td colSpan={8} style={{ padding: 0, background: '#fef2f2', boxShadow: 'inset 4px 0 0 #dc2626' }}>
+                      <tr style={{ borderBottom: `2px solid ${COLORS.red600}` }}>
+                        <td colSpan={8} style={{ padding: 0, background: COLORS.red50, boxShadow: `inset 4px 0 0 ${COLORS.red600}` }}>
                           <div style={{ padding: '18px 20px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
 
                             <div style={expandSectionStyle}>
@@ -846,7 +847,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
                               <p style={expandValueStyle}>#{t.ticket_number} — {t.category}</p>
 
                               {isCompliance && (
-                                <span style={{ display: 'inline-block', fontSize: '9px', fontWeight: 800, color: '#c2410c', background: '#fff7ed', border: '1px solid #fed7aa', padding: '2px 6px', borderRadius: '20px', marginBottom: '8px' }}>
+                                <span style={{ display: 'inline-block', fontSize: '9px', fontWeight: 800, color: COLORS.orange700, background: COLORS.orange50, border: `1px solid ${COLORS.orange200}`, padding: '2px 6px', borderRadius: '20px', marginBottom: '8px' }}>
                                   COMPLIANCE FAILURE
                                 </span>
                               )}
@@ -865,18 +866,18 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
                                   {t.photo_url && (
                                     <a href={t.photo_url} target="_blank" rel="noreferrer">
                                       <p style={expandLabelStyle}>Reported Photo</p>
-                                      <img src={t.photo_url} alt="Reported fault" style={{ width: '140px', height: '140px', objectFit: 'cover', borderRadius: '10px', border: '1px solid #e2e8f0' }} />
+                                      <img src={t.photo_url} alt="Reported fault" style={{ width: '140px', height: '140px', objectFit: 'cover', borderRadius: '10px', border: `1px solid ${COLORS.slate200}` }} />
                                     </a>
                                   )}
                                   {t.completion_photo_url && (
                                     <a href={t.completion_photo_url} target="_blank" rel="noreferrer">
                                       <p style={expandLabelStyle}>Completion Photo</p>
-                                      <img src={t.completion_photo_url} alt="Completed job" style={{ width: '140px', height: '140px', objectFit: 'cover', borderRadius: '10px', border: '1px solid #e2e8f0' }} />
+                                      <img src={t.completion_photo_url} alt="Completed job" style={{ width: '140px', height: '140px', objectFit: 'cover', borderRadius: '10px', border: `1px solid ${COLORS.slate200}` }} />
                                     </a>
                                   )}
                                 </div>
                               ) : (
-                                <p style={{ fontSize: '13px', color: '#94a3b8', fontStyle: 'italic', margin: 0 }}>No photos or videos attached</p>
+                                <p style={{ fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic', margin: 0 }}>No photos or videos attached</p>
                               )}
                             </div>
 
@@ -884,7 +885,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
                               <p style={expandSectionTitleStyle}>Assignment &amp; Priority</p>
                               <p style={expandLabelStyle}>Assigned Builder</p>
                               {t.assigned_builder_id ? (
-                                <p style={{ ...expandValueStyle, color: '#1d4ed8', cursor: 'pointer' }} onClick={() => setBuilderProfileId(t.assigned_builder_id)}>
+                                <p style={{ ...expandValueStyle, color: COLORS.blue700, cursor: 'pointer' }} onClick={() => setBuilderProfileId(t.assigned_builder_id)}>
                                   {t.builderName || 'Unknown'}
                                 </p>
                               ) : (
@@ -920,27 +921,27 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
                             <div style={expandSectionStyle}>
                               <p style={expandSectionTitleStyle}>Notes &amp; Flags</p>
                               {!t.no_access_flag && !(t.status === 'On Hold' && t.hold_reason) && !t.completion_note && (
-                                <p style={{ fontSize: '13px', color: '#94a3b8', fontStyle: 'italic', margin: 0 }}>No notes on this ticket</p>
+                                <p style={{ fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic', margin: 0 }}>No notes on this ticket</p>
                               )}
 
                               {t.no_access_flag && (
-                                <div style={{ padding: '8px 10px', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: '8px', marginBottom: '8px' }}>
-                                  <p style={{ margin: 0, fontSize: '11px', fontWeight: 800, color: '#c2410c' }}>No Access</p>
-                                  {t.no_access_note && <p style={{ margin: '2px 0 0 0', fontSize: '12px', color: '#7c2d12' }}>{t.no_access_note}</p>}
+                                <div style={{ padding: '8px 10px', background: COLORS.orange50, border: `1px solid ${COLORS.orange200}`, borderRadius: '8px', marginBottom: '8px' }}>
+                                  <p style={{ margin: 0, fontSize: '11px', fontWeight: 800, color: COLORS.orange700 }}>No Access</p>
+                                  {t.no_access_note && <p style={{ margin: '2px 0 0 0', fontSize: '12px', color: COLORS.orange900 }}>{t.no_access_note}</p>}
                                 </div>
                               )}
 
                               {t.status === 'On Hold' && t.hold_reason && (
-                                <div style={{ padding: '8px 10px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', marginBottom: '8px' }}>
-                                  <p style={{ margin: 0, fontSize: '11px', fontWeight: 800, color: '#d97706' }}>On Hold — {t.hold_reason}</p>
-                                  {t.hold_note && <p style={{ margin: '2px 0 0 0', fontSize: '12px', color: '#92400e' }}>{t.hold_note}</p>}
+                                <div style={{ padding: '8px 10px', background: COLORS.amber50, border: `1px solid ${COLORS.amber200}`, borderRadius: '8px', marginBottom: '8px' }}>
+                                  <p style={{ margin: 0, fontSize: '11px', fontWeight: 800, color: COLORS.amber600 }}>On Hold — {t.hold_reason}</p>
+                                  {t.hold_note && <p style={{ margin: '2px 0 0 0', fontSize: '12px', color: COLORS.amber800 }}>{t.hold_note}</p>}
                                 </div>
                               )}
 
                               {t.completion_note && (
-                                <div style={{ padding: '8px 10px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px' }}>
-                                  <p style={{ margin: 0, fontSize: '11px', fontWeight: 800, color: '#16a34a' }}>Completion Note</p>
-                                  <p style={{ margin: '2px 0 0 0', fontSize: '12px', color: '#166534' }}>{t.completion_note}</p>
+                                <div style={{ padding: '8px 10px', background: COLORS.green50, border: `1px solid ${COLORS.green200}`, borderRadius: '8px' }}>
+                                  <p style={{ margin: 0, fontSize: '11px', fontWeight: 800, color: COLORS.green600 }}>Completion Note</p>
+                                  <p style={{ margin: '2px 0 0 0', fontSize: '12px', color: COLORS.green800 }}>{t.completion_note}</p>
                                 </div>
                               )}
                             </div>
@@ -953,9 +954,9 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
                                 <button onClick={() => openAddToEventModal(t)} style={actionBtnStyle}>{t.event_id ? 'Change Event' : 'Add to Event'}</button>
                               )}
                               {t.status !== 'Cancelled' && (
-                                <button onClick={() => openCancelModal(t)} style={{ ...actionBtnStyle, color: '#dc2626', borderColor: '#fecaca' }}>Cancel</button>
+                                <button onClick={() => openCancelModal(t)} style={{ ...actionBtnStyle, color: COLORS.red600, borderColor: COLORS.red200 }}>Cancel</button>
                               )}
-                              <button onClick={() => openReassignModal(t)} style={{ ...actionBtnStyle, background: '#1d4ed8', color: '#fff', borderColor: '#1d4ed8' }}>Reassign</button>
+                              <button onClick={() => openReassignModal(t)} style={{ ...actionBtnStyle, background: COLORS.blue700, color: COLORS.white, borderColor: COLORS.blue700 }}>Reassign</button>
                             </div>
                           </div>
                         </td>
@@ -979,7 +980,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
             <label style={modalLabelStyle}>Builder</label>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {reassignOptions.length === 0 && (
-                <p style={{ margin: 0, fontSize: '13px', color: '#94a3b8', fontStyle: 'italic' }}>No one is assignable to this category yet.</p>
+                <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>No one is assignable to this category yet.</p>
               )}
               {reassignOptions.map(b => {
                 const isUnavailable = b.availability !== 'Available'
@@ -991,7 +992,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
                     checked={reassignBuilderId === b.id}
                     onChange={() => setReassignBuilderId(b.id)}
                   />
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: 600, color: isUnavailable ? '#64748b' : '#0f172a' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: 600, color: isUnavailable ? COLORS.slate500 : COLORS.slate900 }}>
                     {b.name}
                     {isUnavailable && (
                       <span style={{ fontSize: '10px', fontWeight: 800, color: STAFF_AVAILABILITY_STYLES[b.availability]?.color, background: STAFF_AVAILABILITY_STYLES[b.availability]?.bg, padding: '2px 8px', borderRadius: '20px', whiteSpace: 'nowrap' }}>
@@ -1013,7 +1014,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
               style={modalTextareaStyle}
             />
 
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '10px 0 0 0', fontSize: '13px', fontWeight: 600, color: '#0f172a', cursor: 'pointer' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '10px 0 0 0', fontSize: '13px', fontWeight: 600, color: COLORS.slate900, cursor: 'pointer' }}>
               <input type="checkbox" checked={reassignSendPush} onChange={(e) => setReassignSendPush(e.target.checked)} />
               Also send a push notification
             </label>
@@ -1040,12 +1041,12 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
 
               {bulkReassignSummary ? (
                 <>
-                  <p style={{ margin: '14px 0 0 0', fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>
+                  <p style={{ margin: '14px 0 0 0', fontSize: '13px', fontWeight: 700, color: COLORS.slate900 }}>
                     Reassigned {bulkReassignSummary.successCount} of {targetTickets.length} ticket{targetTickets.length === 1 ? '' : 's'}.
                   </p>
                   <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                     {bulkReassignSummary.failures.map(f => (
-                      <p key={f.ticket.id} style={{ margin: 0, fontSize: '12px', color: '#dc2626' }}>
+                      <p key={f.ticket.id} style={{ margin: 0, fontSize: '12px', color: COLORS.red600 }}>
                         Job #{f.ticket.ticket_number} failed: {f.message}
                       </p>
                     ))}
@@ -1070,7 +1071,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
                   <label style={modalLabelStyle}>Builder</label>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     {bulkReassignOptions.length === 0 && (
-                      <p style={{ margin: 0, fontSize: '13px', color: '#94a3b8', fontStyle: 'italic' }}>
+                      <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>
                         No one is assignable to every selected ticket's category — try narrowing your selection.
                       </p>
                     )}
@@ -1084,7 +1085,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
                             checked={bulkReassignBuilderId === b.id}
                             onChange={() => setBulkReassignBuilderId(b.id)}
                           />
-                          <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: 600, color: isUnavailable ? '#64748b' : '#0f172a' }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: 600, color: isUnavailable ? COLORS.slate500 : COLORS.slate900 }}>
                             {b.name}
                             {isUnavailable && (
                               <span style={{ fontSize: '10px', fontWeight: 800, color: STAFF_AVAILABILITY_STYLES[b.availability]?.color, background: STAFF_AVAILABILITY_STYLES[b.availability]?.bg, padding: '2px 8px', borderRadius: '20px', whiteSpace: 'nowrap' }}>
@@ -1106,7 +1107,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
                     style={modalTextareaStyle}
                   />
 
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '10px 0 0 0', fontSize: '13px', fontWeight: 600, color: '#0f172a', cursor: 'pointer' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '10px 0 0 0', fontSize: '13px', fontWeight: 600, color: COLORS.slate900, cursor: 'pointer' }}>
                     <input type="checkbox" checked={bulkReassignSendPush} onChange={(e) => setBulkReassignSendPush(e.target.checked)} />
                     Also send a push notification
                   </label>
@@ -1146,7 +1147,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
                   checked={cancelType === 'Mistake / not a real fault'}
                   onChange={() => setCancelType('Mistake / not a real fault')}
                 />
-                <span style={{ fontSize: '13px', fontWeight: 600, color: '#0f172a' }}>Mistake / not a real fault</span>
+                <span style={{ fontSize: '13px', fontWeight: 600, color: COLORS.slate900 }}>Mistake / not a real fault</span>
               </label>
               <label style={radioRowStyle(cancelType === 'Duplicate')}>
                 <input
@@ -1155,7 +1156,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
                   checked={cancelType === 'Duplicate'}
                   onChange={() => setCancelType('Duplicate')}
                 />
-                <span style={{ fontSize: '13px', fontWeight: 600, color: '#0f172a' }}>Duplicate ticket</span>
+                <span style={{ fontSize: '13px', fontWeight: 600, color: COLORS.slate900 }}>Duplicate ticket</span>
               </label>
             </div>
 
@@ -1185,7 +1186,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
 
             <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
               <button onClick={closeCancelModal} style={modalCancelBtnStyle}>Keep Ticket</button>
-              <button onClick={submitCancel} style={{ ...modalConfirmBtnStyle, background: '#dc2626' }}>Confirm Cancellation</button>
+              <button onClick={submitCancel} style={{ ...modalConfirmBtnStyle, background: COLORS.red600 }}>Confirm Cancellation</button>
             </div>
           </div>
         </div>
@@ -1208,7 +1209,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
                     checked={priorityTier === tierOption}
                     onChange={() => setPriorityTier(tierOption)}
                   />
-                  <span style={{ fontSize: '13px', fontWeight: 600, color: '#0f172a' }}>{tierOption}</span>
+                  <span style={{ fontSize: '13px', fontWeight: 600, color: COLORS.slate900 }}>{tierOption}</span>
                 </label>
               ))}
             </div>
@@ -1241,7 +1242,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
             <p style={modalSubtitleStyle}>{addToEventModalTicket.property?.address}</p>
 
             {openEventOptions.length === 0 ? (
-              <p style={{ margin: '16px 0', fontSize: '13px', color: '#94a3b8', fontStyle: 'italic' }}>
+              <p style={{ margin: '16px 0', fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>
                 No open Events yet -- create one from the Events page first.
               </p>
             ) : (
@@ -1281,21 +1282,21 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
                 <p style={modalTitleStyle}>History — Ticket #{historyModalTicket.ticket_number}</p>
                 <p style={modalSubtitleStyle}>{historyModalTicket.property?.address}</p>
               </div>
-              <button onClick={closeHistoryModal} style={{ background: 'none', border: 'none', fontSize: '20px', color: '#94a3b8', cursor: 'pointer', lineHeight: 1 }}>×</button>
+              <button onClick={closeHistoryModal} style={{ background: 'none', border: 'none', fontSize: '20px', color: COLORS.slate400, cursor: 'pointer', lineHeight: 1 }}>×</button>
             </div>
 
             <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {historyEvents.length === 0 && (
-                <p style={{ fontSize: '13px', color: '#94a3b8' }}>No status changes recorded for this ticket yet.</p>
+                <p style={{ fontSize: '13px', color: COLORS.slate400 }}>No status changes recorded for this ticket yet.</p>
               )}
               {historyEvents.map(e => (
-                <div key={e.id} style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '10px 12px' }}>
+                <div key={e.id} style={{ border: `1px solid ${COLORS.slate200}`, borderRadius: '10px', padding: '10px 12px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px', gap: '8px' }}>
-                    <span style={{ fontSize: '11px', fontWeight: 800, color: '#1d4ed8', background: '#eff6ff', padding: '2px 8px', borderRadius: '20px' }}>{e.action}</span>
-                    <span style={{ fontSize: '11px', color: '#94a3b8', whiteSpace: 'nowrap' }}>{formatUKDateTime(e.created_at)}</span>
+                    <span style={{ fontSize: '11px', fontWeight: 800, color: COLORS.blue700, background: COLORS.blue50, padding: '2px 8px', borderRadius: '20px' }}>{e.action}</span>
+                    <span style={{ fontSize: '11px', color: COLORS.slate400, whiteSpace: 'nowrap' }}>{formatUKDateTime(e.created_at)}</span>
                   </div>
-                  <p style={{ margin: '0 0 4px 0', fontSize: '13px', color: '#475569' }}>{e.summary}</p>
-                  <span style={{ fontSize: '11px', color: '#94a3b8' }}>by {e.actor_name}</span>
+                  <p style={{ margin: '0 0 4px 0', fontSize: '13px', color: COLORS.slate600 }}>{e.summary}</p>
+                  <span style={{ fontSize: '11px', color: COLORS.slate400 }}>by {e.actor_name}</span>
                 </div>
               ))}
             </div>
@@ -1316,29 +1317,29 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
                 <p style={modalTitleStyle}>Comments — Ticket #{commentsModalTicket.ticket_number}</p>
                 <p style={modalSubtitleStyle}>{commentsModalTicket.property?.address}</p>
               </div>
-              <button onClick={closeCommentsModal} style={{ background: 'none', border: 'none', fontSize: '20px', color: '#94a3b8', cursor: 'pointer', lineHeight: 1 }}>×</button>
+              <button onClick={closeCommentsModal} style={{ background: 'none', border: 'none', fontSize: '20px', color: COLORS.slate400, cursor: 'pointer', lineHeight: 1 }}>×</button>
             </div>
 
-            <p style={{ margin: '16px 0 8px 0', fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Comments ({comments.length})</p>
+            <p style={{ margin: '16px 0 8px 0', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Comments ({comments.length})</p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '320px', overflowY: 'auto' }}>
               {comments.length === 0 && (
-                <p style={{ fontSize: '13px', color: '#94a3b8', fontStyle: 'italic', textAlign: 'center', padding: '12px 0' }}>No comments yet. Start the conversation about this job.</p>
+                <p style={{ fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic', textAlign: 'center', padding: '12px 0' }}>No comments yet. Start the conversation about this job.</p>
               )}
               {comments.map(c => {
                 const badge = roleBadgeStyle(c.role)
                 return (
-                  <div key={c.id} style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '10px 12px' }}>
+                  <div key={c.id} style={{ border: `1px solid ${COLORS.slate200}`, borderRadius: '10px', padding: '10px 12px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px', gap: '8px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontSize: '12px', fontWeight: 700, color: '#0f172a' }}>{c.author_name}</span>
+                        <span style={{ fontSize: '12px', fontWeight: 700, color: COLORS.slate900 }}>{c.author_name}</span>
                         {c.role && (
                           <span style={{ fontSize: '10px', fontWeight: 800, color: badge.color, background: badge.bg, padding: '2px 8px', borderRadius: '20px', textTransform: 'uppercase' }}>{c.role}</span>
                         )}
                       </div>
-                      <span style={{ fontSize: '11px', color: '#94a3b8', whiteSpace: 'nowrap' }}>{formatUKDateTime(c.created_at)}</span>
+                      <span style={{ fontSize: '11px', color: COLORS.slate400, whiteSpace: 'nowrap' }}>{formatUKDateTime(c.created_at)}</span>
                     </div>
-                    <p style={{ margin: 0, fontSize: '13px', color: '#475569' }}>{c.body}</p>
+                    <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate600 }}>{c.body}</p>
                   </div>
                 )
               })}

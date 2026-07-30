@@ -48,6 +48,7 @@
 
 import { useState, useEffect, useMemo, Fragment } from 'react'
 import { normalizeCustomRoles } from '../../lib/roles'
+import { COLORS } from '../../lib/colors'
 import { fetchDivisions, saveDivisions, DEFAULT_DIVISIONS } from '../../lib/divisions'
 import { fetchMaintenanceCategories, sortedCategoryEntries } from '../../lib/maintenanceCategories'
 import { supabase } from '../../lib/supabase'
@@ -70,18 +71,18 @@ const ERROR_TYPE_LABELS = {
 const BUILT_IN_ROLES = ['Admin', 'Builder', 'Cleaner', 'Support Worker']
 
 const ROLE_STYLES = {
-  'Admin': { bg: '#dbeafe', color: '#1e3a8a' },
-  'Builder': { bg: '#ccfbf1', color: '#0d9488' },
-  'Cleaner': { bg: '#f3e8ff', color: '#9333ea' },
-  'Support Worker': { bg: '#fef3c7', color: '#d97706' },
+  'Admin': { bg: COLORS.blue100, color: COLORS.blue900 },
+  'Builder': { bg: COLORS.teal100, color: COLORS.teal600 },
+  'Cleaner': { bg: COLORS.purple100, color: COLORS.purple600 },
+  'Support Worker': { bg: COLORS.amber100, color: COLORS.amber600 },
 }
-const CUSTOM_ROLE_STYLE = { bg: '#f1f5f9', color: '#64748b' }
+const CUSTOM_ROLE_STYLE = { bg: COLORS.slate100, color: COLORS.slate500 }
 
 function roleStyle(role) {
   return ROLE_STYLES[role] || CUSTOM_ROLE_STYLE
 }
 
-const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '13px', fontFamily: 'inherit', boxSizing: 'border-box' }
+const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', fontFamily: 'inherit', boxSizing: 'border-box' }
 
 const emptyForm = { name: '', email: '', role: 'Builder', job_title: '', phone: '', skills: [] }
 
@@ -100,19 +101,19 @@ function TempPasswordDisplay({ name, tempPassword }) {
 
   return (
     <div>
-      <p style={{ margin: '0 0 12px 0', fontSize: '13px', color: '#64748b', lineHeight: 1.6 }}>
+      <p style={{ margin: '0 0 12px 0', fontSize: '13px', color: COLORS.slate500, lineHeight: 1.6 }}>
         Give <strong>{name}</strong> this temporary password directly — in person, by phone, or secure message. It will not be shown again.
       </p>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '14px 16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', marginBottom: '12px' }}>
-        <span style={{ flex: 1, fontFamily: 'monospace', fontSize: '20px', fontWeight: 800, color: '#0f172a', letterSpacing: '0.04em' }}>{tempPassword}</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '14px 16px', background: COLORS.slate50, border: `1px solid ${COLORS.slate200}`, borderRadius: '10px', marginBottom: '12px' }}>
+        <span style={{ flex: 1, fontFamily: 'monospace', fontSize: '20px', fontWeight: 800, color: COLORS.slate900, letterSpacing: '0.04em' }}>{tempPassword}</span>
         <button
           onClick={handleCopy}
-          style={{ padding: '8px 14px', background: copied ? '#16a34a' : '#1d4ed8', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
+          style={{ padding: '8px 14px', background: copied ? COLORS.green600 : COLORS.blue700, color: COLORS.white, border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
         >
           {copied ? '✓ Copied' : 'Copy'}
         </button>
       </div>
-      <div style={{ padding: '12px 14px', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '10px', fontSize: '12px', color: '#1e3a8a', lineHeight: 1.5 }}>
+      <div style={{ padding: '12px 14px', background: COLORS.blue50, border: `1px solid ${COLORS.blue200}`, borderRadius: '10px', fontSize: '12px', color: COLORS.blue900, lineHeight: 1.5 }}>
         🔒 When {name} logs in with this, they will be taken straight to a "set new password" screen and cannot access anything else until they do.
       </div>
     </div>
@@ -150,7 +151,7 @@ function ResetPasswordModal({ staff, onClose }) {
         {step === 'confirm' ? (
           <>
             <p style={modalTitleStyle}>Reset Password — {staff.name}</p>
-            <p style={{ margin: '10px 0 0 0', fontSize: '13px', color: '#64748b', lineHeight: 1.6 }}>
+            <p style={{ margin: '10px 0 0 0', fontSize: '13px', color: COLORS.slate500, lineHeight: 1.6 }}>
               This will generate a unique temporary password for <strong>{staff.email}</strong>. It will be shown to you once so you can tell them directly — in person or by phone. They will be forced to set a new password as soon as they log in.
             </p>
             {error && <p style={modalErrorStyle}>{error}</p>}
@@ -168,7 +169,7 @@ function ResetPasswordModal({ staff, onClose }) {
         ) : (
           <>
             <p style={modalTitleStyle}>Temporary Password Generated</p>
-            <p style={{ margin: '2px 0 16px 0', fontSize: '13px', color: '#64748b' }}>{staff.email}</p>
+            <p style={{ margin: '2px 0 16px 0', fontSize: '13px', color: COLORS.slate500 }}>{staff.email}</p>
             <TempPasswordDisplay name={staff.name} tempPassword={tempPassword} />
             <button onClick={onClose} style={{ ...modalConfirmBtnStyle, width: '100%', marginTop: '16px' }}>Done</button>
           </>
@@ -324,7 +325,7 @@ function StaffFormModal({ staff, roleOptions, staffDirectory, onClose, onSaved }
       <div style={modalOverlayStyle}>
         <div style={modalCardStyle}>
           <p style={modalTitleStyle}>Staff Member Added</p>
-          <p style={{ margin: '2px 0 16px 0', fontSize: '13px', color: '#64748b' }}>{createdAccount.staff.email}</p>
+          <p style={{ margin: '2px 0 16px 0', fontSize: '13px', color: COLORS.slate500 }}>{createdAccount.staff.email}</p>
           <TempPasswordDisplay name={createdAccount.staff.name} tempPassword={createdAccount.tempPassword} />
           <button
             onClick={() => onSaved({ ...createdAccount.staff, role: form.role })}
@@ -342,7 +343,7 @@ function StaffFormModal({ staff, roleOptions, staffDirectory, onClose, onSaved }
       <div style={modalCardStyle}>
         <p style={modalTitleStyle}>{staff ? 'Edit Staff Member' : 'Add Staff Member'}</p>
 
-        <p style={{ margin: '0 0 16px 0', fontSize: '12px', color: '#92400e', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', padding: '8px 10px' }}>
+        <p style={{ margin: '0 0 16px 0', fontSize: '12px', color: COLORS.amber800, background: COLORS.amber50, border: `1px solid ${COLORS.amber200}`, borderRadius: '8px', padding: '8px 10px' }}>
           Email, Full Name, Job Title, and Phone are shared with every other company system, not just PMMS. Editing them here is an interim measure until a dedicated IT/HR system takes over managing this data centrally.
         </p>
 
@@ -361,7 +362,7 @@ function StaffFormModal({ staff, roleOptions, staffDirectory, onClose, onSaved }
           </datalist>
         )}
         {!staff && matchedExisting && (
-          <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: '#16a34a', fontWeight: 600 }}>
+          <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: COLORS.green600, fontWeight: 600 }}>
             ✓ Found {matchedExisting.name} in the staff directory — this will assign the role to their existing account, not create a duplicate.
           </p>
         )}
@@ -387,7 +388,7 @@ function StaffFormModal({ staff, roleOptions, staffDirectory, onClose, onSaved }
         <input type="text" value={form.phone} onChange={(e) => set('phone', e.target.value)} style={inputStyle} />
 
         <p style={modalLabelStyle}>Skills</p>
-        <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: '#94a3b8' }}>
+        <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: COLORS.slate400 }}>
           Only affects which maintenance tickets get routed to them. Leave all unchecked if they can do any maintenance job.
         </p>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '4px' }}>
@@ -396,9 +397,9 @@ function StaffFormModal({ staff, roleOptions, staffDirectory, onClose, onSaved }
               key={name}
               style={{
                 display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '20px',
-                border: `1px solid ${form.skills.includes(name) ? '#0f766e' : '#e2e8f0'}`,
-                background: form.skills.includes(name) ? '#f0fdfa' : '#fff',
-                fontSize: '12px', fontWeight: 600, color: form.skills.includes(name) ? '#0f766e' : '#475569', cursor: 'pointer',
+                border: `1px solid ${form.skills.includes(name) ? COLORS.teal700 : COLORS.slate200}`,
+                background: form.skills.includes(name) ? COLORS.teal50 : COLORS.white,
+                fontSize: '12px', fontWeight: 600, color: form.skills.includes(name) ? COLORS.teal700 : COLORS.slate600, cursor: 'pointer',
               }}
             >
               <input type="checkbox" checked={form.skills.includes(name)} onChange={() => toggleSkill(name)} />
@@ -531,10 +532,10 @@ function RolesPanel({ staffList, customRoles, customRolesError, onRolesChanged, 
   const staffCountForRole = (role) => staffList.filter(s => s.role === role).length
 
   return (
-    <div style={{ background: '#fff', borderRadius: '16px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-      <p style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: 800, color: '#0f172a' }}>Roles</p>
+    <div style={{ background: COLORS.white, borderRadius: '16px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+      <p style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: 800, color: COLORS.slate900 }}>Roles</p>
 
-      <p style={{ margin: '0 0 8px 0', fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Built-in</p>
+      <p style={{ margin: '0 0 8px 0', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Built-in</p>
       <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '16px' }}>
         {BUILT_IN_ROLES.map(r => {
           const style = roleStyle(r)
@@ -544,16 +545,16 @@ function RolesPanel({ staffList, customRoles, customRolesError, onRolesChanged, 
         })}
       </div>
 
-      <p style={{ margin: '0 0 8px 0', fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Divisions</p>
+      <p style={{ margin: '0 0 8px 0', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Divisions</p>
       <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '8px' }}>
         {divisions.map(d => (
-          <span key={d} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 700, color: '#1e3a8a', background: '#dbeafe', padding: '4px 6px 4px 12px', borderRadius: '20px' }}>
+          <span key={d} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 700, color: COLORS.blue900, background: COLORS.blue100, padding: '4px 6px 4px 12px', borderRadius: '20px' }}>
             {d}
             {d !== 'Maintenance' && (
               <button
                 onClick={() => handleDeleteDivision(d)}
                 title="Remove from the picklist -- roles/categories already tagged with this division keep working, they just won't offer it as a choice anymore"
-                style={{ background: 'none', border: 'none', color: '#1e3a8a', fontSize: '12px', fontWeight: 800, cursor: 'pointer', padding: '0 2px' }}
+                style={{ background: 'none', border: 'none', color: COLORS.blue900, fontSize: '12px', fontWeight: 800, cursor: 'pointer', padding: '0 2px' }}
               >
                 ✕
               </button>
@@ -572,13 +573,13 @@ function RolesPanel({ staffList, customRoles, customRolesError, onRolesChanged, 
           />
           {divisionError && <p style={modalErrorStyle}>{divisionError}</p>}
           <div style={{ display: 'flex', gap: '8px' }}>
-            <button onClick={() => { setAddingDivision(false); setNewDivisionName(''); setDivisionError('') }} style={{ flex: 1, padding: '8px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>
+            <button onClick={() => { setAddingDivision(false); setNewDivisionName(''); setDivisionError('') }} style={{ flex: 1, padding: '8px', background: COLORS.slate100, color: COLORS.slate600, border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>
               Cancel
             </button>
             <button
               onClick={handleAddDivision}
               disabled={savingDivision}
-              style={{ flex: 1, padding: '8px', background: '#1e3a8a', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: savingDivision ? 'not-allowed' : 'pointer', opacity: savingDivision ? 0.6 : 1 }}
+              style={{ flex: 1, padding: '8px', background: COLORS.blue900, color: COLORS.white, border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: savingDivision ? 'not-allowed' : 'pointer', opacity: savingDivision ? 0.6 : 1 }}
             >
               {savingDivision ? 'Saving...' : 'Save'}
             </button>
@@ -587,32 +588,32 @@ function RolesPanel({ staffList, customRoles, customRolesError, onRolesChanged, 
       ) : (
         <button
           onClick={() => setAddingDivision(true)}
-          style={{ width: '100%', padding: '8px', marginBottom: '16px', background: '#fff', color: '#1e3a8a', border: '1px solid #bfdbfe', borderRadius: '10px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
+          style={{ width: '100%', padding: '8px', marginBottom: '16px', background: COLORS.white, color: COLORS.blue900, border: `1px solid ${COLORS.blue200}`, borderRadius: '10px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
         >
           ＋ Add Division
         </button>
       )}
 
-      <p style={{ margin: '0 0 8px 0', fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Custom</p>
+      <p style={{ margin: '0 0 8px 0', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Custom</p>
 
       {customRolesError && (
-        <p style={{ margin: '0 0 10px 0', fontSize: '12px', color: '#dc2626' }}>{customRolesError}</p>
+        <p style={{ margin: '0 0 10px 0', fontSize: '12px', color: COLORS.red600 }}>{customRolesError}</p>
       )}
 
       {customRoles.length === 0 && !customRolesError && (
-        <p style={{ margin: '0 0 10px 0', fontSize: '13px', color: '#94a3b8', fontStyle: 'italic' }}>No custom roles yet.</p>
+        <p style={{ margin: '0 0 10px 0', fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>No custom roles yet.</p>
       )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '12px' }}>
         {customRoles.map(r => (
-          <div key={r.name} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', padding: '6px 10px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '12px', fontWeight: 700, color: '#0f172a' }}>{r.name}</span>
+          <div key={r.name} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', padding: '6px 10px', background: COLORS.slate50, border: `1px solid ${COLORS.slate200}`, borderRadius: '10px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '12px', fontWeight: 700, color: COLORS.slate900 }}>{r.name}</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <select
                 value={r.accessLevel}
                 onChange={(e) => handleChangeAccessLevel(r.name, e.target.value)}
                 title="What logging in with this role grants, on top of Job Title"
-                style={{ fontSize: '11px', fontWeight: 700, padding: '4px 6px', borderRadius: '6px', border: '1px solid #e2e8f0', background: '#fff', color: '#475569', cursor: 'pointer' }}
+                style={{ fontSize: '11px', fontWeight: 700, padding: '4px 6px', borderRadius: '6px', border: `1px solid ${COLORS.slate200}`, background: COLORS.white, color: COLORS.slate600, cursor: 'pointer' }}
               >
                 {Object.entries(ACCESS_LEVEL_LABELS).map(([value, label]) => (
                   <option key={value} value={value}>{label}</option>
@@ -622,14 +623,14 @@ function RolesPanel({ staffList, customRoles, customRolesError, onRolesChanged, 
                 value={r.division || ''}
                 onChange={(e) => handleChangeDivision(r.name, e.target.value)}
                 title="Scopes this role's database access to one division (e.g. a Housekeeping Manager only ever sees Housekeeping tickets). None = unscoped, full access."
-                style={{ fontSize: '11px', fontWeight: 700, padding: '4px 6px', borderRadius: '6px', border: '1px solid #e2e8f0', background: '#fff', color: '#475569', cursor: 'pointer' }}
+                style={{ fontSize: '11px', fontWeight: 700, padding: '4px 6px', borderRadius: '6px', border: `1px solid ${COLORS.slate200}`, background: COLORS.white, color: COLORS.slate600, cursor: 'pointer' }}
               >
                 <option value="">No division</option>
                 {divisions.map(d => <option key={d} value={d}>{d}</option>)}
               </select>
               <label
                 title="Removes the Settings tab from the nav for this role. UI-only -- does not restrict database access."
-                style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 700, color: '#64748b', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 700, color: COLORS.slate500, cursor: 'pointer', whiteSpace: 'nowrap' }}
               >
                 <input
                   type="checkbox"
@@ -640,7 +641,7 @@ function RolesPanel({ staffList, customRoles, customRolesError, onRolesChanged, 
               </label>
               <label
                 title="Lets this role create a new Event (the Compliance/Landlord Liaison ticket-coordination feature). Any manager can still add a ticket to an existing Event regardless of this setting."
-                style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 700, color: '#64748b', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 700, color: COLORS.slate500, cursor: 'pointer', whiteSpace: 'nowrap' }}
               >
                 <input
                   type="checkbox"
@@ -651,7 +652,7 @@ function RolesPanel({ staffList, customRoles, customRolesError, onRolesChanged, 
               </label>
               <button
                 onClick={() => setDeleteTarget(r.name)}
-                style={{ background: 'none', border: 'none', color: '#dc2626', fontSize: '14px', fontWeight: 800, cursor: 'pointer', padding: '2px 6px' }}
+                style={{ background: 'none', border: 'none', color: COLORS.red600, fontSize: '14px', fontWeight: 800, cursor: 'pointer', padding: '2px 6px' }}
                 aria-label={`Delete role ${r.name}`}
               >
                 ✕
@@ -689,13 +690,13 @@ function RolesPanel({ staffList, customRoles, customRolesError, onRolesChanged, 
           </select>
           {error && <p style={modalErrorStyle}>{error}</p>}
           <div style={{ display: 'flex', gap: '8px' }}>
-            <button onClick={() => { setAdding(false); setNewRole(''); setError('') }} style={{ flex: 1, padding: '8px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>
+            <button onClick={() => { setAdding(false); setNewRole(''); setError('') }} style={{ flex: 1, padding: '8px', background: COLORS.slate100, color: COLORS.slate600, border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>
               Cancel
             </button>
             <button
               onClick={handleAddRole}
               disabled={saving}
-              style={{ flex: 1, padding: '8px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.6 : 1 }}
+              style={{ flex: 1, padding: '8px', background: COLORS.green600, color: COLORS.white, border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.6 : 1 }}
             >
               {saving ? 'Saving...' : 'Save'}
             </button>
@@ -704,7 +705,7 @@ function RolesPanel({ staffList, customRoles, customRolesError, onRolesChanged, 
       ) : (
         <button
           onClick={() => setAdding(true)}
-          style={{ width: '100%', padding: '10px', background: '#1e3a8a', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}
+          style={{ width: '100%', padding: '10px', background: COLORS.blue900, color: COLORS.white, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}
         >
           ＋ Add Role
         </button>
@@ -715,18 +716,18 @@ function RolesPanel({ staffList, customRoles, customRolesError, onRolesChanged, 
           <div style={{ ...modalCardStyle, maxWidth: '380px' }}>
             <p style={modalTitleStyle}>Delete Role "{deleteTarget}"</p>
             {staffCountForRole(deleteTarget) > 0 ? (
-              <p style={{ margin: '10px 0 0 0', fontSize: '13px', color: '#d97706', fontWeight: 600 }}>
+              <p style={{ margin: '10px 0 0 0', fontSize: '13px', color: COLORS.amber600, fontWeight: 600 }}>
                 ⚠ {staffCountForRole(deleteTarget)} staff member{staffCountForRole(deleteTarget) === 1 ? '' : 's'} currently have this role. They will keep the label on their record, but it will no longer appear as a filter tab.
               </p>
             ) : (
-              <p style={{ margin: '10px 0 0 0', fontSize: '13px', color: '#64748b' }}>No staff currently use this role.</p>
+              <p style={{ margin: '10px 0 0 0', fontSize: '13px', color: COLORS.slate500 }}>No staff currently use this role.</p>
             )}
             <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
               <button onClick={() => setDeleteTarget(null)} style={modalCancelBtnStyle}>Cancel</button>
               <button
                 onClick={handleDeleteRole}
                 disabled={deleting}
-                style={{ flex: 2, padding: '10px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: deleting ? 'not-allowed' : 'pointer', opacity: deleting ? 0.6 : 1 }}
+                style={{ flex: 2, padding: '10px', background: COLORS.red600, color: COLORS.white, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: deleting ? 'not-allowed' : 'pointer', opacity: deleting ? 0.6 : 1 }}
               >
                 {deleting ? 'Deleting...' : 'Delete Role'}
               </button>
@@ -780,23 +781,23 @@ function LoginActivityPanel({ events }) {
         onClick={() => setIsOpen(prev => !prev)}
         style={{
           display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between', gap: '12px',
-          padding: '14px 20px', background: '#fff', border: 'none', borderRadius: '16px',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.06)', cursor: 'pointer', fontSize: '14px', fontWeight: 800, color: '#0f172a',
+          padding: '14px 20px', background: COLORS.white, border: 'none', borderRadius: '16px',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.06)', cursor: 'pointer', fontSize: '14px', fontWeight: 800, color: COLORS.slate900,
         }}
       >
         <span>Recent Login Activity ({events.length})</span>
-        <span style={{ fontSize: '13px', fontWeight: 700, color: '#94a3b8' }}>{isOpen ? '▲ Collapse' : '▼ Expand'}</span>
+        <span style={{ fontSize: '13px', fontWeight: 700, color: COLORS.slate400 }}>{isOpen ? '▲ Collapse' : '▼ Expand'}</span>
       </button>
       {isOpen && (
-        <div style={{ background: '#fff', borderRadius: '16px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', marginTop: '10px' }}>
-          <p style={{ margin: '0 0 12px 0', fontSize: '12px', color: '#94a3b8' }}>Most recent {LOGIN_EVENTS_LIMIT} sign-ins/sign-outs, newest first.</p>
+        <div style={{ background: COLORS.white, borderRadius: '16px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', marginTop: '10px' }}>
+          <p style={{ margin: '0 0 12px 0', fontSize: '12px', color: COLORS.slate400 }}>Most recent {LOGIN_EVENTS_LIMIT} sign-ins/sign-outs, newest first.</p>
           {events.length === 0 ? (
-            <p style={{ margin: 0, fontSize: '13px', color: '#94a3b8', fontStyle: 'italic' }}>No login activity recorded yet.</p>
+            <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>No login activity recorded yet.</p>
           ) : (
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
-                  <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+                  <tr style={{ borderBottom: `1px solid ${COLORS.slate200}` }}>
                     <th style={thStyle}>Staff</th>
                     <th style={thStyle}>Event</th>
                     <th style={thStyle}>Time</th>
@@ -805,13 +806,13 @@ function LoginActivityPanel({ events }) {
                 </thead>
                 <tbody>
                   {events.map(e => (
-                    <tr key={e.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                    <tr key={e.id} style={{ borderBottom: `1px solid ${COLORS.slate100}` }}>
                       <td style={tdStyle}>{e.staff_name || e.email}</td>
                       <td style={tdStyle}>
                         <span style={{
                           fontSize: '11px', fontWeight: 700, padding: '3px 10px', borderRadius: '20px',
-                          color: e.event_type === 'Signed In' ? '#16a34a' : '#64748b',
-                          background: e.event_type === 'Signed In' ? '#dcfce7' : '#f1f5f9',
+                          color: e.event_type === 'Signed In' ? COLORS.green600 : COLORS.slate500,
+                          background: e.event_type === 'Signed In' ? COLORS.green100 : COLORS.slate100,
                         }}>
                           {e.event_type}
                         </span>
@@ -831,10 +832,10 @@ function LoginActivityPanel({ events }) {
 }
 
 const ERROR_TYPE_STYLES = {
-  js_error: { bg: '#fee2e2', color: '#dc2626' },
-  unhandled_rejection: { bg: '#fef3c7', color: '#d97706' },
-  react_render: { bg: '#f3e8ff', color: '#9333ea' },
-  supabase_query: { bg: '#dbeafe', color: '#1e3a8a' },
+  js_error: { bg: COLORS.red100, color: COLORS.red600 },
+  unhandled_rejection: { bg: COLORS.amber100, color: COLORS.amber600 },
+  react_render: { bg: COLORS.purple100, color: COLORS.purple600 },
+  supabase_query: { bg: COLORS.blue100, color: COLORS.blue900 },
 }
 
 // Collapsible (unlike LoginActivityPanel, which is always visible) since
@@ -852,25 +853,25 @@ function ErrorLogsPanel({ logs }) {
         onClick={() => setIsOpen(prev => !prev)}
         style={{
           display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between', gap: '12px',
-          padding: '14px 20px', background: '#fff', border: 'none', borderRadius: '16px',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.06)', cursor: 'pointer', fontSize: '14px', fontWeight: 800, color: '#0f172a',
+          padding: '14px 20px', background: COLORS.white, border: 'none', borderRadius: '16px',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.06)', cursor: 'pointer', fontSize: '14px', fontWeight: 800, color: COLORS.slate900,
         }}
       >
         <span>Error &amp; Crash Log ({logs.length})</span>
-        <span style={{ fontSize: '13px', fontWeight: 700, color: '#94a3b8' }}>{isOpen ? '▲ Collapse' : '▼ Expand'}</span>
+        <span style={{ fontSize: '13px', fontWeight: 700, color: COLORS.slate400 }}>{isOpen ? '▲ Collapse' : '▼ Expand'}</span>
       </button>
       {isOpen && (
-        <div style={{ background: '#fff', borderRadius: '16px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', marginTop: '10px' }}>
-          <p style={{ margin: '0 0 12px 0', fontSize: '12px', color: '#94a3b8' }}>
+        <div style={{ background: COLORS.white, borderRadius: '16px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', marginTop: '10px' }}>
+          <p style={{ margin: '0 0 12px 0', fontSize: '12px', color: COLORS.slate400 }}>
             Most recent {ERROR_LOGS_LIMIT} JS crashes and failed queries, newest first. Cleared automatically after 30 days. Click a row for details.
           </p>
           {logs.length === 0 ? (
-            <p style={{ margin: 0, fontSize: '13px', color: '#94a3b8', fontStyle: 'italic' }}>No errors recorded. Good sign.</p>
+            <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>No errors recorded. Good sign.</p>
           ) : (
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
-                  <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+                  <tr style={{ borderBottom: `1px solid ${COLORS.slate200}` }}>
                     <th style={thStyle}>Type</th>
                     <th style={thStyle}>Message</th>
                     <th style={thStyle}>Time</th>
@@ -879,13 +880,13 @@ function ErrorLogsPanel({ logs }) {
                 </thead>
                 <tbody>
                   {logs.map(log => {
-                    const style = ERROR_TYPE_STYLES[log.error_type] || { bg: '#f1f5f9', color: '#64748b' }
+                    const style = ERROR_TYPE_STYLES[log.error_type] || { bg: COLORS.slate100, color: COLORS.slate500 }
                     const isExpanded = expandedId === log.id
                     return (
                       <Fragment key={log.id}>
                         <tr
                           onClick={() => setExpandedId(isExpanded ? null : log.id)}
-                          style={{ borderBottom: '1px solid #f1f5f9', cursor: 'pointer', background: isExpanded ? '#f8fafc' : undefined }}
+                          style={{ borderBottom: `1px solid ${COLORS.slate100}`, cursor: 'pointer', background: isExpanded ? COLORS.slate50 : undefined }}
                         >
                           <td style={tdStyle}>
                             <span style={{ fontSize: '11px', fontWeight: 700, padding: '3px 10px', borderRadius: '20px', color: style.color, background: style.bg }}>
@@ -897,13 +898,13 @@ function ErrorLogsPanel({ logs }) {
                           <td style={tdStyle}>{log.staff_name || log.email || 'Unknown'}</td>
                         </tr>
                         {isExpanded && (
-                          <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
-                            <td colSpan={4} style={{ padding: '12px 8px', background: '#f8fafc' }}>
+                          <tr style={{ borderBottom: `1px solid ${COLORS.slate100}` }}>
+                            <td colSpan={4} style={{ padding: '12px 8px', background: COLORS.slate50 }}>
                               {log.stack && (
-                                <pre style={{ margin: '0 0 8px 0', fontSize: '11px', color: '#475569', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{log.stack}</pre>
+                                <pre style={{ margin: '0 0 8px 0', fontSize: '11px', color: COLORS.slate600, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{log.stack}</pre>
                               )}
                               {log.context && (
-                                <pre style={{ margin: 0, fontSize: '11px', color: '#475569', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{JSON.stringify(log.context, null, 2)}</pre>
+                                <pre style={{ margin: 0, fontSize: '11px', color: COLORS.slate600, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{JSON.stringify(log.context, null, 2)}</pre>
                               )}
                             </td>
                           </tr>
@@ -1062,15 +1063,15 @@ export default function AdminAccess({ profile }) {
 
   if (profile?.role !== 'admin') {
     return (
-      <div style={{ background: '#fff', borderRadius: '16px', padding: '32px', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-        <p style={{ margin: 0, fontSize: '14px', color: '#94a3b8', fontStyle: 'italic' }}>This page is only available to Admins.</p>
+      <div style={{ background: COLORS.white, borderRadius: '16px', padding: '32px', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+        <p style={{ margin: 0, fontSize: '14px', color: COLORS.slate400, fontStyle: 'italic' }}>This page is only available to Admins.</p>
       </div>
     )
   }
 
   if (loading) return (
     <div style={{ minHeight: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <p style={{ color: '#94a3b8', fontWeight: 600, fontFamily: 'system-ui' }}>Loading staff...</p>
+      <p style={{ color: COLORS.slate400, fontWeight: 600, fontFamily: 'system-ui' }}>Loading staff...</p>
     </div>
   )
 
@@ -1102,7 +1103,7 @@ export default function AdminAccess({ profile }) {
       <div
         key={s.id}
         style={{
-          background: '#fff', borderRadius: '16px', padding: '14px 20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+          background: COLORS.white, borderRadius: '16px', padding: '14px 20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
           opacity: isActive ? 1 : 0.55,
         }}
       >
@@ -1111,20 +1112,20 @@ export default function AdminAccess({ profile }) {
           <div style={{ flex: '2 1 220px', minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '4px' }}>
               {onDuty && (
-                <span title="On Duty" style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#16a34a', flexShrink: 0 }} />
+                <span title="On Duty" style={{ width: '8px', height: '8px', borderRadius: '50%', background: COLORS.green600, flexShrink: 0 }} />
               )}
-              <span style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>{s.name}</span>
+              <span style={{ fontSize: '14px', fontWeight: 700, color: COLORS.slate900 }}>{s.name}</span>
               {s.role && (
                 <span style={{ fontSize: '10px', fontWeight: 700, color: rStyle.color, background: rStyle.bg, padding: '2px 8px', borderRadius: '20px' }}>{s.role}</span>
               )}
               <span style={{
                 fontSize: '10px', fontWeight: 700, padding: '2px 8px', borderRadius: '20px',
-                color: isActive ? '#16a34a' : '#64748b', background: isActive ? '#dcfce7' : '#f1f5f9',
+                color: isActive ? COLORS.green600 : COLORS.slate500, background: isActive ? COLORS.green100 : COLORS.slate100,
               }}>
                 {isActive ? 'Active' : 'Inactive'}
               </span>
             </div>
-            <span style={{ fontSize: '12px', color: '#64748b' }}>{s.email}</span>
+            <span style={{ fontSize: '12px', color: COLORS.slate500 }}>{s.email}</span>
           </div>
 
           <div style={{ display: 'flex', gap: '8px', flexShrink: 0, flexWrap: 'wrap' }}>
@@ -1143,15 +1144,15 @@ export default function AdminAccess({ profile }) {
   return (
     <div>
       <div style={{ marginBottom: '16px' }}>
-        <h1 style={{ margin: '0 0 4px 0', fontSize: '18px', fontWeight: 800, color: '#0f172a' }}>Admin</h1>
-        <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>Add, edit, activate/deactivate staff accounts, and manage roles. Use the "Unassigned" tab to bring someone new in from the wider staff list. Day-to-day duty monitoring lives on the Staff page.</p>
+        <h1 style={{ margin: '0 0 4px 0', fontSize: '18px', fontWeight: 800, color: COLORS.slate900 }}>Admin</h1>
+        <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate500 }}>Add, edit, activate/deactivate staff accounts, and manage roles. Use the "Unassigned" tab to bring someone new in from the wider staff list. Day-to-day duty monitoring lives on the Staff page.</p>
       </div>
 
       {autoReassignSummary && (
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px',
-          background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '12px',
-          padding: '12px 16px', marginBottom: '16px', fontSize: '13px', color: '#1e3a8a',
+          background: COLORS.blue50, border: `1px solid ${COLORS.blue200}`, borderRadius: '12px',
+          padding: '12px 16px', marginBottom: '16px', fontSize: '13px', color: COLORS.blue900,
         }}>
           <span>
             <strong>{autoReassignSummary.staffName}</strong> was deactivated.{' '}
@@ -1162,7 +1163,7 @@ export default function AdminAccess({ profile }) {
           </span>
           <button
             onClick={() => setAutoReassignSummary(null)}
-            style={{ background: 'none', border: 'none', color: '#1e3a8a', fontWeight: 700, fontSize: '13px', cursor: 'pointer', whiteSpace: 'nowrap' }}
+            style={{ background: 'none', border: 'none', color: COLORS.blue900, fontWeight: 700, fontSize: '13px', cursor: 'pointer', whiteSpace: 'nowrap' }}
           >
             Dismiss
           </button>
@@ -1174,7 +1175,7 @@ export default function AdminAccess({ profile }) {
         <div style={{ flex: '2 1 480px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '14px', flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-              <p style={{ margin: 0, fontSize: '14px', fontWeight: 800, color: '#0f172a' }}>Staff List</p>
+              <p style={{ margin: 0, fontSize: '14px', fontWeight: 800, color: COLORS.slate900 }}>Staff List</p>
               <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)} style={filterSelectStyle}>
                 {filterTabs.map(tab => (
                   <option key={tab} value={tab}>{tab}</option>
@@ -1183,15 +1184,15 @@ export default function AdminAccess({ profile }) {
             </div>
             <button
               onClick={() => setModalStaff(null)}
-              style={{ padding: '9px 16px', background: '#0f766e', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
+              style={{ padding: '9px 16px', background: COLORS.teal700, color: COLORS.white, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
             >
               ＋ Add Staff Member
             </button>
           </div>
 
           {filteredStaff.length === 0 ? (
-            <div style={{ background: '#fff', borderRadius: '16px', padding: '32px', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-              <p style={{ margin: 0, fontSize: '14px', color: '#94a3b8', fontStyle: 'italic' }}>No staff found.</p>
+            <div style={{ background: COLORS.white, borderRadius: '16px', padding: '32px', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+              <p style={{ margin: 0, fontSize: '14px', color: COLORS.slate400, fontStyle: 'italic' }}>No staff found.</p>
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -1205,8 +1206,8 @@ export default function AdminAccess({ profile }) {
                 onClick={() => setDeactivatedOpen(prev => !prev)}
                 style={{
                   display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between', gap: '12px',
-                  padding: '10px 14px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px',
-                  cursor: 'pointer', fontSize: '13px', fontWeight: 700, color: '#64748b',
+                  padding: '10px 14px', background: COLORS.slate50, border: `1px solid ${COLORS.slate200}`, borderRadius: '10px',
+                  cursor: 'pointer', fontSize: '13px', fontWeight: 700, color: COLORS.slate500,
                 }}
               >
                 <span>Deactivated Staff ({deactivatedStaff.length})</span>

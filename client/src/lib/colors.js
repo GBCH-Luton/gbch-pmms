@@ -57,17 +57,23 @@ export const COLORS = {
   // Amber (warning / due soon / procured)
   amber50: '#fffbeb',
   amber100: '#fef3c7',
+  amber200: '#fde68a',
   amber300: '#fcd34d',
+  amber500: '#f59e0b',
   amber600: '#d97706',
   amber700: '#b45309',
   amber800: '#92400e',
   amber900: '#78350f',
+  orange50: '#fff7ed',
   orange100: '#ffedd5',
+  orange200: '#fed7aa',
   orange700: '#c2410c',
+  orange900: '#7c2d12',
 
   // Blue (primary / links / info)
   blue50: '#eff6ff',
   blue100: '#dbeafe',
+  blue200: '#bfdbfe',
   blue400: '#60a5fa',
   blue500: '#3b82f6',
   blue600: '#2563eb',
