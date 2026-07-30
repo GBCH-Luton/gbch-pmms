@@ -38,7 +38,13 @@ export default function AdminStock() {
 
       <div style={{ background: COLORS.white, borderRadius: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
         {loading ? (
-          <p style={{ margin: 0, padding: '24px', fontSize: '13px', color: COLORS.slate400 }}>Loading...</p>
+          <div style={{ minHeight: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <p style={{ color: COLORS.slate400, fontWeight: 600, fontFamily: 'system-ui' }}>Loading stock...</p>
+          </div>
+        ) : items.length === 0 ? (
+          <div style={{ minHeight: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <p style={{ margin: 0, fontSize: '14px', color: COLORS.slate400, fontStyle: 'italic' }}>No stock items found.</p>
+          </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -82,7 +88,7 @@ export default function AdminStock() {
           </div>
         )}
       </div>
-      {!loading && (
+      {!loading && items.length > 0 && (
         <p style={{ margin: '12px 4px 0 4px', fontSize: '12px', color: COLORS.slate400 }}>Showing {items.length} of {items.length} items</p>
       )}
     </div>

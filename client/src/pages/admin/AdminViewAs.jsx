@@ -98,7 +98,11 @@ export default function AdminViewAs({ profile }) {
     // to the target's dashboard -- no navigation call needed here.
   }
 
-  if (loading) return <p style={{ padding: '24px', color: COLORS.slate500 }}>Loading...</p>
+  if (loading) return (
+    <div style={{ minHeight: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <p style={{ color: COLORS.slate400, fontWeight: 600, fontFamily: 'system-ui' }}>Loading staff...</p>
+    </div>
+  )
 
   return (
     <div style={{ padding: '24px' }}>
@@ -145,7 +149,7 @@ export default function AdminViewAs({ profile }) {
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={3} style={{ ...tdStyle, textAlign: 'center', color: COLORS.slate400, padding: '24px' }}>
+                <td colSpan={3} style={{ ...tdStyle, textAlign: 'center', color: COLORS.slate400, fontStyle: 'italic', padding: '24px' }}>
                   No eligible staff members found.
                 </td>
               </tr>
