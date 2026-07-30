@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react'
+import { COLORS } from '../lib/colors'
 
 // Shared by AdminTeamChat.jsx and BuilderDashboard.jsx's Team Chat view.
 // Mentions are tracked structurally as you pick them from the dropdown
@@ -88,7 +89,7 @@ export default function ChatComposer({ members, onSend, sending, placeholder, se
       {mentionQuery !== null && matches.length > 0 && (
         <div style={{
           position: 'absolute', bottom: '100%', left: 0, marginBottom: '6px',
-          background: '#fff', border: '1px solid #e2e8f0', borderRadius: '10px',
+          background: COLORS.white, border: `1px solid ${COLORS.slate200}`, borderRadius: '10px',
           boxShadow: '0 8px 20px rgba(0,0,0,0.12)', overflow: 'hidden', minWidth: '160px', zIndex: 20,
         }}>
           {matches.map(m => (
@@ -97,8 +98,8 @@ export default function ChatComposer({ members, onSend, sending, placeholder, se
               onClick={() => pickMention(m)}
               style={{
                 display: 'block', width: '100%', textAlign: 'left', padding: '8px 12px',
-                background: 'none', border: 'none', borderBottom: '1px solid #f1f5f9',
-                fontSize: '13px', fontWeight: 600, color: '#0f172a', cursor: 'pointer',
+                background: 'none', border: 'none', borderBottom: `1px solid ${COLORS.slate100}`,
+                fontSize: '13px', fontWeight: 600, color: COLORS.slate900, cursor: 'pointer',
               }}
             >
               @{m.name}
@@ -108,11 +109,11 @@ export default function ChatComposer({ members, onSend, sending, placeholder, se
       )}
       {photoPreview && (
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-          <img src={photoPreview} alt="" style={{ width: '48px', height: '48px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
+          <img src={photoPreview} alt="" style={{ width: '48px', height: '48px', objectFit: 'cover', borderRadius: '8px', border: `1px solid ${COLORS.slate200}` }} />
           <button
             onClick={removePhoto}
             aria-label="Remove photo"
-            style={{ background: '#f1f5f9', border: 'none', borderRadius: '999px', width: '22px', height: '22px', fontSize: '12px', color: '#64748b', cursor: 'pointer' }}
+            style={{ background: COLORS.slate100, border: 'none', borderRadius: '999px', width: '22px', height: '22px', fontSize: '12px', color: COLORS.slate500, cursor: 'pointer' }}
           >
             ✕
           </button>

@@ -1,4 +1,5 @@
 import logo from '../assets/gbch-logo.svg'
+import { COLORS } from '../lib/colors'
 
 // Shown while the app checks for a saved login session -- same background as
 // Login so the transition into it feels seamless rather than a jump cut.
@@ -6,7 +7,7 @@ export default function SplashScreen() {
   return (
     <div style={{
       minHeight: '100%',
-      background: 'linear-gradient(160deg, #0D1B3E 0%, #0A2444 60%, #0D2F5E 100%)',
+      background: `linear-gradient(160deg, ${COLORS.brandNavy} 0%, ${COLORS.brandNavyMid} 60%, ${COLORS.brandNavyLight} 100%)`,
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -23,7 +24,7 @@ export default function SplashScreen() {
           style={{ height: '56px', width: 'auto', marginBottom: '14px', position: 'relative', animation: 'splashFadeInUp 0.7s ease-out both' }}
         />
         <h1 style={{
-          fontSize: '32px', fontWeight: 800, color: '#ffffff', margin: '0 0 6px 0',
+          fontSize: '32px', fontWeight: 800, color: COLORS.white, margin: '0 0 6px 0',
           letterSpacing: '-0.03em', lineHeight: 1, animation: 'splashFadeInUp 0.7s ease-out 0.15s both',
         }}>
           PMMS
@@ -36,7 +37,7 @@ export default function SplashScreen() {
         </p>
         <div style={{ width: '140px', height: '3px', background: 'rgba(255,255,255,0.1)', borderRadius: '999px', overflow: 'hidden', margin: '0 auto' }}>
           <div style={{
-            height: '100%', background: 'linear-gradient(90deg, #2563eb, #60a5fa)', borderRadius: '999px',
+            height: '100%', background: `linear-gradient(90deg, ${COLORS.blue600}, ${COLORS.blue400})`, borderRadius: '999px',
             animation: 'splashBarFill 1.3s ease-out 0.4s both',
           }} />
         </div>

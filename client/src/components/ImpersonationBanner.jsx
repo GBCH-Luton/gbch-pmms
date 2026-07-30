@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { getImpersonationMarker, returnToAdmin } from '../lib/impersonation'
+import { COLORS } from '../lib/colors'
 
 // Rendered once in App.jsx, above <Routes>, rather than duplicated into
 // AdminDashboard.jsx/BuilderDashboard.jsx. BuilderDashboard's main views are
@@ -47,7 +48,7 @@ export default function ImpersonationBanner() {
   return (
     <div ref={barRef} style={{
       position: 'fixed', top: 0, left: 0, right: 0, zIndex: 999999,
-      background: '#b45309', color: '#fff', padding: '8px 16px',
+      background: COLORS.amber700, color: COLORS.white, padding: '8px 16px',
       display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px',
       fontSize: '13px', fontWeight: 700, fontFamily: 'system-ui, sans-serif',
     }}>
@@ -56,7 +57,7 @@ export default function ImpersonationBanner() {
         onClick={handleReturn}
         disabled={returning}
         style={{
-          background: '#fff', color: '#b45309', border: 'none', borderRadius: '6px',
+          background: COLORS.white, color: COLORS.amber700, border: 'none', borderRadius: '6px',
           padding: '4px 12px', fontWeight: 700, cursor: returning ? 'default' : 'pointer',
         }}
       >

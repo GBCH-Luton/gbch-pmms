@@ -1,3 +1,5 @@
+import { COLORS } from '../lib/colors'
+
 // Minimal in-page photo viewer -- click a thumbnail to see it large without
 // navigating away (a new tab loses the chat/page context, which is why a
 // plain target="_blank" link wasn't the right fix). Click anywhere to close.
@@ -17,7 +19,7 @@ export default function PhotoLightbox({ url, onClose }) {
         aria-label="Close"
         style={{
           position: 'absolute', top: '16px', right: '16px', width: '36px', height: '36px', borderRadius: '50%',
-          background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', fontSize: '18px', cursor: 'pointer',
+          background: 'rgba(255,255,255,0.15)', border: 'none', color: COLORS.white, fontSize: '18px', cursor: 'pointer',
         }}
       >
         ✕

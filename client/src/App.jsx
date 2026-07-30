@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { supabase } from './lib/supabase'
+import { COLORS } from './lib/colors'
 import { roleFromJobTitle, normalizeCustomRoles, accessLevelForRole, hideSettingsForRole, divisionForRole, canCreateEventsForRole } from './lib/roles'
 import { logLoginEvent } from './lib/loginEvents'
 import { consumeSuppressSignInLog } from './lib/impersonation'
@@ -187,12 +188,12 @@ export default function App() {
       } />
       <Route path="/no-access" element={
         <div style={{ minHeight: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'system-ui' }}>
-          <p style={{ color: '#64748b', fontWeight: 600 }}>You do not have access to this system.</p>
+          <p style={{ color: COLORS.slate500, fontWeight: 600 }}>You do not have access to this system.</p>
         </div>
       } />
       <Route path="/deactivated" element={
         <div style={{ minHeight: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'system-ui' }}>
-          <p style={{ color: '#64748b', fontWeight: 600 }}>Your account has been deactivated. Contact your admin if you believe this is a mistake.</p>
+          <p style={{ color: COLORS.slate500, fontWeight: 600 }}>Your account has been deactivated. Contact your admin if you believe this is a mistake.</p>
         </div>
       } />
       <Route path="*" element={<Navigate to={session ? homeForRole() : '/login'} replace />} />

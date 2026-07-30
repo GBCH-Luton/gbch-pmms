@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { speechToTextSupported } from '../lib/speechToText'
+import { COLORS } from '../lib/colors'
 
 // One-shot dictation: the browser already waits for a natural pause
 // in speech before firing a single final result, so there's no need
@@ -35,9 +36,9 @@ export default function VoiceInputButton({ onResult }) {
       aria-label={listening ? 'Stop dictation' : 'Dictate'}
       title={listening ? 'Listening…' : 'Tap to speak'}
       style={{
-        background: listening ? '#fee2e2' : 'none', border: 'none', borderRadius: '8px',
+        background: listening ? COLORS.red100 : 'none', border: 'none', borderRadius: '8px',
         fontSize: '18px', cursor: 'pointer', flexShrink: 0, padding: '4px 8px',
-        color: listening ? '#dc2626' : 'inherit',
+        color: listening ? COLORS.red600 : 'inherit',
       }}
     >
       {listening ? '⏹' : '🎤'}

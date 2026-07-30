@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { COLORS } from '../../lib/colors'
 
 // The system's runbook: plain-language answers to "how do I do X" and "what
 // do I do if Y breaks", written for a non-technical admin. Keep every
@@ -240,7 +241,7 @@ const SECTIONS = [
   },
 ]
 
-const inputStyle = { padding: '10px 14px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '13px', fontFamily: 'inherit', boxSizing: 'border-box' }
+const inputStyle = { padding: '10px 14px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', fontFamily: 'inherit', boxSizing: 'border-box' }
 
 function sectionMatchesSearch(section, query) {
   const q = query.toLowerCase()
@@ -250,7 +251,7 @@ function sectionMatchesSearch(section, query) {
 
 function HelpSection({ section, isOpen, onToggle }) {
   return (
-    <div id={`help-section-${section.key}`} style={{ background: '#fff', borderRadius: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', overflow: 'hidden', scrollMarginTop: '16px' }}>
+    <div id={`help-section-${section.key}`} style={{ background: COLORS.white, borderRadius: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', overflow: 'hidden', scrollMarginTop: '16px' }}>
       <button
         onClick={onToggle}
         style={{
@@ -259,15 +260,15 @@ function HelpSection({ section, isOpen, onToggle }) {
         }}
       >
         <span style={{ fontSize: '20px' }}>{section.icon}</span>
-        <span style={{ flex: 1, fontSize: '15px', fontWeight: 800, color: '#0f172a' }}>{section.title}</span>
-        <span style={{ fontSize: '13px', color: '#94a3b8', fontWeight: 700 }}>{isOpen ? '▲' : '▼'}</span>
+        <span style={{ flex: 1, fontSize: '15px', fontWeight: 800, color: COLORS.slate900 }}>{section.title}</span>
+        <span style={{ fontSize: '13px', color: COLORS.slate400, fontWeight: 700 }}>{isOpen ? '▲' : '▼'}</span>
       </button>
       {isOpen && (
         <div style={{ padding: '0 20px 20px 20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
           {section.body.map((item, i) => (
-            <div key={i} style={{ borderTop: '1px solid #f1f5f9', paddingTop: '14px' }}>
-              <p style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>{item.q}</p>
-              <p style={{ margin: 0, fontSize: '13px', color: '#475569', lineHeight: 1.6 }}>{item.a}</p>
+            <div key={i} style={{ borderTop: `1px solid ${COLORS.slate100}`, paddingTop: '14px' }}>
+              <p style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 700, color: COLORS.slate900 }}>{item.q}</p>
+              <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate600, lineHeight: 1.6 }}>{item.a}</p>
             </div>
           ))}
         </div>
@@ -304,8 +305,8 @@ export default function AdminHelp() {
 
   return (
     <div>
-      <h1 style={{ margin: '0 0 4px 0', fontSize: '18px', fontWeight: 800, color: '#0f172a' }}>Help & Guide</h1>
-      <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: '#64748b' }}>
+      <h1 style={{ margin: '0 0 4px 0', fontSize: '18px', fontWeight: 800, color: COLORS.slate900 }}>Help & Guide</h1>
+      <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: COLORS.slate500 }}>
         One section per page in the system -- read a section to understand how that whole page works, not just answers to isolated questions.
       </p>
 
@@ -329,7 +330,7 @@ export default function AdminHelp() {
       </div>
 
       {visibleSections.length === 0 ? (
-        <p style={{ fontSize: '13px', color: '#94a3b8', fontStyle: 'italic' }}>Nothing matches "{trimmedSearch}".</p>
+        <p style={{ fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>Nothing matches "{trimmedSearch}".</p>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {visibleSections.map(section => (

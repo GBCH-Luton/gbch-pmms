@@ -1,3 +1,5 @@
+import { COLORS } from '../lib/colors'
+
 // Small hand-rolled SVG bar chart -- this project has no charting library
 // (@supabase/supabase-js, react, react-dom, react-router-dom are the only
 // runtime deps), so a couple of chart types don't justify pulling one in.
@@ -13,7 +15,7 @@ const GROUP_GAP = 18
 
 export default function SimpleBarChart({ data, series, height = CHART_HEIGHT }) {
   if (!data || data.length === 0) {
-    return <p style={{ margin: 0, fontSize: '13px', color: '#94a3b8', fontStyle: 'italic' }}>No data for this range.</p>
+    return <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>No data for this range.</p>
   }
 
   const maxValue = Math.max(1, ...data.flatMap(d => d.values))
@@ -47,7 +49,7 @@ export default function SimpleBarChart({ data, series, height = CHART_HEIGHT }) 
                   <g key={s.name}>
                     <rect x={x} y={y} width={barWidth} height={barHeight} rx={3} fill={s.color} />
                     {value > 0 && (
-                      <text x={x + barWidth / 2} y={y - 4} textAnchor="middle" fontSize="10" fontWeight="700" fill="#475569">
+                      <text x={x + barWidth / 2} y={y - 4} textAnchor="middle" fontSize="10" fontWeight="700" fill={COLORS.slate600}>
                         {value}
                       </text>
                     )}
@@ -57,13 +59,13 @@ export default function SimpleBarChart({ data, series, height = CHART_HEIGHT }) 
               {rotateLabels ? (
                 <text
                   x={groupX + groupWidth / 2} y={height + 14}
-                  textAnchor="end" fontSize="11" fontWeight="600" fill="#64748b"
+                  textAnchor="end" fontSize="11" fontWeight="600" fill={COLORS.slate500}
                   transform={`rotate(-40 ${groupX + groupWidth / 2} ${height + 14})`}
                 >
                   {d.label}
                 </text>
               ) : (
-                <text x={groupX + groupWidth / 2} y={height + 18} textAnchor="middle" fontSize="11" fontWeight="600" fill="#64748b">
+                <text x={groupX + groupWidth / 2} y={height + 18} textAnchor="middle" fontSize="11" fontWeight="600" fill={COLORS.slate500}>
                   {d.label}
                 </text>
               )}
@@ -76,7 +78,7 @@ export default function SimpleBarChart({ data, series, height = CHART_HEIGHT }) 
           {series.map(s => (
             <div key={s.name} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <span style={{ width: '10px', height: '10px', borderRadius: '3px', background: s.color, display: 'inline-block' }} />
-              <span style={{ fontSize: '12px', fontWeight: 600, color: '#475569' }}>{s.name}</span>
+              <span style={{ fontSize: '12px', fontWeight: 600, color: COLORS.slate600 }}>{s.name}</span>
             </div>
           ))}
         </div>
