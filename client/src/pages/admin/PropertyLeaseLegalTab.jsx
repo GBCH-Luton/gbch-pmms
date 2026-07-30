@@ -298,7 +298,7 @@ export default function PropertyLeaseLegalTab({ property, onFieldsSaved }) {
         property={property}
         onSave={saveFields}
         fields={[
-          { key: 'rent_amount', label: 'Monthly Rent Amount (£)', type: 'number' },
+          { key: 'rent_amount', label: 'Weekly Rent Amount (£)', type: 'number' },
           { key: 'rent_payment_day', label: 'Rent Payment Day (1–31)', type: 'number', min: 1, max: 31 },
           { key: 'deposit_amount', label: 'Deposit Amount (£)', type: 'number' },
           { key: 'deposit_scheme', label: 'Deposit Protection Scheme', type: 'select', options: DEPOSIT_SCHEMES },

@@ -19,7 +19,7 @@ import { supabase } from '../../lib/supabase'
 import {
   priorityTierLabel, priorityBadgeStyle, statusColour, statusLabel, GENDER_RESTRICTION_STYLES,
   modalOverlayStyle, modalCardStyle, modalTitleStyle, modalLabelStyle, modalErrorStyle,
-  modalCancelBtnStyle, modalConfirmBtnStyle, formatUKDateTime, fetchPriorityThresholds,
+  modalCancelBtnStyle, modalConfirmBtnStyle, formatUKDateTime, fetchPriorityThresholds, KpiTiles,
 } from './shared'
 import PropertyCoreTab from './PropertyCoreTab'
 import PropertyComplianceTab from './PropertyComplianceTab'
@@ -415,6 +415,16 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
     filterMode === 'gardensOverdue' ? 'Gardens' :
     null
 
+  // Same 4 metrics/colours as the dashboard's Properties tiles, computed
+  // client-side from the already-fetched `properties` list instead of
+  // separate count queries, since the full list is already in memory here.
+  const propertyKpis = [
+    { label: 'Total Properties', value: properties.length, colour: '#2563eb', mode: 'all' },
+    { label: 'New Properties', value: properties.filter(isNewProperty).length, colour: '#0f766e', mode: 'newProperties' },
+    { label: 'Procured', value: properties.filter(p => p.status === 'Procured').length, colour: '#64748b', mode: 'procured' },
+    { label: 'Live', value: properties.filter(p => p.status === 'Live').length, colour: '#16a34a', mode: 'live' },
+  ]
+
   const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '13px', fontFamily: 'inherit', boxSizing: 'border-box' }
 
   const statusPillStyle = (status) => {
@@ -641,6 +651,8 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
   // ---------------------------------------------------------------------
   return (
     <div>
+      <KpiTiles kpis={propertyKpis} onTileClick={(kpi) => setFilterMode(kpi.mode)} />
+
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
         <input
           type="text"
