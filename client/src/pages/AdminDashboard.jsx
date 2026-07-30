@@ -1,31 +1,35 @@
-import { useState, useEffect, useCallback, useRef, Fragment } from 'react'
+import { useState, useEffect, useCallback, useRef, Fragment, lazy, Suspense } from 'react'
 import { supabase } from '../lib/supabase'
 import { COLORS } from '../lib/colors'
 import { logLoginEvent } from '../lib/loginEvents'
 import { pushNotificationsSupported, hasActivePushSubscription, enablePushNotifications } from '../lib/pushNotifications'
 import gbchLogo from '../assets/gbch-logo.svg'
-import AdminDashboardPage from './admin/AdminDashboard'
-import AdminPipeline from './admin/AdminPipeline'
-import AdminProperties from './admin/AdminProperties'
-import AdminCompliance from './admin/AdminCompliance'
-import AdminVoids from './admin/AdminVoids'
-import AdminSignOff from './admin/AdminSignOff'
-import AdminBuilders from './admin/AdminBuilders'
-import AdminClocking from './admin/AdminClocking'
-import AdminRaiseTicket from './admin/AdminRaiseTicket'
-import AdminStock from './admin/AdminStock'
-import AdminReports from './admin/AdminReports'
-import AdminSettings from './admin/AdminSettings'
-import AdminAccess from './admin/AdminAccess'
-import AdminHelp from './admin/AdminHelp'
-import AdminHousekeeping from './admin/AdminHousekeeping'
-import AdminEvents from './admin/AdminEvents'
-import AdminViewAs from './admin/AdminViewAs'
-import AdminTeamChat from './admin/AdminTeamChat'
 import { EVENTS_FEATURE_ENABLED, resolveStaffPhotoUrl } from './admin/shared'
 import { getImpersonationMarker, returnToAdmin } from '../lib/impersonation'
 import { countUnreadMessages } from '../lib/chat'
 import { fetchDivisions } from '../lib/divisions'
+
+// Lazy-loaded: an admin/manager only ever looks at a handful of these tabs
+// in a given session, so each becomes its own chunk fetched on first visit
+// instead of all 18 admin pages loading up front in the main bundle.
+const AdminDashboardPage = lazy(() => import('./admin/AdminDashboard'))
+const AdminPipeline = lazy(() => import('./admin/AdminPipeline'))
+const AdminProperties = lazy(() => import('./admin/AdminProperties'))
+const AdminCompliance = lazy(() => import('./admin/AdminCompliance'))
+const AdminVoids = lazy(() => import('./admin/AdminVoids'))
+const AdminSignOff = lazy(() => import('./admin/AdminSignOff'))
+const AdminBuilders = lazy(() => import('./admin/AdminBuilders'))
+const AdminClocking = lazy(() => import('./admin/AdminClocking'))
+const AdminRaiseTicket = lazy(() => import('./admin/AdminRaiseTicket'))
+const AdminStock = lazy(() => import('./admin/AdminStock'))
+const AdminReports = lazy(() => import('./admin/AdminReports'))
+const AdminSettings = lazy(() => import('./admin/AdminSettings'))
+const AdminAccess = lazy(() => import('./admin/AdminAccess'))
+const AdminHelp = lazy(() => import('./admin/AdminHelp'))
+const AdminHousekeeping = lazy(() => import('./admin/AdminHousekeeping'))
+const AdminEvents = lazy(() => import('./admin/AdminEvents'))
+const AdminViewAs = lazy(() => import('./admin/AdminViewAs'))
+const AdminTeamChat = lazy(() => import('./admin/AdminTeamChat'))
 
 const NAV_ITEMS = [
   // Grouped by what they're actually for: core ticket lifecycle first,
@@ -428,19 +432,21 @@ export default function AdminDashboard({ profile }) {
 
         {/* Main content */}
         <div style={{ flex: 1, padding: '20px', width: '100%', boxSizing: 'border-box' }}>
-          <ActivePage
-            profile={profile}
-            onTicketsChanged={refreshCounts}
-            onNavigate={goToPage}
-            initialStatusFilter={currentPage === 'pipeline' ? pipelineInitialFilter : null}
-            initialPriorityFilter={currentPage === 'pipeline' ? pipelineInitialPriorityFilter : null}
-            initialStuckFilter={currentPage === 'pipeline' ? pipelineInitialStuckFilter : null}
-            onInitialFilterConsumed={() => { setPipelineInitialFilter(null); setPipelineInitialPriorityFilter(null); setPipelineInitialStuckFilter(null) }}
-            initialPropertiesFilter={currentPage === 'properties' ? propertiesInitialFilter : null}
-            onPropertiesFilterConsumed={() => setPropertiesInitialFilter(null)}
-            initialTierFilter={currentPage === 'compliance' ? complianceInitialTierFilter : currentPage === 'voids' ? voidsInitialTierFilter : null}
-            onInitialTierFilterConsumed={() => { setComplianceInitialTierFilter(null); setVoidsInitialTierFilter(null) }}
-          />
+          <Suspense fallback={<p style={{ color: COLORS.slate400, fontSize: '13px' }}>Loading...</p>}>
+            <ActivePage
+              profile={profile}
+              onTicketsChanged={refreshCounts}
+              onNavigate={goToPage}
+              initialStatusFilter={currentPage === 'pipeline' ? pipelineInitialFilter : null}
+              initialPriorityFilter={currentPage === 'pipeline' ? pipelineInitialPriorityFilter : null}
+              initialStuckFilter={currentPage === 'pipeline' ? pipelineInitialStuckFilter : null}
+              onInitialFilterConsumed={() => { setPipelineInitialFilter(null); setPipelineInitialPriorityFilter(null); setPipelineInitialStuckFilter(null) }}
+              initialPropertiesFilter={currentPage === 'properties' ? propertiesInitialFilter : null}
+              onPropertiesFilterConsumed={() => setPropertiesInitialFilter(null)}
+              initialTierFilter={currentPage === 'compliance' ? complianceInitialTierFilter : currentPage === 'voids' ? voidsInitialTierFilter : null}
+              onInitialTierFilterConsumed={() => { setComplianceInitialTierFilter(null); setVoidsInitialTierFilter(null) }}
+            />
+          </Suspense>
         </div>
       </div>
 

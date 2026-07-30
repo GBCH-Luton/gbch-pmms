@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, lazy, Suspense } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { supabase } from './lib/supabase'
 import { COLORS } from './lib/colors'
@@ -7,10 +7,15 @@ import { logLoginEvent } from './lib/loginEvents'
 import { consumeSuppressSignInLog } from './lib/impersonation'
 import Login from './pages/Login'
 import SetPassword from './pages/SetPassword'
-import AdminDashboard from './pages/AdminDashboard'
-import BuilderDashboard from './pages/BuilderDashboard'
 import SplashScreen from './pages/SplashScreen'
 import ImpersonationBanner from './components/ImpersonationBanner'
+
+// Lazy-loaded so an admin's browser never downloads the builder bundle (and
+// vice versa) -- each becomes its own chunk Vite fetches only once routing
+// actually lands on it, instead of both being in the single main bundle
+// every user downloads regardless of role.
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard'))
+const BuilderDashboard = lazy(() => import('./pages/BuilderDashboard'))
 
 export default function App() {
   const [session, setSession]   = useState(null)
@@ -173,6 +178,7 @@ export default function App() {
           (guaranteed visible, no z-index/layout fights); BuilderDashboard
           has no equivalent chrome yet, so it still needs the banner. */}
       {profile?.role === 'builder' && <ImpersonationBanner />}
+      <Suspense fallback={<SplashScreen />}>
       <Routes>
       <Route path="/login" element={!session ? <Login /> : <Navigate to={homeForRole()} replace />} />
       <Route path="/set-password" element={session ? <SetPassword profile={profile} onDone={() => fetchProfile(session.user.email)} /> : <Navigate to="/login" replace />} />
@@ -198,6 +204,7 @@ export default function App() {
       } />
       <Route path="*" element={<Navigate to={session ? homeForRole() : '/login'} replace />} />
       </Routes>
+      </Suspense>
     </>
   )
 }
