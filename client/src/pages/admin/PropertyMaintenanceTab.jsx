@@ -23,6 +23,7 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
+import { COLORS } from '../../lib/colors'
 import { fetchAllMaintenanceCategoryNames } from '../../lib/maintenanceCategories'
 import {
   priorityTierLabel, priorityBadgeStyle, statusColour, statusLabel, formatUKDate,
@@ -34,7 +35,7 @@ const OVERDUE_DAYS = 7
 
 const tileStyle = (colour) => ({ flex: '1 1 160px', background: colour, borderRadius: '16px', padding: '16px', textAlign: 'center' })
 const tileLabelStyle = { margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase', letterSpacing: '0.06em' }
-const tileValueStyle = { margin: 0, fontSize: '26px', fontWeight: 800, color: '#ffffff' }
+const tileValueStyle = { margin: 0, fontSize: '26px', fontWeight: 800, color: COLORS.white }
 
 export default function PropertyMaintenanceTab({ property }) {
   const [tickets, setTickets] = useState(null)
@@ -66,16 +67,16 @@ export default function PropertyMaintenanceTab({ property }) {
   if (tickets === null) {
     return (
       <div style={{ minHeight: '120px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <p style={{ color: '#94a3b8', fontWeight: 600 }}>Loading work orders...</p>
+        <p style={{ color: COLORS.slate400, fontWeight: 600 }}>Loading work orders...</p>
       </div>
     )
   }
 
   if (loadError) {
     return (
-      <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '16px', padding: '24px', textAlign: 'center' }}>
-        <p style={{ margin: '0 0 4px 0', fontSize: '14px', fontWeight: 700, color: '#dc2626' }}>Couldn't load work orders</p>
-        <p style={{ margin: 0, fontSize: '13px', color: '#7f1d1d', fontFamily: 'monospace' }}>{loadError}</p>
+      <div style={{ background: COLORS.red50, border: `1px solid ${COLORS.red200}`, borderRadius: '16px', padding: '24px', textAlign: 'center' }}>
+        <p style={{ margin: '0 0 4px 0', fontSize: '14px', fontWeight: 700, color: COLORS.red600 }}>Couldn't load work orders</p>
+        <p style={{ margin: 0, fontSize: '13px', color: COLORS.red900, fontFamily: 'monospace' }}>{loadError}</p>
       </div>
     )
   }
@@ -127,23 +128,23 @@ export default function PropertyMaintenanceTab({ property }) {
     <div>
       {/* KPI tiles */}
       <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
-        <div style={tileStyle('#64748b')}>
+        <div style={tileStyle(COLORS.slate500)}>
           <p style={tileLabelStyle}>Total Work Orders</p>
           <p style={tileValueStyle}>{totalCount}</p>
         </div>
-        <div style={tileStyle('#0d9488')}>
+        <div style={tileStyle(COLORS.teal600)}>
           <p style={tileLabelStyle}>Open</p>
           <p style={tileValueStyle}>{openCount}</p>
         </div>
-        <div style={tileStyle('#16a34a')}>
+        <div style={tileStyle(COLORS.green600)}>
           <p style={tileLabelStyle}>Completed</p>
           <p style={tileValueStyle}>{completedCount}</p>
         </div>
-        <div style={tileStyle('#d97706')}>
+        <div style={tileStyle(COLORS.amber600)}>
           <p style={tileLabelStyle}>Overdue (7+ days)</p>
           <p style={tileValueStyle}>{overdueCount}</p>
         </div>
-        <div style={tileStyle('#dc2626')}>
+        <div style={tileStyle(COLORS.red600)}>
           <p style={tileLabelStyle}>Emergency / P1</p>
           <p style={tileValueStyle}>{emergencyCount}</p>
         </div>
@@ -151,20 +152,20 @@ export default function PropertyMaintenanceTab({ property }) {
 
       {/* Recurring issues + Top 5 issues */}
       <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginBottom: '16px' }}>
-        <div style={{ flex: '1 1 320px', background: '#fff', borderRadius: '16px', padding: '18px 20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-          <p style={{ margin: '0 0 12px 0', fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Recurring Issues (by category)</p>
+        <div style={{ flex: '1 1 320px', background: COLORS.white, borderRadius: '16px', padding: '18px 20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+          <p style={{ margin: '0 0 12px 0', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Recurring Issues (by category)</p>
           {recurringIssues.length === 0 ? (
-            <p style={{ margin: 0, fontSize: '13px', color: '#94a3b8', fontStyle: 'italic' }}>No work orders yet.</p>
+            <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>No work orders yet.</p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {recurringIssues.map(([cat, count]) => (
-                <div key={cat} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid #f1f5f9' }}>
-                  <span style={{ fontSize: '13px', fontWeight: 600, color: '#0f172a' }}>{cat}</span>
+                <div key={cat} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: `1px solid ${COLORS.slate100}` }}>
+                  <span style={{ fontSize: '13px', fontWeight: 600, color: COLORS.slate900 }}>{cat}</span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     {count >= 3 && (
-                      <span style={{ fontSize: '10px', fontWeight: 800, color: '#dc2626', background: '#fee2e2', padding: '2px 8px', borderRadius: '20px' }}>⚠ Recurring</span>
+                      <span style={{ fontSize: '10px', fontWeight: 800, color: COLORS.red600, background: COLORS.red100, padding: '2px 8px', borderRadius: '20px' }}>⚠ Recurring</span>
                     )}
-                    <span style={{ fontSize: '13px', fontWeight: 800, color: '#0f172a', fontFamily: 'monospace' }}>{count}</span>
+                    <span style={{ fontSize: '13px', fontWeight: 800, color: COLORS.slate900, fontFamily: 'monospace' }}>{count}</span>
                   </div>
                 </div>
               ))}
@@ -172,16 +173,16 @@ export default function PropertyMaintenanceTab({ property }) {
           )}
         </div>
 
-        <div style={{ flex: '1 1 320px', background: '#fff', borderRadius: '16px', padding: '18px 20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-          <p style={{ margin: '0 0 12px 0', fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Top 5 Issues</p>
+        <div style={{ flex: '1 1 320px', background: COLORS.white, borderRadius: '16px', padding: '18px 20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+          <p style={{ margin: '0 0 12px 0', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Top 5 Issues</p>
           {topIssues.length === 0 ? (
-            <p style={{ margin: 0, fontSize: '13px', color: '#94a3b8', fontStyle: 'italic' }}>No work orders yet.</p>
+            <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>No work orders yet.</p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {topIssues.map(([tag, count], idx) => (
-                <div key={tag} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid #f1f5f9' }}>
-                  <span style={{ fontSize: '13px', fontWeight: 600, color: '#0f172a' }}>{idx + 1}. {tag}</span>
-                  <span style={{ fontSize: '13px', fontWeight: 800, color: '#0f172a', fontFamily: 'monospace' }}>{count}</span>
+                <div key={tag} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: `1px solid ${COLORS.slate100}` }}>
+                  <span style={{ fontSize: '13px', fontWeight: 600, color: COLORS.slate900 }}>{idx + 1}. {tag}</span>
+                  <span style={{ fontSize: '13px', fontWeight: 800, color: COLORS.slate900, fontFamily: 'monospace' }}>{count}</span>
                 </div>
               ))}
             </div>
@@ -190,9 +191,9 @@ export default function PropertyMaintenanceTab({ property }) {
       </div>
 
       {/* Work order history */}
-      <div style={{ background: '#fff', borderRadius: '16px', padding: '18px 20px', marginBottom: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+      <div style={{ background: COLORS.white, borderRadius: '16px', padding: '18px 20px', marginBottom: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '10px' }}>
-          <p style={{ margin: 0, fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+          <p style={{ margin: 0, fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
             Work Order History ({filteredTickets.length})
           </p>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -210,12 +211,12 @@ export default function PropertyMaintenanceTab({ property }) {
         </div>
 
         {filteredTickets.length === 0 ? (
-          <p style={{ margin: 0, fontSize: '13px', color: '#94a3b8', fontStyle: 'italic' }}>No work orders match these filters.</p>
+          <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>No work orders match these filters.</p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
-                <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+                <tr style={{ borderBottom: `1px solid ${COLORS.slate200}` }}>
                   <th style={thStyle}>Ticket</th>
                   <th style={thStyle}>Summary</th>
                   <th style={thStyle}>Category</th>
@@ -230,7 +231,7 @@ export default function PropertyMaintenanceTab({ property }) {
                   const tier = priorityTierLabel(t.priority_score, p1Threshold, p2Threshold)
                   const tierStyle = priorityBadgeStyle(tier)
                   return (
-                    <tr key={t.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                    <tr key={t.id} style={{ borderBottom: `1px solid ${COLORS.slate100}` }}>
                       <td style={tdStyle}>#{t.ticket_number}</td>
                       <td style={tdStyle}>{t.issue_tag || t.description || '—'}</td>
                       <td style={tdStyle}>{t.category || '—'}</td>
@@ -252,28 +253,28 @@ export default function PropertyMaintenanceTab({ property }) {
       </div>
 
       {/* Performance metrics */}
-      <div style={{ background: '#fff', borderRadius: '16px', padding: '18px 20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-        <p style={{ margin: '0 0 12px 0', fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Performance Metrics</p>
+      <div style={{ background: COLORS.white, borderRadius: '16px', padding: '18px 20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+        <p style={{ margin: '0 0 12px 0', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Performance Metrics</p>
         <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
           <div style={{ flex: '1 1 200px' }}>
-            <p style={{ margin: '0 0 4px 0', fontSize: '12px', fontWeight: 700, color: '#94a3b8' }}>Average Response Time</p>
-            <p style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: avgResponseMs != null ? '#0f172a' : '#94a3b8' }}>{avgResponseMs != null ? formatDuration(avgResponseMs) : 'N/A'}</p>
-            <p style={{ margin: '2px 0 0 0', fontSize: '11px', color: '#cbd5e1' }}>Raised → first assigned</p>
+            <p style={{ margin: '0 0 4px 0', fontSize: '12px', fontWeight: 700, color: COLORS.slate400 }}>Average Response Time</p>
+            <p style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: avgResponseMs != null ? COLORS.slate900 : COLORS.slate400 }}>{avgResponseMs != null ? formatDuration(avgResponseMs) : 'N/A'}</p>
+            <p style={{ margin: '2px 0 0 0', fontSize: '11px', color: COLORS.slate300 }}>Raised → first assigned</p>
           </div>
           <div style={{ flex: '1 1 200px' }}>
-            <p style={{ margin: '0 0 4px 0', fontSize: '12px', fontWeight: 700, color: '#94a3b8' }}>Average Completion Time</p>
-            <p style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: avgAssignedToCompleteMs != null ? '#0f172a' : '#94a3b8' }}>{avgAssignedToCompleteMs != null ? formatDuration(avgAssignedToCompleteMs) : 'N/A'}</p>
-            <p style={{ margin: '2px 0 0 0', fontSize: '11px', color: '#cbd5e1' }}>Assigned → completed</p>
+            <p style={{ margin: '0 0 4px 0', fontSize: '12px', fontWeight: 700, color: COLORS.slate400 }}>Average Completion Time</p>
+            <p style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: avgAssignedToCompleteMs != null ? COLORS.slate900 : COLORS.slate400 }}>{avgAssignedToCompleteMs != null ? formatDuration(avgAssignedToCompleteMs) : 'N/A'}</p>
+            <p style={{ margin: '2px 0 0 0', fontSize: '11px', color: COLORS.slate300 }}>Assigned → completed</p>
           </div>
           <div style={{ flex: '1 1 200px' }}>
-            <p style={{ margin: '0 0 4px 0', fontSize: '12px', fontWeight: 700, color: '#94a3b8' }}>First Time Fix Rate</p>
-            <p style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: '#94a3b8' }}>—</p>
-            <p style={{ margin: '2px 0 0 0', fontSize: '11px', color: '#cbd5e1' }}>Requires a revisit_required column, not currently tracked</p>
+            <p style={{ margin: '0 0 4px 0', fontSize: '12px', fontWeight: 700, color: COLORS.slate400 }}>First Time Fix Rate</p>
+            <p style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: COLORS.slate400 }}>—</p>
+            <p style={{ margin: '2px 0 0 0', fontSize: '11px', color: COLORS.slate300 }}>Requires a revisit_required column, not currently tracked</p>
           </div>
           <div style={{ flex: '1 1 200px' }}>
-            <p style={{ margin: '0 0 4px 0', fontSize: '12px', fontWeight: 700, color: '#94a3b8' }}>Avg. Created → Completed</p>
-            <p style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: '#0f172a' }}>{avgTurnaroundHours != null ? `${avgTurnaroundHours} hrs` : 'N/A'}</p>
-            <p style={{ margin: '2px 0 0 0', fontSize: '11px', color: '#cbd5e1' }}>Full raise-to-completion turnaround, available with existing data</p>
+            <p style={{ margin: '0 0 4px 0', fontSize: '12px', fontWeight: 700, color: COLORS.slate400 }}>Avg. Created → Completed</p>
+            <p style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: COLORS.slate900 }}>{avgTurnaroundHours != null ? `${avgTurnaroundHours} hrs` : 'N/A'}</p>
+            <p style={{ margin: '2px 0 0 0', fontSize: '11px', color: COLORS.slate300 }}>Full raise-to-completion turnaround, available with existing data</p>
           </div>
         </div>
       </div>

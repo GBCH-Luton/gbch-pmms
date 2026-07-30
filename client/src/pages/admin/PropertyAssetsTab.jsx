@@ -27,6 +27,7 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
+import { COLORS } from '../../lib/colors'
 import {
   modalOverlayStyle, modalCardStyle, modalTitleStyle, modalLabelStyle, modalErrorStyle,
   modalCancelBtnStyle, modalConfirmBtnStyle, formatUKDate,
@@ -38,12 +39,12 @@ const CURRENT_STATUSES = ['Operational', 'Needs Repair', 'End of Life']
 const MAINTENANCE_FREQUENCIES = ['Annual', '6-Monthly', 'Monthly', 'As Required']
 
 const STATUS_STYLES = {
-  'Operational': { bg: '#dcfce7', color: '#16a34a' },
-  'Needs Repair': { bg: '#fef3c7', color: '#d97706' },
-  'End of Life': { bg: '#fee2e2', color: '#dc2626' },
+  'Operational': { bg: COLORS.green100, color: COLORS.green600 },
+  'Needs Repair': { bg: COLORS.amber100, color: COLORS.amber600 },
+  'End of Life': { bg: COLORS.red100, color: COLORS.red600 },
 }
 
-const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '13px', fontFamily: 'inherit', boxSizing: 'border-box' }
+const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', fontFamily: 'inherit', boxSizing: 'border-box' }
 
 function computeNextService(lastServiceDate, frequency) {
   if (!lastServiceDate) return null
@@ -228,8 +229,8 @@ function AssetFormModal({ property, asset, onClose, onSaved, onDeleted }) {
             {form.warranty_end && (
               <span style={{
                 display: 'inline-block', marginTop: '6px', fontSize: '10px', fontWeight: 800, padding: '2px 10px', borderRadius: '20px',
-                color: new Date(form.warranty_end) >= warrantyToday ? '#16a34a' : '#dc2626',
-                background: new Date(form.warranty_end) >= warrantyToday ? '#dcfce7' : '#fee2e2',
+                color: new Date(form.warranty_end) >= warrantyToday ? COLORS.green600 : COLORS.red600,
+                background: new Date(form.warranty_end) >= warrantyToday ? COLORS.green100 : COLORS.red100,
               }}>
                 {new Date(form.warranty_end) >= warrantyToday ? 'In Warranty' : 'Expired'}
               </span>
@@ -256,7 +257,7 @@ function AssetFormModal({ property, asset, onClose, onSaved, onDeleted }) {
           </div>
           <div>
             <p style={modalLabelStyle}>Next Service Date</p>
-            <input type="text" readOnly value={nextService ? formatUKDate(nextService.toISOString()) : '—'} style={{ ...inputStyle, background: '#f8fafc', color: '#64748b' }} />
+            <input type="text" readOnly value={nextService ? formatUKDate(nextService.toISOString()) : '—'} style={{ ...inputStyle, background: COLORS.slate50, color: COLORS.slate500 }} />
           </div>
 
           <div style={{ gridColumn: '1 / -1' }}>
@@ -283,7 +284,7 @@ function AssetFormModal({ property, asset, onClose, onSaved, onDeleted }) {
             <button
               onClick={() => document.getElementById('asset-photo-input').click()}
               disabled={uploading}
-              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '2px dashed #cbd5e1', background: '#fff', color: '#64748b', fontSize: '13px', fontWeight: 600, cursor: uploading ? 'not-allowed' : 'pointer' }}
+              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `2px dashed ${COLORS.slate300}`, background: COLORS.white, color: COLORS.slate500, fontSize: '13px', fontWeight: 600, cursor: uploading ? 'not-allowed' : 'pointer' }}
             >
               {uploading ? 'Uploading...' : form.asset_photo_url ? 'Change photo' : 'Upload photo'}
             </button>
@@ -293,14 +294,14 @@ function AssetFormModal({ property, asset, onClose, onSaved, onDeleted }) {
         {error && <p style={modalErrorStyle}>{error}</p>}
 
         {confirmingDelete ? (
-          <div style={{ marginTop: '16px', padding: '14px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px' }}>
-            <p style={{ margin: '0 0 12px 0', fontSize: '13px', fontWeight: 700, color: '#7f1d1d' }}>Delete this asset? This cannot be undone.</p>
+          <div style={{ marginTop: '16px', padding: '14px', background: COLORS.red50, border: `1px solid ${COLORS.red200}`, borderRadius: '10px' }}>
+            <p style={{ margin: '0 0 12px 0', fontSize: '13px', fontWeight: 700, color: COLORS.red900 }}>Delete this asset? This cannot be undone.</p>
             <div style={{ display: 'flex', gap: '10px' }}>
               <button onClick={() => setConfirmingDelete(false)} style={modalCancelBtnStyle}>Cancel</button>
               <button
                 onClick={handleDelete}
                 disabled={deleting}
-                style={{ flex: 2, padding: '10px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: deleting ? 'not-allowed' : 'pointer', opacity: deleting ? 0.6 : 1 }}
+                style={{ flex: 2, padding: '10px', background: COLORS.red600, color: COLORS.white, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: deleting ? 'not-allowed' : 'pointer', opacity: deleting ? 0.6 : 1 }}
               >
                 {deleting ? 'Deleting...' : 'Delete Asset'}
               </button>
@@ -312,7 +313,7 @@ function AssetFormModal({ property, asset, onClose, onSaved, onDeleted }) {
             {asset && (
               <button
                 onClick={() => setConfirmingDelete(true)}
-                style={{ padding: '10px 16px', background: '#fff', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}
+                style={{ padding: '10px 16px', background: COLORS.white, color: COLORS.red600, border: `1px solid ${COLORS.red200}`, borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}
               >
                 Delete
               </button>
@@ -337,9 +338,9 @@ function AssetCard({ asset, onOpen }) {
   const statusStyle = STATUS_STYLES[asset.current_status] || STATUS_STYLES['Operational']
 
   return (
-    <div style={{ background: '#fff', borderRadius: '16px', padding: '18px 20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+    <div style={{ background: COLORS.white, borderRadius: '16px', padding: '18px 20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px', marginBottom: '10px', flexWrap: 'wrap' }}>
-        <p style={{ margin: 0, fontSize: '15px', fontWeight: 800, color: '#0f172a' }}>{asset.asset_name}</p>
+        <p style={{ margin: 0, fontSize: '15px', fontWeight: 800, color: COLORS.slate900 }}>{asset.asset_name}</p>
         <span style={{ fontSize: '11px', fontWeight: 800, color: statusStyle.color, background: statusStyle.bg, padding: '3px 10px', borderRadius: '20px', whiteSpace: 'nowrap' }}>
           {asset.current_status || 'Operational'}
         </span>
@@ -347,23 +348,23 @@ function AssetCard({ asset, onOpen }) {
 
       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px' }}>
         {asset.asset_category && (
-          <span style={{ fontSize: '10px', fontWeight: 700, color: '#1d4ed8', background: '#dbeafe', padding: '2px 8px', borderRadius: '20px' }}>{asset.asset_category}</span>
+          <span style={{ fontSize: '10px', fontWeight: 700, color: COLORS.blue700, background: COLORS.blue100, padding: '2px 8px', borderRadius: '20px' }}>{asset.asset_category}</span>
         )}
         {replace && (
-          <span style={{ fontSize: '10px', fontWeight: 800, color: '#c2410c', background: '#ffedd5', padding: '2px 8px', borderRadius: '20px' }}>⚠ Consider Replace</span>
+          <span style={{ fontSize: '10px', fontWeight: 800, color: COLORS.orange700, background: COLORS.orange100, padding: '2px 8px', borderRadius: '20px' }}>⚠ Consider Replace</span>
         )}
       </div>
 
-      <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '4px' }}>
-        Last service: <strong style={{ color: '#0f172a' }}>{asset.last_service_date ? formatUKDate(asset.last_service_date) : '—'}</strong>
+      <div style={{ fontSize: '12px', color: COLORS.slate500, marginBottom: '4px' }}>
+        Last service: <strong style={{ color: COLORS.slate900 }}>{asset.last_service_date ? formatUKDate(asset.last_service_date) : '—'}</strong>
       </div>
-      <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '14px' }}>
-        Next service: <strong style={{ color: '#0f172a' }}>{nextService ? formatUKDate(nextService.toISOString()) : '—'}</strong>
+      <div style={{ fontSize: '12px', color: COLORS.slate500, marginBottom: '14px' }}>
+        Next service: <strong style={{ color: COLORS.slate900 }}>{nextService ? formatUKDate(nextService.toISOString()) : '—'}</strong>
       </div>
 
       <button
         onClick={() => onOpen(asset)}
-        style={{ width: '100%', padding: '9px', background: '#0f766e', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}
+        style={{ width: '100%', padding: '9px', background: COLORS.teal700, color: COLORS.white, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}
       >
         View / Edit
       </button>
@@ -418,7 +419,7 @@ export default function PropertyAssetsTab({ property }) {
   if (loading) {
     return (
       <div style={{ minHeight: '120px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <p style={{ color: '#94a3b8', fontWeight: 600 }}>Loading assets...</p>
+        <p style={{ color: COLORS.slate400, fontWeight: 600 }}>Loading assets...</p>
       </div>
     )
   }
@@ -426,25 +427,25 @@ export default function PropertyAssetsTab({ property }) {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-        <p style={{ margin: 0, fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+        <p style={{ margin: 0, fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
           Assets ({assets.length})
         </p>
         <button
           onClick={() => setModalAsset(null)}
-          style={{ padding: '10px 18px', background: '#0f766e', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}
+          style={{ padding: '10px 18px', background: COLORS.teal700, color: COLORS.white, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}
         >
           ＋ Add Asset
         </button>
       </div>
 
       {loadError ? (
-        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '16px', padding: '24px', textAlign: 'center' }}>
-          <p style={{ margin: '0 0 4px 0', fontSize: '14px', fontWeight: 700, color: '#dc2626' }}>Couldn't load assets</p>
-          <p style={{ margin: 0, fontSize: '13px', color: '#7f1d1d', fontFamily: 'monospace' }}>{loadError}</p>
+        <div style={{ background: COLORS.red50, border: `1px solid ${COLORS.red200}`, borderRadius: '16px', padding: '24px', textAlign: 'center' }}>
+          <p style={{ margin: '0 0 4px 0', fontSize: '14px', fontWeight: 700, color: COLORS.red600 }}>Couldn't load assets</p>
+          <p style={{ margin: 0, fontSize: '13px', color: COLORS.red900, fontFamily: 'monospace' }}>{loadError}</p>
         </div>
       ) : assets.length === 0 ? (
-        <div style={{ background: '#fff', borderRadius: '16px', padding: '40px', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-          <p style={{ margin: 0, fontSize: '14px', color: '#94a3b8', fontStyle: 'italic' }}>No assets recorded for this property yet.</p>
+        <div style={{ background: COLORS.white, borderRadius: '16px', padding: '40px', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+          <p style={{ margin: 0, fontSize: '14px', color: COLORS.slate400, fontStyle: 'italic' }}>No assets recorded for this property yet.</p>
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '12px' }}>

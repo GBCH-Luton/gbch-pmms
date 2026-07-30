@@ -38,6 +38,7 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
+import { COLORS } from '../../lib/colors'
 import {
   modalOverlayStyle, modalCardStyle, modalTitleStyle, modalLabelStyle, modalErrorStyle,
   modalCancelBtnStyle, modalConfirmBtnStyle, formatUKDate,
@@ -47,11 +48,11 @@ const ROOM_TYPES = ['Bedroom', 'Bathroom', 'Kitchen', 'Living Room', 'Other']
 const BED_TYPES = ['Single', 'Double', 'Twin', 'Bunk']
 
 const STATUS_STYLES = {
-  Occupied: { bg: '#dcfce7', color: '#16a34a' },
-  Void: { bg: '#fef3c7', color: '#d97706' },
+  Occupied: { bg: COLORS.green100, color: COLORS.green600 },
+  Void: { bg: COLORS.amber100, color: COLORS.amber600 },
 }
 
-const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '13px', fontFamily: 'inherit', boxSizing: 'border-box' }
+const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', fontFamily: 'inherit', boxSizing: 'border-box' }
 
 function todayIso() {
   return new Date().toISOString().slice(0, 10)
@@ -232,10 +233,10 @@ function MarkVoidModal({ room, onClose, onSaved }) {
       <div style={{ ...modalCardStyle, maxWidth: '380px' }}>
         <p style={modalTitleStyle}>Mark "{room.room_name}" as Void</p>
 
-        <p style={{ margin: '0 0 12px 0', fontSize: '13px', color: '#64748b' }}>
+        <p style={{ margin: '0 0 12px 0', fontSize: '13px', color: COLORS.slate500 }}>
           Bed Type: {room.bed_type
-            ? <strong style={{ color: '#0f172a' }}>{room.bed_type}</strong>
-            : <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>Not set</span>}
+            ? <strong style={{ color: COLORS.slate900 }}>{room.bed_type}</strong>
+            : <span style={{ color: COLORS.slate400, fontStyle: 'italic' }}>Not set</span>}
         </p>
 
         <p style={modalLabelStyle}>Move-out Date</p>
@@ -251,7 +252,7 @@ function MarkVoidModal({ room, onClose, onSaved }) {
           <button
             onClick={handleConfirm}
             disabled={saving}
-            style={{ flex: 2, padding: '10px', background: '#d97706', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.6 : 1 }}
+            style={{ flex: 2, padding: '10px', background: COLORS.amber600, color: COLORS.white, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.6 : 1 }}
           >
             {saving ? 'Saving...' : 'Confirm Void'}
           </button>
@@ -311,7 +312,7 @@ function MarkOccupiedModal({ room, onClose, onSaved }) {
           <button
             onClick={handleConfirm}
             disabled={saving}
-            style={{ flex: 2, padding: '10px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.6 : 1 }}
+            style={{ flex: 2, padding: '10px', background: COLORS.green600, color: COLORS.white, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.6 : 1 }}
           >
             {saving ? 'Saving...' : 'Confirm Occupied'}
           </button>
@@ -348,26 +349,26 @@ function RoomHistoryModal({ room, onClose }) {
         <div style={{ marginTop: '12px', maxHeight: '360px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {error && <p style={modalErrorStyle}>{error}</p>}
           {history === null && !error && (
-            <p style={{ margin: 0, fontSize: '13px', color: '#94a3b8' }}>Loading...</p>
+            <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate400 }}>Loading...</p>
           )}
           {history && history.length === 0 && (
-            <p style={{ margin: 0, fontSize: '13px', color: '#94a3b8', fontStyle: 'italic' }}>No history recorded for this room yet.</p>
+            <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>No history recorded for this room yet.</p>
           )}
           {history && history.map(h => {
             const isMoveIn = h.action === 'Moved In'
             return (
-              <div key={h.id} style={{ border: '1px solid #e2e8f0', borderRadius: '10px', padding: '10px 12px' }}>
+              <div key={h.id} style={{ border: `1px solid ${COLORS.slate200}`, borderRadius: '10px', padding: '10px 12px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
                   <span style={{
                     fontSize: '11px', fontWeight: 800, padding: '2px 10px', borderRadius: '20px',
-                    color: isMoveIn ? '#16a34a' : '#dc2626', background: isMoveIn ? '#dcfce7' : '#fee2e2',
+                    color: isMoveIn ? COLORS.green600 : COLORS.red600, background: isMoveIn ? COLORS.green100 : COLORS.red100,
                   }}>
                     {h.action}
                   </span>
-                  <span style={{ fontSize: '12px', color: '#94a3b8' }}>{formatUKDate(h.action_date)}</span>
+                  <span style={{ fontSize: '12px', color: COLORS.slate400 }}>{formatUKDate(h.action_date)}</span>
                 </div>
-                {h.tenant_name && <p style={{ margin: '0 0 2px 0', fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>{h.tenant_name}</p>}
-                {h.notes && <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>{h.notes}</p>}
+                {h.tenant_name && <p style={{ margin: '0 0 2px 0', fontSize: '13px', fontWeight: 700, color: COLORS.slate900 }}>{h.tenant_name}</p>}
+                {h.notes && <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate500 }}>{h.notes}</p>}
               </div>
             )
           })}
@@ -385,9 +386,9 @@ function RoomCard({ room, onEdit, onMarkVoid, onMarkOccupied, onViewHistory }) {
   const statusStyle = STATUS_STYLES[room.current_status] || STATUS_STYLES.Occupied
 
   return (
-    <div style={{ background: '#fff', borderRadius: '16px', padding: '18px 20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+    <div style={{ background: COLORS.white, borderRadius: '16px', padding: '18px 20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px', marginBottom: '10px', flexWrap: 'wrap' }}>
-        <p style={{ margin: 0, fontSize: '15px', fontWeight: 800, color: '#0f172a' }}>{room.room_name}</p>
+        <p style={{ margin: 0, fontSize: '15px', fontWeight: 800, color: COLORS.slate900 }}>{room.room_name}</p>
         <span style={{ fontSize: '11px', fontWeight: 800, color: statusStyle.color, background: statusStyle.bg, padding: '3px 10px', borderRadius: '20px', whiteSpace: 'nowrap' }}>
           {room.current_status}
         </span>
@@ -395,16 +396,16 @@ function RoomCard({ room, onEdit, onMarkVoid, onMarkOccupied, onViewHistory }) {
 
       <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '12px' }}>
         {room.room_type && (
-          <span style={{ display: 'inline-block', fontSize: '10px', fontWeight: 700, color: '#1d4ed8', background: '#dbeafe', padding: '2px 8px', borderRadius: '20px' }}>
+          <span style={{ display: 'inline-block', fontSize: '10px', fontWeight: 700, color: COLORS.blue700, background: COLORS.blue100, padding: '2px 8px', borderRadius: '20px' }}>
             {room.room_type}
           </span>
         )}
         {room.bed_type ? (
-          <span style={{ display: 'inline-block', fontSize: '10px', fontWeight: 700, color: '#7c3aed', background: '#ede9fe', padding: '2px 8px', borderRadius: '20px' }}>
+          <span style={{ display: 'inline-block', fontSize: '10px', fontWeight: 700, color: COLORS.violet600, background: COLORS.violet100, padding: '2px 8px', borderRadius: '20px' }}>
             {room.bed_type}
           </span>
         ) : (
-          <span style={{ display: 'inline-block', fontSize: '10px', color: '#94a3b8', fontStyle: 'italic', padding: '2px 8px' }}>
+          <span style={{ display: 'inline-block', fontSize: '10px', color: COLORS.slate400, fontStyle: 'italic', padding: '2px 8px' }}>
             Bed type not set
           </span>
         )}
@@ -412,28 +413,28 @@ function RoomCard({ room, onEdit, onMarkVoid, onMarkOccupied, onViewHistory }) {
 
       <div style={{ marginBottom: '14px' }}>
         {room.current_status === 'Occupied' ? (
-          <p style={{ margin: 0, fontSize: '13px', color: '#0f172a' }}>Tenant: <strong>{room.tenant_name || '—'}</strong></p>
+          <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate900 }}>Tenant: <strong>{room.tenant_name || '—'}</strong></p>
         ) : (
-          <p style={{ margin: 0, fontSize: '13px', color: '#d97706', fontWeight: 600 }}>
+          <p style={{ margin: 0, fontSize: '13px', color: COLORS.amber600, fontWeight: 600 }}>
             Void since {room.void_since ? formatUKDate(room.void_since) : '—'}
           </p>
         )}
       </div>
 
       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-        <button onClick={() => onEdit(room)} style={{ flex: '1 1 80px', padding: '8px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>
+        <button onClick={() => onEdit(room)} style={{ flex: '1 1 80px', padding: '8px', background: COLORS.slate100, color: COLORS.slate600, border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>
           Edit
         </button>
         {room.current_status === 'Occupied' ? (
-          <button onClick={() => onMarkVoid(room)} style={{ flex: '1 1 110px', padding: '8px', background: '#fffbeb', color: '#92400e', border: '1px solid #fcd34d', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>
+          <button onClick={() => onMarkVoid(room)} style={{ flex: '1 1 110px', padding: '8px', background: COLORS.amber50, color: COLORS.amber800, border: `1px solid ${COLORS.amber300}`, borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>
             Mark as Void
           </button>
         ) : (
-          <button onClick={() => onMarkOccupied(room)} style={{ flex: '1 1 130px', padding: '8px', background: '#f0fdf4', color: '#166534', border: '1px solid #bbf7d0', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>
+          <button onClick={() => onMarkOccupied(room)} style={{ flex: '1 1 130px', padding: '8px', background: COLORS.green50, color: COLORS.green800, border: `1px solid ${COLORS.green200}`, borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>
             Mark as Occupied
           </button>
         )}
-        <button onClick={() => onViewHistory(room)} style={{ flex: '1 1 100px', padding: '8px', background: '#fff', color: '#64748b', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>
+        <button onClick={() => onViewHistory(room)} style={{ flex: '1 1 100px', padding: '8px', background: COLORS.white, color: COLORS.slate500, border: `1px solid ${COLORS.slate200}`, borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>
           View History
         </button>
       </div>
@@ -489,16 +490,16 @@ export default function PropertyRoomsTab({ property }) {
   if (loading) {
     return (
       <div style={{ minHeight: '120px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <p style={{ color: '#94a3b8', fontWeight: 600 }}>Loading rooms...</p>
+        <p style={{ color: COLORS.slate400, fontWeight: 600 }}>Loading rooms...</p>
       </div>
     )
   }
 
   if (loadError) {
     return (
-      <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '16px', padding: '24px', textAlign: 'center' }}>
-        <p style={{ margin: '0 0 4px 0', fontSize: '14px', fontWeight: 700, color: '#dc2626' }}>Couldn't load rooms</p>
-        <p style={{ margin: 0, fontSize: '13px', color: '#7f1d1d', fontFamily: 'monospace' }}>{loadError}</p>
+      <div style={{ background: COLORS.red50, border: `1px solid ${COLORS.red200}`, borderRadius: '16px', padding: '24px', textAlign: 'center' }}>
+        <p style={{ margin: '0 0 4px 0', fontSize: '14px', fontWeight: 700, color: COLORS.red600 }}>Couldn't load rooms</p>
+        <p style={{ margin: 0, fontSize: '13px', color: COLORS.red900, fontFamily: 'monospace' }}>{loadError}</p>
       </div>
     )
   }
@@ -513,29 +514,29 @@ export default function PropertyRoomsTab({ property }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
           <div>
-            <span style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>Total Rooms</span>
-            <p style={{ margin: 0, fontSize: '20px', fontWeight: 800, color: '#0f172a' }}>{totalRooms}</p>
+            <span style={{ fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase' }}>Total Rooms</span>
+            <p style={{ margin: 0, fontSize: '20px', fontWeight: 800, color: COLORS.slate900 }}>{totalRooms}</p>
           </div>
           <div>
-            <span style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>Occupied</span>
-            <p style={{ margin: 0, fontSize: '20px', fontWeight: 800, color: '#16a34a' }}>{occupiedCount}</p>
+            <span style={{ fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase' }}>Occupied</span>
+            <p style={{ margin: 0, fontSize: '20px', fontWeight: 800, color: COLORS.green600 }}>{occupiedCount}</p>
           </div>
           <div>
-            <span style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>Void</span>
-            <p style={{ margin: 0, fontSize: '20px', fontWeight: 800, color: '#d97706' }}>{voidCount}</p>
+            <span style={{ fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase' }}>Void</span>
+            <p style={{ margin: 0, fontSize: '20px', fontWeight: 800, color: COLORS.amber600 }}>{voidCount}</p>
           </div>
         </div>
         <button
           onClick={() => setModalRoom(null)}
-          style={{ padding: '10px 18px', background: '#1e3a8a', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
+          style={{ padding: '10px 18px', background: COLORS.blue900, color: COLORS.white, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
         >
           ＋ Add Room
         </button>
       </div>
 
       {rooms.length === 0 ? (
-        <div style={{ background: '#fff', borderRadius: '16px', padding: '40px', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-          <p style={{ margin: 0, fontSize: '14px', color: '#94a3b8', fontStyle: 'italic' }}>No rooms recorded for this property yet.</p>
+        <div style={{ background: COLORS.white, borderRadius: '16px', padding: '40px', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+          <p style={{ margin: 0, fontSize: '14px', color: COLORS.slate400, fontStyle: 'italic' }}>No rooms recorded for this property yet.</p>
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '12px' }}>

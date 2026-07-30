@@ -14,6 +14,7 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
+import { COLORS } from '../../lib/colors'
 import { modalLabelStyle, modalErrorStyle, fetchAssignableStaffForCategory } from './shared'
 import { compressImage } from '../../lib/imageCompression'
 
@@ -23,10 +24,10 @@ const PROPERTY_STATUSES = ['Occupied', 'Void', 'Procured', 'Live']
 const UNIT_LAYOUT_TYPES = ['Studio', '1-Bed', '2-Bed', '3-Bed', '4-Bed', '5-Bed', 'HMO', 'Other']
 const CONSTRUCTION_TYPES = ['Brick', 'Timber Frame', 'Concrete', 'Other']
 
-const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '13px', fontFamily: 'inherit', boxSizing: 'border-box' }
-const readRowStyle = { display: 'flex', justifyContent: 'space-between', gap: '12px', padding: '8px 0', borderBottom: '1px solid #f1f5f9' }
-const readLabelStyle = { fontSize: '12px', fontWeight: 700, color: '#94a3b8' }
-const readValueStyle = { fontSize: '13px', fontWeight: 600, color: '#0f172a', textAlign: 'right' }
+const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', fontFamily: 'inherit', boxSizing: 'border-box' }
+const readRowStyle = { display: 'flex', justifyContent: 'space-between', gap: '12px', padding: '8px 0', borderBottom: `1px solid ${COLORS.slate100}` }
+const readLabelStyle = { fontSize: '12px', fontWeight: 700, color: COLORS.slate400 }
+const readValueStyle = { fontSize: '13px', fontWeight: 600, color: COLORS.slate900, textAlign: 'right' }
 
 function fieldInput(field, value, onChange) {
   if (field.type === 'select') {
@@ -60,7 +61,7 @@ function fieldInput(field, value, onChange) {
 function formatReadValue(field, value) {
   if (value === null || value === undefined || value === '') return '—'
   if (field.key === 'maps_link') {
-    return <a href={value} target="_blank" rel="noopener noreferrer" style={{ color: '#1d4ed8', fontWeight: 700 }}>{value}</a>
+    return <a href={value} target="_blank" rel="noopener noreferrer" style={{ color: COLORS.blue700, fontWeight: 700 }}>{value}</a>
   }
   return String(value)
 }
@@ -89,13 +90,13 @@ function EditableSection({ title, fields, property, onSave }) {
   }
 
   return (
-    <div style={{ background: '#fff', borderRadius: '16px', padding: '20px', marginBottom: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+    <div style={{ background: COLORS.white, borderRadius: '16px', padding: '20px', marginBottom: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-        <p style={{ margin: 0, fontSize: '14px', fontWeight: 800, color: '#0f172a' }}>{title}</p>
+        <p style={{ margin: 0, fontSize: '14px', fontWeight: 800, color: COLORS.slate900 }}>{title}</p>
         {!editing && (
           <button
             onClick={startEdit}
-            style={{ padding: '6px 14px', background: '#1d4ed8', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
+            style={{ padding: '6px 14px', background: COLORS.blue700, color: COLORS.white, border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
           >
             Edit
           </button>
@@ -123,13 +124,13 @@ function EditableSection({ title, fields, property, onSave }) {
           {error && <p style={modalErrorStyle}>{error}</p>}
 
           <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
-            <button onClick={() => setEditing(false)} style={{ flex: 1, padding: '10px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
+            <button onClick={() => setEditing(false)} style={{ flex: 1, padding: '10px', background: COLORS.slate100, color: COLORS.slate600, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
               Cancel
             </button>
             <button
               onClick={save}
               disabled={saving}
-              style={{ flex: 2, padding: '10px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.6 : 1 }}
+              style={{ flex: 2, padding: '10px', background: COLORS.green600, color: COLORS.white, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.6 : 1 }}
             >
               {saving ? 'Saving...' : 'Save'}
             </button>
@@ -164,13 +165,13 @@ function VulnerabilitySection({ property, onSave, readOnly = false }) {
   }
 
   return (
-    <div style={{ background: '#fff', borderRadius: '16px', padding: '20px', marginBottom: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+    <div style={{ background: COLORS.white, borderRadius: '16px', padding: '20px', marginBottom: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-        <p style={{ margin: 0, fontSize: '14px', fontWeight: 800, color: '#0f172a' }}>Vulnerability</p>
+        <p style={{ margin: 0, fontSize: '14px', fontWeight: 800, color: COLORS.slate900 }}>Vulnerability</p>
         {!editing && !readOnly && (
           <button
             onClick={startEdit}
-            style={{ padding: '6px 14px', background: '#1d4ed8', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
+            style={{ padding: '6px 14px', background: COLORS.blue700, color: COLORS.white, border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
           >
             Edit
           </button>
@@ -181,7 +182,7 @@ function VulnerabilitySection({ property, onSave, readOnly = false }) {
         <div>
           <div style={readRowStyle}>
             <span style={readLabelStyle}>Vulnerability Flag</span>
-            <span style={{ fontSize: '11px', fontWeight: 800, color: property.high_vulnerability ? '#dc2626' : '#16a34a', background: property.high_vulnerability ? '#fee2e2' : '#dcfce7', padding: '3px 10px', borderRadius: '20px' }}>
+            <span style={{ fontSize: '11px', fontWeight: 800, color: property.high_vulnerability ? COLORS.red600 : COLORS.green600, background: property.high_vulnerability ? COLORS.red100 : COLORS.green100, padding: '3px 10px', borderRadius: '20px' }}>
               {property.high_vulnerability ? 'ON' : 'OFF'}
             </span>
           </div>
@@ -195,17 +196,17 @@ function VulnerabilitySection({ property, onSave, readOnly = false }) {
       ) : (
         <div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 0' }}>
-            <span style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>Vulnerability Flag</span>
+            <span style={{ fontSize: '13px', fontWeight: 700, color: COLORS.slate900 }}>Vulnerability Flag</span>
             <button
               onClick={() => setFlag(prev => !prev)}
               style={{
                 width: '48px', height: '28px', borderRadius: '999px', border: 'none', cursor: 'pointer', position: 'relative',
-                background: flag ? '#dc2626' : '#cbd5e1', transition: 'background 0.15s',
+                background: flag ? COLORS.red600 : COLORS.slate300, transition: 'background 0.15s',
               }}
             >
               <span style={{
                 position: 'absolute', top: '3px', left: flag ? '23px' : '3px', width: '22px', height: '22px',
-                borderRadius: '50%', background: '#fff', transition: 'left 0.15s',
+                borderRadius: '50%', background: COLORS.white, transition: 'left 0.15s',
               }} />
             </button>
           </div>
@@ -220,13 +221,13 @@ function VulnerabilitySection({ property, onSave, readOnly = false }) {
           {error && <p style={modalErrorStyle}>{error}</p>}
 
           <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
-            <button onClick={() => setEditing(false)} style={{ flex: 1, padding: '10px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
+            <button onClick={() => setEditing(false)} style={{ flex: 1, padding: '10px', background: COLORS.slate100, color: COLORS.slate600, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
               Cancel
             </button>
             <button
               onClick={save}
               disabled={saving}
-              style={{ flex: 2, padding: '10px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.6 : 1 }}
+              style={{ flex: 2, padding: '10px', background: COLORS.green600, color: COLORS.white, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.6 : 1 }}
             >
               {saving ? 'Saving...' : 'Save'}
             </button>
@@ -290,13 +291,13 @@ function CleanerAssignmentSection({ property, onSave }) {
   }
 
   return (
-    <div style={{ background: '#fff', borderRadius: '16px', padding: '20px', marginBottom: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+    <div style={{ background: COLORS.white, borderRadius: '16px', padding: '20px', marginBottom: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-        <p style={{ margin: 0, fontSize: '14px', fontWeight: 800, color: '#0f172a' }}>Assigned Cleaner</p>
+        <p style={{ margin: 0, fontSize: '14px', fontWeight: 800, color: COLORS.slate900 }}>Assigned Cleaner</p>
         {!editing && (
           <button
             onClick={startEdit}
-            style={{ padding: '6px 14px', background: '#1d4ed8', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
+            style={{ padding: '6px 14px', background: COLORS.blue700, color: COLORS.white, border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
           >
             {property.assigned_cleaner_id ? 'Reassign' : 'Assign'}
           </button>
@@ -312,7 +313,7 @@ function CleanerAssignmentSection({ property, onSave }) {
         <div>
           <p style={modalLabelStyle}>Cleaner</p>
           {cleanersLoading ? (
-            <p style={{ margin: 0, fontSize: '13px', color: '#94a3b8' }}>Loading eligible cleaners...</p>
+            <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate400 }}>Loading eligible cleaners...</p>
           ) : (
             <select value={selectedId} onChange={(e) => setSelectedId(e.target.value)} style={inputStyle}>
               <option value="">Unassigned</option>
@@ -320,7 +321,7 @@ function CleanerAssignmentSection({ property, onSave }) {
             </select>
           )}
           {!cleanersLoading && restrictionGender && eligibleCleaners.length === 0 && (
-            <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: '#d97706' }}>
+            <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: COLORS.amber600 }}>
               No {restrictionGender.toLowerCase()} cleaners available to match this property's gender restriction.
             </p>
           )}
@@ -328,13 +329,13 @@ function CleanerAssignmentSection({ property, onSave }) {
           {error && <p style={modalErrorStyle}>{error}</p>}
 
           <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
-            <button onClick={() => setEditing(false)} style={{ flex: 1, padding: '10px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
+            <button onClick={() => setEditing(false)} style={{ flex: 1, padding: '10px', background: COLORS.slate100, color: COLORS.slate600, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
               Cancel
             </button>
             <button
               onClick={save}
               disabled={saving}
-              style={{ flex: 2, padding: '10px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.6 : 1 }}
+              style={{ flex: 2, padding: '10px', background: COLORS.green600, color: COLORS.white, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.6 : 1 }}
             >
               {saving ? 'Saving...' : 'Save'}
             </button>
@@ -389,8 +390,8 @@ export default function PropertyCoreTab({ property, onFieldsSaved, profile }) {
   return (
     <div>
       {property.high_vulnerability && (
-        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '10px', padding: '14px 16px', marginBottom: '16px' }}>
-          <p style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: '#dc2626' }}>
+        <div style={{ background: COLORS.red50, border: `1px solid ${COLORS.red200}`, borderRadius: '10px', padding: '14px 16px', marginBottom: '16px' }}>
+          <p style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: COLORS.red600 }}>
             ⚠ Vulnerable Occupant — {property.vulnerability_reason || 'No further details provided'}
           </p>
         </div>
@@ -410,8 +411,8 @@ export default function PropertyCoreTab({ property, onFieldsSaved, profile }) {
       ) : (
         <>
           {/* Cover photo */}
-          <div style={{ background: '#fff', borderRadius: '16px', padding: '20px', marginBottom: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-            <p style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: 800, color: '#0f172a' }}>Cover Photo</p>
+          <div style={{ background: COLORS.white, borderRadius: '16px', padding: '20px', marginBottom: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+            <p style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: 800, color: COLORS.slate900 }}>Cover Photo</p>
             {property.cover_photo_url && (
               <img src={property.cover_photo_url} alt="Property cover" style={{ width: '100%', maxHeight: '260px', objectFit: 'cover', borderRadius: '10px', display: 'block', marginBottom: '12px' }} />
             )}
@@ -419,7 +420,7 @@ export default function PropertyCoreTab({ property, onFieldsSaved, profile }) {
             <button
               onClick={() => document.getElementById('cover-photo-input').click()}
               disabled={photoUploading}
-              style={{ width: '100%', height: '44px', borderRadius: '10px', border: '2px dashed #cbd5e1', background: '#ffffff', color: '#64748b', fontSize: '13px', fontWeight: 600, cursor: photoUploading ? 'not-allowed' : 'pointer', boxSizing: 'border-box' }}
+              style={{ width: '100%', height: '44px', borderRadius: '10px', border: `2px dashed ${COLORS.slate300}`, background: COLORS.white, color: COLORS.slate500, fontSize: '13px', fontWeight: 600, cursor: photoUploading ? 'not-allowed' : 'pointer', boxSizing: 'border-box' }}
             >
               {photoUploading ? 'Uploading...' : property.cover_photo_url ? 'Change cover photo' : 'Upload cover photo'}
             </button>

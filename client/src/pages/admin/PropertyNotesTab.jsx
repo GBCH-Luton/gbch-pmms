@@ -21,6 +21,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
+import { COLORS } from '../../lib/colors'
 import {
   modalOverlayStyle, modalCardStyle, modalTitleStyle, modalLabelStyle, modalErrorStyle,
   modalCancelBtnStyle, modalConfirmBtnStyle, formatUKDateTime,
@@ -31,13 +32,13 @@ const FILTER_TABS = ['All', ...CATEGORIES]
 const FLAG_STATUSES = ['Open', 'In Progress', 'Resolved']
 
 const CATEGORY_STYLES = {
-  Observation: { bg: '#f1f5f9', color: '#64748b' },
-  Flag: { bg: '#fee2e2', color: '#dc2626' },
-  Reminder: { bg: '#fef3c7', color: '#d97706' },
-  Complaint: { bg: '#ffedd5', color: '#c2410c' },
+  Observation: { bg: COLORS.slate100, color: COLORS.slate500 },
+  Flag: { bg: COLORS.red100, color: COLORS.red600 },
+  Reminder: { bg: COLORS.amber100, color: COLORS.amber600 },
+  Complaint: { bg: COLORS.orange100, color: COLORS.orange700 },
 }
 
-const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '13px', fontFamily: 'inherit', boxSizing: 'border-box' }
+const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', fontFamily: 'inherit', boxSizing: 'border-box' }
 
 const emptyForm = { note_category: '', note_text: '', flag_this: false }
 
@@ -105,23 +106,23 @@ function NoteFormModal({ property, note, profile, onClose, onSaved }) {
         <textarea value={form.note_text} onChange={(e) => set('note_text', e.target.value)} rows={4} style={{ ...inputStyle, resize: 'vertical' }} />
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '16px' }}>
-          <span style={{ fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>Flag this item</span>
+          <span style={{ fontSize: '13px', fontWeight: 700, color: COLORS.slate900 }}>Flag this item</span>
           <button
             onClick={() => set('flag_this', !form.flag_this)}
             style={{
               width: '48px', height: '28px', borderRadius: '999px', border: 'none', cursor: 'pointer', position: 'relative',
-              background: form.flag_this ? '#dc2626' : '#cbd5e1', transition: 'background 0.15s',
+              background: form.flag_this ? COLORS.red600 : COLORS.slate300, transition: 'background 0.15s',
             }}
           >
             <span style={{
               position: 'absolute', top: '3px', left: form.flag_this ? '23px' : '3px', width: '22px', height: '22px',
-              borderRadius: '50%', background: '#fff', transition: 'left 0.15s',
+              borderRadius: '50%', background: COLORS.white, transition: 'left 0.15s',
             }} />
           </button>
         </div>
 
         <p style={modalLabelStyle}>Author</p>
-        <input type="text" value={note?.author || profile?.name || ''} disabled style={{ ...inputStyle, background: '#f8fafc', color: '#64748b' }} />
+        <input type="text" value={note?.author || profile?.name || ''} disabled style={{ ...inputStyle, background: COLORS.slate50, color: COLORS.slate500 }} />
 
         {error && <p style={modalErrorStyle}>{error}</p>}
 
@@ -145,13 +146,13 @@ function DeleteConfirmModal({ onCancel, onConfirm, deleting }) {
     <div style={modalOverlayStyle}>
       <div style={{ ...modalCardStyle, maxWidth: '380px' }}>
         <p style={modalTitleStyle}>Delete Note</p>
-        <p style={{ margin: '10px 0 0 0', fontSize: '13px', color: '#64748b' }}>This cannot be undone. Are you sure?</p>
+        <p style={{ margin: '10px 0 0 0', fontSize: '13px', color: COLORS.slate500 }}>This cannot be undone. Are you sure?</p>
         <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
           <button onClick={onCancel} style={modalCancelBtnStyle}>Cancel</button>
           <button
             onClick={onConfirm}
             disabled={deleting}
-            style={{ flex: 2, padding: '10px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: deleting ? 'not-allowed' : 'pointer', opacity: deleting ? 0.6 : 1 }}
+            style={{ flex: 2, padding: '10px', background: COLORS.red600, color: COLORS.white, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: deleting ? 'not-allowed' : 'pointer', opacity: deleting ? 0.6 : 1 }}
           >
             {deleting ? 'Deleting...' : 'Delete'}
           </button>
@@ -265,7 +266,7 @@ export default function PropertyNotesTab({ property, profile }) {
   if (loading) {
     return (
       <div style={{ minHeight: '120px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <p style={{ color: '#94a3b8', fontWeight: 600 }}>Loading notes...</p>
+        <p style={{ color: COLORS.slate400, fontWeight: 600 }}>Loading notes...</p>
       </div>
     )
   }
@@ -273,8 +274,8 @@ export default function PropertyNotesTab({ property, profile }) {
   return (
     <div>
       {openFlagged.length > 0 && (
-        <div style={{ background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: '12px', padding: '14px 16px', marginBottom: '16px' }}>
-          <p style={{ margin: '0 0 10px 0', fontSize: '13px', fontWeight: 800, color: '#92400e' }}>
+        <div style={{ background: COLORS.amber50, border: `1px solid ${COLORS.amber300}`, borderRadius: '12px', padding: '14px 16px', marginBottom: '16px' }}>
+          <p style={{ margin: '0 0 10px 0', fontSize: '13px', fontWeight: 800, color: COLORS.amber800 }}>
             ⚑ {openFlagged.length} open flagged item{openFlagged.length === 1 ? '' : 's'}
           </p>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -283,8 +284,8 @@ export default function PropertyNotesTab({ property, profile }) {
                 key={n.id}
                 onClick={() => jumpToNote(n)}
                 style={{
-                  padding: '6px 12px', background: '#fff', border: '1px solid #fcd34d', borderRadius: '20px',
-                  fontSize: '12px', fontWeight: 700, color: '#92400e', cursor: 'pointer', maxWidth: '220px',
+                  padding: '6px 12px', background: COLORS.white, border: `1px solid ${COLORS.amber300}`, borderRadius: '20px',
+                  fontSize: '12px', fontWeight: 700, color: COLORS.amber800, cursor: 'pointer', maxWidth: '220px',
                   whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                 }}
               >
@@ -301,24 +302,24 @@ export default function PropertyNotesTab({ property, profile }) {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search by text, author, or category..."
-          style={{ flex: '1 1 260px', padding: '10px 14px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '13px', boxSizing: 'border-box' }}
+          style={{ flex: '1 1 260px', padding: '10px 14px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', boxSizing: 'border-box' }}
         />
         <button
           onClick={() => setModalNote(null)}
-          style={{ padding: '10px 18px', background: '#0f766e', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
+          style={{ padding: '10px 18px', background: COLORS.teal700, color: COLORS.white, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
         >
           ＋ Add Note
         </button>
       </div>
 
-      <div style={{ display: 'flex', gap: '4px', marginBottom: '16px', flexWrap: 'wrap', borderBottom: '1px solid #e2e8f0' }}>
+      <div style={{ display: 'flex', gap: '4px', marginBottom: '16px', flexWrap: 'wrap', borderBottom: `1px solid ${COLORS.slate200}` }}>
         {FILTER_TABS.map(tab => (
           <button
             key={tab}
             onClick={() => setCategoryFilter(tab)}
             style={{
-              padding: '8px 14px', background: 'none', border: 'none', borderBottom: categoryFilter === tab ? '2px solid #0f766e' : '2px solid transparent',
-              color: categoryFilter === tab ? '#0f766e' : '#64748b', fontSize: '13px', fontWeight: 700, cursor: 'pointer', marginBottom: '-1px',
+              padding: '8px 14px', background: 'none', border: 'none', borderBottom: categoryFilter === tab ? `2px solid ${COLORS.teal700}` : '2px solid transparent',
+              color: categoryFilter === tab ? COLORS.teal700 : COLORS.slate500, fontSize: '13px', fontWeight: 700, cursor: 'pointer', marginBottom: '-1px',
             }}
           >
             {tab}
@@ -327,13 +328,13 @@ export default function PropertyNotesTab({ property, profile }) {
       </div>
 
       {loadError ? (
-        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '16px', padding: '24px', textAlign: 'center' }}>
-          <p style={{ margin: '0 0 4px 0', fontSize: '14px', fontWeight: 700, color: '#dc2626' }}>Couldn't load notes</p>
-          <p style={{ margin: 0, fontSize: '13px', color: '#7f1d1d', fontFamily: 'monospace' }}>{loadError}</p>
+        <div style={{ background: COLORS.red50, border: `1px solid ${COLORS.red200}`, borderRadius: '16px', padding: '24px', textAlign: 'center' }}>
+          <p style={{ margin: '0 0 4px 0', fontSize: '14px', fontWeight: 700, color: COLORS.red600 }}>Couldn't load notes</p>
+          <p style={{ margin: 0, fontSize: '13px', color: COLORS.red900, fontFamily: 'monospace' }}>{loadError}</p>
         </div>
       ) : filteredNotes.length === 0 ? (
-        <div style={{ background: '#fff', borderRadius: '16px', padding: '40px', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-          <p style={{ margin: 0, fontSize: '14px', color: '#94a3b8', fontStyle: 'italic' }}>No notes found.</p>
+        <div style={{ background: COLORS.white, borderRadius: '16px', padding: '40px', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+          <p style={{ margin: 0, fontSize: '14px', color: COLORS.slate400, fontStyle: 'italic' }}>No notes found.</p>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -343,7 +344,7 @@ export default function PropertyNotesTab({ property, profile }) {
               <div
                 key={note.id}
                 ref={(el) => { noteRefs.current[note.id] = el }}
-                style={{ background: '#fff', borderRadius: '16px', padding: '16px 20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}
+                style={{ background: COLORS.white, borderRadius: '16px', padding: '16px 20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px', marginBottom: '10px', flexWrap: 'wrap' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
@@ -352,11 +353,11 @@ export default function PropertyNotesTab({ property, profile }) {
                     )}
                     {note.is_flagged && (
                       <>
-                        <span style={{ fontSize: '10px', fontWeight: 800, color: '#dc2626', background: '#fee2e2', padding: '3px 10px', borderRadius: '20px' }}>⚑ Flagged</span>
+                        <span style={{ fontSize: '10px', fontWeight: 800, color: COLORS.red600, background: COLORS.red100, padding: '3px 10px', borderRadius: '20px' }}>⚑ Flagged</span>
                         <select
                           value={note.flag_status || 'Open'}
                           onChange={(e) => handleFlagStatusChange(note, e.target.value)}
-                          style={{ padding: '4px 8px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '11px', fontWeight: 700, color: '#0f172a', background: '#f8fafc', cursor: 'pointer' }}
+                          style={{ padding: '4px 8px', borderRadius: '8px', border: `1px solid ${COLORS.slate200}`, fontSize: '11px', fontWeight: 700, color: COLORS.slate900, background: COLORS.slate50, cursor: 'pointer' }}
                         >
                           {FLAG_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
                         </select>
@@ -367,21 +368,21 @@ export default function PropertyNotesTab({ property, profile }) {
                   <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
                     <button
                       onClick={() => setModalNote(note)}
-                      style={{ padding: '6px 12px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
+                      style={{ padding: '6px 12px', background: COLORS.slate100, color: COLORS.slate600, border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
                     >
                       Edit
                     </button>
                     <button
                       onClick={() => setDeleteTarget(note)}
-                      style={{ padding: '6px 12px', background: '#fff', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
+                      style={{ padding: '6px 12px', background: COLORS.white, color: COLORS.red600, border: `1px solid ${COLORS.red200}`, borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
                     >
                       Delete
                     </button>
                   </div>
                 </div>
 
-                <p style={{ margin: '0 0 8px 0', fontSize: '14px', color: '#0f172a', whiteSpace: 'pre-wrap' }}>{note.note_text}</p>
-                <p style={{ margin: 0, fontSize: '12px', color: '#94a3b8' }}>
+                <p style={{ margin: '0 0 8px 0', fontSize: '14px', color: COLORS.slate900, whiteSpace: 'pre-wrap' }}>{note.note_text}</p>
+                <p style={{ margin: 0, fontSize: '12px', color: COLORS.slate400 }}>
                   {note.author || 'Unknown'} · {formatUKDateTime(note.created_at)}
                 </p>
                 {flagStatusErrors[note.id] && (

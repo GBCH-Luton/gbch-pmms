@@ -3,6 +3,7 @@
 // and dashboard KPIs all render tickets/priorities/dates identically.
 
 import { supabase } from '../../lib/supabase'
+import { COLORS } from '../../lib/colors'
 import { distanceMetres, ensurePropertyCoords } from '../../lib/geo'
 import { normalizeCustomRoles } from '../../lib/roles'
 import { attachProperties } from '../../lib/properties'
@@ -35,16 +36,16 @@ export const P2_URGENT_THRESHOLD = 40
 
 export const GENDER_RESTRICTION_OPTIONS = ['Male Only', 'Female Only', 'Both']
 export const GENDER_RESTRICTION_STYLES = {
-  'Male Only': { bg: '#e0e7ff', color: '#4338ca' },
-  'Female Only': { bg: '#fce7f3', color: '#be185d' },
-  'Both': { bg: '#ccfbf1', color: '#0d9488' },
+  'Male Only': { bg: COLORS.indigo100, color: COLORS.indigo700 },
+  'Female Only': { bg: COLORS.pink100, color: COLORS.pink700 },
+  'Both': { bg: COLORS.teal100, color: COLORS.teal600 },
 }
 
 export const GARDEN_STATE_OPTIONS = ['Good', 'Needs Attention', 'Overgrown']
 export const GARDEN_STATE_STYLES = {
-  'Good': { bg: '#dcfce7', color: '#16a34a' },
-  'Needs Attention': { bg: '#fef3c7', color: '#d97706' },
-  'Overgrown': { bg: '#fee2e2', color: '#dc2626' },
+  'Good': { bg: COLORS.green100, color: COLORS.green600 },
+  'Needs Attention': { bg: COLORS.amber100, color: COLORS.amber600 },
+  'Overgrown': { bg: COLORS.red100, color: COLORS.red600 },
 }
 
 // supabase-js resolves a non-2xx Edge Function response as `error`, with the
@@ -62,9 +63,9 @@ export async function extractFunctionError(error) {
 
 export const STAFF_AVAILABILITY_OPTIONS = ['Available', 'On Leave', 'Sick']
 export const STAFF_AVAILABILITY_STYLES = {
-  'Available': { bg: '#dcfce7', color: '#16a34a' },
-  'On Leave': { bg: '#fef3c7', color: '#d97706' },
-  'Sick': { bg: '#fee2e2', color: '#dc2626' },
+  'Available': { bg: COLORS.green100, color: COLORS.green600 },
+  'On Leave': { bg: COLORS.amber100, color: COLORS.amber600 },
+  'Sick': { bg: COLORS.red100, color: COLORS.red600 },
 }
 
 // public.staff is a company-wide table other systems also write to, and
@@ -90,7 +91,7 @@ export function Avatar({ name, photoUrl, size = 36 }) {
   const initials = (name || '?').split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase()
   return (
     <div style={{
-      width: `${size}px`, height: `${size}px`, borderRadius: '50%', background: '#e2e8f0', color: '#64748b',
+      width: `${size}px`, height: `${size}px`, borderRadius: '50%', background: COLORS.slate200, color: COLORS.slate500,
       fontSize: `${Math.round(size * 0.4)}px`, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
     }}>
       {initials}
@@ -135,20 +136,20 @@ export async function fetchPriorityThresholds() {
 }
 
 export function priorityBadgeStyle(tier) {
-  if (tier === 'P1 Critical') return { bg: '#fee2e2', color: '#dc2626' }
-  if (tier === 'P2 Urgent') return { bg: '#fef3c7', color: '#d97706' }
-  return { bg: '#f1f5f9', color: '#64748b' }
+  if (tier === 'P1 Critical') return { bg: COLORS.red100, color: COLORS.red600 }
+  if (tier === 'P2 Urgent') return { bg: COLORS.amber100, color: COLORS.amber600 }
+  return { bg: COLORS.slate100, color: COLORS.slate500 }
 }
 
 export const statusColour = (status) => {
-  if (status === 'Pending')     return '#dc2626'
-  if (status === 'Assigned')    return '#3b82f6'
-  if (status === 'In Progress') return '#0d9488'
-  if (status === 'On Hold')     return '#d97706'
-  if (status === 'Completed')   return '#9333ea'
-  if (status === 'Archived')    return '#64748b'
-  if (status === 'Cancelled')   return '#94a3b8'
-  return '#3b82f6'
+  if (status === 'Pending')     return COLORS.red600
+  if (status === 'Assigned')    return COLORS.blue500
+  if (status === 'In Progress') return COLORS.teal600
+  if (status === 'On Hold')     return COLORS.amber600
+  if (status === 'Completed')   return COLORS.purple600
+  if (status === 'Archived')    return COLORS.slate500
+  if (status === 'Cancelled')   return COLORS.slate400
+  return COLORS.blue500
 }
 
 // Display-only -- the stored value stays 'Pending' everywhere (every
@@ -203,7 +204,7 @@ export function KpiTiles({ kpis, onTileClick }) {
           style={{ flex: '1 1 160px', background: kpi.colour, borderRadius: '16px', padding: '16px', border: 'none', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', textAlign: 'center' }}
         >
           <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{kpi.label}</p>
-          <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: '#ffffff' }}>{kpi.value}</p>
+          <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: COLORS.white }}>{kpi.value}</p>
         </button>
       ))}
     </div>
@@ -229,10 +230,10 @@ export const COMPLIANCE_TYPES = [
 ]
 
 export const RAG_STYLES = {
-  green: { bg: '#dcfce7', color: '#16a34a' },
-  amber: { bg: '#fef3c7', color: '#d97706' },
-  red: { bg: '#fee2e2', color: '#dc2626' },
-  grey: { bg: '#f1f5f9', color: '#64748b' },
+  green: { bg: COLORS.green100, color: COLORS.green600 },
+  amber: { bg: COLORS.amber100, color: COLORS.amber600 },
+  red: { bg: COLORS.red100, color: COLORS.red600 },
+  grey: { bg: COLORS.slate100, color: COLORS.slate500 },
 }
 
 export function RagPill({ tier, label }) {
@@ -460,32 +461,32 @@ export const formatUKDateTime = (isoString) => {
   return `${dd}/${mm}/${yyyy} ${hh}:${min}`
 }
 
-export const filterSelectStyle = { padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '13px', fontWeight: 600, color: '#0f172a', background: '#f8fafc', cursor: 'pointer' }
-export const thStyle = { padding: '10px 14px', textAlign: 'left', fontSize: '10px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }
+export const filterSelectStyle = { padding: '8px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', fontWeight: 600, color: COLORS.slate900, background: COLORS.slate50, cursor: 'pointer' }
+export const thStyle = { padding: '10px 14px', textAlign: 'left', fontSize: '10px', fontWeight: 800, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }
 export const tdStyle = { padding: '12px 14px', verticalAlign: 'top', fontSize: '13px' }
-export const actionBtnStyle = { padding: '6px 10px', borderRadius: '8px', border: '1px solid #e2e8f0', background: '#fff', color: '#475569', fontSize: '11px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }
+export const actionBtnStyle = { padding: '6px 10px', borderRadius: '8px', border: `1px solid ${COLORS.slate200}`, background: COLORS.white, color: COLORS.slate600, fontSize: '11px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }
 
 export const modalOverlayStyle = { position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.45)', zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }
-export const modalCardStyle = { background: '#fff', borderRadius: '16px', padding: '20px', width: '100%', maxWidth: '460px', maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 10px 40px rgba(0,0,0,0.25)' }
-export const modalTitleStyle = { margin: 0, fontSize: '16px', fontWeight: 800, color: '#0f172a' }
-export const modalSubtitleStyle = { margin: '2px 0 0 0', fontSize: '13px', color: '#64748b' }
-export const modalLabelStyle = { display: 'block', margin: '16px 0 6px 0', fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }
-export const modalTextareaStyle = { width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '13px', fontFamily: 'inherit', resize: 'vertical', boxSizing: 'border-box' }
-export const modalErrorStyle = { margin: '10px 0 0 0', fontSize: '13px', color: '#ef4444', fontWeight: 600 }
-export const modalCancelBtnStyle = { flex: 1, padding: '10px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }
-export const modalConfirmBtnStyle = { flex: 2, padding: '10px', background: '#1d4ed8', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }
+export const modalCardStyle = { background: COLORS.white, borderRadius: '16px', padding: '20px', width: '100%', maxWidth: '460px', maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 10px 40px rgba(0,0,0,0.25)' }
+export const modalTitleStyle = { margin: 0, fontSize: '16px', fontWeight: 800, color: COLORS.slate900 }
+export const modalSubtitleStyle = { margin: '2px 0 0 0', fontSize: '13px', color: COLORS.slate500 }
+export const modalLabelStyle = { display: 'block', margin: '16px 0 6px 0', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }
+export const modalTextareaStyle = { width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', fontFamily: 'inherit', resize: 'vertical', boxSizing: 'border-box' }
+export const modalErrorStyle = { margin: '10px 0 0 0', fontSize: '13px', color: COLORS.red500, fontWeight: 600 }
+export const modalCancelBtnStyle = { flex: 1, padding: '10px', background: COLORS.slate100, color: COLORS.slate600, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }
+export const modalConfirmBtnStyle = { flex: 2, padding: '10px', background: COLORS.blue700, color: COLORS.white, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }
 
 export function roleBadgeStyle(role) {
-  if (role === 'admin' || role === 'manager') return { bg: '#f3e8ff', color: '#9333ea' }
-  if (role === 'builder') return { bg: '#dbeafe', color: '#1d4ed8' }
-  return { bg: '#ccfbf1', color: '#0d9488' }
+  if (role === 'admin' || role === 'manager') return { bg: COLORS.purple100, color: COLORS.purple600 }
+  if (role === 'builder') return { bg: COLORS.blue100, color: COLORS.blue700 }
+  return { bg: COLORS.teal100, color: COLORS.teal600 }
 }
 
 export function radioRowStyle(active) {
   return {
     display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px',
-    borderRadius: '10px', border: active ? '2px solid #1d4ed8' : '1px solid #e2e8f0',
-    background: active ? '#eff6ff' : '#fff', cursor: 'pointer',
+    borderRadius: '10px', border: active ? `2px solid ${COLORS.blue700}` : `1px solid ${COLORS.slate200}`,
+    background: active ? COLORS.blue50 : COLORS.white, cursor: 'pointer',
   }
 }
 
@@ -594,12 +595,12 @@ export function computeDutyStatus(staffTickets, availabilityStatus) {
   // they went off duty. Without this, "On Duty Now" and the duty badge
   // could contradict the availability badge shown right next to it.
   if (availabilityStatus === 'On Leave' || availabilityStatus === 'Sick') {
-    return { activeJobs, inProgressJob, badge: { label: 'Off Duty', bg: '#f1f5f9', color: '#94a3b8' }, onDuty: false }
+    return { activeJobs, inProgressJob, badge: { label: 'Off Duty', bg: COLORS.slate100, color: COLORS.slate400 }, onDuty: false }
   }
 
-  let badge = { label: 'Standby / Idle', bg: '#f1f5f9', color: '#94a3b8' }
-  if (inProgressJob) badge = { label: 'On-Site Active', bg: '#dcfce7', color: '#16a34a' }
-  else if (activeJobs.length > 0) badge = { label: 'Assigned / Transit', bg: '#dbeafe', color: '#1d4ed8' }
+  let badge = { label: 'Standby / Idle', bg: COLORS.slate100, color: COLORS.slate400 }
+  if (inProgressJob) badge = { label: 'On-Site Active', bg: COLORS.green100, color: COLORS.green600 }
+  else if (activeJobs.length > 0) badge = { label: 'Assigned / Transit', bg: COLORS.blue100, color: COLORS.blue700 }
 
   return { activeJobs, inProgressJob, badge, onDuty: !!inProgressJob }
 }

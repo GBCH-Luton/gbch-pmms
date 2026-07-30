@@ -17,6 +17,7 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
+import { COLORS } from '../../lib/colors'
 import { modalLabelStyle, modalErrorStyle, formatUKDate, COMPLIANCE_TYPES, RAG_STYLES, RagPill, computeComplianceAging } from './shared'
 import { compressImage } from '../../lib/imageCompression'
 
@@ -67,15 +68,15 @@ function ComplianceCard({ type, record, onUpload, onSave, thresholdDays }) {
   const inputId = `compliance-file-${type.key}`
 
   return (
-    <div style={{ background: '#fff', borderRadius: '16px', padding: '18px 20px', marginBottom: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+    <div style={{ background: COLORS.white, borderRadius: '16px', padding: '18px 20px', marginBottom: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', marginBottom: '12px', flexWrap: 'wrap' }}>
-        <p style={{ margin: 0, fontSize: '14px', fontWeight: 800, color: '#0f172a' }}>{type.title}</p>
+        <p style={{ margin: 0, fontSize: '14px', fontWeight: 800, color: COLORS.slate900 }}>{type.title}</p>
         <RagPill tier={rag.tier} label={rag.label} />
       </div>
 
       <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', cursor: 'pointer' }}>
         <input type="checkbox" checked={notApplicable} onChange={(e) => markDirty(setNotApplicable)(e.target.checked)} />
-        <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748b' }}>Not applicable to this property</span>
+        <span style={{ fontSize: '12px', fontWeight: 600, color: COLORS.slate500 }}>Not applicable to this property</span>
       </label>
 
       {!notApplicable && (
@@ -86,7 +87,7 @@ function ComplianceCard({ type, record, onUpload, onSave, thresholdDays }) {
               type="date"
               value={expiryDate || ''}
               onChange={(e) => markDirty(setExpiryDate)(e.target.value)}
-              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '13px', boxSizing: 'border-box' }}
+              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', boxSizing: 'border-box' }}
             />
           </div>
 
@@ -96,12 +97,12 @@ function ComplianceCard({ type, record, onUpload, onSave, thresholdDays }) {
             <button
               onClick={() => document.getElementById(inputId).click()}
               disabled={uploading}
-              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '2px dashed #cbd5e1', background: '#fff', color: '#64748b', fontSize: '13px', fontWeight: 600, cursor: uploading ? 'not-allowed' : 'pointer' }}
+              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `2px dashed ${COLORS.slate300}`, background: COLORS.white, color: COLORS.slate500, fontSize: '13px', fontWeight: 600, cursor: uploading ? 'not-allowed' : 'pointer' }}
             >
               {uploading ? 'Uploading...' : 'Upload Certificate'}
             </button>
             {record?.cert_url && (
-              <a href={record.cert_url} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', marginTop: '6px', fontSize: '12px', fontWeight: 700, color: '#1d4ed8' }}>
+              <a href={record.cert_url} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', marginTop: '6px', fontSize: '12px', fontWeight: 700, color: COLORS.blue700 }}>
                 View current certificate ↗
               </a>
             )}
@@ -114,20 +115,20 @@ function ComplianceCard({ type, record, onUpload, onSave, thresholdDays }) {
         value={notes}
         onChange={(e) => markDirty(setNotes)(e.target.value)}
         rows={2}
-        style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '13px', fontFamily: 'inherit', boxSizing: 'border-box', resize: 'vertical' }}
+        style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', fontFamily: 'inherit', boxSizing: 'border-box', resize: 'vertical' }}
       />
 
       {error && <p style={modalErrorStyle}>{error}</p>}
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px' }}>
-        <span style={{ fontSize: '11px', color: '#94a3b8' }}>
+        <span style={{ fontSize: '11px', color: COLORS.slate400 }}>
           {record?.updated_at ? `Last updated ${formatUKDate(record.updated_at)}` : 'Never updated'}
         </span>
         <button
           onClick={handleSave}
           disabled={saving || !dirty}
           style={{
-            padding: '8px 20px', background: dirty ? '#16a34a' : '#e2e8f0', color: dirty ? '#fff' : '#94a3b8',
+            padding: '8px 20px', background: dirty ? COLORS.green600 : COLORS.slate200, color: dirty ? COLORS.white : COLORS.slate400,
             border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: (saving || !dirty) ? 'not-allowed' : 'pointer',
           }}
         >
@@ -222,16 +223,16 @@ export default function PropertyComplianceTab({ property }) {
   if (loading) {
     return (
       <div style={{ minHeight: '120px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <p style={{ color: '#94a3b8', fontWeight: 600 }}>Loading compliance records...</p>
+        <p style={{ color: COLORS.slate400, fontWeight: 600 }}>Loading compliance records...</p>
       </div>
     )
   }
 
   if (loadError) {
     return (
-      <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '16px', padding: '24px', textAlign: 'center' }}>
-        <p style={{ margin: '0 0 4px 0', fontSize: '14px', fontWeight: 700, color: '#dc2626' }}>Couldn't load compliance records</p>
-        <p style={{ margin: 0, fontSize: '13px', color: '#7f1d1d', fontFamily: 'monospace' }}>{loadError}</p>
+      <div style={{ background: COLORS.red50, border: `1px solid ${COLORS.red200}`, borderRadius: '16px', padding: '24px', textAlign: 'center' }}>
+        <p style={{ margin: '0 0 4px 0', fontSize: '14px', fontWeight: 700, color: COLORS.red600 }}>Couldn't load compliance records</p>
+        <p style={{ margin: 0, fontSize: '13px', color: COLORS.red900, fontFamily: 'monospace' }}>{loadError}</p>
       </div>
     )
   }
@@ -239,15 +240,15 @@ export default function PropertyComplianceTab({ property }) {
   return (
     <div>
       {/* RAG dashboard */}
-      <div style={{ background: '#fff', borderRadius: '16px', padding: '18px 20px', marginBottom: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-        <p style={{ margin: '0 0 12px 0', fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Compliance Overview</p>
+      <div style={{ background: COLORS.white, borderRadius: '16px', padding: '18px 20px', marginBottom: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+        <p style={{ margin: '0 0 12px 0', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Compliance Overview</p>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           {COMPLIANCE_TYPES.map(type => {
             const rag = computeComplianceAging(records[type.key], thresholdDays)
             return (
-              <div key={type.key} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 10px', borderRadius: '10px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+              <div key={type.key} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 10px', borderRadius: '10px', background: COLORS.slate50, border: `1px solid ${COLORS.slate200}` }}>
                 <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: RAG_STYLES[rag.tier].color, flexShrink: 0 }} />
-                <span style={{ fontSize: '11px', fontWeight: 700, color: '#0f172a', whiteSpace: 'nowrap' }}>{type.title}</span>
+                <span style={{ fontSize: '11px', fontWeight: 700, color: COLORS.slate900, whiteSpace: 'nowrap' }}>{type.title}</span>
               </div>
             )
           })}

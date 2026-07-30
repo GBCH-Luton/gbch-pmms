@@ -11,11 +11,12 @@
 
 import { useState } from 'react'
 import { supabase } from '../../lib/supabase'
+import { COLORS } from '../../lib/colors'
 import { modalLabelStyle, modalErrorStyle, GENDER_RESTRICTION_OPTIONS, GENDER_RESTRICTION_STYLES } from './shared'
 
-const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '13px', fontFamily: 'inherit', boxSizing: 'border-box' }
+const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', fontFamily: 'inherit', boxSizing: 'border-box' }
 const readRowStyle = { display: 'flex', justifyContent: 'space-between', gap: '12px', padding: '8px 0' }
-const readLabelStyle = { fontSize: '12px', fontWeight: 700, color: '#94a3b8' }
+const readLabelStyle = { fontSize: '12px', fontWeight: 700, color: COLORS.slate400 }
 
 export default function PropertyRestrictionsTab({ property, onFieldsSaved, readOnly = false }) {
   const [editing, setEditing] = useState(false)
@@ -50,20 +51,20 @@ export default function PropertyRestrictionsTab({ property, onFieldsSaved, readO
   const currentStyle = GENDER_RESTRICTION_STYLES[property.staff_gender_restriction]
 
   return (
-    <div style={{ background: '#fff', borderRadius: '16px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+    <div style={{ background: COLORS.white, borderRadius: '16px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-        <p style={{ margin: 0, fontSize: '14px', fontWeight: 800, color: '#0f172a' }}>Support Worker Restrictions</p>
+        <p style={{ margin: 0, fontSize: '14px', fontWeight: 800, color: COLORS.slate900 }}>Support Worker Restrictions</p>
         {!editing && !readOnly && (
           <button
             onClick={startEdit}
-            style={{ padding: '6px 14px', background: '#1d4ed8', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
+            style={{ padding: '6px 14px', background: COLORS.blue700, color: COLORS.white, border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
           >
             Edit
           </button>
         )}
       </div>
 
-      <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: '#64748b' }}>
+      <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: COLORS.slate500 }}>
         Some residents have a gender preference for the support worker who visits the property. Set that here so it's visible to anyone assigning or attending a job.
       </p>
 
@@ -75,7 +76,7 @@ export default function PropertyRestrictionsTab({ property, onFieldsSaved, readO
               {property.staff_gender_restriction}
             </span>
           ) : (
-            <span style={{ fontSize: '13px', color: '#94a3b8', fontStyle: 'italic' }}>Not set</span>
+            <span style={{ fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>Not set</span>
           )}
         </div>
       ) : (
@@ -89,13 +90,13 @@ export default function PropertyRestrictionsTab({ property, onFieldsSaved, readO
           {error && <p style={modalErrorStyle}>{error}</p>}
 
           <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
-            <button onClick={() => setEditing(false)} style={{ flex: 1, padding: '10px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
+            <button onClick={() => setEditing(false)} style={{ flex: 1, padding: '10px', background: COLORS.slate100, color: COLORS.slate600, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
               Cancel
             </button>
             <button
               onClick={save}
               disabled={saving}
-              style={{ flex: 2, padding: '10px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.6 : 1 }}
+              style={{ flex: 2, padding: '10px', background: COLORS.green600, color: COLORS.white, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.6 : 1 }}
             >
               {saving ? 'Saving...' : 'Save'}
             </button>

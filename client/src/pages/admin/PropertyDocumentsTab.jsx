@@ -22,6 +22,7 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
+import { COLORS } from '../../lib/colors'
 import {
   modalOverlayStyle, modalCardStyle, modalTitleStyle, modalLabelStyle, modalErrorStyle,
   modalCancelBtnStyle, modalConfirmBtnStyle, formatUKDate,
@@ -32,21 +33,21 @@ const CATEGORIES = ['Safety', 'Maintenance', 'Legal', 'Tenant', 'Other']
 const FILTER_TABS = ['All', ...CATEGORIES]
 
 const CATEGORY_STYLES = {
-  Safety: { bg: '#fee2e2', color: '#dc2626' },
-  Maintenance: { bg: '#ccfbf1', color: '#0d9488' },
-  Legal: { bg: '#dbeafe', color: '#1e3a8a' },
-  Tenant: { bg: '#f3e8ff', color: '#9333ea' },
-  Other: { bg: '#f1f5f9', color: '#64748b' },
+  Safety: { bg: COLORS.red100, color: COLORS.red600 },
+  Maintenance: { bg: COLORS.teal100, color: COLORS.teal600 },
+  Legal: { bg: COLORS.blue100, color: COLORS.blue900 },
+  Tenant: { bg: COLORS.purple100, color: COLORS.purple600 },
+  Other: { bg: COLORS.slate100, color: COLORS.slate500 },
 }
 
 const RAG_STYLES = {
-  green: { bg: '#dcfce7', color: '#16a34a' },
-  amber: { bg: '#fef3c7', color: '#d97706' },
-  red: { bg: '#fee2e2', color: '#dc2626' },
-  grey: { bg: '#f1f5f9', color: '#64748b' },
+  green: { bg: COLORS.green100, color: COLORS.green600 },
+  amber: { bg: COLORS.amber100, color: COLORS.amber600 },
+  red: { bg: COLORS.red100, color: COLORS.red600 },
+  grey: { bg: COLORS.slate100, color: COLORS.slate500 },
 }
 
-const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '13px', fontFamily: 'inherit', boxSizing: 'border-box' }
+const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', fontFamily: 'inherit', boxSizing: 'border-box' }
 
 function expiryRag(expiryDate) {
   if (!expiryDate) return { tier: 'grey', label: 'No expiry' }
@@ -161,7 +162,7 @@ function DocumentFormModal({ property, profile, doc, onClose, onSaved }) {
 
         <p style={modalLabelStyle}>File</p>
         {form.file_url && (
-          <a href={form.file_url} target="_blank" rel="noopener noreferrer" style={{ display: 'block', marginBottom: '8px', fontSize: '13px', fontWeight: 700, color: '#1d4ed8' }}>
+          <a href={form.file_url} target="_blank" rel="noopener noreferrer" style={{ display: 'block', marginBottom: '8px', fontSize: '13px', fontWeight: 700, color: COLORS.blue700 }}>
             📄 View current file ↗
           </a>
         )}
@@ -169,13 +170,13 @@ function DocumentFormModal({ property, profile, doc, onClose, onSaved }) {
         <button
           onClick={() => document.getElementById('document-file-input').click()}
           disabled={uploading}
-          style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '2px dashed #cbd5e1', background: '#fff', color: '#64748b', fontSize: '13px', fontWeight: 600, cursor: uploading ? 'not-allowed' : 'pointer' }}
+          style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `2px dashed ${COLORS.slate300}`, background: COLORS.white, color: COLORS.slate500, fontSize: '13px', fontWeight: 600, cursor: uploading ? 'not-allowed' : 'pointer' }}
         >
           {uploading ? 'Uploading...' : form.file_url ? 'Replace file' : 'Upload file'}
         </button>
 
         <p style={modalLabelStyle}>Uploaded By</p>
-        <input type="text" value={profile?.name || ''} disabled style={{ ...inputStyle, background: '#f8fafc', color: '#64748b' }} />
+        <input type="text" value={profile?.name || ''} disabled style={{ ...inputStyle, background: COLORS.slate50, color: COLORS.slate500 }} />
 
         {error && <p style={modalErrorStyle}>{error}</p>}
 
@@ -199,13 +200,13 @@ function DeleteConfirmModal({ onCancel, onConfirm, deleting }) {
     <div style={modalOverlayStyle}>
       <div style={{ ...modalCardStyle, maxWidth: '380px' }}>
         <p style={modalTitleStyle}>Delete Document</p>
-        <p style={{ margin: '10px 0 0 0', fontSize: '13px', color: '#64748b' }}>This cannot be undone. Are you sure?</p>
+        <p style={{ margin: '10px 0 0 0', fontSize: '13px', color: COLORS.slate500 }}>This cannot be undone. Are you sure?</p>
         <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
           <button onClick={onCancel} style={modalCancelBtnStyle}>Cancel</button>
           <button
             onClick={onConfirm}
             disabled={deleting}
-            style={{ flex: 2, padding: '10px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: deleting ? 'not-allowed' : 'pointer', opacity: deleting ? 0.6 : 1 }}
+            style={{ flex: 2, padding: '10px', background: COLORS.red600, color: COLORS.white, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: deleting ? 'not-allowed' : 'pointer', opacity: deleting ? 0.6 : 1 }}
           >
             {deleting ? 'Deleting...' : 'Delete'}
           </button>
@@ -282,7 +283,7 @@ export default function PropertyDocumentsTab({ property, profile }) {
   if (loading) {
     return (
       <div style={{ minHeight: '120px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <p style={{ color: '#94a3b8', fontWeight: 600 }}>Loading documents...</p>
+        <p style={{ color: COLORS.slate400, fontWeight: 600 }}>Loading documents...</p>
       </div>
     )
   }
@@ -295,24 +296,24 @@ export default function PropertyDocumentsTab({ property, profile }) {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search by document name or notes..."
-          style={{ flex: '1 1 260px', padding: '10px 14px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '13px', boxSizing: 'border-box' }}
+          style={{ flex: '1 1 260px', padding: '10px 14px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', boxSizing: 'border-box' }}
         />
         <button
           onClick={() => setModalDoc(null)}
-          style={{ padding: '10px 18px', background: '#0f766e', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
+          style={{ padding: '10px 18px', background: COLORS.teal700, color: COLORS.white, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
         >
           ＋ Upload Document
         </button>
       </div>
 
-      <div style={{ display: 'flex', gap: '4px', marginBottom: '16px', flexWrap: 'wrap', borderBottom: '1px solid #e2e8f0' }}>
+      <div style={{ display: 'flex', gap: '4px', marginBottom: '16px', flexWrap: 'wrap', borderBottom: `1px solid ${COLORS.slate200}` }}>
         {FILTER_TABS.map(tab => (
           <button
             key={tab}
             onClick={() => setCategoryFilter(tab)}
             style={{
-              padding: '8px 14px', background: 'none', border: 'none', borderBottom: categoryFilter === tab ? '2px solid #0f766e' : '2px solid transparent',
-              color: categoryFilter === tab ? '#0f766e' : '#64748b', fontSize: '13px', fontWeight: 700, cursor: 'pointer', marginBottom: '-1px',
+              padding: '8px 14px', background: 'none', border: 'none', borderBottom: categoryFilter === tab ? `2px solid ${COLORS.teal700}` : '2px solid transparent',
+              color: categoryFilter === tab ? COLORS.teal700 : COLORS.slate500, fontSize: '13px', fontWeight: 700, cursor: 'pointer', marginBottom: '-1px',
             }}
           >
             {tab}
@@ -321,13 +322,13 @@ export default function PropertyDocumentsTab({ property, profile }) {
       </div>
 
       {loadError ? (
-        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '16px', padding: '24px', textAlign: 'center' }}>
-          <p style={{ margin: '0 0 4px 0', fontSize: '14px', fontWeight: 700, color: '#dc2626' }}>Couldn't load documents</p>
-          <p style={{ margin: 0, fontSize: '13px', color: '#7f1d1d', fontFamily: 'monospace' }}>{loadError}</p>
+        <div style={{ background: COLORS.red50, border: `1px solid ${COLORS.red200}`, borderRadius: '16px', padding: '24px', textAlign: 'center' }}>
+          <p style={{ margin: '0 0 4px 0', fontSize: '14px', fontWeight: 700, color: COLORS.red600 }}>Couldn't load documents</p>
+          <p style={{ margin: 0, fontSize: '13px', color: COLORS.red900, fontFamily: 'monospace' }}>{loadError}</p>
         </div>
       ) : filteredDocs.length === 0 ? (
-        <div style={{ background: '#fff', borderRadius: '16px', padding: '40px', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-          <p style={{ margin: 0, fontSize: '14px', color: '#94a3b8', fontStyle: 'italic' }}>No documents found.</p>
+        <div style={{ background: COLORS.white, borderRadius: '16px', padding: '40px', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+          <p style={{ margin: 0, fontSize: '14px', color: COLORS.slate400, fontStyle: 'italic' }}>No documents found.</p>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -336,24 +337,24 @@ export default function PropertyDocumentsTab({ property, profile }) {
             const rag = expiryRag(doc.expiry_date)
             const ragStyle = RAG_STYLES[rag.tier]
             return (
-              <div key={doc.id} style={{ background: '#fff', borderRadius: '16px', padding: '14px 20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
+              <div key={doc.id} style={{ background: COLORS.white, borderRadius: '16px', padding: '14px 20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
                 <div style={{ flex: '2 1 220px', minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '4px' }}>
                     {doc.file_url ? (
-                      <a href={doc.file_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: '14px', fontWeight: 700, color: '#1d4ed8' }}>{doc.document_name}</a>
+                      <a href={doc.file_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: '14px', fontWeight: 700, color: COLORS.blue700 }}>{doc.document_name}</a>
                     ) : (
-                      <span style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>{doc.document_name}</span>
+                      <span style={{ fontSize: '14px', fontWeight: 700, color: COLORS.slate900 }}>{doc.document_name}</span>
                     )}
                     {doc.document_category && (
                       <span style={{ fontSize: '10px', fontWeight: 700, color: catStyle.color, background: catStyle.bg, padding: '2px 8px', borderRadius: '20px' }}>{doc.document_category}</span>
                     )}
                   </div>
                   {doc.notes && (
-                    <p style={{ margin: 0, fontSize: '12px', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '360px' }}>{doc.notes}</p>
+                    <p style={{ margin: 0, fontSize: '12px', color: COLORS.slate500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '360px' }}>{doc.notes}</p>
                   )}
                 </div>
 
-                <div style={{ flex: '1 1 120px', fontSize: '12px', color: '#64748b' }}>
+                <div style={{ flex: '1 1 120px', fontSize: '12px', color: COLORS.slate500 }}>
                   {doc.document_date ? formatUKDate(doc.document_date) : '—'}
                 </div>
 
@@ -366,13 +367,13 @@ export default function PropertyDocumentsTab({ property, profile }) {
                 <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
                   <button
                     onClick={() => setModalDoc(doc)}
-                    style={{ padding: '7px 14px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
+                    style={{ padding: '7px 14px', background: COLORS.slate100, color: COLORS.slate600, border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
                   >
                     Edit
                   </button>
                   <button
                     onClick={() => setDeleteTarget(doc)}
-                    style={{ padding: '7px 14px', background: '#fff', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
+                    style={{ padding: '7px 14px', background: COLORS.white, color: COLORS.red600, border: `1px solid ${COLORS.red200}`, borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
                   >
                     Delete
                   </button>

@@ -62,6 +62,7 @@ export const COLORS = {
   amber700: '#b45309',
   amber800: '#92400e',
   amber900: '#78350f',
+  orange100: '#ffedd5',
   orange700: '#c2410c',
 
   // Blue (primary / links / info)
@@ -73,9 +74,15 @@ export const COLORS = {
   blue700: '#1d4ed8',
   blue900: '#1e3a8a',
 
-  // Purple
+  // Purple / violet / indigo / pink (category/type badge variety)
   purple100: '#f3e8ff',
   purple600: '#9333ea',
+  violet100: '#ede9fe',
+  violet600: '#7c3aed',
+  indigo100: '#e0e7ff',
+  indigo700: '#4338ca',
+  pink100: '#fce7f3',
+  pink700: '#be185d',
 
   // Brand (logo/splash gradient -- not part of the neutral/status scales above)
   brandNavy: '#0D1B3E',

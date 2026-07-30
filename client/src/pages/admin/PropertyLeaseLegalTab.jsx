@@ -24,6 +24,7 @@
 
 import { useState } from 'react'
 import { supabase } from '../../lib/supabase'
+import { COLORS } from '../../lib/colors'
 import { modalLabelStyle, modalErrorStyle } from './shared'
 import { compressImage } from '../../lib/imageCompression'
 
@@ -31,10 +32,10 @@ const LEASE_TYPES = ['Fixed Term', 'Rolling', 'Assured Shorthold', 'Other']
 const LEASE_STATUSES = ['Active', 'Expiring', 'Renewed', 'Terminated']
 const DEPOSIT_SCHEMES = ['DPS', 'TDS', 'MyDeposits', 'None']
 
-const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '13px', fontFamily: 'inherit', boxSizing: 'border-box' }
-const readRowStyle = { display: 'flex', justifyContent: 'space-between', gap: '12px', padding: '8px 0', borderBottom: '1px solid #f1f5f9' }
-const readLabelStyle = { fontSize: '12px', fontWeight: 700, color: '#94a3b8' }
-const readValueStyle = { fontSize: '13px', fontWeight: 600, color: '#0f172a', textAlign: 'right' }
+const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', fontFamily: 'inherit', boxSizing: 'border-box' }
+const readRowStyle = { display: 'flex', justifyContent: 'space-between', gap: '12px', padding: '8px 0', borderBottom: `1px solid ${COLORS.slate100}` }
+const readLabelStyle = { fontSize: '12px', fontWeight: 700, color: COLORS.slate400 }
+const readValueStyle = { fontSize: '13px', fontWeight: 600, color: COLORS.slate900, textAlign: 'right' }
 
 function daysBetween(dateStr) {
   const target = new Date(dateStr)
@@ -67,10 +68,10 @@ function insuranceBadge(expiry) {
 }
 
 const BADGE_STYLES = {
-  green: { bg: '#dcfce7', color: '#16a34a' },
-  amber: { bg: '#fef3c7', color: '#d97706' },
-  red: { bg: '#fee2e2', color: '#dc2626' },
-  grey: { bg: '#f1f5f9', color: '#64748b' },
+  green: { bg: COLORS.green100, color: COLORS.green600 },
+  amber: { bg: COLORS.amber100, color: COLORS.amber600 },
+  red: { bg: COLORS.red100, color: COLORS.red600 },
+  grey: { bg: COLORS.slate100, color: COLORS.slate500 },
 }
 
 function fieldInput(field, value, onChange) {
@@ -102,7 +103,7 @@ function fieldInput(field, value, onChange) {
 function formatReadValue(field, value) {
   if (value === null || value === undefined || value === '') return '—'
   if (field.key === 'landlord_email') {
-    return <a href={`mailto:${value}`} style={{ color: '#1d4ed8', fontWeight: 700 }}>{value}</a>
+    return <a href={`mailto:${value}`} style={{ color: COLORS.blue700, fontWeight: 700 }}>{value}</a>
   }
   if (field.key === 'rent_amount' || field.key === 'deposit_amount') {
     return `£${Number(value).toLocaleString()}`
@@ -134,13 +135,13 @@ function EditableSection({ title, fields, property, onSave, extra }) {
   }
 
   return (
-    <div style={{ background: '#fff', borderRadius: '16px', padding: '20px', marginBottom: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+    <div style={{ background: COLORS.white, borderRadius: '16px', padding: '20px', marginBottom: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-        <p style={{ margin: 0, fontSize: '14px', fontWeight: 800, color: '#0f172a' }}>{title}</p>
+        <p style={{ margin: 0, fontSize: '14px', fontWeight: 800, color: COLORS.slate900 }}>{title}</p>
         {!editing && (
           <button
             onClick={startEdit}
-            style={{ padding: '6px 14px', background: '#1d4ed8', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
+            style={{ padding: '6px 14px', background: COLORS.blue700, color: COLORS.white, border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
           >
             Edit
           </button>
@@ -169,13 +170,13 @@ function EditableSection({ title, fields, property, onSave, extra }) {
           {error && <p style={modalErrorStyle}>{error}</p>}
 
           <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
-            <button onClick={() => setEditing(false)} style={{ flex: 1, padding: '10px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
+            <button onClick={() => setEditing(false)} style={{ flex: 1, padding: '10px', background: COLORS.slate100, color: COLORS.slate600, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
               Cancel
             </button>
             <button
               onClick={save}
               disabled={saving}
-              style={{ flex: 2, padding: '10px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.6 : 1 }}
+              style={{ flex: 2, padding: '10px', background: COLORS.green600, color: COLORS.white, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.6 : 1 }}
             >
               {saving ? 'Saving...' : 'Save'}
             </button>
@@ -221,7 +222,7 @@ function DocUpload({ label, urlKey, property, onSave, bucketFolder }) {
     <div style={{ marginTop: '4px' }}>
       <p style={modalLabelStyle}>{label}</p>
       {existingUrl && (
-        <a href={existingUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'block', marginBottom: '8px', fontSize: '13px', fontWeight: 700, color: '#1d4ed8' }}>
+        <a href={existingUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'block', marginBottom: '8px', fontSize: '13px', fontWeight: 700, color: COLORS.blue700 }}>
           📄 {filenameFromUrl(existingUrl)} — Download ↗
         </a>
       )}
@@ -229,7 +230,7 @@ function DocUpload({ label, urlKey, property, onSave, bucketFolder }) {
       <button
         onClick={() => document.getElementById(inputId).click()}
         disabled={uploading}
-        style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '2px dashed #cbd5e1', background: '#fff', color: '#64748b', fontSize: '13px', fontWeight: 600, cursor: uploading ? 'not-allowed' : 'pointer' }}
+        style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `2px dashed ${COLORS.slate300}`, background: COLORS.white, color: COLORS.slate500, fontSize: '13px', fontWeight: 600, cursor: uploading ? 'not-allowed' : 'pointer' }}
       >
         {uploading ? 'Uploading...' : existingUrl ? 'Replace document' : 'Upload document'}
       </button>
@@ -306,9 +307,9 @@ export default function PropertyLeaseLegalTab({ property, onFieldsSaved }) {
         ]}
       />
 
-      <div style={{ background: '#fff', borderRadius: '16px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+      <div style={{ background: COLORS.white, borderRadius: '16px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-          <p style={{ margin: 0, fontSize: '14px', fontWeight: 800, color: '#0f172a' }}>Insurance</p>
+          <p style={{ margin: 0, fontSize: '14px', fontWeight: 800, color: COLORS.slate900 }}>Insurance</p>
           {insBadge && (
             <span style={{ fontSize: '11px', fontWeight: 800, color: insBadgeStyle.color, background: insBadgeStyle.bg, padding: '3px 10px', borderRadius: '20px' }}>
               {insBadge.label}
@@ -364,19 +365,19 @@ function InsuranceSection({ property, onSave }) {
         {!editing ? (
           <button
             onClick={startEdit}
-            style={{ padding: '6px 14px', background: '#1d4ed8', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
+            style={{ padding: '6px 14px', background: COLORS.blue700, color: COLORS.white, border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
           >
             Edit
           </button>
         ) : (
           <>
-            <button onClick={() => setEditing(false)} style={{ flex: 1, padding: '10px', background: '#f1f5f9', color: '#475569', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
+            <button onClick={() => setEditing(false)} style={{ flex: 1, padding: '10px', background: COLORS.slate100, color: COLORS.slate600, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
               Cancel
             </button>
             <button
               onClick={save}
               disabled={saving}
-              style={{ flex: 2, padding: '10px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.6 : 1 }}
+              style={{ flex: 2, padding: '10px', background: COLORS.green600, color: COLORS.white, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.6 : 1 }}
             >
               {saving ? 'Saving...' : 'Save'}
             </button>
