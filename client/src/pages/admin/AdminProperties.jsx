@@ -147,7 +147,7 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
   const [openTicketCounts, setOpenTicketCounts] = useState({})
   const [voidRoomCounts, setVoidRoomCounts] = useState({})
   const [newPropertyWindowHours, setNewPropertyWindowHours] = useState(DEFAULT_NEW_PROPERTY_WINDOW_HOURS)
-  const [filterMode, setFilterMode] = useState('all') // 'all' | 'newProperties' | 'procured' | 'live' | 'gardensOverdue'
+  const [filterMode, setFilterMode] = useState('all') // 'all' | 'newProperties' | 'procured' | 'live' | 'inactive' | 'gardensOverdue'
   const [p1Threshold, setP1Threshold] = useState(70)
   const [p2Threshold, setP2Threshold] = useState(40)
   const [loading, setLoading] = useState(true)
@@ -401,9 +401,14 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
       if (!matches) return false
     }
     if (townFilter && p.town !== townFilter) return false
+    // Inactive properties are no longer with the company -- hidden from
+    // every other view (including the default "all") so they don't clutter
+    // normal browsing, only reachable via the dedicated Inactive tile.
+    if (filterMode !== 'inactive' && p.status === 'Inactive') return false
     if (filterMode === 'newProperties' && !isNewProperty(p)) return false
     if (filterMode === 'procured' && p.status !== 'Procured') return false
     if (filterMode === 'live' && p.status !== 'Live') return false
+    if (filterMode === 'inactive' && p.status !== 'Inactive') return false
     if (filterMode === 'gardensOverdue' && !p.has_garden) return false
     return true
   })
@@ -412,6 +417,7 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
     filterMode === 'newProperties' ? 'New Properties' :
     filterMode === 'procured' ? 'Procured' :
     filterMode === 'live' ? 'Live' :
+    filterMode === 'inactive' ? 'Inactive' :
     filterMode === 'gardensOverdue' ? 'Gardens' :
     null
 
@@ -420,14 +426,18 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
   // instead of adding a second separate count display next to the dropdown.
   const activeFilterLabel = [filterModeLabel, townFilter].filter(Boolean).join(' · ') || null
 
-  // Same 4 metrics/colours as the dashboard's Properties tiles, computed
-  // client-side from the already-fetched `properties` list instead of
-  // separate count queries, since the full list is already in memory here.
+  // Same 4 metrics/colours as the dashboard's Properties tiles, plus a 5th
+  // Inactive tile (page-local, not mirrored on the dashboard). Total
+  // deliberately excludes Inactive so the headline number reflects only
+  // properties still actively managed -- Inactive ones are no longer with
+  // the company (returned to landlord etc.) and are only reachable via
+  // their own tile/filter.
   const propertyKpis = [
-    { label: 'Total Properties', value: properties.length, colour: '#2563eb', mode: 'all' },
+    { label: 'Total Properties', value: properties.filter(p => p.status !== 'Inactive').length, colour: '#2563eb', mode: 'all' },
     { label: 'New Properties', value: properties.filter(isNewProperty).length, colour: '#0f766e', mode: 'newProperties' },
     { label: 'Procured', value: properties.filter(p => p.status === 'Procured').length, colour: '#64748b', mode: 'procured' },
     { label: 'Live', value: properties.filter(p => p.status === 'Live').length, colour: '#16a34a', mode: 'live' },
+    { label: 'Inactive', value: properties.filter(p => p.status === 'Inactive').length, colour: '#57534e', mode: 'inactive' },
   ]
 
   const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '13px', fontFamily: 'inherit', boxSizing: 'border-box' }
@@ -435,6 +445,7 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
   const statusPillStyle = (status) => {
     if (status === 'Void') return { fontSize: '11px', fontWeight: 700, padding: '3px 10px', borderRadius: '20px', color: '#dc2626', background: '#fee2e2' }
     if (status === 'Procured') return { fontSize: '11px', fontWeight: 700, padding: '3px 10px', borderRadius: '20px', color: '#64748b', background: '#f1f5f9' }
+    if (status === 'Inactive') return { fontSize: '11px', fontWeight: 700, padding: '3px 10px', borderRadius: '20px', color: '#57534e', background: '#e7e5e4' }
     return { fontSize: '11px', fontWeight: 700, padding: '3px 10px', borderRadius: '20px', color: '#16a34a', background: '#dcfce7' } // Occupied / Live
   }
 
@@ -522,6 +533,7 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
                 <option value="Void">Void</option>
                 <option value="Procured">Procured</option>
                 <option value="Live">Live</option>
+                <option value="Inactive">Inactive</option>
               </select>
 
               {editError && <p style={modalErrorStyle}>{editError}</p>}
@@ -783,6 +795,7 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
             <select value={addStatus} onChange={(e) => setAddStatus(e.target.value)} style={inputStyle}>
               <option value="Procured">Procured</option>
               <option value="Live">Live</option>
+              <option value="Inactive">Inactive</option>
             </select>
 
             {addError && <p style={modalErrorStyle}>{addError}</p>}
