@@ -13,6 +13,7 @@ import { compressImage } from '../lib/imageCompression'
 import PropertySearchSelect from '../components/PropertySearchSelect'
 import ChatComposer from '../components/ChatComposer'
 import PhotoLightbox from '../components/PhotoLightbox'
+import VoiceInputButton from '../components/VoiceInputButton'
 import gbchLogo from '../assets/gbch-logo.svg'
 
 // Hidden for now, not removed -- flip back to true to bring the builder's
@@ -2531,13 +2532,16 @@ export default function BuilderDashboard({ profile }) {
                         <p style={{ margin: '0 0 8px 0', fontSize: '11px', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                           Describe the area
                         </p>
-                        <input
-                          type="text"
-                          value={ticketOtherArea}
-                          onChange={(e) => setTicketOtherArea(e.target.value)}
-                          placeholder="e.g. Back garden boundary wall"
-                          style={{ width: '100%', height: '44px', padding: '0 12px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '13px', boxSizing: 'border-box' }}
-                        />
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          <input
+                            type="text"
+                            value={ticketOtherArea}
+                            onChange={(e) => setTicketOtherArea(e.target.value)}
+                            placeholder="e.g. Back garden boundary wall"
+                            style={{ flex: 1, height: '44px', padding: '0 12px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '13px', boxSizing: 'border-box' }}
+                          />
+                          <VoiceInputButton onResult={(text) => setTicketOtherArea(prev => prev ? `${prev} ${text}` : text)} />
+                        </div>
                       </div>
                     )}
                   </div>
@@ -2601,13 +2605,16 @@ export default function BuilderDashboard({ profile }) {
                     </div>
 
                     {isUnlistedTag(ticketIssueTag) && (
-                      <input
-                        type="text"
-                        value={ticketIssueOther}
-                        onChange={(e) => setTicketIssueOther(e.target.value)}
-                        placeholder={`Describe the unlisted ${ticketCategory} issue (defaults to a baseline ${maintenanceCategories[ticketCategory]?.weight ?? 15}-point score)`}
-                        style={{ width: '100%', marginTop: '10px', height: '44px', padding: '0 12px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '13px', boxSizing: 'border-box' }}
-                      />
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '10px' }}>
+                        <input
+                          type="text"
+                          value={ticketIssueOther}
+                          onChange={(e) => setTicketIssueOther(e.target.value)}
+                          placeholder={`Describe the unlisted ${ticketCategory} issue (defaults to a baseline ${maintenanceCategories[ticketCategory]?.weight ?? 15}-point score)`}
+                          style={{ flex: 1, height: '44px', padding: '0 12px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '13px', boxSizing: 'border-box' }}
+                        />
+                        <VoiceInputButton onResult={(text) => setTicketIssueOther(prev => prev ? `${prev} ${text}` : text)} />
+                      </div>
                     )}
 
                     {ticketIssueTag && (() => {
