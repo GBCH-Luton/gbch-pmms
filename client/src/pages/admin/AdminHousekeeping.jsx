@@ -8,21 +8,22 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
+import { COLORS } from '../../lib/colors'
 import { attachProperties } from '../../lib/properties'
 import {
   fetchRoutineVisitAging, fetchAssignableStaffForCategory, createNotification, postAuditEvent,
   STAFF_AVAILABILITY_STYLES,
 } from './shared'
 
-const cardStyle = { background: '#fff', borderRadius: '16px', padding: '20px', marginBottom: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }
-const sectionTitleStyle = { margin: '0 0 4px 0', fontSize: '16px', fontWeight: 800, color: '#0f172a' }
-const sectionSubtitleStyle = { margin: '0 0 16px 0', fontSize: '13px', color: '#64748b' }
+const cardStyle = { background: COLORS.white, borderRadius: '16px', padding: '20px', marginBottom: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }
+const sectionTitleStyle = { margin: '0 0 4px 0', fontSize: '16px', fontWeight: 800, color: COLORS.slate900 }
+const sectionSubtitleStyle = { margin: '0 0 16px 0', fontSize: '13px', color: COLORS.slate500 }
 
 const TIER_STYLES = {
-  red: { bg: '#fee2e2', color: '#dc2626' },
-  amber: { bg: '#fef3c7', color: '#d97706' },
-  green: { bg: '#dcfce7', color: '#16a34a' },
-  grey: { bg: '#f1f5f9', color: '#64748b' },
+  red: { bg: COLORS.red100, color: COLORS.red600 },
+  amber: { bg: COLORS.amber100, color: COLORS.amber600 },
+  green: { bg: COLORS.green100, color: COLORS.green600 },
+  grey: { bg: COLORS.slate100, color: COLORS.slate500 },
 }
 
 const OPEN_STATUSES = ['Pending', 'Assigned', 'In Progress', 'On Hold']
@@ -123,19 +124,19 @@ export default function AdminHousekeeping({ profile, onNavigate }) {
 
   if (loading) return (
     <div style={{ minHeight: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <p style={{ color: '#94a3b8', fontWeight: 600, fontFamily: 'system-ui' }}>Loading Housekeeping...</p>
+      <p style={{ color: COLORS.slate400, fontWeight: 600, fontFamily: 'system-ui' }}>Loading Housekeeping...</p>
     </div>
   )
 
   return (
     <div>
-      <h1 style={{ margin: '0 0 16px 0', fontSize: '20px', fontWeight: 800, color: '#0f172a' }}>Housekeeping</h1>
+      <h1 style={{ margin: '0 0 16px 0', fontSize: '20px', fontWeight: 800, color: COLORS.slate900 }}>Housekeeping</h1>
 
       <div style={cardStyle}>
         <p style={sectionTitleStyle}>Routine Visits Due</p>
         <p style={sectionSubtitleStyle}>Every property with a cleaner assigned, ordered by how overdue it is.</p>
         {visits.length === 0 && (
-          <p style={{ margin: 0, fontSize: '13px', color: '#94a3b8', fontStyle: 'italic' }}>No properties have a cleaner assigned yet.</p>
+          <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>No properties have a cleaner assigned yet.</p>
         )}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {visits.map(v => {
@@ -144,11 +145,11 @@ export default function AdminHousekeeping({ profile, onNavigate }) {
               <button
                 key={v.propertyId}
                 onClick={() => onNavigate?.('properties', { propertyId: v.propertyId })}
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', padding: '10px 12px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', cursor: 'pointer', textAlign: 'left' }}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', padding: '10px 12px', background: COLORS.slate50, border: `1px solid ${COLORS.slate200}`, borderRadius: '10px', cursor: 'pointer', textAlign: 'left' }}
               >
                 <div>
-                  <p style={{ margin: '0 0 2px 0', fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>{v.address}</p>
-                  <p style={{ margin: 0, fontSize: '12px', color: '#64748b' }}>{v.cleanerName}{v.daysSince != null ? ` — ${v.daysSince} days since last visit` : ''}</p>
+                  <p style={{ margin: '0 0 2px 0', fontSize: '13px', fontWeight: 700, color: COLORS.slate900 }}>{v.address}</p>
+                  <p style={{ margin: 0, fontSize: '12px', color: COLORS.slate500 }}>{v.cleanerName}{v.daysSince != null ? ` — ${v.daysSince} days since last visit` : ''}</p>
                 </div>
                 <span style={{ fontSize: '11px', fontWeight: 800, color: style.color, background: style.bg, padding: '3px 10px', borderRadius: '20px', flexShrink: 0 }}>{v.label}</span>
               </button>
@@ -161,16 +162,16 @@ export default function AdminHousekeeping({ profile, onNavigate }) {
         <p style={sectionTitleStyle}>Cleaner Workload</p>
         <p style={sectionSubtitleStyle}>How many properties and open jobs each cleaner currently has.</p>
         {cleaners.length === 0 && (
-          <p style={{ margin: 0, fontSize: '13px', color: '#94a3b8', fontStyle: 'italic' }}>No Housekeepers found.</p>
+          <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>No Housekeepers found.</p>
         )}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {cleaners.map(c => {
             const availStyle = STAFF_AVAILABILITY_STYLES[c.availability] || STAFF_AVAILABILITY_STYLES['Available']
             return (
-              <div key={c.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', padding: '10px 12px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px' }}>
+              <div key={c.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', padding: '10px 12px', background: COLORS.slate50, border: `1px solid ${COLORS.slate200}`, borderRadius: '10px' }}>
                 <div>
-                  <p style={{ margin: '0 0 2px 0', fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>{c.name}</p>
-                  <p style={{ margin: 0, fontSize: '12px', color: '#64748b' }}>{c.propertyCount} propert{c.propertyCount === 1 ? 'y' : 'ies'} · {c.openTicketCount} open job{c.openTicketCount === 1 ? '' : 's'}</p>
+                  <p style={{ margin: '0 0 2px 0', fontSize: '13px', fontWeight: 700, color: COLORS.slate900 }}>{c.name}</p>
+                  <p style={{ margin: 0, fontSize: '12px', color: COLORS.slate500 }}>{c.propertyCount} propert{c.propertyCount === 1 ? 'y' : 'ies'} · {c.openTicketCount} open job{c.openTicketCount === 1 ? '' : 's'}</p>
                 </div>
                 <span style={{ fontSize: '11px', fontWeight: 800, color: availStyle.color, background: availStyle.bg, padding: '3px 10px', borderRadius: '20px', flexShrink: 0 }}>{c.availability}</span>
               </div>
@@ -183,29 +184,29 @@ export default function AdminHousekeeping({ profile, onNavigate }) {
         <p style={sectionTitleStyle}>Pending Delay Reasons</p>
         <p style={sectionSubtitleStyle}>A cleaner reported they couldn't complete a routine visit on time -- review before it's accepted.</p>
         {pendingDelays.length === 0 && (
-          <p style={{ margin: 0, fontSize: '13px', color: '#94a3b8', fontStyle: 'italic' }}>Nothing waiting for review.</p>
+          <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>Nothing waiting for review.</p>
         )}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {pendingDelays.map(t => (
-            <div key={t.id} style={{ padding: '12px', background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: '10px' }}>
-              <p style={{ margin: '0 0 2px 0', fontSize: '11px', fontWeight: 700, color: '#94a3b8' }}>#{t.ticket_number}</p>
-              <p style={{ margin: '0 0 2px 0', fontSize: '13px', fontWeight: 700, color: '#0f172a' }}>{t.property?.address}</p>
-              <p style={{ margin: '0 0 8px 0', fontSize: '13px', color: '#78350f' }}>
+            <div key={t.id} style={{ padding: '12px', background: COLORS.amber50, border: `1px solid ${COLORS.amber300}`, borderRadius: '10px' }}>
+              <p style={{ margin: '0 0 2px 0', fontSize: '11px', fontWeight: 700, color: COLORS.slate400 }}>#{t.ticket_number}</p>
+              <p style={{ margin: '0 0 2px 0', fontSize: '13px', fontWeight: 700, color: COLORS.slate900 }}>{t.property?.address}</p>
+              <p style={{ margin: '0 0 8px 0', fontSize: '13px', color: COLORS.amber900 }}>
                 <strong>{t.cleanerName}</strong>: {t.delay_reason}{t.delay_reason_note ? ` — ${t.delay_reason_note}` : ''}
               </p>
-              {actionError[t.id] && <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: '#dc2626' }}>{actionError[t.id]}</p>}
+              {actionError[t.id] && <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: COLORS.red600 }}>{actionError[t.id]}</p>}
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button
                   onClick={() => handleReviewDelay(t, 'approved')}
                   disabled={actionSubmitting[t.id]}
-                  style={{ flex: 1, padding: '8px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: actionSubmitting[t.id] ? 'not-allowed' : 'pointer' }}
+                  style={{ flex: 1, padding: '8px', background: COLORS.green600, color: COLORS.white, border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: actionSubmitting[t.id] ? 'not-allowed' : 'pointer' }}
                 >
                   ✓ Approve
                 </button>
                 <button
                   onClick={() => handleReviewDelay(t, 'rejected')}
                   disabled={actionSubmitting[t.id]}
-                  style={{ flex: 1, padding: '8px', background: '#fff', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: actionSubmitting[t.id] ? 'not-allowed' : 'pointer' }}
+                  style={{ flex: 1, padding: '8px', background: COLORS.white, color: COLORS.red600, border: `1px solid ${COLORS.red200}`, borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: actionSubmitting[t.id] ? 'not-allowed' : 'pointer' }}
                 >
                   ✕ Reject
                 </button>

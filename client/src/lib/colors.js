@@ -33,6 +33,10 @@ export const COLORS = {
   // "slate" scale above -- a few call sites use this one instead)
   gray700: '#374151',
 
+  // Section header background -- lighter than slate100, used only for the
+  // dashboard's collapsible section headers
+  sectionHeaderBg: '#eef1f6',
+
   // Red (danger / expired / errors)
   red50: '#fef2f2',
   red100: '#fee2e2',
@@ -46,10 +50,15 @@ export const COLORS = {
   green50: '#f0fdf4',
   green100: '#dcfce7',
   green200: '#bbf7d0',
+  green300: '#86efac',
   green600: '#16a34a',
+  green700: '#15803d',
   green800: '#166534',
   green900: '#14532d',
   greenDark: '#19562e',
+
+  // Lime (a distinct step used for a badge/type variant)
+  lime600: '#65a30d',
 
   // Teal (brand accent -- primary buttons, "new" badges, active nav)
   teal50: '#f0fdfa',
@@ -84,19 +93,32 @@ export const COLORS = {
   blue700: '#1d4ed8',
   blue900: '#1e3a8a',
 
+  // Sky / cyan (distinct blue-family steps used for a badge/type variant)
+  sky500: '#0ea5e9',
+  sky700: '#0369a1',
+  cyan600: '#0891b2',
+
   // Purple / violet / indigo / pink (category/type badge variety)
+  purple50: '#faf5ff',
   purple100: '#f3e8ff',
+  purple200: '#e9d5ff',
   purple600: '#9333ea',
+  purple700: '#7e22ce',
   violet100: '#ede9fe',
   violet500: '#8b5cf6',
   violet600: '#7c3aed',
   indigo100: '#e0e7ff',
   indigo700: '#4338ca',
   pink100: '#fce7f3',
+  pink600: '#db2777',
   pink700: '#be185d',
+
+  // Yellow (distinct from amber -- a badge/type variant)
+  yellow700: '#a16207',
 
   // Brand (logo/splash gradient -- not part of the neutral/status scales above)
   brandNavy: '#0D1B3E',
   brandNavyMid: '#0A2444',
   brandNavyLight: '#0D2F5E',
+  brandNavyPanel: '#142654',
 }

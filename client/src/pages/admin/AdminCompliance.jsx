@@ -7,6 +7,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
+import { COLORS } from '../../lib/colors'
 import PropertySearchSelect from '../../components/PropertySearchSelect'
 import {
   COMPLIANCE_TYPES, RagPill, computeComplianceAging, formatUKDate,
@@ -85,11 +86,11 @@ export default function AdminCompliance({ onNavigate, initialTierFilter, onIniti
   }, [properties, records, thresholdDays])
 
   const kpis = useMemo(() => [
-    { label: 'Total records', value: rows.length, colour: '#64748b', tierFilter: 'All' },
-    { label: 'Expired', value: rows.filter(r => r.category === 'Expired').length, colour: '#dc2626', tierFilter: 'Expired' },
-    { label: 'Due Soon', value: rows.filter(r => r.category === 'Due Soon').length, colour: '#d97706', tierFilter: 'Due Soon' },
-    { label: 'No Record', value: rows.filter(r => r.category === 'No Record').length, colour: '#94a3b8', tierFilter: 'No Record' },
-    { label: 'Valid', value: rows.filter(r => r.category === 'Valid').length, colour: '#16a34a', tierFilter: 'Valid' },
+    { label: 'Total records', value: rows.length, colour: COLORS.slate500, tierFilter: 'All' },
+    { label: 'Expired', value: rows.filter(r => r.category === 'Expired').length, colour: COLORS.red600, tierFilter: 'Expired' },
+    { label: 'Due Soon', value: rows.filter(r => r.category === 'Due Soon').length, colour: COLORS.amber600, tierFilter: 'Due Soon' },
+    { label: 'No Record', value: rows.filter(r => r.category === 'No Record').length, colour: COLORS.slate400, tierFilter: 'No Record' },
+    { label: 'Valid', value: rows.filter(r => r.category === 'Valid').length, colour: COLORS.green600, tierFilter: 'Valid' },
   ], [rows])
 
   function applyKpiFilter(kpi) {
@@ -178,7 +179,7 @@ export default function AdminCompliance({ onNavigate, initialTierFilter, onIniti
 
   if (loading) return (
     <div style={{ minHeight: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <p style={{ color: '#94a3b8', fontWeight: 600, fontFamily: 'system-ui' }}>Loading compliance records...</p>
+      <p style={{ color: COLORS.slate400, fontWeight: 600, fontFamily: 'system-ui' }}>Loading compliance records...</p>
     </div>
   )
 
@@ -197,15 +198,15 @@ export default function AdminCompliance({ onNavigate, initialTierFilter, onIniti
         <div style={{ width: '220px' }}>
           <PropertySearchSelect properties={properties} value={propertyFilter} onChange={setPropertyFilter} placeholder="All Properties" />
         </div>
-        <button onClick={clearFilters} style={{ padding: '8px 14px', borderRadius: '10px', border: '1px solid #e2e8f0', background: '#fff', color: '#64748b', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
+        <button onClick={clearFilters} style={{ padding: '8px 14px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, background: COLORS.white, color: COLORS.slate500, fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
           Clear filters
         </button>
       </div>
 
-      <div style={{ background: '#fff', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+      <div style={{ background: COLORS.white, borderRadius: '16px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
-            <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+            <tr style={{ borderBottom: `1px solid ${COLORS.slate100}` }}>
               <th style={{ ...thStyle, cursor: 'pointer' }} onClick={() => toggleSort('property')}>Property{sortArrow('property')}</th>
               <th style={{ ...thStyle, cursor: 'pointer' }} onClick={() => toggleSort('certType')}>Cert Type{sortArrow('certType')}</th>
               <th style={{ ...thStyle, cursor: 'pointer' }} onClick={() => toggleSort('status')}>Status{sortArrow('status')}</th>
@@ -216,7 +217,7 @@ export default function AdminCompliance({ onNavigate, initialTierFilter, onIniti
           <tbody>
             {sortedRows.length === 0 && (
               <tr>
-                <td colSpan={5} style={{ ...tdStyle, textAlign: 'center', color: '#94a3b8', padding: '32px' }}>
+                <td colSpan={5} style={{ ...tdStyle, textAlign: 'center', color: COLORS.slate400, padding: '32px' }}>
                   No compliance records match these filters.
                 </td>
               </tr>
@@ -225,11 +226,11 @@ export default function AdminCompliance({ onNavigate, initialTierFilter, onIniti
               <tr
                 key={`${r.property.id}:${r.type.key}`}
                 onClick={() => goToPropertyCompliance(r)}
-                style={{ borderBottom: '1px solid #f1f5f9', cursor: 'pointer' }}
+                style={{ borderBottom: `1px solid ${COLORS.slate100}`, cursor: 'pointer' }}
               >
                 <td style={tdStyle}>
-                  <span style={{ display: 'block', fontWeight: 700, color: '#0f172a' }}>{r.property.address}</span>
-                  {r.property.postcode && <span style={{ fontSize: '12px', color: '#94a3b8' }}>{r.property.postcode}</span>}
+                  <span style={{ display: 'block', fontWeight: 700, color: COLORS.slate900 }}>{r.property.address}</span>
+                  {r.property.postcode && <span style={{ fontSize: '12px', color: COLORS.slate400 }}>{r.property.postcode}</span>}
                 </td>
                 <td style={tdStyle}>{r.type.title}</td>
                 <td style={tdStyle}><RagPill tier={r.aging.tier} label={r.aging.label} /></td>
@@ -239,7 +240,7 @@ export default function AdminCompliance({ onNavigate, initialTierFilter, onIniti
             ))}
             {hasMore && (
               <tr>
-                <td colSpan={5} ref={sentinelRef} style={{ ...tdStyle, textAlign: 'center', color: '#94a3b8', padding: '16px' }}>
+                <td colSpan={5} ref={sentinelRef} style={{ ...tdStyle, textAlign: 'center', color: COLORS.slate400, padding: '16px' }}>
                   Loading more…
                 </td>
               </tr>
@@ -248,7 +249,7 @@ export default function AdminCompliance({ onNavigate, initialTierFilter, onIniti
         </table>
       </div>
       {sortedRows.length > 0 && (
-        <p style={{ margin: '10px 2px 0', fontSize: '12px', color: '#94a3b8', textAlign: 'center' }}>
+        <p style={{ margin: '10px 2px 0', fontSize: '12px', color: COLORS.slate400, textAlign: 'center' }}>
           Showing {visibleRows.length} of {sortedRows.length}
         </p>
       )}

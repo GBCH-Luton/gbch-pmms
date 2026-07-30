@@ -7,6 +7,7 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
+import { COLORS } from '../../lib/colors'
 import { attachProperties } from '../../lib/properties'
 import { fetchAllMaintenanceCategoryNames } from '../../lib/maintenanceCategories'
 import {
@@ -18,10 +19,10 @@ import SimpleBarChart from '../../components/SimpleBarChart'
 
 const tileStyle = (colour) => ({ flex: '1 1 160px', background: colour, borderRadius: '16px', padding: '16px', textAlign: 'center' })
 const tileLabelStyle = { margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase', letterSpacing: '0.06em' }
-const tileValueStyle = { margin: 0, fontSize: '26px', fontWeight: 800, color: '#ffffff' }
-const cardStyle = { background: '#fff', borderRadius: '16px', padding: '18px 20px', marginBottom: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }
-const cardLabelStyle = { margin: '0 0 12px 0', fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }
-const filterLabelStyle = { display: 'block', fontSize: '11px', fontWeight: 700, color: '#94a3b8', marginBottom: '4px' }
+const tileValueStyle = { margin: 0, fontSize: '26px', fontWeight: 800, color: COLORS.white }
+const cardStyle = { background: COLORS.white, borderRadius: '16px', padding: '18px 20px', marginBottom: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }
+const cardLabelStyle = { margin: '0 0 12px 0', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }
+const filterLabelStyle = { display: 'block', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, marginBottom: '4px' }
 
 function avgMsLabel(ms) {
   if (ms == null) return 'N/A'
@@ -70,16 +71,16 @@ export default function AdminReports({ profile }) {
   if (tickets === null) {
     return (
       <div style={{ minHeight: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <p style={{ color: '#94a3b8', fontWeight: 600 }}>Loading reports...</p>
+        <p style={{ color: COLORS.slate400, fontWeight: 600 }}>Loading reports...</p>
       </div>
     )
   }
 
   if (loadError) {
     return (
-      <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '16px', padding: '24px', textAlign: 'center' }}>
-        <p style={{ margin: '0 0 4px 0', fontSize: '14px', fontWeight: 700, color: '#dc2626' }}>Couldn't load reports</p>
-        <p style={{ margin: 0, fontSize: '13px', color: '#7f1d1d', fontFamily: 'monospace' }}>{loadError}</p>
+      <div style={{ background: COLORS.red50, border: `1px solid ${COLORS.red200}`, borderRadius: '16px', padding: '24px', textAlign: 'center' }}>
+        <p style={{ margin: '0 0 4px 0', fontSize: '14px', fontWeight: 700, color: COLORS.red600 }}>Couldn't load reports</p>
+        <p style={{ margin: 0, fontSize: '13px', color: COLORS.red900, fontFamily: 'monospace' }}>{loadError}</p>
       </div>
     )
   }
@@ -152,7 +153,7 @@ export default function AdminReports({ profile }) {
 
   return (
     <div>
-      <h2 style={{ margin: '0 0 16px 0', fontSize: '18px', fontWeight: 800, color: '#0f172a' }}>Reports</h2>
+      <h2 style={{ margin: '0 0 16px 0', fontSize: '18px', fontWeight: 800, color: COLORS.slate900 }}>Reports</h2>
 
       <div style={{ ...cardStyle, display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
         <div>
@@ -174,23 +175,23 @@ export default function AdminReports({ profile }) {
       </div>
 
       <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
-        <div style={tileStyle('#64748b')}>
+        <div style={tileStyle(COLORS.slate500)}>
           <p style={tileLabelStyle}>Tickets Raised (Range)</p>
           <p style={tileValueStyle}>{createdInRange.length}</p>
         </div>
-        <div style={tileStyle('#16a34a')}>
+        <div style={tileStyle(COLORS.green600)}>
           <p style={tileLabelStyle}>Completed (Range)</p>
           <p style={tileValueStyle}>{completedInRange.length}</p>
         </div>
-        <div style={tileStyle('#0d9488')}>
+        <div style={tileStyle(COLORS.teal600)}>
           <p style={tileLabelStyle}>Currently Open</p>
           <p style={tileValueStyle}>{currentlyOpen.length}</p>
         </div>
-        <div style={tileStyle('#9333ea')}>
+        <div style={tileStyle(COLORS.purple600)}>
           <p style={tileLabelStyle}>Avg. Turnaround</p>
           <p style={tileValueStyle}>{avgMsLabel(avgTurnaroundMs)}</p>
         </div>
-        <div style={tileStyle('#2563eb')}>
+        <div style={tileStyle(COLORS.blue600)}>
           <p style={tileLabelStyle}>Avg. Response Time</p>
           <p style={tileValueStyle}>{avgMsLabel(avgResponseMs)}</p>
         </div>
@@ -201,8 +202,8 @@ export default function AdminReports({ profile }) {
         <SimpleBarChart
           data={trendData}
           series={[
-            { name: 'Raised', color: '#3b82f6' },
-            { name: 'Completed', color: '#16a34a' },
+            { name: 'Raised', color: COLORS.blue500 },
+            { name: 'Completed', color: COLORS.green600 },
           ]}
         />
       </div>
@@ -217,24 +218,24 @@ export default function AdminReports({ profile }) {
         </div>
         <SimpleBarChart
           data={breakdownChartData}
-          series={[{ name: breakdownMode === 'division' ? 'Division' : 'Category', color: '#0d9488' }]}
+          series={[{ name: breakdownMode === 'division' ? 'Division' : 'Category', color: COLORS.teal600 }]}
         />
       </div>
 
       <div style={cardStyle}>
         <p style={cardLabelStyle}>Properties With the Most Tickets</p>
         {recurringProperties.length === 0 ? (
-          <p style={{ margin: 0, fontSize: '13px', color: '#94a3b8', fontStyle: 'italic' }}>No tickets match these filters.</p>
+          <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>No tickets match these filters.</p>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {recurringProperties.map((p, idx) => (
-              <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid #f1f5f9' }}>
-                <span style={{ fontSize: '13px', fontWeight: 600, color: '#0f172a' }}>{p.address}</span>
+              <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: `1px solid ${COLORS.slate100}` }}>
+                <span style={{ fontSize: '13px', fontWeight: 600, color: COLORS.slate900 }}>{p.address}</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   {p.count >= 3 && (
-                    <span style={{ fontSize: '10px', fontWeight: 800, color: '#dc2626', background: '#fee2e2', padding: '2px 8px', borderRadius: '20px' }}>⚠ Recurring</span>
+                    <span style={{ fontSize: '10px', fontWeight: 800, color: COLORS.red600, background: COLORS.red100, padding: '2px 8px', borderRadius: '20px' }}>⚠ Recurring</span>
                   )}
-                  <span style={{ fontSize: '13px', fontWeight: 800, color: '#0f172a', fontFamily: 'monospace' }}>{p.count}</span>
+                  <span style={{ fontSize: '13px', fontWeight: 800, color: COLORS.slate900, fontFamily: 'monospace' }}>{p.count}</span>
                 </div>
               </div>
             ))}
@@ -245,12 +246,12 @@ export default function AdminReports({ profile }) {
       <div style={cardStyle}>
         <p style={cardLabelStyle}>Staff Workload (Range)</p>
         {workload.length === 0 ? (
-          <p style={{ margin: 0, fontSize: '13px', color: '#94a3b8', fontStyle: 'italic' }}>No assigned tickets match these filters.</p>
+          <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>No assigned tickets match these filters.</p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
-                <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+                <tr style={{ borderBottom: `1px solid ${COLORS.slate200}` }}>
                   <th style={thStyle}>Staff</th>
                   <th style={thStyle}>Raised</th>
                   <th style={thStyle}>Completed</th>
@@ -260,7 +261,7 @@ export default function AdminReports({ profile }) {
               </thead>
               <tbody>
                 {workload.map(w => (
-                  <tr key={w.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                  <tr key={w.id} style={{ borderBottom: `1px solid ${COLORS.slate100}` }}>
                     <td style={tdStyle}>{w.name}</td>
                     <td style={tdStyle}>{w.assignedCount}</td>
                     <td style={tdStyle}>{w.completedCount}</td>

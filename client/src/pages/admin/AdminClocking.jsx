@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
+import { COLORS } from '../../lib/colors'
 import { distanceMetres, googleMapsEmbedLink, googleMapsRouteEmbedLink, metresToMiles, formatDistanceMetres, ensurePropertyCoords } from '../../lib/geo'
 import { attachProperties } from '../../lib/properties'
 import {
@@ -19,11 +20,11 @@ function LocationCell({ distance, thresholdM, lat, lng, onOpenMap }) {
   const tooFar = distance != null && distance > thresholdM
   return (
     <div style={{ fontFamily: 'system-ui', marginTop: '2px' }}>
-      <button onClick={() => onOpenMap(lat, lng)} style={{ background: 'none', border: 'none', padding: 0, fontSize: '11px', fontWeight: 700, color: '#1d4ed8', cursor: 'pointer' }}>
+      <button onClick={() => onOpenMap(lat, lng)} style={{ background: 'none', border: 'none', padding: 0, fontSize: '11px', fontWeight: 700, color: COLORS.blue700, cursor: 'pointer' }}>
         📍 Map
       </button>
       {tooFar && (
-        <span style={{ display: 'block', fontSize: '10px', fontWeight: 800, color: '#dc2626' }}>
+        <span style={{ display: 'block', fontSize: '10px', fontWeight: 800, color: COLORS.red600 }}>
           ⚠ {formatDistanceMetres(distance)} away
         </span>
       )}
@@ -284,7 +285,7 @@ export default function AdminClocking({ profile }) {
 
   if (loading) return (
     <div style={{ minHeight: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <p style={{ color: '#94a3b8', fontWeight: 600, fontFamily: 'system-ui' }}>Loading clocking data...</p>
+      <p style={{ color: COLORS.slate400, fontWeight: 600, fontFamily: 'system-ui' }}>Loading clocking data...</p>
     </div>
   )
 
@@ -292,12 +293,12 @@ export default function AdminClocking({ profile }) {
     <div>
 
       {/* Section 1: Currently Clocked In */}
-      <div style={{ background: '#fff', borderRadius: '16px', padding: '20px', marginBottom: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-        <h2 style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: 800, color: '#0f172a' }}>Currently Clocked In</h2>
-        <p style={{ margin: '0 0 14px 0', fontSize: '13px', color: '#64748b' }}>Live running timers. A red row means the job has been running past 8 hours — the builder may have forgotten to clock out.</p>
+      <div style={{ background: COLORS.white, borderRadius: '16px', padding: '20px', marginBottom: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+        <h2 style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: 800, color: COLORS.slate900 }}>Currently Clocked In</h2>
+        <p style={{ margin: '0 0 14px 0', fontSize: '13px', color: COLORS.slate500 }}>Live running timers. A red row means the job has been running past 8 hours — the builder may have forgotten to clock out.</p>
 
         {liveSessions.length === 0 && (
-          <p style={{ margin: 0, fontSize: '13px', color: '#94a3b8', fontStyle: 'italic' }}>Nobody is clocked in right now.</p>
+          <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>Nobody is clocked in right now.</p>
         )}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -312,35 +313,35 @@ export default function AdminClocking({ profile }) {
                 style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px',
                   borderRadius: '12px', padding: '12px 14px',
-                  background: overrun ? '#fef2f2' : '#f0fdfa',
-                  border: overrun ? '1px solid #fecaca' : '1px solid #99f6e4',
+                  background: overrun ? COLORS.red50 : COLORS.teal50,
+                  border: overrun ? `1px solid ${COLORS.red200}` : `1px solid ${COLORS.teal300}`,
                 }}
               >
                 <div>
-                  <strong style={{ display: 'block', fontSize: '13px', color: '#0f172a' }}>{row.builderName}</strong>
-                  <span style={{ fontSize: '12px', color: '#64748b' }}>
+                  <strong style={{ display: 'block', fontSize: '13px', color: COLORS.slate900 }}>{row.builderName}</strong>
+                  <span style={{ fontSize: '12px', color: COLORS.slate500 }}>
                     #{row.ticket.ticket_number} · {row.ticket.property?.address} — {row.ticket.room || '—'} → {row.ticket.description}
                   </span>
                   {overrun && (
-                    <span style={{ display: 'block', marginTop: '4px', fontSize: '11px', fontWeight: 800, color: '#dc2626' }}>
+                    <span style={{ display: 'block', marginTop: '4px', fontSize: '11px', fontWeight: 800, color: COLORS.red600 }}>
                       ⏱ Over 8h — check builder hasn't forgotten to clock out
                     </span>
                   )}
                   {tooFar && (
-                    <span style={{ display: 'block', marginTop: '4px', fontSize: '11px', fontWeight: 800, color: '#dc2626' }}>
+                    <span style={{ display: 'block', marginTop: '4px', fontSize: '11px', fontWeight: 800, color: COLORS.red600 }}>
                       ⚠ Clocked in {formatDistanceMetres(row.clockInDistance)} from the property
                     </span>
                   )}
                   {hasPin && (
                     <button
                       onClick={() => openPinMap(row.session.clock_in_lat, row.session.clock_in_lng)}
-                      style={{ display: 'inline-block', marginTop: '4px', background: 'none', border: 'none', padding: 0, fontSize: '11px', fontWeight: 700, color: '#1d4ed8', cursor: 'pointer' }}
+                      style={{ display: 'inline-block', marginTop: '4px', background: 'none', border: 'none', padding: 0, fontSize: '11px', fontWeight: 700, color: COLORS.blue700, cursor: 'pointer' }}
                     >
                       📍 View clock-in location
                     </button>
                   )}
                 </div>
-                <span style={{ fontFamily: 'monospace', fontSize: '16px', fontWeight: 800, color: overrun ? '#dc2626' : '#0d9488', whiteSpace: 'nowrap' }}>
+                <span style={{ fontFamily: 'monospace', fontSize: '16px', fontWeight: 800, color: overrun ? COLORS.red600 : COLORS.teal600, whiteSpace: 'nowrap' }}>
                   {formatDuration(elapsedMs)}
                 </span>
               </div>
@@ -350,18 +351,18 @@ export default function AdminClocking({ profile }) {
       </div>
 
       {/* Section 2: Average Time by Job Type */}
-      <div style={{ background: '#fff', borderRadius: '16px', padding: '20px', marginBottom: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-        <h2 style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: 800, color: '#0f172a' }}>Average Time by Job Type</h2>
-        <p style={{ margin: '0 0 14px 0', fontSize: '13px', color: '#64748b' }}>Based on completed jobs with recorded clock times.</p>
+      <div style={{ background: COLORS.white, borderRadius: '16px', padding: '20px', marginBottom: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+        <h2 style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: 800, color: COLORS.slate900 }}>Average Time by Job Type</h2>
+        <p style={{ margin: '0 0 14px 0', fontSize: '13px', color: COLORS.slate500 }}>Based on completed jobs with recorded clock times.</p>
 
         {categoryEntries.length === 0 ? (
-          <p style={{ margin: 0, fontSize: '13px', color: '#94a3b8', fontStyle: 'italic' }}>No completed jobs with recorded time yet.</p>
+          <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>No completed jobs with recorded time yet.</p>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
             {categoryEntries.map(([category, stats]) => (
-              <div key={category} style={{ background: '#0d9488', borderRadius: '16px', padding: '16px', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+              <div key={category} style={{ background: COLORS.teal600, borderRadius: '16px', padding: '16px', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
                 <span style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.85)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{category}</span>
-                <strong style={{ display: 'block', fontSize: '28px', fontWeight: 800, color: '#ffffff', marginTop: '8px' }}>{formatDuration(stats.totalMs / stats.count)}</strong>
+                <strong style={{ display: 'block', fontSize: '28px', fontWeight: 800, color: COLORS.white, marginTop: '8px' }}>{formatDuration(stats.totalMs / stats.count)}</strong>
                 <span style={{ display: 'block', fontSize: '11px', color: 'rgba(255,255,255,0.75)', marginTop: '4px' }}>avg over {stats.count} job{stats.count === 1 ? '' : 's'}</span>
               </div>
             ))}
@@ -370,11 +371,11 @@ export default function AdminClocking({ profile }) {
       </div>
 
       {/* Section 3: Completed Job Timesheet */}
-      <div style={{ background: '#fff', borderRadius: '16px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+      <div style={{ background: COLORS.white, borderRadius: '16px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px', marginBottom: '14px' }}>
           <div>
-            <h2 style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: 800, color: '#0f172a' }}>Completed Job Timesheet</h2>
-            <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>Clock-in, clock-out, total worked time and mileage per finished job.</p>
+            <h2 style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: 800, color: COLORS.slate900 }}>Completed Job Timesheet</h2>
+            <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate500 }}>Clock-in, clock-out, total worked time and mileage per finished job.</p>
           </div>
           <select value={builderFilter} onChange={(e) => setBuilderFilter(e.target.value)} style={filterSelectStyle}>
             <option value="All">All builders</option>
@@ -387,7 +388,7 @@ export default function AdminClocking({ profile }) {
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
-              <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+              <tr style={{ background: COLORS.slate50, borderBottom: `1px solid ${COLORS.slate200}` }}>
                 <th style={thStyle}>Job</th>
                 <th style={thStyle}>Builder</th>
                 <th style={thStyle}>Clock-In</th>
@@ -401,17 +402,17 @@ export default function AdminClocking({ profile }) {
             <tbody>
               {filteredCompletedRows.length === 0 && (
                 <tr>
-                  <td colSpan={8} style={{ padding: '32px', textAlign: 'center', color: '#94a3b8', fontWeight: 600 }}>
+                  <td colSpan={8} style={{ padding: '32px', textAlign: 'center', color: COLORS.slate400, fontWeight: 600 }}>
                     No completed jobs to show.
                   </td>
                 </tr>
               )}
               {filteredCompletedRows.map(row => (
-                <tr key={row.ticket.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                <tr key={row.ticket.id} style={{ borderBottom: `1px solid ${COLORS.slate100}` }}>
                   <td style={tdStyle}>
-                    <span style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#94a3b8' }}>#{row.ticket.ticket_number}</span>
-                    <span style={{ display: 'block', fontWeight: 700, color: '#0f172a' }}>{row.ticket.property?.address}</span>
-                    <span style={{ display: 'block', fontSize: '12px', color: '#64748b' }}>{row.ticket.room || '—'} → {row.ticket.description}</span>
+                    <span style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: COLORS.slate400 }}>#{row.ticket.ticket_number}</span>
+                    <span style={{ display: 'block', fontWeight: 700, color: COLORS.slate900 }}>{row.ticket.property?.address}</span>
+                    <span style={{ display: 'block', fontSize: '12px', color: COLORS.slate500 }}>{row.ticket.room || '—'} → {row.ticket.description}</span>
                   </td>
                   <td style={tdStyle}>{row.builderName}</td>
                   <td style={{ ...tdStyle, fontFamily: 'monospace', fontSize: '12px' }}>
@@ -422,10 +423,10 @@ export default function AdminClocking({ profile }) {
                     {formatUKDateTime(row.lastOut)}
                     <LocationCell distance={row.clockOutDistance} thresholdM={distanceThresholdM} lat={row.lastSession.clock_out_lat} lng={row.lastSession.clock_out_lng} onOpenMap={openPinMap} />
                   </td>
-                  <td style={{ ...tdStyle, fontWeight: 800, color: '#0d9488', fontFamily: 'monospace' }}>
+                  <td style={{ ...tdStyle, fontWeight: 800, color: COLORS.teal600, fontFamily: 'monospace' }}>
                     {formatDuration(row.totalMs)}
                     {row.sessions.length > 1 && (
-                      <span style={{ display: 'block', fontSize: '10px', color: '#94a3b8', fontWeight: 600 }}>{row.sessions.length} sessions</span>
+                      <span style={{ display: 'block', fontSize: '10px', color: COLORS.slate400, fontWeight: 600 }}>{row.sessions.length} sessions</span>
                     )}
                   </td>
                   <td style={tdStyle}>{(row.ticket.mileage_logged || 0).toFixed(1)}</td>
@@ -433,12 +434,12 @@ export default function AdminClocking({ profile }) {
                     {row.firstSession.clock_in_lat != null && row.firstSession.clock_in_lng != null && row.lastSession.clock_out_lat != null && row.lastSession.clock_out_lng != null ? (
                       <button
                         onClick={() => openRouteMap(row.firstSession.clock_in_lat, row.firstSession.clock_in_lng, row.lastSession.clock_out_lat, row.lastSession.clock_out_lng)}
-                        style={{ background: 'none', border: 'none', padding: 0, fontSize: '11px', fontWeight: 700, color: '#1d4ed8', cursor: 'pointer' }}
+                        style={{ background: 'none', border: 'none', padding: 0, fontSize: '11px', fontWeight: 700, color: COLORS.blue700, cursor: 'pointer' }}
                       >
                         🧭 Route
                       </button>
                     ) : (
-                      <span style={{ fontSize: '11px', color: '#cbd5e1' }}>—</span>
+                      <span style={{ fontSize: '11px', color: COLORS.slate300 }}>—</span>
                     )}
                   </td>
                   <td style={{ ...tdStyle, textAlign: 'right' }}>
@@ -456,14 +457,14 @@ export default function AdminClocking({ profile }) {
         <div style={modalOverlayStyle}>
           <div style={modalCardStyle}>
             <p style={modalTitleStyle}>Correct Clock Times — Job #{editRow.ticket.ticket_number}</p>
-            <p style={{ margin: '2px 0 0 0', fontSize: '13px', color: '#64748b' }}>{editRow.ticket.property?.address}</p>
+            <p style={{ margin: '2px 0 0 0', fontSize: '13px', color: COLORS.slate500 }}>{editRow.ticket.property?.address}</p>
 
             <label style={modalLabelStyle}>Clock-In</label>
             <input
               type="datetime-local"
               value={editClockIn}
               onChange={(e) => setEditClockIn(e.target.value)}
-              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '13px', boxSizing: 'border-box' }}
+              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', boxSizing: 'border-box' }}
             />
 
             <label style={modalLabelStyle}>Clock-Out</label>
@@ -471,11 +472,11 @@ export default function AdminClocking({ profile }) {
               type="datetime-local"
               value={editClockOut}
               onChange={(e) => setEditClockOut(e.target.value)}
-              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '13px', boxSizing: 'border-box' }}
+              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', boxSizing: 'border-box' }}
             />
 
             {editRow.sessions.length > 1 && (
-              <p style={{ margin: '10px 0 0 0', fontSize: '12px', color: '#94a3b8' }}>
+              <p style={{ margin: '10px 0 0 0', fontSize: '12px', color: COLORS.slate400 }}>
                 This job has {editRow.sessions.length} separate work sessions (paused/resumed). Only the very first clock-in and the very last clock-out are corrected here.
               </p>
             )}
@@ -500,7 +501,7 @@ export default function AdminClocking({ profile }) {
           <div style={{ ...modalCardStyle, maxWidth: '640px' }}>
             <p style={modalTitleStyle}>{mapModal.mode === 'route' ? 'Clock-In → Clock-Out Route' : 'Location'}</p>
             {mapModal.mode === 'route' && (
-              <p style={{ margin: '2px 0 12px 0', fontSize: '13px', color: '#64748b' }}>
+              <p style={{ margin: '2px 0 12px 0', fontSize: '13px', color: COLORS.slate500 }}>
                 Estimated straight-line distance: <strong>{mapModal.distanceMiles.toFixed(2)} miles</strong>
               </p>
             )}

@@ -16,6 +16,7 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
+import { COLORS } from '../../lib/colors'
 import { normalizeCustomRoles } from '../../lib/roles'
 import { attachProperties } from '../../lib/properties'
 import BuilderProfilePage from './BuilderProfilePage'
@@ -116,7 +117,7 @@ export default function AdminBuilders({ profile }) {
 
   if (loading) return (
     <div style={{ minHeight: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <p style={{ color: '#94a3b8', fontWeight: 600, fontFamily: 'system-ui' }}>Loading staff...</p>
+      <p style={{ color: COLORS.slate400, fontWeight: 600, fontFamily: 'system-ui' }}>Loading staff...</p>
     </div>
   )
 
@@ -172,39 +173,39 @@ export default function AdminBuilders({ profile }) {
   return (
     <div>
       <div style={{ marginBottom: '16px' }}>
-        <h1 style={{ margin: '0 0 4px 0', fontSize: '18px', fontWeight: 800, color: '#0f172a' }}>Live Field Radar</h1>
-        <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>Real-time duty status and current assignment for every active staff member.</p>
+        <h1 style={{ margin: '0 0 4px 0', fontSize: '18px', fontWeight: 800, color: COLORS.slate900 }}>Live Field Radar</h1>
+        <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate500 }}>Real-time duty status and current assignment for every active staff member.</p>
       </div>
 
       {/* KPI tiles */}
       <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
-        <div style={{ flex: '1 1 160px', background: '#64748b', borderRadius: '16px', padding: '16px', textAlign: 'center' }}>
+        <div style={{ flex: '1 1 160px', background: COLORS.slate500, borderRadius: '16px', padding: '16px', textAlign: 'center' }}>
           <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Total Staff</p>
-          <p style={{ margin: 0, fontSize: '26px', fontWeight: 800, color: '#fff' }}>{totalStaff}</p>
+          <p style={{ margin: 0, fontSize: '26px', fontWeight: 800, color: COLORS.white }}>{totalStaff}</p>
         </div>
-        <div style={{ flex: '1 1 160px', background: '#16a34a', borderRadius: '16px', padding: '16px', textAlign: 'center' }}>
+        <div style={{ flex: '1 1 160px', background: COLORS.green600, borderRadius: '16px', padding: '16px', textAlign: 'center' }}>
           <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Active</p>
-          <p style={{ margin: 0, fontSize: '26px', fontWeight: 800, color: '#fff' }}>{activeCount}</p>
+          <p style={{ margin: 0, fontSize: '26px', fontWeight: 800, color: COLORS.white }}>{activeCount}</p>
         </div>
-        <div style={{ flex: '1 1 160px', background: '#0d9488', borderRadius: '16px', padding: '16px', textAlign: 'center' }}>
+        <div style={{ flex: '1 1 160px', background: COLORS.teal600, borderRadius: '16px', padding: '16px', textAlign: 'center' }}>
           <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>On Duty Now</p>
-          <p style={{ margin: 0, fontSize: '26px', fontWeight: 800, color: '#fff' }}>{onDutyCount}</p>
+          <p style={{ margin: 0, fontSize: '26px', fontWeight: 800, color: COLORS.white }}>{onDutyCount}</p>
         </div>
-        <div style={{ flex: '1 1 160px', background: '#94a3b8', borderRadius: '16px', padding: '16px', textAlign: 'center' }}>
+        <div style={{ flex: '1 1 160px', background: COLORS.slate400, borderRadius: '16px', padding: '16px', textAlign: 'center' }}>
           <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Inactive</p>
-          <p style={{ margin: 0, fontSize: '26px', fontWeight: 800, color: '#fff' }}>{inactiveCount}</p>
+          <p style={{ margin: 0, fontSize: '26px', fontWeight: 800, color: COLORS.white }}>{inactiveCount}</p>
         </div>
       </div>
 
       {/* Role filter */}
-      <div style={{ display: 'flex', gap: '4px', marginBottom: '14px', flexWrap: 'wrap', borderBottom: '1px solid #e2e8f0' }}>
+      <div style={{ display: 'flex', gap: '4px', marginBottom: '14px', flexWrap: 'wrap', borderBottom: `1px solid ${COLORS.slate200}` }}>
         {filterTabs.map(tab => (
           <button
             key={tab}
             onClick={() => setRoleFilter(tab)}
             style={{
-              padding: '8px 14px', background: 'none', border: 'none', borderBottom: effectiveRoleFilter === tab ? '2px solid #0f766e' : '2px solid transparent',
-              color: effectiveRoleFilter === tab ? '#0f766e' : '#64748b', fontSize: '13px', fontWeight: 700, cursor: 'pointer', marginBottom: '-1px', whiteSpace: 'nowrap',
+              padding: '8px 14px', background: 'none', border: 'none', borderBottom: effectiveRoleFilter === tab ? `2px solid ${COLORS.teal700}` : '2px solid transparent',
+              color: effectiveRoleFilter === tab ? COLORS.teal700 : COLORS.slate500, fontSize: '13px', fontWeight: 700, cursor: 'pointer', marginBottom: '-1px', whiteSpace: 'nowrap',
             }}
           >
             {tab}
@@ -212,11 +213,11 @@ export default function AdminBuilders({ profile }) {
         ))}
       </div>
 
-      <div style={{ background: '#fff', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+      <div style={{ background: COLORS.white, borderRadius: '16px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
-              <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+              <tr style={{ background: COLORS.slate50, borderBottom: `1px solid ${COLORS.slate200}` }}>
                 <th style={thStyle}>Staff</th>
                 <th style={thStyle}>Availability</th>
                 <th style={thStyle}>Duty Status</th>
@@ -228,7 +229,7 @@ export default function AdminBuilders({ profile }) {
             <tbody>
               {radarStaff.length === 0 && (
                 <tr>
-                  <td colSpan={6} style={{ padding: '32px', textAlign: 'center', color: '#94a3b8', fontWeight: 600 }}>
+                  <td colSpan={6} style={{ padding: '32px', textAlign: 'center', color: COLORS.slate400, fontWeight: 600 }}>
                     No active staff found.
                   </td>
                 </tr>
@@ -237,14 +238,14 @@ export default function AdminBuilders({ profile }) {
                 const { activeJobs, inProgressJob, badge } = dutyFor(b.id)
                 const availStyle = STAFF_AVAILABILITY_STYLES[b.availability] || STAFF_AVAILABILITY_STYLES.Available
                 return (
-                  <tr key={b.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                  <tr key={b.id} style={{ borderBottom: `1px solid ${COLORS.slate100}` }}>
                     <td style={tdStyle}>
                       <div
                         onClick={() => setSelectedStaffId(b.id)}
                         style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}
                       >
                         <Avatar name={b.name} photoUrl={b.photo_url} size={28} />
-                        <span style={{ fontWeight: 700, color: '#1d4ed8' }}>
+                        <span style={{ fontWeight: 700, color: COLORS.blue700 }}>
                           {b.name}
                         </span>
                       </div>
@@ -267,7 +268,7 @@ export default function AdminBuilders({ profile }) {
                           onChange={(e) => handleNoteChange(b.id, e.target.value)}
                           onBlur={() => handleNoteBlur(b.id)}
                           placeholder="Note (e.g. back Monday)"
-                          style={{ display: 'block', marginTop: '4px', width: '160px', padding: '4px 8px', borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '11px', boxSizing: 'border-box' }}
+                          style={{ display: 'block', marginTop: '4px', width: '160px', padding: '4px 8px', borderRadius: '6px', border: `1px solid ${COLORS.slate200}`, fontSize: '11px', boxSizing: 'border-box' }}
                         />
                       )}
                     </td>
@@ -278,13 +279,13 @@ export default function AdminBuilders({ profile }) {
                     </td>
                     <td style={tdStyle}>
                       {inProgressJob ? (
-                        <span style={{ color: '#475569' }}>
-                          <strong style={{ color: '#0f172a' }}>{inProgressJob.property?.address}</strong> — {inProgressJob.room || '—'} → {inProgressJob.description}
+                        <span style={{ color: COLORS.slate600 }}>
+                          <strong style={{ color: COLORS.slate900 }}>{inProgressJob.property?.address}</strong> — {inProgressJob.room || '—'} → {inProgressJob.description}
                         </span>
                       ) : activeJobs.length > 0 ? (
-                        <span style={{ color: '#475569' }}>{activeJobs.length} active job{activeJobs.length === 1 ? '' : 's'}</span>
+                        <span style={{ color: COLORS.slate600 }}>{activeJobs.length} active job{activeJobs.length === 1 ? '' : 's'}</span>
                       ) : (
-                        <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>No active assignment</span>
+                        <span style={{ color: COLORS.slate400, fontStyle: 'italic' }}>No active assignment</span>
                       )}
                     </td>
                     <td style={tdStyle}>{activeJobs.length}</td>

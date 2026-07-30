@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef, Fragment } from 'react'
 import { supabase } from '../lib/supabase'
+import { COLORS } from '../lib/colors'
 import { logLoginEvent } from '../lib/loginEvents'
 import { pushNotificationsSupported, hasActivePushSubscription, enablePushNotifications } from '../lib/pushNotifications'
 import gbchLogo from '../assets/gbch-logo.svg'
@@ -195,7 +196,7 @@ export default function AdminDashboard({ profile }) {
   const navButtonStyle = (active) => ({
     display: 'flex', alignItems: 'center', gap: '10px', width: '100%', textAlign: 'left', padding: '7px 12px', marginBottom: '1px',
     borderRadius: '8px', border: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: active ? 700 : 400,
-    background: active ? '#19562e' : 'transparent', color: '#ffffff', fontFamily: 'inherit',
+    background: active ? COLORS.greenDark : 'transparent', color: COLORS.white, fontFamily: 'inherit',
   })
   const navIconStyle = { width: '18px', flexShrink: 0, textAlign: 'center', fontSize: '14px', lineHeight: 1 }
 
@@ -248,7 +249,7 @@ export default function AdminDashboard({ profile }) {
           style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'none', border: 'none', padding: '20px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.1)', width: '100%', textAlign: 'left' }}
         >
           <img src={gbchLogo} alt="GBCH" style={{ height: '32px' }} />
-          <span style={{ fontSize: '15px', fontWeight: 800, color: '#ffffff' }}>PMMS</span>
+          <span style={{ fontSize: '15px', fontWeight: 800, color: COLORS.white }}>PMMS</span>
         </button>
 
         {impersonationMarker && (
@@ -260,7 +261,7 @@ export default function AdminDashboard({ profile }) {
               onClick={handleReturnToAdmin}
               disabled={returning}
               style={{
-                width: '100%', background: '#b45309', color: '#fff', border: 'none', borderRadius: '8px',
+                width: '100%', background: COLORS.amber700, color: COLORS.white, border: 'none', borderRadius: '8px',
                 padding: '8px 12px', fontSize: '13px', fontWeight: 700, cursor: returning ? 'default' : 'pointer',
               }}
             >
@@ -282,7 +283,7 @@ export default function AdminDashboard({ profile }) {
                   {item.key === 'sign-off' && pendingSignOffCount > 0 && (
                     <span
                       style={{
-                        background: '#dc2626', color: '#ffffff', fontSize: '11px', fontWeight: 800,
+                        background: COLORS.red600, color: COLORS.white, fontSize: '11px', fontWeight: 800,
                         borderRadius: '999px', padding: '1px 8px', marginLeft: '8px', minWidth: '20px', textAlign: 'center', flexShrink: 0,
                       }}
                     >
@@ -292,7 +293,7 @@ export default function AdminDashboard({ profile }) {
                   {item.key === 'pipeline' && totalTicketsCount > 0 && (
                     <span
                       style={{
-                        background: '#dc2626', color: '#ffffff', fontSize: '11px', fontWeight: 800,
+                        background: COLORS.red600, color: COLORS.white, fontSize: '11px', fontWeight: 800,
                         borderRadius: '999px', padding: '1px 8px', marginLeft: '8px', minWidth: '20px', textAlign: 'center', flexShrink: 0,
                       }}
                     >
@@ -302,7 +303,7 @@ export default function AdminDashboard({ profile }) {
                   {item.key === 'team-chat' && chatUnreadTotal > 0 && (
                     <span
                       style={{
-                        background: '#dc2626', color: '#ffffff', fontSize: '11px', fontWeight: 800,
+                        background: COLORS.red600, color: COLORS.white, fontSize: '11px', fontWeight: 800,
                         borderRadius: '999px', padding: '1px 8px', marginLeft: '8px', minWidth: '20px', textAlign: 'center', flexShrink: 0,
                       }}
                     >
@@ -324,7 +325,7 @@ export default function AdminDashboard({ profile }) {
               ref={popoverRef}
               style={{
                 position: 'absolute', left: '16px', right: '16px', bottom: 'calc(100% + 8px)',
-                background: '#142654', border: '1px solid rgba(255,255,255,0.16)', borderRadius: '10px',
+                background: COLORS.brandNavyPanel, border: '1px solid rgba(255,255,255,0.16)', borderRadius: '10px',
                 padding: '6px', boxShadow: '0 12px 28px rgba(0,0,0,0.35)', display: 'flex', flexDirection: 'column', zIndex: 30,
               }}
             >
@@ -354,12 +355,12 @@ export default function AdminDashboard({ profile }) {
             {resolveStaffPhotoUrl(profile.photo_url) ? (
               <img src={resolveStaffPhotoUrl(profile.photo_url)} alt="" style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
             ) : (
-              <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'rgba(255,255,255,0.15)', color: '#ffffff', fontSize: '13px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'rgba(255,255,255,0.15)', color: COLORS.white, fontSize: '13px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 {(profile.name || '?').split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase()}
               </div>
             )}
             <div style={{ minWidth: 0, flex: 1 }}>
-              <p style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: '#ffffff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{profile.name}</p>
+              <p style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: COLORS.white, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{profile.name}</p>
               <p style={{ margin: 0, fontSize: '12px', color: 'rgba(255,255,255,0.6)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{profile.job_title}</p>
             </div>
             <span style={{ flexShrink: 0, color: 'rgba(255,255,255,0.6)', fontSize: '11px', transform: popoverOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }}>▲</span>
@@ -369,12 +370,12 @@ export default function AdminDashboard({ profile }) {
             <button
               onClick={handleEnableNotifications}
               disabled={pushEnabled}
-              style={{ width: '100%', padding: '10px', borderRadius: '10px', border: 'none', background: 'rgba(255,255,255,0.1)', color: pushEnabled ? 'rgba(255,255,255,0.5)' : '#ffffff', fontWeight: 700, fontSize: '13px', cursor: pushEnabled ? 'default' : 'pointer' }}
+              style={{ width: '100%', padding: '10px', borderRadius: '10px', border: 'none', background: 'rgba(255,255,255,0.1)', color: pushEnabled ? 'rgba(255,255,255,0.5)' : COLORS.white, fontWeight: 700, fontSize: '13px', cursor: pushEnabled ? 'default' : 'pointer' }}
             >
               🔔 {pushEnabled ? 'Notifications: On' : 'Enable Notifications'}
             </button>
           )}
-          {pushError && <p style={{ margin: '8px 0 0 0', fontSize: '11px', color: '#fca5a5' }}>{pushError}</p>}
+          {pushError && <p style={{ margin: '8px 0 0 0', fontSize: '11px', color: COLORS.red300 }}>{pushError}</p>}
         </div>
       </>
     )
@@ -390,12 +391,12 @@ export default function AdminDashboard({ profile }) {
     : AdminDashboardPage
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: '#f1f5f9', fontFamily: 'system-ui, sans-serif' }}>
+    <div style={{ display: 'flex', minHeight: '100vh', background: COLORS.slate100, fontFamily: 'system-ui, sans-serif' }}>
 
       {/* Desktop sidebar */}
       <div
         className="admin-sidebar-desktop"
-        style={{ width: '240px', minWidth: '240px', background: '#0D1B3E', display: 'flex', flexDirection: 'column', position: 'sticky', top: 'var(--pmms-banner-offset, 0px)', height: 'calc(100vh - var(--pmms-banner-offset, 0px))' }}
+        style={{ width: '240px', minWidth: '240px', background: COLORS.brandNavy, display: 'flex', flexDirection: 'column', position: 'sticky', top: 'var(--pmms-banner-offset, 0px)', height: 'calc(100vh - var(--pmms-banner-offset, 0px))' }}
       >
         <SidebarContent />
       </div>
@@ -405,23 +406,23 @@ export default function AdminDashboard({ profile }) {
         {/* Mobile top bar */}
         <div
           className="admin-mobile-topbar"
-          style={{ alignItems: 'center', justifyContent: 'space-between', background: '#0D1B3E', padding: '14px 16px', position: 'sticky', top: 'var(--pmms-banner-offset, 0px)', zIndex: 20 }}
+          style={{ alignItems: 'center', justifyContent: 'space-between', background: COLORS.brandNavy, padding: '14px 16px', position: 'sticky', top: 'var(--pmms-banner-offset, 0px)', zIndex: 20 }}
         >
           <button
             onClick={() => goToPage('dashboard')}
             style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
           >
             <img src={gbchLogo} alt="GBCH" style={{ height: '28px' }} />
-            <span style={{ color: '#ffffff', fontWeight: 800, fontSize: '14px' }}>PMMS</span>
+            <span style={{ color: COLORS.white, fontWeight: 800, fontSize: '14px' }}>PMMS</span>
           </button>
           <button
             onClick={() => setSidebarOpen(true)}
             aria-label="Menu"
             style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '4px', background: 'none', border: 'none', padding: '8px', cursor: 'pointer' }}
           >
-            <span style={{ width: '22px', height: '2px', background: '#ffffff', borderRadius: '2px' }} />
-            <span style={{ width: '22px', height: '2px', background: '#ffffff', borderRadius: '2px' }} />
-            <span style={{ width: '22px', height: '2px', background: '#ffffff', borderRadius: '2px' }} />
+            <span style={{ width: '22px', height: '2px', background: COLORS.white, borderRadius: '2px' }} />
+            <span style={{ width: '22px', height: '2px', background: COLORS.white, borderRadius: '2px' }} />
+            <span style={{ width: '22px', height: '2px', background: COLORS.white, borderRadius: '2px' }} />
           </button>
         </div>
 
@@ -446,7 +447,7 @@ export default function AdminDashboard({ profile }) {
       {/* Mobile drawer */}
       {sidebarOpen && (
         <div style={{ position: 'fixed', top: 'var(--pmms-banner-offset, 0px)', left: 0, right: 0, bottom: 0, zIndex: 100, display: 'flex' }}>
-          <div style={{ width: '260px', maxWidth: '80vw', background: '#0D1B3E', height: '100%', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ width: '260px', maxWidth: '80vw', background: COLORS.brandNavy, height: '100%', display: 'flex', flexDirection: 'column' }}>
             <SidebarContent />
           </div>
           <div onClick={() => setSidebarOpen(false)} style={{ flex: 1, background: 'rgba(15,23,42,0.5)' }} />

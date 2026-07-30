@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { COLORS } from './colors'
 import { compressImage } from './imageCompression'
 
 const LAST_READ_PREFIX = 'pmms_chat_last_read_'
@@ -13,8 +14,8 @@ const MESSAGE_LIMIT = 200
 // #dc2626 (reserved for urgent/unread badges elsewhere in this app) and
 // the brand green (already used for "your own" message bubbles).
 const SENDER_COLOURS = [
-  '#0d9488', '#7c3aed', '#f59e0b', '#1d4ed8', '#db2777', '#65a30d', '#0891b2', '#9333ea',
-  '#c2410c', '#4338ca', '#0369a1', '#a16207', '#be185d', '#15803d',
+  COLORS.teal600, COLORS.violet600, COLORS.amber500, COLORS.blue700, COLORS.pink600, COLORS.lime600, COLORS.cyan600, COLORS.purple600,
+  COLORS.orange700, COLORS.indigo700, COLORS.sky700, COLORS.yellow700, COLORS.pink700, COLORS.green700,
 ]
 
 export function colorForSender(id) {

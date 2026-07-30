@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
+import { COLORS } from '../../lib/colors'
 import { priorityTierLabel, fetchFlaggedClockingCount, isTicketStuck, KpiTiles, fetchComplianceAgingCounts, fetchVoidAgingCounts, fetchGardenReviewAging, computeAvgResponseMs, formatDuration, fetchPriorityThresholds } from './shared'
 
 const DEFAULT_NEW_PROPERTY_WINDOW_HOURS = 48
@@ -31,15 +32,15 @@ function DashboardSection({ id, title, background, alertCount = 0, children }) {
         style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px',
           padding: '10px 20px', cursor: 'pointer', userSelect: 'none',
-          background: '#eef1f6', borderBottom: '1px solid #e2e8f0',
+          background: COLORS.sectionHeaderBg, borderBottom: `1px solid ${COLORS.slate200}`,
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <p style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: '#0f172a' }}>{title}</p>
+          <p style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: COLORS.slate900 }}>{title}</p>
           {collapsed && alertCount > 0 && (
             <span style={{
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '20px', height: '20px',
-              padding: '0 6px', borderRadius: '20px', background: '#dc2626', color: '#fff', fontSize: '11px', fontWeight: 800,
+              padding: '0 6px', borderRadius: '20px', background: COLORS.red600, color: COLORS.white, fontSize: '11px', fontWeight: 800,
             }}>
               {alertCount}
             </span>
@@ -47,7 +48,7 @@ function DashboardSection({ id, title, background, alertCount = 0, children }) {
         </div>
         <span style={{
           display: 'flex', alignItems: 'center', justifyContent: 'center', width: '20px', height: '20px', flexShrink: 0,
-          color: '#64748b', transition: 'transform 0.2s ease', transform: collapsed ? 'rotate(-90deg)' : 'none',
+          color: COLORS.slate500, transition: 'transform 0.2s ease', transform: collapsed ? 'rotate(-90deg)' : 'none',
         }}>▾</span>
       </div>
       <div style={{ display: 'grid', gridTemplateRows: collapsed ? '0fr' : '1fr', transition: 'grid-template-rows 0.22s ease' }}>
@@ -220,25 +221,25 @@ export default function AdminDashboard({ profile, onNavigate }) {
   ).length
 
   const kpis = [
-    { label: `Total Tickets (${TOTAL_TICKETS_PERIOD_LABELS[totalTicketsPeriod] || 'All Time'})`, value: totalTicketsCount, colour: '#64748b', statusFilter: 'All' },
-    { label: 'Unassigned', value: tickets.filter(t => t.status === 'Pending').length, colour: '#dc2626', statusFilter: 'Pending' },
-    { label: 'In Progress', value: tickets.filter(t => t.status === 'In Progress').length, colour: '#0d9488', statusFilter: 'In Progress' },
-    { label: 'On Hold', value: tickets.filter(t => t.status === 'On Hold').length, colour: '#f59e0b', statusFilter: 'On Hold' },
-    { label: 'Completed', value: tickets.filter(t => t.status === 'Completed').length, colour: '#16a34a', statusFilter: 'Completed' },
+    { label: `Total Tickets (${TOTAL_TICKETS_PERIOD_LABELS[totalTicketsPeriod] || 'All Time'})`, value: totalTicketsCount, colour: COLORS.slate500, statusFilter: 'All' },
+    { label: 'Unassigned', value: tickets.filter(t => t.status === 'Pending').length, colour: COLORS.red600, statusFilter: 'Pending' },
+    { label: 'In Progress', value: tickets.filter(t => t.status === 'In Progress').length, colour: COLORS.teal600, statusFilter: 'In Progress' },
+    { label: 'On Hold', value: tickets.filter(t => t.status === 'On Hold').length, colour: COLORS.amber500, statusFilter: 'On Hold' },
+    { label: 'Completed', value: tickets.filter(t => t.status === 'Completed').length, colour: COLORS.green600, statusFilter: 'Completed' },
     {
       // Matches the Pipeline page's own "effective tier" logic exactly
       // (priority_override wins over the raw score) so this count always
       // equals the number of rows you land on after clicking the tile.
       label: 'P1 Critical',
       value: tickets.filter(t => (t.priority_override || priorityTierLabel(t.priority_score, p1Threshold, p2Threshold)) === 'P1 Critical').length,
-      colour: '#dc2626',
+      colour: COLORS.red600,
       statusFilter: 'All',
       priorityFilter: 'P1 Critical',
     },
     {
       label: 'Stuck',
       value: tickets.filter(t => isTicketStuck(t, stuckThresholds, Date.now(), p1Threshold, p2Threshold)).length,
-      colour: '#dc2626',
+      colour: COLORS.red600,
       statusFilter: 'All',
       stuckOnly: true,
     },
@@ -253,21 +254,21 @@ export default function AdminDashboard({ profile, onNavigate }) {
   ].map(kpi => ({ ...kpi, statusFilter: 'Completed' }))
 
   const complianceKpis = [
-    { label: 'Expired Certs', value: complianceCounts.expired, colour: '#dc2626', tierFilter: 'Expired' },
-    { label: 'Due Soon', value: complianceCounts.dueSoon, colour: '#d97706', tierFilter: 'Due Soon' },
-    { label: 'No Record', value: complianceCounts.noRecord, colour: '#94a3b8', tierFilter: 'No Record' },
+    { label: 'Expired Certs', value: complianceCounts.expired, colour: COLORS.red600, tierFilter: 'Expired' },
+    { label: 'Due Soon', value: complianceCounts.dueSoon, colour: COLORS.amber600, tierFilter: 'Due Soon' },
+    { label: 'No Record', value: complianceCounts.noRecord, colour: COLORS.slate400, tierFilter: 'No Record' },
   ]
 
   const voidAgingKpis = [
-    { label: 'Overdue Voids', value: voidAgingCounts.overdue, colour: '#dc2626', tierFilter: 'Overdue' },
-    { label: 'Aging Voids', value: voidAgingCounts.aging, colour: '#d97706', tierFilter: 'Aging' },
-    { label: 'Recent Voids', value: voidAgingCounts.recent, colour: '#16a34a', tierFilter: 'Recent' },
+    { label: 'Overdue Voids', value: voidAgingCounts.overdue, colour: COLORS.red600, tierFilter: 'Overdue' },
+    { label: 'Aging Voids', value: voidAgingCounts.aging, colour: COLORS.amber600, tierFilter: 'Aging' },
+    { label: 'Recent Voids', value: voidAgingCounts.recent, colour: COLORS.green600, tierFilter: 'Recent' },
   ]
 
   const gardenAgingKpis = [
-    { label: 'Overdue Gardens', value: gardenAgingCounts.overdue, colour: '#dc2626' },
-    { label: 'Due Soon', value: gardenAgingCounts.aging, colour: '#d97706' },
-    { label: 'Recently Attended', value: gardenAgingCounts.recent, colour: '#16a34a' },
+    { label: 'Overdue Gardens', value: gardenAgingCounts.overdue, colour: COLORS.red600 },
+    { label: 'Due Soon', value: gardenAgingCounts.aging, colour: COLORS.amber600 },
+    { label: 'Recently Attended', value: gardenAgingCounts.recent, colour: COLORS.green600 },
   ]
 
   const pendingSignOffCount = tickets.filter(t => t.status === 'Completed').length
@@ -280,13 +281,13 @@ export default function AdminDashboard({ profile, onNavigate }) {
 
   if (loading) return (
     <div style={{ minHeight: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <p style={{ color: '#94a3b8', fontWeight: 600, fontFamily: 'system-ui' }}>Loading tickets...</p>
+      <p style={{ color: COLORS.slate400, fontWeight: 600, fontFamily: 'system-ui' }}>Loading tickets...</p>
     </div>
   )
 
   return (
     <div>
-      <DashboardSection id="pipeline" title="Ticket Pipeline" background="#ffffff" alertCount={kpis.find(k => k.label === 'Stuck')?.value || 0}>
+      <DashboardSection id="pipeline" title="Ticket Pipeline" background={COLORS.white} alertCount={kpis.find(k => k.label === 'Stuck')?.value || 0}>
         <div style={{ width: '100%' }}>
           <KpiTiles
             kpis={kpis}
@@ -295,49 +296,49 @@ export default function AdminDashboard({ profile, onNavigate }) {
         </div>
       </DashboardSection>
 
-      <DashboardSection id="properties" title="Properties" background="#ffffff">
+      <DashboardSection id="properties" title="Properties" background={COLORS.white}>
         <button
           onClick={() => onNavigate?.('properties')}
           style={{
-            flex: '1 1 220px', background: '#2563eb', borderRadius: '16px', padding: '16px',
+            flex: '1 1 220px', background: COLORS.blue600, borderRadius: '16px', padding: '16px',
             border: 'none', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', textAlign: 'center',
           }}
         >
           <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Total Properties</p>
-          <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: '#ffffff' }}>{totalPropertiesCount}</p>
+          <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: COLORS.white }}>{totalPropertiesCount}</p>
         </button>
 
         <button
           onClick={() => onNavigate?.('properties', { filterMode: 'newProperties' })}
           style={{
-            flex: '1 1 220px', background: '#0f766e', borderRadius: '16px', padding: '16px',
+            flex: '1 1 220px', background: COLORS.teal700, borderRadius: '16px', padding: '16px',
             border: 'none', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', textAlign: 'center',
           }}
         >
           <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>New Properties</p>
-          <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: '#ffffff' }}>{newPropertiesCount}</p>
+          <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: COLORS.white }}>{newPropertiesCount}</p>
         </button>
 
         <button
           onClick={() => onNavigate?.('properties', { filterMode: 'procured' })}
           style={{
-            flex: '1 1 220px', background: '#64748b', borderRadius: '16px', padding: '16px',
+            flex: '1 1 220px', background: COLORS.slate500, borderRadius: '16px', padding: '16px',
             border: 'none', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', textAlign: 'center',
           }}
         >
           <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Procured</p>
-          <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: '#ffffff' }}>{procuredPropertiesCount}</p>
+          <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: COLORS.white }}>{procuredPropertiesCount}</p>
         </button>
 
         <button
           onClick={() => onNavigate?.('properties', { filterMode: 'live' })}
           style={{
-            flex: '1 1 220px', background: '#16a34a', borderRadius: '16px', padding: '16px',
+            flex: '1 1 220px', background: COLORS.green600, borderRadius: '16px', padding: '16px',
             border: 'none', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', textAlign: 'center',
           }}
         >
           <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Live</p>
-          <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: '#ffffff' }}>{livePropertiesCount}</p>
+          <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: COLORS.white }}>{livePropertiesCount}</p>
         </button>
       </DashboardSection>
 
@@ -345,7 +346,7 @@ export default function AdminDashboard({ profile, onNavigate }) {
           Compliance Manager alike -- only Housekeeping/other divisions
           don't need it. Void Aging and Gardens are Maintenance-only. */}
       {(!profile.division || profile.division === 'Compliance') && (
-        <DashboardSection id="compliance" title="Compliance" background="#ffffff" alertCount={complianceCounts.expired}>
+        <DashboardSection id="compliance" title="Compliance" background={COLORS.white} alertCount={complianceCounts.expired}>
           <div style={{ width: '100%' }}>
             <KpiTiles
               kpis={complianceKpis}
@@ -356,7 +357,7 @@ export default function AdminDashboard({ profile, onNavigate }) {
       )}
 
       {!profile.division && (
-        <DashboardSection id="void-aging" title="Void Aging" background="#ffffff" alertCount={voidAgingCounts.overdue}>
+        <DashboardSection id="void-aging" title="Void Aging" background={COLORS.white} alertCount={voidAgingCounts.overdue}>
           <div style={{ width: '100%' }}>
             <KpiTiles
               kpis={voidAgingKpis}
@@ -367,7 +368,7 @@ export default function AdminDashboard({ profile, onNavigate }) {
       )}
 
       {!profile.division && (
-        <DashboardSection id="gardens" title="Gardens" background="#ffffff" alertCount={gardenAgingCounts.overdue}>
+        <DashboardSection id="gardens" title="Gardens" background={COLORS.white} alertCount={gardenAgingCounts.overdue}>
           <div style={{ width: '100%' }}>
             <KpiTiles
               kpis={gardenAgingKpis}
@@ -377,73 +378,73 @@ export default function AdminDashboard({ profile, onNavigate }) {
         </DashboardSection>
       )}
 
-      <DashboardSection id="jobs-completed" title="Jobs Completed" background="#f8fafc">
+      <DashboardSection id="jobs-completed" title="Jobs Completed" background={COLORS.slate50}>
         {completionKpis.map(kpi => (
           <button
             key={kpi.label}
             onClick={() => onNavigate?.('pipeline', { statusFilter: kpi.statusFilter })}
-            style={{ flex: '1 1 160px', background: '#19562e', borderRadius: '16px', padding: '16px', border: 'none', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', textAlign: 'center' }}
+            style={{ flex: '1 1 160px', background: COLORS.greenDark, borderRadius: '16px', padding: '16px', border: 'none', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', textAlign: 'center' }}
           >
             <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{kpi.label}</p>
-            <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: '#ffffff' }}>{kpi.value}</p>
+            <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: COLORS.white }}>{kpi.value}</p>
           </button>
         ))}
       </DashboardSection>
 
-      <DashboardSection id="sign-off-mileage" title="Sign-Off & Mileage" background="#f8fafc" alertCount={flaggedLocationsCount}>
+      <DashboardSection id="sign-off-mileage" title="Sign-Off & Mileage" background={COLORS.slate50} alertCount={flaggedLocationsCount}>
         <button
           onClick={() => onNavigate?.('sign-off')}
           style={{
-            flex: '1 1 220px', background: '#2563eb', borderRadius: '16px', padding: '16px',
+            flex: '1 1 220px', background: COLORS.blue600, borderRadius: '16px', padding: '16px',
             border: 'none', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', textAlign: 'center',
           }}
         >
           <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Pending Sign-Off</p>
-          <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: '#ffffff' }}>{pendingSignOffCount}</p>
+          <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: COLORS.white }}>{pendingSignOffCount}</p>
         </button>
 
         <button
           onClick={() => onNavigate?.('builders')}
           style={{
-            flex: '1 1 220px', background: '#0ea5e9', borderRadius: '16px', padding: '16px',
+            flex: '1 1 220px', background: COLORS.sky500, borderRadius: '16px', padding: '16px',
             border: 'none', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', textAlign: 'center',
           }}
         >
           <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Fleet Mileage (This Month)</p>
-          <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: '#ffffff' }}>{fleetMileageThisMonth.toFixed(1)}</p>
+          <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: COLORS.white }}>{fleetMileageThisMonth.toFixed(1)}</p>
         </button>
 
         <button
           onClick={() => onNavigate?.('clocking')}
           style={{
-            flex: '1 1 220px', background: '#7c3aed', borderRadius: '16px', padding: '16px',
+            flex: '1 1 220px', background: COLORS.violet600, borderRadius: '16px', padding: '16px',
             border: 'none', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', textAlign: 'center',
           }}
         >
           <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Currently Clocked In</p>
-          <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: '#ffffff' }}>{clockedInCount}</p>
+          <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: COLORS.white }}>{clockedInCount}</p>
         </button>
 
         <button
           onClick={() => onNavigate?.('clocking')}
           style={{
-            flex: '1 1 220px', background: '#dc2626', borderRadius: '16px', padding: '16px',
+            flex: '1 1 220px', background: COLORS.red600, borderRadius: '16px', padding: '16px',
             border: 'none', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', textAlign: 'center',
           }}
         >
           <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Flagged Locations</p>
-          <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: '#ffffff' }}>{flaggedLocationsCount}</p>
+          <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: COLORS.white }}>{flaggedLocationsCount}</p>
         </button>
 
         <button
           onClick={() => onNavigate?.('reports')}
           style={{
-            flex: '1 1 220px', background: '#0d9488', borderRadius: '16px', padding: '16px',
+            flex: '1 1 220px', background: COLORS.teal600, borderRadius: '16px', padding: '16px',
             border: 'none', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', textAlign: 'center',
           }}
         >
           <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Avg. Response Time</p>
-          <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: '#ffffff' }}>{avgResponseMs != null ? formatDuration(avgResponseMs) : 'N/A'}</p>
+          <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: COLORS.white }}>{avgResponseMs != null ? formatDuration(avgResponseMs) : 'N/A'}</p>
         </button>
       </DashboardSection>
     </div>

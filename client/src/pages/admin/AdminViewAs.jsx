@@ -8,6 +8,7 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
+import { COLORS } from '../../lib/colors'
 import { startImpersonation } from '../../lib/impersonation'
 import { thStyle, tdStyle, actionBtnStyle, extractFunctionError } from './shared'
 
@@ -97,12 +98,12 @@ export default function AdminViewAs({ profile }) {
     // to the target's dashboard -- no navigation call needed here.
   }
 
-  if (loading) return <p style={{ padding: '24px', color: '#64748b' }}>Loading...</p>
+  if (loading) return <p style={{ padding: '24px', color: COLORS.slate500 }}>Loading...</p>
 
   return (
     <div style={{ padding: '24px' }}>
-      <h1 style={{ fontSize: '20px', fontWeight: 800, color: '#0f172a', marginBottom: '4px' }}>View As</h1>
-      <p style={{ fontSize: '13px', color: '#64748b', marginBottom: '16px' }}>
+      <h1 style={{ fontSize: '20px', fontWeight: 800, color: COLORS.slate900, marginBottom: '4px' }}>View As</h1>
+      <p style={{ fontSize: '13px', color: COLORS.slate500, marginBottom: '16px' }}>
         See PMMS exactly as another staff member would. You'll be able to return to your own account at any time.
       </p>
 
@@ -111,14 +112,14 @@ export default function AdminViewAs({ profile }) {
         placeholder="Search by name, role, or job title..."
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        style={{ width: '100%', maxWidth: '360px', padding: '8px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '13px', marginBottom: '16px' }}
+        style={{ width: '100%', maxWidth: '360px', padding: '8px 12px', borderRadius: '8px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', marginBottom: '16px' }}
       />
 
       {error && (
-        <p style={{ color: '#dc2626', fontSize: '13px', fontWeight: 600, marginBottom: '12px' }}>{error}</p>
+        <p style={{ color: COLORS.red600, fontSize: '13px', fontWeight: 600, marginBottom: '12px' }}>{error}</p>
       )}
 
-      <div style={{ background: '#fff', borderRadius: '10px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+      <div style={{ background: COLORS.white, borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, overflow: 'hidden' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr>
@@ -133,8 +134,8 @@ export default function AdminViewAs({ profile }) {
                 key={s.id}
                 onClick={() => handleSelectRow(s.id)}
                 style={{
-                  borderTop: '1px solid #f1f5f9', cursor: 'pointer',
-                  background: selectedId === s.id ? '#eff6ff' : 'transparent',
+                  borderTop: `1px solid ${COLORS.slate100}`, cursor: 'pointer',
+                  background: selectedId === s.id ? COLORS.blue50 : 'transparent',
                 }}
               >
                 <td style={tdStyle}>{s.name}</td>
@@ -144,7 +145,7 @@ export default function AdminViewAs({ profile }) {
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={3} style={{ ...tdStyle, textAlign: 'center', color: '#94a3b8', padding: '24px' }}>
+                <td colSpan={3} style={{ ...tdStyle, textAlign: 'center', color: COLORS.slate400, padding: '24px' }}>
                   No eligible staff members found.
                 </td>
               </tr>
@@ -155,7 +156,7 @@ export default function AdminViewAs({ profile }) {
 
       {selected && (
         <div style={{
-          position: 'sticky', bottom: '16px', marginTop: '16px', background: '#0f172a', color: '#fff',
+          position: 'sticky', bottom: '16px', marginTop: '16px', background: COLORS.slate900, color: COLORS.white,
           borderRadius: '10px', padding: '12px 16px', display: 'flex', alignItems: 'center',
           justifyContent: 'space-between', gap: '12px', boxShadow: '0 8px 20px rgba(0,0,0,0.15)',
         }}>

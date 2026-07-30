@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { COLORS } from '../lib/colors'
 import logo from '../assets/gbch-logo.svg'
 
 export default function SetPassword({ profile, onDone }) {
@@ -45,7 +46,7 @@ export default function SetPassword({ profile, onDone }) {
   return (
     <div style={{
       minHeight: '100%',
-      background: 'linear-gradient(160deg, #0D1B3E 0%, #0A2444 60%, #0D2F5E 100%)',
+      background: `linear-gradient(160deg, ${COLORS.brandNavy} 0%, ${COLORS.brandNavyMid} 60%, ${COLORS.brandNavyLight} 100%)`,
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -56,7 +57,7 @@ export default function SetPassword({ profile, onDone }) {
 
         <div style={{ marginBottom: '32px', textAlign: 'center' }}>
           <img src={logo} alt="GBCH Logo" style={{ height: '52px', width: 'auto', marginBottom: '10px' }} />
-          <h1 style={{ fontSize: '30px', fontWeight: 800, color: '#ffffff', margin: '0 0 6px 0', letterSpacing: '-0.03em', lineHeight: 1 }}>
+          <h1 style={{ fontSize: '30px', fontWeight: 800, color: COLORS.white, margin: '0 0 6px 0', letterSpacing: '-0.03em', lineHeight: 1 }}>
             Set a new password
           </h1>
         </div>
@@ -70,7 +71,7 @@ export default function SetPassword({ profile, onDone }) {
         }}>
           {!success ? (
             <>
-              <div style={{ padding: '12px 14px', background: 'rgba(217,119,6,0.15)', border: '1px solid rgba(217,119,6,0.3)', color: '#fcd34d', borderRadius: '10px', fontSize: '13px', marginBottom: '22px', lineHeight: 1.5 }}>
+              <div style={{ padding: '12px 14px', background: 'rgba(217,119,6,0.15)', border: '1px solid rgba(217,119,6,0.3)', color: COLORS.amber300, borderRadius: '10px', fontSize: '13px', marginBottom: '22px', lineHeight: 1.5 }}>
                 🔒 Your password was reset by an administrator. Please set a new password to continue — you cannot access the system until you do.
               </div>
 
@@ -83,7 +84,7 @@ export default function SetPassword({ profile, onDone }) {
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   placeholder="At least 6 characters"
-                  style={{ width: '100%', padding: '13px 15px', border: '1.5px solid rgba(255,255,255,0.12)', borderRadius: '12px', background: 'rgba(255,255,255,0.07)', color: '#ffffff', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }}
+                  style={{ width: '100%', padding: '13px 15px', border: '1.5px solid rgba(255,255,255,0.12)', borderRadius: '12px', background: 'rgba(255,255,255,0.07)', color: COLORS.white, fontSize: '14px', outline: 'none', boxSizing: 'border-box' }}
                 />
               </div>
 
@@ -97,12 +98,12 @@ export default function SetPassword({ profile, onDone }) {
                   onChange={e => setConfirmPassword(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && handleSubmit()}
                   placeholder="Re-enter your new password"
-                  style={{ width: '100%', padding: '13px 15px', border: '1.5px solid rgba(255,255,255,0.12)', borderRadius: '12px', background: 'rgba(255,255,255,0.07)', color: '#ffffff', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }}
+                  style={{ width: '100%', padding: '13px 15px', border: '1.5px solid rgba(255,255,255,0.12)', borderRadius: '12px', background: 'rgba(255,255,255,0.07)', color: COLORS.white, fontSize: '14px', outline: 'none', boxSizing: 'border-box' }}
                 />
               </div>
 
               {error && (
-                <div style={{ padding: '12px 14px', background: 'rgba(220,38,38,0.15)', border: '1px solid rgba(220,38,38,0.3)', color: '#fca5a5', borderRadius: '10px', fontSize: '13px', marginTop: '16px' }}>
+                <div style={{ padding: '12px 14px', background: 'rgba(220,38,38,0.15)', border: '1px solid rgba(220,38,38,0.3)', color: COLORS.red300, borderRadius: '10px', fontSize: '13px', marginTop: '16px' }}>
                   ⚠️ {error}
                 </div>
               )}
@@ -110,13 +111,13 @@ export default function SetPassword({ profile, onDone }) {
               <button
                 onClick={handleSubmit}
                 disabled={loading}
-                style={{ width: '100%', padding: '14px', marginTop: '24px', background: loading ? 'rgba(255,255,255,0.1)' : 'linear-gradient(135deg, #2563eb, #1d4ed8)', color: '#fff', border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer', boxShadow: loading ? 'none' : '0 4px 20px rgba(37,99,235,0.4)', letterSpacing: '0.02em' }}>
+                style={{ width: '100%', padding: '14px', marginTop: '24px', background: loading ? 'rgba(255,255,255,0.1)' : `linear-gradient(135deg, ${COLORS.blue600}, ${COLORS.blue700})`, color: COLORS.white, border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer', boxShadow: loading ? 'none' : '0 4px 20px rgba(37,99,235,0.4)', letterSpacing: '0.02em' }}>
                 {loading ? 'Setting password...' : 'Set password →'}
               </button>
             </>
           ) : (
             <div style={{ textAlign: 'center', padding: '12px 0' }}>
-              <p style={{ fontSize: '15px', fontWeight: 700, color: '#86efac', margin: 0 }}>
+              <p style={{ fontSize: '15px', fontWeight: 700, color: COLORS.green300, margin: 0 }}>
                 ✓ Password updated! Redirecting you in…
               </p>
               {profile?.name && (

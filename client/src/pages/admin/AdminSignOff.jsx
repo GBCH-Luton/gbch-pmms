@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
+import { COLORS } from '../../lib/colors'
 import { attachProperties } from '../../lib/properties'
 import {
   formatDuration, postSystemComment, postAuditEvent, filterSelectStyle,
@@ -148,7 +149,7 @@ export default function AdminSignOff({ profile, onTicketsChanged }) {
 
   if (loading) return (
     <div style={{ minHeight: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <p style={{ color: '#94a3b8', fontWeight: 600, fontFamily: 'system-ui' }}>Loading pending sign-offs...</p>
+      <p style={{ color: COLORS.slate400, fontWeight: 600, fontFamily: 'system-ui' }}>Loading pending sign-offs...</p>
     </div>
   )
 
@@ -174,10 +175,10 @@ export default function AdminSignOff({ profile, onTicketsChanged }) {
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-        <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '32px', height: '32px', borderRadius: '50%', background: '#f3e8ff', color: '#9333ea', fontSize: '16px' }}>✓</span>
+        <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '32px', height: '32px', borderRadius: '50%', background: COLORS.purple100, color: COLORS.purple600, fontSize: '16px' }}>✓</span>
         <div>
-          <h1 style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: '#0f172a' }}>Pending Sign-Off ({filteredTickets.length} ticket{filteredTickets.length === 1 ? '' : 's'})</h1>
-          <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>Completed repairs awaiting office verification before archiving.</p>
+          <h1 style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: COLORS.slate900 }}>Pending Sign-Off ({filteredTickets.length} ticket{filteredTickets.length === 1 ? '' : 's'})</h1>
+          <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate500 }}>Completed repairs awaiting office verification before archiving.</p>
         </div>
       </div>
 
@@ -204,7 +205,7 @@ export default function AdminSignOff({ profile, onTicketsChanged }) {
         {(propertyFilter !== 'All' || ticketNumberFilter || raiserFilter !== 'All') && (
           <button
             onClick={() => { setPropertyFilter('All'); setTicketNumberFilter(''); setRaiserFilter('All') }}
-            style={{ ...filterSelectStyle, background: '#fff' }}
+            style={{ ...filterSelectStyle, background: COLORS.white }}
           >
             Clear filters
           </button>
@@ -212,23 +213,23 @@ export default function AdminSignOff({ profile, onTicketsChanged }) {
       </div>
 
       {filteredTickets.length === 0 ? (
-        <div style={{ background: '#fff', borderRadius: '16px', padding: '40px', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-          <p style={{ margin: 0, fontSize: '14px', color: '#94a3b8', fontStyle: 'italic' }}>
+        <div style={{ background: COLORS.white, borderRadius: '16px', padding: '40px', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+          <p style={{ margin: 0, fontSize: '14px', color: COLORS.slate400, fontStyle: 'italic' }}>
             {tickets.length === 0 ? 'All clear — no completed repairs awaiting verification.' : 'No completed repairs match these filters.'}
           </p>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {filteredTickets.map(t => (
-            <div key={t.id} style={{ border: '1px solid #e9d5ff', background: '#faf5ff', borderRadius: '12px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+            <div key={t.id} style={{ border: `1px solid ${COLORS.purple200}`, background: COLORS.purple50, borderRadius: '12px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
               <div style={{ marginBottom: '10px' }}>
-                <span style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#94a3b8' }}>#{t.ticket_number}</span>
-                <span style={{ display: 'block', fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>{t.property?.address}</span>
-                <span style={{ display: 'block', fontSize: '13px', color: '#475569' }}>{t.room ? `${t.room} — ` : ''}{t.issue_tag || t.category}</span>
-                <span style={{ display: 'block', fontSize: '13px', color: '#7e22ce', fontWeight: 600, marginTop: '2px' }}>Completed by {t.builderName || 'Unknown'}</span>
-                <span style={{ display: 'block', fontSize: '12px', color: '#64748b', marginTop: '1px' }}>Raised by {t.raised_by_name || 'Unknown'}</span>
+                <span style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: COLORS.slate400 }}>#{t.ticket_number}</span>
+                <span style={{ display: 'block', fontSize: '14px', fontWeight: 700, color: COLORS.slate900 }}>{t.property?.address}</span>
+                <span style={{ display: 'block', fontSize: '13px', color: COLORS.slate600 }}>{t.room ? `${t.room} — ` : ''}{t.issue_tag || t.category}</span>
+                <span style={{ display: 'block', fontSize: '13px', color: COLORS.purple700, fontWeight: 600, marginTop: '2px' }}>Completed by {t.builderName || 'Unknown'}</span>
+                <span style={{ display: 'block', fontSize: '12px', color: COLORS.slate500, marginTop: '1px' }}>Raised by {t.raised_by_name || 'Unknown'}</span>
                 {workedMsByTicket[t.id] != null && (
-                  <span style={{ display: 'inline-block', marginTop: '6px', fontSize: '11px', fontWeight: 700, color: '#0d9488', background: '#f0fdfa', padding: '2px 8px', borderRadius: '20px' }}>
+                  <span style={{ display: 'inline-block', marginTop: '6px', fontSize: '11px', fontWeight: 700, color: COLORS.teal600, background: COLORS.teal50, padding: '2px 8px', borderRadius: '20px' }}>
                     ⏱ {formatDuration(workedMsByTicket[t.id])} worked
                   </span>
                 )}
@@ -240,51 +241,51 @@ export default function AdminSignOff({ profile, onTicketsChanged }) {
                   need to sit side by side, not just whichever photo happened
                   to exist. */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                <div style={{ background: '#fff', border: '1px solid #e9d5ff', borderRadius: '10px', padding: '10px' }}>
-                  <p style={{ margin: '0 0 6px 0', fontSize: '10px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Before — reported issue</p>
+                <div style={{ background: COLORS.white, border: `1px solid ${COLORS.purple200}`, borderRadius: '10px', padding: '10px' }}>
+                  <p style={{ margin: '0 0 6px 0', fontSize: '10px', fontWeight: 800, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Before — reported issue</p>
                   {t.photo_url ? (
                     <img src={t.photo_url} alt="Reported issue" style={{ width: '100%', height: '140px', objectFit: 'cover', borderRadius: '8px', marginBottom: '6px' }} />
                   ) : (
-                    <div style={{ width: '100%', height: '140px', borderRadius: '8px', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '6px' }}>
-                      <span style={{ fontSize: '12px', color: '#94a3b8', fontStyle: 'italic' }}>No photo</span>
+                    <div style={{ width: '100%', height: '140px', borderRadius: '8px', background: COLORS.slate50, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '6px' }}>
+                      <span style={{ fontSize: '12px', color: COLORS.slate400, fontStyle: 'italic' }}>No photo</span>
                     </div>
                   )}
-                  <p style={{ margin: 0, fontSize: '13px', color: '#475569' }}>{t.description || t.issue_tag || 'No description recorded.'}</p>
+                  <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate600 }}>{t.description || t.issue_tag || 'No description recorded.'}</p>
                 </div>
 
-                <div style={{ background: '#fff', border: '1px solid #e9d5ff', borderRadius: '10px', padding: '10px' }}>
-                  <p style={{ margin: '0 0 6px 0', fontSize: '10px', fontWeight: 800, color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.05em' }}>After — completed work</p>
+                <div style={{ background: COLORS.white, border: `1px solid ${COLORS.purple200}`, borderRadius: '10px', padding: '10px' }}>
+                  <p style={{ margin: '0 0 6px 0', fontSize: '10px', fontWeight: 800, color: COLORS.green600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>After — completed work</p>
                   {t.completion_photo_url ? (
                     <img src={t.completion_photo_url} alt="Completed work" style={{ width: '100%', height: '140px', objectFit: 'cover', borderRadius: '8px', marginBottom: '6px' }} />
                   ) : (
-                    <div style={{ width: '100%', height: '140px', borderRadius: '8px', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '6px' }}>
-                      <span style={{ fontSize: '12px', color: '#94a3b8', fontStyle: 'italic' }}>No photo</span>
+                    <div style={{ width: '100%', height: '140px', borderRadius: '8px', background: COLORS.slate50, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '6px' }}>
+                      <span style={{ fontSize: '12px', color: COLORS.slate400, fontStyle: 'italic' }}>No photo</span>
                     </div>
                   )}
                   {t.checklist_responses?.length > 0 && (
                     <div style={{ marginBottom: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                       {t.checklist_responses.map((item, i) => (
-                        <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', fontSize: '12px', color: item.checked ? '#16a34a' : '#dc2626' }}>
+                        <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', fontSize: '12px', color: item.checked ? COLORS.green600 : COLORS.red600 }}>
                           <span>{item.checked ? '✓' : '✕'}</span>
-                          <span style={{ color: '#374151' }}>{item.label}</span>
+                          <span style={{ color: COLORS.gray700 }}>{item.label}</span>
                         </div>
                       ))}
                     </div>
                   )}
-                  <p style={{ margin: 0, fontSize: '13px', color: '#475569' }}>{t.completion_note || 'No completion note recorded.'}</p>
+                  <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate600 }}>{t.completion_note || 'No completion note recorded.'}</p>
                 </div>
               </div>
 
               <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
                 <button
                   onClick={() => openArchiveConfirm(t)}
-                  style={{ flex: 1, padding: '10px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}
+                  style={{ flex: 1, padding: '10px', background: COLORS.green600, color: COLORS.white, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}
                 >
                   ✓ Verify &amp; Archive
                 </button>
                 <button
                   onClick={() => openReopenModal(t)}
-                  style={{ flex: 1, padding: '10px', background: '#fff', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}
+                  style={{ flex: 1, padding: '10px', background: COLORS.white, color: COLORS.red600, border: `1px solid ${COLORS.red200}`, borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}
                 >
                   ↩ Reopen
                 </button>
@@ -317,7 +318,7 @@ export default function AdminSignOff({ profile, onTicketsChanged }) {
 
             <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
               <button onClick={closeReopenModal} style={modalCancelBtnStyle}>Cancel</button>
-              <button onClick={submitReopen} style={{ ...modalConfirmBtnStyle, background: '#dc2626' }}>Reopen Ticket</button>
+              <button onClick={submitReopen} style={{ ...modalConfirmBtnStyle, background: COLORS.red600 }}>Reopen Ticket</button>
             </div>
           </div>
         </div>
@@ -329,7 +330,7 @@ export default function AdminSignOff({ profile, onTicketsChanged }) {
           <div style={modalCardStyle} onClick={(e) => e.stopPropagation()}>
             <p style={modalTitleStyle}>Verify &amp; Archive Ticket #{archiveConfirmTicket.ticket_number}?</p>
             <p style={modalSubtitleStyle}>{archiveConfirmTicket.property?.address}</p>
-            <p style={{ margin: '10px 0 0 0', fontSize: '13px', color: '#64748b' }}>
+            <p style={{ margin: '10px 0 0 0', fontSize: '13px', color: COLORS.slate500 }}>
               This confirms the work is verified and closes the ticket for good. This can't be undone from here — a closed ticket can only be reopened separately.
             </p>
             <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
@@ -337,7 +338,7 @@ export default function AdminSignOff({ profile, onTicketsChanged }) {
               <button
                 onClick={confirmArchive}
                 disabled={archiveConfirming}
-                style={{ ...modalConfirmBtnStyle, background: '#16a34a', opacity: archiveConfirming ? 0.6 : 1, cursor: archiveConfirming ? 'not-allowed' : 'pointer' }}
+                style={{ ...modalConfirmBtnStyle, background: COLORS.green600, opacity: archiveConfirming ? 0.6 : 1, cursor: archiveConfirming ? 'not-allowed' : 'pointer' }}
               >
                 {archiveConfirming ? 'Archiving...' : '✓ Verify & Archive'}
               </button>
