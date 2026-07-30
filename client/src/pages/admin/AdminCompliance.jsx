@@ -5,7 +5,7 @@
 // click here just deep-links into that tab instead of duplicating any
 // edit UI.
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import PropertySearchSelect from '../../components/PropertySearchSelect'
 import {
@@ -14,6 +14,11 @@ import {
 } from './shared'
 
 const CATEGORY_OPTIONS = ['All', 'Expired', 'Due Soon', 'No Record', 'Valid', 'N/A']
+
+// How many rows render at once -- more load in automatically as the user
+// scrolls near the bottom (see the IntersectionObserver effect below),
+// instead of a full ~1,000-row table or prev/next pagination.
+const PAGE_SIZE = 50
 
 // Groups computeComplianceAging's {tier, label} into the same 5 buckets
 // the KPI tiles/dashboard count by -- 'red' covers both Expired and No
@@ -61,25 +66,31 @@ export default function AdminCompliance({ onNavigate, initialTierFilter, onIniti
   // Full cross-product of properties x cert types -- so a property with
   // zero property_compliance rows still contributes a "No Record" row per
   // cert type, instead of silently vanishing from the portfolio view.
-  const recordsByKey = {}
-  records.forEach(r => { recordsByKey[`${r.property_id}:${r.cert_type}`] = r })
+  // Memoized because this (and the filter/sort below) previously reran on
+  // every render -- including every keystroke in the filters -- which is
+  // what made the page feel sluggish with ~150 properties x 7 cert types.
+  const rows = useMemo(() => {
+    const recordsByKey = {}
+    records.forEach(r => { recordsByKey[`${r.property_id}:${r.cert_type}`] = r })
 
-  const rows = []
-  properties.forEach(property => {
-    COMPLIANCE_TYPES.forEach(type => {
-      const record = recordsByKey[`${property.id}:${type.key}`]
-      const aging = computeComplianceAging(record, thresholdDays)
-      rows.push({ property, type, record, aging, category: agingCategory(aging) })
+    const built = []
+    properties.forEach(property => {
+      COMPLIANCE_TYPES.forEach(type => {
+        const record = recordsByKey[`${property.id}:${type.key}`]
+        const aging = computeComplianceAging(record, thresholdDays)
+        built.push({ property, type, record, aging, category: agingCategory(aging) })
+      })
     })
-  })
+    return built
+  }, [properties, records, thresholdDays])
 
-  const kpis = [
+  const kpis = useMemo(() => [
     { label: 'Total records', value: rows.length, colour: '#64748b', tierFilter: 'All' },
     { label: 'Expired', value: rows.filter(r => r.category === 'Expired').length, colour: '#dc2626', tierFilter: 'Expired' },
     { label: 'Due Soon', value: rows.filter(r => r.category === 'Due Soon').length, colour: '#d97706', tierFilter: 'Due Soon' },
     { label: 'No Record', value: rows.filter(r => r.category === 'No Record').length, colour: '#94a3b8', tierFilter: 'No Record' },
     { label: 'Valid', value: rows.filter(r => r.category === 'Valid').length, colour: '#16a34a', tierFilter: 'Valid' },
-  ]
+  ], [rows])
 
   function applyKpiFilter(kpi) {
     clearFilters()
@@ -92,12 +103,12 @@ export default function AdminCompliance({ onNavigate, initialTierFilter, onIniti
     setPropertyFilter('')
   }
 
-  const filteredRows = rows.filter(r => {
+  const filteredRows = useMemo(() => rows.filter(r => {
     if (tierFilter !== 'All' && r.category !== tierFilter) return false
     if (certTypeFilter !== 'All' && r.type.key !== certTypeFilter) return false
     if (propertyFilter && String(r.property.id) !== String(propertyFilter)) return false
     return true
-  })
+  }), [rows, tierFilter, certTypeFilter, propertyFilter])
 
   function sortValue(r, column) {
     switch (column) {
@@ -124,15 +135,42 @@ export default function AdminCompliance({ onNavigate, initialTierFilter, onIniti
     return sortDirection === 'asc' ? ' ▲' : ' ▼'
   }
 
-  const sortedRows = sortColumn
-    ? [...filteredRows].sort((a, b) => {
-        const va = sortValue(a, sortColumn)
-        const vb = sortValue(b, sortColumn)
-        if (va < vb) return sortDirection === 'asc' ? -1 : 1
-        if (va > vb) return sortDirection === 'asc' ? 1 : -1
-        return 0
-      })
-    : filteredRows
+  const sortedRows = useMemo(() => (
+    sortColumn
+      ? [...filteredRows].sort((a, b) => {
+          const va = sortValue(a, sortColumn)
+          const vb = sortValue(b, sortColumn)
+          if (va < vb) return sortDirection === 'asc' ? -1 : 1
+          if (va > vb) return sortDirection === 'asc' ? 1 : -1
+          return 0
+        })
+      : filteredRows
+  ), [filteredRows, sortColumn, sortDirection])
+
+  // Infinite scroll: render a growing slice instead of all ~1,000 rows (or
+  // prev/next pagination) -- resets to the first page whenever the filtered
+  // set changes so a new filter doesn't start scrolled halfway down.
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
+  const sentinelRef = useRef(null)
+
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE)
+  }, [tierFilter, certTypeFilter, propertyFilter, sortColumn, sortDirection])
+
+  useEffect(() => {
+    const el = sentinelRef.current
+    if (!el) return
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting) {
+        setVisibleCount(v => Math.min(v + PAGE_SIZE, sortedRows.length))
+      }
+    }, { rootMargin: '300px' })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [sortedRows.length])
+
+  const visibleRows = sortedRows.slice(0, visibleCount)
+  const hasMore = visibleCount < sortedRows.length
 
   function goToPropertyCompliance(row) {
     onNavigate?.('properties', { propertyId: row.property.id, tab: 'Compliance' })
@@ -183,7 +221,7 @@ export default function AdminCompliance({ onNavigate, initialTierFilter, onIniti
                 </td>
               </tr>
             )}
-            {sortedRows.map(r => (
+            {visibleRows.map(r => (
               <tr
                 key={`${r.property.id}:${r.type.key}`}
                 onClick={() => goToPropertyCompliance(r)}
@@ -199,9 +237,21 @@ export default function AdminCompliance({ onNavigate, initialTierFilter, onIniti
                 <td style={tdStyle}>{r.aging.daysLeft != null ? `${r.aging.daysLeft}d` : '—'}</td>
               </tr>
             ))}
+            {hasMore && (
+              <tr>
+                <td colSpan={5} ref={sentinelRef} style={{ ...tdStyle, textAlign: 'center', color: '#94a3b8', padding: '16px' }}>
+                  Loading more…
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
+      {sortedRows.length > 0 && (
+        <p style={{ margin: '10px 2px 0', fontSize: '12px', color: '#94a3b8', textAlign: 'center' }}>
+          Showing {visibleRows.length} of {sortedRows.length}
+        </p>
+      )}
     </div>
   )
 }
