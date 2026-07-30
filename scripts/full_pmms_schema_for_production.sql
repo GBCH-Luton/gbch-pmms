@@ -404,6 +404,15 @@ create table pmms.chat_messages (
   CONSTRAINT chat_messages_pkey PRIMARY KEY (id)
 );
 
+-- chat_channel_reads: Team Chat read receipts, one row per division+staff
+-- member holding a read watermark (added 2026-07-30)
+create table pmms.chat_channel_reads (
+  division      text NOT NULL,
+  staff_id      uuid NOT NULL,
+  last_read_at  timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT chat_channel_reads_pkey PRIMARY KEY (division, staff_id)
+);
+
 -- =============================================================================
 -- 5. INDEXES (explicit, non-PK/non-unique-constraint indexes)
 -- =============================================================================
@@ -738,6 +747,8 @@ ALTER TABLE pmms.audit_events ADD CONSTRAINT audit_events_ticket_id_fkey FOREIGN
 
 ALTER TABLE pmms.chat_messages ADD CONSTRAINT chat_messages_sender_id_fkey FOREIGN KEY (sender_id) REFERENCES staff(id);
 
+ALTER TABLE pmms.chat_channel_reads ADD CONSTRAINT chat_channel_reads_staff_id_fkey FOREIGN KEY (staff_id) REFERENCES staff(id);
+
 ALTER TABLE pmms.comments ADD CONSTRAINT comments_author_id_fkey FOREIGN KEY (author_id) REFERENCES staff(id);
 ALTER TABLE pmms.comments ADD CONSTRAINT comments_ticket_id_fkey FOREIGN KEY (ticket_id) REFERENCES pmms.tickets(id);
 
@@ -800,6 +811,10 @@ alter default privileges in schema pmms grant all on sequences to anon, authenti
 -- applies to the underlying feed the same as any normal query.
 alter publication supabase_realtime add table pmms.chat_messages;
 
+-- Read receipts ("Seen by ..."): same Realtime treatment as chat_messages
+-- so other members' read state updates live without polling.
+alter publication supabase_realtime add table pmms.chat_channel_reads;
+
 -- =============================================================================
 -- 9. ENABLE ROW LEVEL SECURITY
 -- =============================================================================
@@ -824,6 +839,7 @@ ALTER TABLE pmms.error_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE pmms.settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE pmms.impersonation_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE pmms.chat_messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE pmms.chat_channel_reads ENABLE ROW LEVEL SECURITY;
 
 -- =============================================================================
 -- 10. RLS POLICIES
@@ -860,6 +876,20 @@ CREATE POLICY "manager_division_scoped_access" ON pmms.chat_messages AS PERMISSI
 CREATE POLICY "builder_division_access" ON pmms.chat_messages AS PERMISSIVE FOR ALL TO authenticated
   USING ((pmms.current_access_level() = 'builder'::text) AND (coalesce(pmms.current_division(), 'Maintenance'::text) = division))
   WITH CHECK ((pmms.current_access_level() = 'builder'::text) AND (coalesce(pmms.current_division(), 'Maintenance'::text) = division) AND (sender_id = pmms.current_staff_id()));
+
+-- chat_channel_reads
+CREATE POLICY "admin_full_access" ON pmms.chat_channel_reads AS PERMISSIVE FOR ALL TO authenticated
+  USING (pmms.current_access_level() = 'admin'::text)
+  WITH CHECK (pmms.current_access_level() = 'admin'::text);
+CREATE POLICY "manager_unscoped_access" ON pmms.chat_channel_reads AS PERMISSIVE FOR ALL TO authenticated
+  USING ((pmms.current_access_level() = 'manager'::text) AND (pmms.current_division() IS NULL))
+  WITH CHECK ((pmms.current_access_level() = 'manager'::text) AND (pmms.current_division() IS NULL) AND (staff_id = pmms.current_staff_id()));
+CREATE POLICY "manager_division_scoped_access" ON pmms.chat_channel_reads AS PERMISSIVE FOR ALL TO authenticated
+  USING ((pmms.current_access_level() = 'manager'::text) AND (pmms.current_division() = division))
+  WITH CHECK ((pmms.current_access_level() = 'manager'::text) AND (pmms.current_division() = division) AND (staff_id = pmms.current_staff_id()));
+CREATE POLICY "builder_division_access" ON pmms.chat_channel_reads AS PERMISSIVE FOR ALL TO authenticated
+  USING ((pmms.current_access_level() = 'builder'::text) AND (coalesce(pmms.current_division(), 'Maintenance'::text) = division))
+  WITH CHECK ((pmms.current_access_level() = 'builder'::text) AND (coalesce(pmms.current_division(), 'Maintenance'::text) = division) AND (staff_id = pmms.current_staff_id()));
 
 -- comments
 CREATE POLICY "admin_full_access" ON pmms.comments AS PERMISSIVE FOR ALL TO authenticated

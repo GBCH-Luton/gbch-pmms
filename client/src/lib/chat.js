@@ -41,13 +41,24 @@ export async function fetchChannelMessages(division) {
 // division they can't read; no extra filtering needed beyond the
 // `filter` below (which is just an efficiency narrowing, not the real
 // security boundary).
-export function subscribeToChannel(division, onInsert) {
+//
+// One channel object per division carries both bindings (new messages
+// and read-receipt updates) rather than opening a second WebSocket
+// subscription. `onReadUpdate` fires on both INSERT (someone's first
+// ever read in this division) and UPDATE (the upsert hitting their
+// existing row on every later read).
+export function subscribeToChannel(division, onInsert, onReadUpdate) {
   const channel = supabase
     .channel(`chat:${division}`)
     .on(
       'postgres_changes',
       { event: 'INSERT', schema: 'pmms', table: 'chat_messages', filter: `division=eq.${division}` },
       (payload) => onInsert(payload.new)
+    )
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'pmms', table: 'chat_channel_reads', filter: `division=eq.${division}` },
+      (payload) => onReadUpdate?.(payload.new)
     )
     .subscribe()
 
@@ -97,6 +108,28 @@ export function getLastReadAt(division) {
 
 export function markChannelRead(division) {
   localStorage.setItem(`${LAST_READ_PREFIX}${division}`, new Date().toISOString())
+}
+
+// Shared, cross-user read watermark (unlike the localStorage-only
+// getLastReadAt/markChannelRead pair above) -- one row per
+// division+staff member, upserted every time the channel is opened or
+// a new message arrives while it's open. This is what powers the
+// "Seen by ..." line other people can see, not your own unread badge.
+export async function fetchChannelReads(division) {
+  const { data, error } = await supabase
+    .schema('pmms')
+    .from('chat_channel_reads')
+    .select('staff_id, last_read_at')
+    .eq('division', division)
+  if (error) return {}
+  return Object.fromEntries((data || []).map((r) => [r.staff_id, r.last_read_at]))
+}
+
+export async function markChannelReadRemote(division, staffId) {
+  await supabase
+    .schema('pmms')
+    .from('chat_channel_reads')
+    .upsert({ division, staff_id: staffId, last_read_at: new Date().toISOString() }, { onConflict: 'division,staff_id' })
 }
 
 export async function countUnreadMentions(division, myStaffId) {

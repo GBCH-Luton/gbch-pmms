@@ -8,7 +8,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import { fetchDivisions } from '../../lib/divisions'
-import { fetchChannelMessages, subscribeToChannel, postMessage, markChannelRead, colorForSender } from '../../lib/chat'
+import { fetchChannelMessages, subscribeToChannel, postMessage, markChannelRead, markChannelReadRemote, fetchChannelReads, colorForSender } from '../../lib/chat'
 import { Avatar, formatUKDateTime } from './shared'
 import ChatComposer from '../../components/ChatComposer'
 import PhotoLightbox from '../../components/PhotoLightbox'
@@ -18,6 +18,7 @@ export default function AdminTeamChat({ profile }) {
   const [activeDivision, setActiveDivision] = useState(profile.division || null)
   const [members, setMembers] = useState([])
   const [messages, setMessages] = useState([])
+  const [channelReads, setChannelReads] = useState({})
   const [sending, setSending] = useState(false)
   const [lightboxUrl, setLightboxUrl] = useState(null)
   const listRef = useRef(null)
@@ -39,12 +40,21 @@ export default function AdminTeamChat({ profile }) {
 
     fetchChannelMessages(activeDivision).then(rows => { if (!cancelled) setMessages(rows) })
     fetchChannelMembers(activeDivision).then(rows => { if (!cancelled) setMembers(rows) })
+    fetchChannelReads(activeDivision).then(reads => { if (!cancelled) setChannelReads(reads) })
     markChannelRead(activeDivision)
+    markChannelReadRemote(activeDivision, profile.id)
 
-    const unsubscribe = subscribeToChannel(activeDivision, (newMessage) => {
-      setMessages(prev => [...prev, newMessage])
-      markChannelRead(activeDivision)
-    })
+    const unsubscribe = subscribeToChannel(
+      activeDivision,
+      (newMessage) => {
+        setMessages(prev => [...prev, newMessage])
+        markChannelRead(activeDivision)
+        markChannelReadRemote(activeDivision, profile.id)
+      },
+      (read) => {
+        setChannelReads(prev => ({ ...prev, [read.staff_id]: read.last_read_at }))
+      }
+    )
 
     return () => { cancelled = true; unsubscribe() }
   }, [activeDivision])
@@ -110,7 +120,7 @@ export default function AdminTeamChat({ profile }) {
           {messages.length === 0 && (
             <p style={{ margin: 'auto', color: '#94a3b8', fontSize: '13px' }}>No messages yet -- say hello 👋</p>
           )}
-          {messages.map(m => (
+          {messages.map((m, i) => (
             <div key={m.id} style={{ display: 'flex', gap: '10px' }}>
               <Avatar name={m.sender_name} size={32} />
               <div>
@@ -127,6 +137,14 @@ export default function AdminTeamChat({ profile }) {
                     style={{ marginTop: '6px', maxWidth: '220px', maxHeight: '220px', borderRadius: '10px', border: '1px solid #e2e8f0', display: 'block', cursor: 'pointer' }}
                   />
                 )}
+                {i === messages.length - 1 && (() => {
+                  const seenBy = members
+                    .filter(mem => mem.id !== m.sender_id && mem.id !== profile.id && channelReads[mem.id] && new Date(channelReads[mem.id]) >= new Date(m.created_at))
+                    .map(mem => mem.name)
+                  return seenBy.length > 0 && (
+                    <p style={{ margin: '4px 0 0', fontSize: '11px', color: '#94a3b8' }}>Seen by {seenBy.join(', ')}</p>
+                  )
+                })()}
               </div>
             </div>
           ))}

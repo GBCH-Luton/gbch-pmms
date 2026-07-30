@@ -8,7 +8,7 @@ import { logLoginEvent } from '../lib/loginEvents'
 import { pushNotificationsSupported, hasActivePushSubscription, enablePushNotifications } from '../lib/pushNotifications'
 import { pushEmergencyAlert, priorityTierLabel, fetchPriorityThresholds } from './admin/shared'
 import { fetchAvailableMaterials, logMaterialUsage } from '../lib/simsMaterialsBridge'
-import { fetchChannelMessages, subscribeToChannel, postMessage, markChannelRead, countUnreadMentions, colorForSender } from '../lib/chat'
+import { fetchChannelMessages, subscribeToChannel, postMessage, markChannelRead, markChannelReadRemote, fetchChannelReads, countUnreadMentions, colorForSender } from '../lib/chat'
 import { compressImage } from '../lib/imageCompression'
 import PropertySearchSelect from '../components/PropertySearchSelect'
 import ChatComposer from '../components/ChatComposer'
@@ -38,6 +38,7 @@ export default function BuilderDashboard({ profile }) {
   const chatDivision = profile.division || 'Maintenance'
   const [chatMessages, setChatMessages] = useState([])
   const [chatMembers, setChatMembers] = useState([])
+  const [chatReads, setChatReads] = useState({})
   const [chatSending, setChatSending] = useState(false)
   const [unreadMentions, setUnreadMentions] = useState(0)
   const [chatLightboxUrl, setChatLightboxUrl] = useState(null)
@@ -156,13 +157,22 @@ export default function BuilderDashboard({ profile }) {
     if (page === 'team-chat') {
       fetchChannelMessages(chatDivision).then(setChatMessages)
       fetchChatMembers()
+      fetchChannelReads(chatDivision).then(setChatReads)
       markChannelRead(chatDivision)
+      markChannelReadRemote(chatDivision, profile.id)
       setUnreadMentions(0)
-      const unsubscribe = subscribeToChannel(chatDivision, (newMessage) => {
-        setChatMessages(prev => [...prev, newMessage])
-        markChannelRead(chatDivision)
-        if ((newMessage.mentioned_staff_ids || []).includes(profile.id)) setUnreadMentions(0)
-      })
+      const unsubscribe = subscribeToChannel(
+        chatDivision,
+        (newMessage) => {
+          setChatMessages(prev => [...prev, newMessage])
+          markChannelRead(chatDivision)
+          markChannelReadRemote(chatDivision, profile.id)
+          if ((newMessage.mentioned_staff_ids || []).includes(profile.id)) setUnreadMentions(0)
+        },
+        (read) => {
+          setChatReads(prev => ({ ...prev, [read.staff_id]: read.last_read_at }))
+        }
+      )
       return unsubscribe
     }
   }, [page])
@@ -2260,8 +2270,13 @@ export default function BuilderDashboard({ profile }) {
             {chatMessages.length === 0 && (
               <p style={{ margin: 'auto', color: '#94a3b8', fontSize: '13px' }}>No messages yet -- say hello 👋</p>
             )}
-            {chatMessages.map(m => {
+            {chatMessages.map((m, i) => {
               const isMine = m.sender_id === profile.id
+              const seenBy = i === chatMessages.length - 1
+                ? chatMembers
+                    .filter(mem => mem.id !== m.sender_id && mem.id !== profile.id && chatReads[mem.id] && new Date(chatReads[mem.id]) >= new Date(m.created_at))
+                    .map(mem => mem.name)
+                : []
               return (
                 <div key={m.id} style={{ alignSelf: isMine ? 'flex-end' : 'flex-start', maxWidth: '80%' }}>
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'baseline', flexDirection: isMine ? 'row-reverse' : 'row' }}>
@@ -2285,6 +2300,9 @@ export default function BuilderDashboard({ profile }) {
                       onClick={() => setChatLightboxUrl(m.photo_url)}
                       style={{ marginTop: '4px', maxWidth: '200px', maxHeight: '200px', borderRadius: '10px', border: '1px solid #e2e8f0', display: 'block', cursor: 'pointer' }}
                     />
+                  )}
+                  {seenBy.length > 0 && (
+                    <p style={{ margin: '4px 0 0', fontSize: '11px', color: '#94a3b8', textAlign: isMine ? 'right' : 'left' }}>Seen by {seenBy.join(', ')}</p>
                   )}
                 </div>
               )
