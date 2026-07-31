@@ -16,6 +16,7 @@ import ImpersonationBanner from './components/ImpersonationBanner'
 // every user downloads regardless of role.
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'))
 const BuilderDashboard = lazy(() => import('./pages/BuilderDashboard'))
+const SubmitterDashboard = lazy(() => import('./pages/SubmitterDashboard'))
 
 export default function App() {
   const [session, setSession]   = useState(null)
@@ -167,6 +168,7 @@ export default function App() {
     if (profile.must_reset_password) return '/set-password'
     if (profile.role === 'admin' || profile.role === 'manager') return '/admin'
     if (profile.role === 'builder') return '/builder'
+    if (profile.role === 'submitter') return '/submit'
     return '/no-access'
   }
 
@@ -190,6 +192,11 @@ export default function App() {
       <Route path="/builder" element={
         session && profile?.role === 'builder'
           ? (profile?.must_reset_password ? <Navigate to="/set-password" replace /> : <BuilderDashboard profile={profile} />)
+          : <Navigate to="/login" replace />
+      } />
+      <Route path="/submit" element={
+        session && profile?.role === 'submitter'
+          ? (profile?.must_reset_password ? <Navigate to="/set-password" replace /> : <SubmitterDashboard profile={profile} />)
           : <Navigate to="/login" replace />
       } />
       <Route path="/no-access" element={

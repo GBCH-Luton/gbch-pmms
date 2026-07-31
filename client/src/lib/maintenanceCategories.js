@@ -66,6 +66,31 @@ export function sortedCategoryEntries(categories) {
   return Object.entries(categories).sort((a, b) => (a[1].order ?? 0) - (b[1].order ?? 0))
 }
 
+// Shared between AdminRaiseTicket.jsx (manager/admin) and
+// SubmitterDashboard.jsx (the Ticket Submitter role) -- both need the exact
+// same "pick a listed issue tag, or describe an unlisted one" fallback and
+// the exact same scoring formula, so a ticket's priority never depends on
+// which form raised it.
+export const UNLISTED_MARKER_PREFIX = '__UNLISTED_FALLBACK__'
+
+export const isUnlistedTag = (tag) => typeof tag === 'string' && tag.startsWith(UNLISTED_MARKER_PREFIX)
+export const unlistedTagFor = (category) => `${UNLISTED_MARKER_PREFIX}${category}`
+export const unlistedLabelFor = (category) => category === 'Other / Unlisted Trade' ? 'Something Else Entirely (Describe Below)' : `Other Unlisted ${category} Issue`
+
+// Reads from the same maintenance_categories data the Admin Settings page
+// manages -- a sub-category's own score, falling back to its parent
+// category's weight (covers both the "unlisted issue" case and any
+// category/sub-category combination that's missing a score for some reason).
+export const calculatePriorityScore = (maintenanceCategories, category, issueTag) => {
+  const cat = maintenanceCategories[category]
+  if (!cat) return 15
+  if (issueTag && !isUnlistedTag(issueTag)) {
+    const sub = cat.subCategories.find(s => s.label === issueTag)
+    if (sub) return Number(sub.score)
+  }
+  return Number(cat.weight) ?? 15
+}
+
 // Migrates the legacy array shape (an earlier, short-lived implementation
 // used [{id, name, enabled, category, items}], mirroring
 // compliance_check_types) onto the new keyed-by-name object shape.

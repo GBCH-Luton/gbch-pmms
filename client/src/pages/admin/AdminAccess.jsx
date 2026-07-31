@@ -429,6 +429,7 @@ const ACCESS_LEVEL_LABELS = {
   none: 'No system login',
   manager: 'Manager access',
   builder: 'Builder access',
+  submitter: 'Ticket Submitter access',
 }
 
 function RolesPanel({ staffList, customRoles, customRolesError, onRolesChanged, divisions, onDivisionsChanged }) {

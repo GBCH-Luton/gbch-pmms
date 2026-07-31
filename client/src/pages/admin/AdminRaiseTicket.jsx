@@ -3,33 +3,13 @@ import { supabase } from '../../lib/supabase'
 import { COLORS } from '../../lib/colors'
 import { fetchAssignableStaffForCategory, builderOptionLabel, createNotification, sendPushNotification, pushEmergencyAlert, priorityTierLabel, fetchPriorityThresholds, EVENTS_FEATURE_ENABLED } from './shared'
 import { fetchComplianceCheckTypes } from '../../lib/compliance'
-import { fetchMaintenanceCategories, sortedCategoryEntries } from '../../lib/maintenanceCategories'
+import { fetchMaintenanceCategories, sortedCategoryEntries, UNLISTED_MARKER_PREFIX, isUnlistedTag, unlistedTagFor, unlistedLabelFor, calculatePriorityScore } from '../../lib/maintenanceCategories'
 import { fetchDivisions } from '../../lib/divisions'
 import { compressImage } from '../../lib/imageCompression'
 import PropertySearchSelect from '../../components/PropertySearchSelect'
 import VoiceInputButton from '../../components/VoiceInputButton'
 
 const ROOM_OPTIONS = ['Kitchen', 'Bathroom', 'Communal Area', 'Bedroom', 'Hallways / Stairs', 'Garden', 'Other Area...']
-
-const UNLISTED_MARKER_PREFIX = '__UNLISTED_FALLBACK__'
-
-const isUnlistedTag = (tag) => typeof tag === 'string' && tag.startsWith(UNLISTED_MARKER_PREFIX)
-const unlistedTagFor = (category) => `${UNLISTED_MARKER_PREFIX}${category}`
-const unlistedLabelFor = (category) => category === 'Other / Unlisted Trade' ? 'Something Else Entirely (Describe Below)' : `Other Unlisted ${category} Issue`
-
-// Reads from the same maintenance_categories data the Admin Settings page
-// manages -- a sub-category's own score, falling back to its parent
-// category's weight (covers both the "unlisted issue" case and any
-// category/sub-category combination that's missing a score for some reason).
-const calculatePriorityScore = (maintenanceCategories, category, issueTag) => {
-  const cat = maintenanceCategories[category]
-  if (!cat) return 15
-  if (issueTag && !isUnlistedTag(issueTag)) {
-    const sub = cat.subCategories.find(s => s.label === issueTag)
-    if (sub) return Number(sub.score)
-  }
-  return Number(cat.weight) ?? 15
-}
 
 function floorContextOptions(property) {
   if (!property) return ['Ground Floor', 'First Floor']
