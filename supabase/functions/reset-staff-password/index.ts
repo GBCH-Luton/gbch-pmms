@@ -1,6 +1,7 @@
 import { corsHeaders } from '../_shared/cors.ts'
 import { authorizeAdmin } from '../_shared/authorizeAdmin.ts'
 import { generateTempPassword } from '../_shared/tempPassword.ts'
+import { findAuthUserByEmail } from '../_shared/findAuthUserByEmail.ts'
 
 // Ensures a staff member has a working login with a fresh temp password,
 // forcing them to set a new one on next login -- covers both a genuine
@@ -33,8 +34,7 @@ Deno.serve(async (req: Request) => {
       return new Response(JSON.stringify({ error: 'Staff record not found' }), { status: 404, headers: corsHeaders })
     }
 
-    const { data: listData, error: listError } = await adminClient.auth.admin.listUsers()
-    const authUser = !listError ? listData?.users?.find(u => u.email?.toLowerCase() === staffRow.email?.toLowerCase()) : null
+    const authUser = await findAuthUserByEmail(adminClient, staffRow.email || '')
 
     const tempPassword = generateTempPassword()
 

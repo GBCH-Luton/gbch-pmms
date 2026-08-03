@@ -1,6 +1,7 @@
 import { corsHeaders } from '../_shared/cors.ts'
 import { authorizeAdmin } from '../_shared/authorizeAdmin.ts'
 import { generateTempPassword } from '../_shared/tempPassword.ts'
+import { findAuthUserByEmail } from '../_shared/findAuthUserByEmail.ts'
 
 // Creates a brand-new person: a Supabase Auth login (with a one-time temp
 // password) + their public.staff row + their pmms.staff_roles assignment.
@@ -57,8 +58,7 @@ Deno.serve(async (req: Request) => {
       // row (e.g. a former staff member's account never got cleaned up) --
       // fall back to reusing it with a fresh temp password rather than
       // erroring out.
-      const { data: listData, error: listError } = await adminClient.auth.admin.listUsers()
-      const existingAuthUser = !listError ? listData?.users?.find(u => u.email?.toLowerCase() === email) : null
+      const existingAuthUser = await findAuthUserByEmail(adminClient, email)
       if (!existingAuthUser) {
         return new Response(JSON.stringify({ error: createError.message }), { status: 400, headers: corsHeaders })
       }
