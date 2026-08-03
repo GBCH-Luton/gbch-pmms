@@ -73,10 +73,19 @@ export default function AiPriorityScoring({ onNavigate }) {
         </button>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', background: COLORS.violet100, border: `1px solid ${COLORS.violet500}`, borderRadius: '12px', padding: '12px 16px', marginBottom: '18px' }}>
-        <span style={{ fontSize: '18px' }}>✨</span>
-        <p style={{ margin: 0, fontSize: '12.5px', color: COLORS.slate600, lineHeight: 1.5 }}>
-          <b style={{ color: COLORS.slate900 }}>How this works:</b> nothing to type here either -- the moment this page opens, it automatically checks every currently open ticket's description and issue tag for words like "burst," "flooding," "sparking," "gas smell," "no heat," or "emergency." Any ticket that mentions one of those, and whose current priority score doesn't already reflect that severity, shows up below as a suggestion. <b style={{ color: COLORS.slate900 }}>Read-only</b> — nothing here changes a real ticket's score. If you agree with a suggestion, go adjust it yourself on the Pipeline page. Use <b>Refresh</b> above to re-scan after new tickets come in.
+      <div style={{ background: COLORS.violet100, border: `1px solid ${COLORS.violet500}`, borderRadius: '12px', padding: '16px 18px', marginBottom: '18px' }}>
+        <p style={{ margin: '0 0 10px 0', fontSize: '13px', fontWeight: 800, color: COLORS.slate900 }}>✨ What this page is</p>
+        <p style={{ margin: '0 0 8px 0', fontSize: '12.5px', color: COLORS.slate600, lineHeight: 1.6 }}>
+          Every ticket already has a priority score (P1/P2/P3), first calculated on the <b>Log a Ticket</b> page and shown on the <b>Pipeline</b> page. That score comes from a fixed points system your admin set up on Settings -- each category and issue tag is worth a set number of points.
+        </p>
+        <p style={{ margin: '0 0 8px 0', fontSize: '12.5px', color: COLORS.slate600, lineHeight: 1.6 }}>
+          This page double-checks that score against what was actually <i>written</i> on each open ticket. It scans the description and issue tag for words like "burst," "flooding," "sparking," "gas smell," "no heat," or "emergency" -- and if it finds one that the fixed score doesn't seem to account for, it lists that ticket below as a suggestion worth a second look.
+        </p>
+        <p style={{ margin: '0 0 8px 0', fontSize: '12.5px', color: COLORS.slate600, lineHeight: 1.6 }}>
+          <b style={{ color: COLORS.slate900 }}>What to do if a ticket is listed here:</b> go find it on the Pipeline page and decide for yourself. If you agree it should be more urgent, use Pipeline's own "Priority Override" feature to bump it -- this page cannot change a ticket's score itself, it can only point one out.
+        </p>
+        <p style={{ margin: 0, fontSize: '12.5px', color: COLORS.slate600, lineHeight: 1.6 }}>
+          <b style={{ color: COLORS.slate900 }}>If nothing is listed below:</b> that's a good result -- it means today's Pipeline priorities already match what people wrote, and there's nothing to reconsider right now. Use <b>Refresh</b> above to check again after new tickets come in.
         </p>
       </div>
 
