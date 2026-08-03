@@ -30,6 +30,15 @@ const AdminHousekeeping = lazy(() => import('./admin/AdminHousekeeping'))
 const AdminEvents = lazy(() => import('./admin/AdminEvents'))
 const AdminViewAs = lazy(() => import('./admin/AdminViewAs'))
 const AdminTeamChat = lazy(() => import('./admin/AdminTeamChat'))
+const AiTicketLogging = lazy(() => import('./admin/ai-trial/AiTicketLogging'))
+const AiPriorityScoring = lazy(() => import('./admin/ai-trial/AiPriorityScoring'))
+const AiReports = lazy(() => import('./admin/ai-trial/AiReports'))
+const AiComplianceDigest = lazy(() => import('./admin/ai-trial/AiComplianceDigest'))
+
+// Keys of every AI Trial submenu child -- used to auto-expand that section
+// in the sidebar if you're already on one of its pages, and to resolve
+// currentPage -> nav item for the ones nested under 'ai-trial' below.
+const AI_TRIAL_CHILD_KEYS = ['ai-ticket', 'ai-priority', 'ai-reports', 'ai-compliance']
 
 const NAV_ITEMS = [
   // Grouped by what they're actually for: core ticket lifecycle first,
@@ -54,6 +63,21 @@ const NAV_ITEMS = [
   { key: 'clocking', label: 'Clocking', icon: '⏱️', Component: AdminClocking },
   { key: 'stock', label: 'Stock', icon: '📦', Component: AdminStock, divisions: ['Maintenance'] },
   { key: 'reports', label: 'Reports', icon: '📈', Component: AdminReports },
+  // Trial section, admin-only while it's being tried out and shown to
+  // managers -- free, rule-based (no external AI service, no cost), see
+  // client/src/pages/admin/ai-trial/keywordEngine.js. Each child also
+  // carries adminOnly itself (not just the parent) so the defense-in-depth
+  // check below (activeNavItem + isNavItemVisible) still holds if one is
+  // ever resolved directly by key.
+  {
+    key: 'ai-trial', label: 'AI Trial', icon: '✨', adminOnly: true,
+    children: [
+      { key: 'ai-ticket', label: 'Ticket Logging', Component: AiTicketLogging, adminOnly: true },
+      { key: 'ai-priority', label: 'Priority Scoring', Component: AiPriorityScoring, adminOnly: true },
+      { key: 'ai-reports', label: 'Reports', Component: AiReports, adminOnly: true },
+      { key: 'ai-compliance', label: 'Compliance Digest', Component: AiComplianceDigest, adminOnly: true },
+    ],
+  },
   // These three are rendered in the profile popover, not the main nav list
   // (see SidebarContent) -- still present here so NAV_ITEMS/isNavItemVisible
   // keep working as the single source of truth for routing + visibility.
@@ -211,6 +235,9 @@ export default function AdminDashboard({ profile }) {
   function SidebarContent() {
     const [popoverOpen, setPopoverOpen] = useState(false)
     const [returning, setReturning] = useState(false)
+    // Lazy-initialized so reopening the sidebar while already on an AI
+    // Trial page doesn't collapse the section you're currently in.
+    const [aiTrialOpen, setAiTrialOpen] = useState(() => AI_TRIAL_CHILD_KEYS.includes(currentPage))
     const impersonationMarker = getImpersonationMarker()
     const popoverRef = useRef(null)
 
@@ -277,45 +304,69 @@ export default function AdminDashboard({ profile }) {
         <nav style={{ flex: 1, padding: '10px', overflowY: 'auto' }}>
           {mainNavItems.map(item => (
             <Fragment key={item.key}>
-              <button
-                onClick={() => goToPage(item.key)}
-                style={navButtonStyle(currentPage === item.key)}
-              >
-                <span style={navIconStyle}>{item.icon}</span>
-                <span style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label}</span>
-                  {item.key === 'sign-off' && pendingSignOffCount > 0 && (
-                    <span
-                      style={{
-                        background: COLORS.red600, color: COLORS.white, fontSize: '11px', fontWeight: 800,
-                        borderRadius: '999px', padding: '1px 8px', marginLeft: '8px', minWidth: '20px', textAlign: 'center', flexShrink: 0,
-                      }}
-                    >
-                      {pendingSignOffCount}
+              {item.children ? (
+                <>
+                  <button
+                    onClick={() => setAiTrialOpen(o => !o)}
+                    style={navButtonStyle(item.children.some(c => c.key === currentPage))}
+                  >
+                    <span style={navIconStyle}>{item.icon}</span>
+                    <span style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label}</span>
+                      <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.5)', transform: aiTrialOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s ease' }}>▶</span>
                     </span>
-                  )}
-                  {item.key === 'pipeline' && totalTicketsCount > 0 && (
-                    <span
-                      style={{
-                        background: COLORS.red600, color: COLORS.white, fontSize: '11px', fontWeight: 800,
-                        borderRadius: '999px', padding: '1px 8px', marginLeft: '8px', minWidth: '20px', textAlign: 'center', flexShrink: 0,
-                      }}
+                  </button>
+                  {aiTrialOpen && item.children.filter(child => isNavItemVisible(child, profile)).map(child => (
+                    <button
+                      key={child.key}
+                      onClick={() => goToPage(child.key)}
+                      style={{ ...navButtonStyle(currentPage === child.key), paddingLeft: '34px', fontSize: '13px' }}
                     >
-                      {totalTicketsCount}
-                    </span>
-                  )}
-                  {item.key === 'team-chat' && chatUnreadTotal > 0 && (
-                    <span
-                      style={{
-                        background: COLORS.red600, color: COLORS.white, fontSize: '11px', fontWeight: 800,
-                        borderRadius: '999px', padding: '1px 8px', marginLeft: '8px', minWidth: '20px', textAlign: 'center', flexShrink: 0,
-                      }}
-                    >
-                      {chatUnreadTotal}
-                    </span>
-                  )}
-                </span>
-              </button>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{child.label}</span>
+                    </button>
+                  ))}
+                </>
+              ) : (
+                <button
+                  onClick={() => goToPage(item.key)}
+                  style={navButtonStyle(currentPage === item.key)}
+                >
+                  <span style={navIconStyle}>{item.icon}</span>
+                  <span style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label}</span>
+                    {item.key === 'sign-off' && pendingSignOffCount > 0 && (
+                      <span
+                        style={{
+                          background: COLORS.red600, color: COLORS.white, fontSize: '11px', fontWeight: 800,
+                          borderRadius: '999px', padding: '1px 8px', marginLeft: '8px', minWidth: '20px', textAlign: 'center', flexShrink: 0,
+                        }}
+                      >
+                        {pendingSignOffCount}
+                      </span>
+                    )}
+                    {item.key === 'pipeline' && totalTicketsCount > 0 && (
+                      <span
+                        style={{
+                          background: COLORS.red600, color: COLORS.white, fontSize: '11px', fontWeight: 800,
+                          borderRadius: '999px', padding: '1px 8px', marginLeft: '8px', minWidth: '20px', textAlign: 'center', flexShrink: 0,
+                        }}
+                      >
+                        {totalTicketsCount}
+                      </span>
+                    )}
+                    {item.key === 'team-chat' && chatUnreadTotal > 0 && (
+                      <span
+                        style={{
+                          background: COLORS.red600, color: COLORS.white, fontSize: '11px', fontWeight: 800,
+                          borderRadius: '999px', padding: '1px 8px', marginLeft: '8px', minWidth: '20px', textAlign: 'center', flexShrink: 0,
+                        }}
+                      >
+                        {chatUnreadTotal}
+                      </span>
+                    )}
+                  </span>
+                </button>
+              )}
               {DIVIDER_AFTER_KEYS.includes(item.key) && (
                 <div style={{ borderTop: '1px solid rgba(255,255,255,0.12)', margin: '6px 4px' }} />
               )}
@@ -389,7 +440,9 @@ export default function AdminDashboard({ profile }) {
   // hidden for non-admins, this guards against currentPage ever landing on
   // one some other way (there's no URL-based deep link into these pages
   // today, but the check is cheap and this is a security-adjacent feature).
+  // Searches one level of children too, for the AI Trial submenu items.
   const activeNavItem = NAV_ITEMS.find(item => item.key === currentPage)
+    || NAV_ITEMS.flatMap(item => item.children || []).find(child => child.key === currentPage)
   const ActivePage = (activeNavItem && isNavItemVisible(activeNavItem, profile))
     ? activeNavItem.Component
     : AdminDashboardPage
