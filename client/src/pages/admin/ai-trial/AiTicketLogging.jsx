@@ -26,11 +26,22 @@ const cardStyle = { background: COLORS.white, borderRadius: '16px', boxShadow: '
 
 function TrialBanner() {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: COLORS.violet100, border: `1px solid ${COLORS.violet500}`, borderRadius: '12px', padding: '12px 16px', marginBottom: '18px' }}>
-      <span style={{ fontSize: '18px' }}>✨</span>
-      <p style={{ margin: 0, fontSize: '12.5px', color: COLORS.slate600, lineHeight: 1.5 }}>
-        <b style={{ color: COLORS.slate900 }}>AI Trial — free, rule-based keyword matching, no external AI service connected yet.</b> Good for common, clearly-worded issues; expect it to miss unusual phrasing. Nothing submits without you reviewing it first.
+    <div style={{ background: COLORS.violet100, border: `1px solid ${COLORS.violet500}`, borderRadius: '12px', padding: '16px 18px', marginBottom: '18px' }}>
+      <p style={{ margin: '0 0 10px 0', fontSize: '13px', fontWeight: 800, color: COLORS.slate900 }}>✨ What this page is</p>
+      <p style={{ margin: '0 0 8px 0', fontSize: '12.5px', color: COLORS.slate600, lineHeight: 1.6 }}>
+        A quicker way to raise a ticket: describe the issue in your own words instead of clicking through Property → Room → Category → Issue Tag by hand. It's <b style={{ color: COLORS.slate900 }}>free, rule-based keyword matching</b> -- not a connected AI service yet -- so it works well on common, clearly-worded issues and may miss unusual phrasing. Nothing is created until you review and submit.
       </p>
+      <p style={{ margin: '0 0 10px 0', fontSize: '12.5px', color: COLORS.slate600, lineHeight: 1.6 }}>
+        <b style={{ color: COLORS.slate900 }}>How the priority score is worked out:</b> exactly the same way as the real Log a Ticket page. The keyword matching only guesses which category and issue tag fit your description -- the actual points come from the category weights and issue-tag scores configured on the <b>Settings</b> page, the same real numbers Log a Ticket uses. Change a score on Settings, and this page's results change too.
+      </p>
+      <p style={{ margin: '0 0 6px 0', fontSize: '12.5px', fontWeight: 800, color: COLORS.slate900 }}>Steps:</p>
+      <ol style={{ margin: 0, paddingLeft: '18px', fontSize: '12.5px', color: COLORS.slate600, lineHeight: 1.7 }}>
+        <li>Type (or speak) what's wrong, in plain language -- mention the property address if you can.</li>
+        <li>Click <b>Draft the ticket</b>.</li>
+        <li>Check the suggested property, room, category, and issue tag -- anything wrong or missing, click to change it by hand.</li>
+        <li>Look at the priority score shown -- that's the real number this ticket would get, not a guess.</li>
+        <li>Click <b>Submit</b> -- this creates a real ticket, exactly as if it were raised from Log a Ticket.</li>
+      </ol>
     </div>
   )
 }
