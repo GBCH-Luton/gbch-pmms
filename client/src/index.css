@@ -58,33 +58,6 @@ body {
   }
 }
 
-/* AdminDashboard.jsx's collapsed sidebar: a hover-revealed label next to
-   each icon. Inline styles can't express :hover, so this one lives here. */
-.pmms-nav-tooltip-wrap {
-  position: relative;
-}
-.pmms-nav-tooltip {
-  position: absolute;
-  left: 54px;
-  top: 50%;
-  transform: translateY(-50%);
-  background: #0d1b3e;
-  color: #fff;
-  font-size: 12px;
-  font-weight: 600;
-  padding: 6px 10px;
-  border-radius: 6px;
-  white-space: nowrap;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.1s ease;
-  z-index: 25;
-}
-.pmms-nav-tooltip-wrap:hover .pmms-nav-tooltip {
-  opacity: 1;
-}
-
 /* PrintableTicketReport.jsx: the standard "print only this element" trick --
    hides literally everything in the page except .pmms-print-area, regardless
    of z-index/overlay stacking elsewhere in the app, then re-hides the

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef, Fragment, lazy, Suspense } from 'react'
+import { createPortal } from 'react-dom'
 import { supabase } from '../lib/supabase'
 import { COLORS } from '../lib/colors'
 import { logLoginEvent } from '../lib/loginEvents'
@@ -260,6 +261,23 @@ export default function AdminDashboard({ profile }) {
     const impersonationMarker = getImpersonationMarker()
     const popoverRef = useRef(null)
 
+    // Collapsed-rail hover labels render via portal to document.body --
+    // the nav list scrolls (overflow-y: auto) which forces overflow-x to
+    // clip too, so a tooltip positioned inside it as a plain absolute child
+    // never actually became visible. alignBottom is for the profile
+    // trigger at the very bottom of the rail, where the label should hang
+    // off the bottom edge rather than centering on a element near the
+    // bottom of the screen.
+    const [hoverTip, setHoverTip] = useState(null)
+    function showTip(e, label, alignBottom = false) {
+      if (!isCollapsed) return
+      const rect = e.currentTarget.getBoundingClientRect()
+      setHoverTip(alignBottom
+        ? { label, left: rect.right + 10, bottom: window.innerHeight - rect.bottom, alignBottom: true }
+        : { label, left: rect.right + 10, top: rect.top + rect.height / 2, alignBottom: false })
+    }
+    function hideTip() { setHoverTip(null) }
+
     function handleNavItemClick(item) {
       if (item.children) {
         if (isCollapsed) { setSidebarCollapsed(false); setAiTrialOpen(true) }
@@ -357,7 +375,7 @@ export default function AdminDashboard({ profile }) {
               <Fragment key={item.key}>
                 {item.children ? (
                   <>
-                    <div className={isCollapsed ? 'pmms-nav-tooltip-wrap' : undefined}>
+                    <div onMouseEnter={(e) => showTip(e, item.label)} onMouseLeave={hideTip}>
                       <button
                         onClick={() => handleNavItemClick(item)}
                         style={{ ...navButtonStyle(item.children.some(c => c.key === currentPage)), justifyContent: isCollapsed ? 'center' : 'flex-start', padding: isCollapsed ? '9px 0' : '7px 12px' }}
@@ -370,7 +388,6 @@ export default function AdminDashboard({ profile }) {
                           </span>
                         )}
                       </button>
-                      {isCollapsed && <span className="pmms-nav-tooltip">{item.label}</span>}
                     </div>
                     {aiTrialOpen && !isCollapsed && item.children.filter(child => isNavItemVisible(child, profile)).map(child => (
                       <button
@@ -383,7 +400,7 @@ export default function AdminDashboard({ profile }) {
                     ))}
                   </>
                 ) : (
-                  <div className={isCollapsed ? 'pmms-nav-tooltip-wrap' : undefined}>
+                  <div onMouseEnter={(e) => showTip(e, item.label)} onMouseLeave={hideTip}>
                     <button
                       onClick={() => goToPage(item.key)}
                       style={{ ...navButtonStyle(currentPage === item.key), justifyContent: isCollapsed ? 'center' : 'flex-start', padding: isCollapsed ? '9px 0' : '7px 12px' }}
@@ -410,7 +427,6 @@ export default function AdminDashboard({ profile }) {
                         </span>
                       )}
                     </button>
-                    {isCollapsed && <span className="pmms-nav-tooltip">{item.label}</span>}
                   </div>
                 )}
                 {DIVIDER_AFTER_KEYS.includes(item.key) && (
@@ -455,7 +471,7 @@ export default function AdminDashboard({ profile }) {
             </div>
           )}
 
-          <div className={isCollapsed ? 'pmms-nav-tooltip-wrap' : undefined}>
+          <div onMouseEnter={(e) => showTip(e, profile.name, true)} onMouseLeave={hideTip}>
             <button
               ref={triggerRef}
               onClick={() => setPopoverOpen(o => !o)}
@@ -478,7 +494,6 @@ export default function AdminDashboard({ profile }) {
                 </>
               )}
             </button>
-            {isCollapsed && <span className="pmms-nav-tooltip" style={{ bottom: 0, top: 'auto', transform: 'none' }}>{profile.name}</span>}
           </div>
 
           {!isCollapsed && pushNotificationsSupported() && (
@@ -492,6 +507,23 @@ export default function AdminDashboard({ profile }) {
           )}
           {!isCollapsed && pushError && <p style={{ margin: '8px 0 0 0', fontSize: '11px', color: COLORS.red300 }}>{pushError}</p>}
         </div>
+
+        {hoverTip && createPortal(
+          <div
+            style={{
+              position: 'fixed', left: `${hoverTip.left}px`,
+              top: hoverTip.alignBottom ? 'auto' : `${hoverTip.top}px`,
+              bottom: hoverTip.alignBottom ? `${hoverTip.bottom}px` : 'auto',
+              transform: hoverTip.alignBottom ? 'none' : 'translateY(-50%)',
+              background: COLORS.brandNavy, color: COLORS.white, fontSize: '12px', fontWeight: 600,
+              padding: '6px 10px', borderRadius: '6px', whiteSpace: 'nowrap',
+              boxShadow: '0 4px 14px rgba(0,0,0,0.25)', pointerEvents: 'none', zIndex: 9999,
+            }}
+          >
+            {hoverTip.label}
+          </div>,
+          document.body
+        )}
       </>
     )
   }
