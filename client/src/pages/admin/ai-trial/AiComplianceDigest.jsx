@@ -75,13 +75,20 @@ export default function AiComplianceDigest() {
 
   return (
     <div>
-      <h1 style={{ margin: '0 0 4px 0', fontSize: '18px', fontWeight: 800, color: COLORS.slate900 }}>AI Trial · Compliance Digest</h1>
-      <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: COLORS.slate500 }}>A plain-language summary of the same data the Compliance page tracks.</p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
+        <div>
+          <h1 style={{ margin: '0 0 4px 0', fontSize: '18px', fontWeight: 800, color: COLORS.slate900 }}>AI Trial · Compliance Digest</h1>
+          <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: COLORS.slate500 }}>A plain-language summary of the same data the Compliance page tracks.</p>
+        </div>
+        <button onClick={load} style={{ flexShrink: 0, background: COLORS.white, border: `1px solid ${COLORS.slate200}`, borderRadius: '8px', padding: '8px 14px', fontSize: '12.5px', fontWeight: 700, color: COLORS.slate600, cursor: 'pointer' }}>
+          ↻ Refresh
+        </button>
+      </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: COLORS.violet100, border: `1px solid ${COLORS.violet500}`, borderRadius: '12px', padding: '12px 16px', marginBottom: '18px' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', background: COLORS.violet100, border: `1px solid ${COLORS.violet500}`, borderRadius: '12px', padding: '12px 16px', marginBottom: '18px' }}>
         <span style={{ fontSize: '18px' }}>✨</span>
         <p style={{ margin: 0, fontSize: '12.5px', color: COLORS.slate600, lineHeight: 1.5 }}>
-          <b style={{ color: COLORS.slate900 }}>AI Trial — real numbers, templated sentences.</b> Every figure below is a live count from your compliance records, not a generated guess.
+          <b style={{ color: COLORS.slate900 }}>How to read this page:</b> there's nothing to type or click to get a result -- it reads every property's compliance record automatically and writes the summary below the moment the page opens. Every figure is a live count from your real records, not a generated guess. Use <b>Refresh</b> above if you've changed a compliance record and want the summary to catch up.
         </p>
       </div>
 

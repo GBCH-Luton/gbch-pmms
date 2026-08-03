@@ -63,19 +63,27 @@ export default function AiPriorityScoring({ onNavigate }) {
 
   return (
     <div>
-      <h1 style={{ margin: '0 0 4px 0', fontSize: '18px', fontWeight: 800, color: COLORS.slate900 }}>AI Trial · Priority Scoring</h1>
-      <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: COLORS.slate500 }}>Open tickets whose description suggests a different urgency than their current score.</p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
+        <div>
+          <h1 style={{ margin: '0 0 4px 0', fontSize: '18px', fontWeight: 800, color: COLORS.slate900 }}>AI Trial · Priority Scoring</h1>
+          <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: COLORS.slate500 }}>Open tickets whose description suggests a different urgency than their current score.</p>
+        </div>
+        <button onClick={load} style={{ flexShrink: 0, background: COLORS.white, border: `1px solid ${COLORS.slate200}`, borderRadius: '8px', padding: '8px 14px', fontSize: '12.5px', fontWeight: 700, color: COLORS.slate600, cursor: 'pointer' }}>
+          ↻ Refresh
+        </button>
+      </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: COLORS.violet100, border: `1px solid ${COLORS.violet500}`, borderRadius: '12px', padding: '12px 16px', marginBottom: '18px' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', background: COLORS.violet100, border: `1px solid ${COLORS.violet500}`, borderRadius: '12px', padding: '12px 16px', marginBottom: '18px' }}>
         <span style={{ fontSize: '18px' }}>✨</span>
         <p style={{ margin: 0, fontSize: '12.5px', color: COLORS.slate600, lineHeight: 1.5 }}>
-          <b style={{ color: COLORS.slate900 }}>AI Trial — read-only.</b> Nothing here changes a real ticket's score. Use the Pipeline page to actually adjust priority if you agree with a suggestion.
+          <b style={{ color: COLORS.slate900 }}>How this works:</b> nothing to type here either -- the moment this page opens, it automatically checks every currently open ticket's description and issue tag for words like "burst," "flooding," "sparking," "gas smell," "no heat," or "emergency." Any ticket that mentions one of those, and whose current priority score doesn't already reflect that severity, shows up below as a suggestion. <b style={{ color: COLORS.slate900 }}>Read-only</b> — nothing here changes a real ticket's score. If you agree with a suggestion, go adjust it yourself on the Pipeline page. Use <b>Refresh</b> above to re-scan after new tickets come in.
         </p>
       </div>
 
       {flagged.length === 0 ? (
         <div style={{ background: COLORS.white, borderRadius: '16px', padding: '40px', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-          <p style={{ margin: 0, fontSize: '14px', color: COLORS.slate400, fontStyle: 'italic' }}>No open tickets currently flagged -- nothing's description-text suggests a higher urgency than its score.</p>
+          <p style={{ margin: '0 0 6px 0', fontSize: '14px', color: COLORS.slate600, fontWeight: 600 }}>All clear — nothing flagged right now.</p>
+          <p style={{ margin: 0, fontSize: '12.5px', color: COLORS.slate400 }}>Either there are no open tickets, or none of their descriptions mention a severity keyword the current score doesn't already account for. That's a normal, good result — not a sign the page isn't working.</p>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
