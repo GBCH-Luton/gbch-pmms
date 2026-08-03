@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { COLORS } from '../../lib/colors'
 import { attachProperties } from '../../lib/properties'
+import PropertySearchSelect from '../../components/PropertySearchSelect'
 import {
   formatDuration, postSystemComment, postAuditEvent, filterSelectStyle,
   modalOverlayStyle, modalCardStyle, modalTitleStyle, modalSubtitleStyle, modalLabelStyle,
@@ -14,7 +15,7 @@ export default function AdminSignOff({ profile, onTicketsChanged }) {
   const [loading, setLoading] = useState(true)
   const [workedMsByTicket, setWorkedMsByTicket] = useState({})
 
-  const [propertyFilter, setPropertyFilter] = useState('All')
+  const [propertyFilter, setPropertyFilter] = useState('')
   const [ticketNumberFilter, setTicketNumberFilter] = useState('')
   const [raiserFilter, setRaiserFilter] = useState('All')
 
@@ -164,9 +165,9 @@ export default function AdminSignOff({ profile, onTicketsChanged }) {
   ).sort((a, b) => a.name.localeCompare(b.name))
 
   const filteredTickets = tickets.filter(t => {
-    // Native <select> values are always strings, but property_id off the
-    // ticket is a number -- compare as strings so "3" matches 3.
-    if (propertyFilter !== 'All' && String(t.property_id) !== String(propertyFilter)) return false
+    // property_id off the ticket is a number -- compare as strings so "3"
+    // matches 3. Empty propertyFilter means "All Properties" (no filter).
+    if (propertyFilter && String(t.property_id) !== String(propertyFilter)) return false
     if (ticketNumberFilter.trim() && !String(t.id).includes(ticketNumberFilter.trim())) return false
     if (raiserFilter !== 'All' && String(t.raised_by) !== String(raiserFilter)) return false
     return true
@@ -183,12 +184,9 @@ export default function AdminSignOff({ profile, onTicketsChanged }) {
       </div>
 
       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '16px' }}>
-        <select value={propertyFilter} onChange={(e) => setPropertyFilter(e.target.value)} style={filterSelectStyle}>
-          <option value="All">All Properties</option>
-          {properties.map(p => (
-            <option key={p.id} value={p.id}>{p.address}</option>
-          ))}
-        </select>
+        <div style={{ width: '220px' }}>
+          <PropertySearchSelect properties={properties} value={propertyFilter} onChange={setPropertyFilter} placeholder="All Properties" />
+        </div>
         <select value={raiserFilter} onChange={(e) => setRaiserFilter(e.target.value)} style={filterSelectStyle}>
           <option value="All">All Raisers</option>
           {raisers.map(r => (
@@ -202,9 +200,9 @@ export default function AdminSignOff({ profile, onTicketsChanged }) {
           placeholder="Search ticket #..."
           style={{ ...filterSelectStyle, cursor: 'text', width: '160px' }}
         />
-        {(propertyFilter !== 'All' || ticketNumberFilter || raiserFilter !== 'All') && (
+        {(propertyFilter || ticketNumberFilter || raiserFilter !== 'All') && (
           <button
-            onClick={() => { setPropertyFilter('All'); setTicketNumberFilter(''); setRaiserFilter('All') }}
+            onClick={() => { setPropertyFilter(''); setTicketNumberFilter(''); setRaiserFilter('All') }}
             style={{ ...filterSelectStyle, background: COLORS.white }}
           >
             Clear filters
