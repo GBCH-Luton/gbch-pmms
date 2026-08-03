@@ -92,8 +92,9 @@ const POPOVER_ITEM_KEYS = ['settings', 'admin', 'view-as', 'help']
 // Visual grouping dividers in the main nav: Dashboard alone, then the
 // ticket lifecycle (Pipeline/Log a Ticket/Sign-Off), then property/
 // division monitoring (Properties/Voids/Compliance/Housekeeping), then
-// people-ops (Staff/Clocking), then Stock/Reports.
-const DIVIDER_AFTER_KEYS = ['team-chat', 'sign-off', 'housekeeping', 'clocking']
+// people-ops (Staff/Clocking), then Stock/Reports, then the AI Trial
+// section set apart on its own.
+const DIVIDER_AFTER_KEYS = ['team-chat', 'sign-off', 'housekeeping', 'clocking', 'reports']
 
 const PENDING_SIGN_OFF_POLL_MS = 20000
 
