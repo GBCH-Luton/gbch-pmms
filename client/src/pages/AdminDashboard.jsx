@@ -9,6 +9,7 @@ import gbchLogo from '../assets/gbch-logo.svg'
 import { EVENTS_FEATURE_ENABLED, resolveStaffPhotoUrl } from './admin/shared'
 import { getImpersonationMarker, returnToAdmin } from '../lib/impersonation'
 import { countUnreadMessages } from '../lib/chat'
+import { countUnreadDms } from '../lib/dm'
 import { fetchDivisions } from '../lib/divisions'
 
 // Lazy-loaded: an admin/manager only ever looks at a handful of these tabs
@@ -192,8 +193,11 @@ export default function AdminDashboard({ profile }) {
 
   const fetchChatUnreadTotal = useCallback(async () => {
     const divs = profile.division ? [profile.division] : await fetchDivisions()
-    const counts = await Promise.all(divs.map(d => countUnreadMessages(d, profile.id)))
-    setChatUnreadTotal(counts.reduce((a, b) => a + b, 0))
+    const [channelCounts, dmCount] = await Promise.all([
+      Promise.all(divs.map(d => countUnreadMessages(d, profile.id))),
+      countUnreadDms(profile.id),
+    ])
+    setChatUnreadTotal(channelCounts.reduce((a, b) => a + b, 0) + dmCount)
   }, [profile.division, profile.id])
 
   const refreshCounts = useCallback(async () => {

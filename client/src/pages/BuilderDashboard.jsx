@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { COLORS } from '../lib/colors'
 import { getCurrentPositionSafe } from '../lib/geo'
@@ -7,9 +7,11 @@ import { fetchMaintenanceCategories, fetchAllMaintenanceCategoryNames, sortedCat
 import { attachBuilderSafeProperties } from '../lib/properties'
 import { logLoginEvent } from '../lib/loginEvents'
 import { pushNotificationsSupported, hasActivePushSubscription, enablePushNotifications } from '../lib/pushNotifications'
-import { pushEmergencyAlert, priorityTierLabel, fetchPriorityThresholds } from './admin/shared'
+import { pushEmergencyAlert, priorityTierLabel, fetchPriorityThresholds, Avatar } from './admin/shared'
 import { fetchAvailableMaterials, logMaterialUsage } from '../lib/simsMaterialsBridge'
 import { fetchChannelMessages, subscribeToChannel, postMessage, markChannelRead, markChannelReadRemote, fetchChannelReads, countUnreadMentions, colorForSender } from '../lib/chat'
+import { fetchDmContacts, fetchConversations, fetchThreadMessages, subscribeToDm, postDm, markThreadRead, countUnreadDms } from '../lib/dm'
+import { NavIcon } from '../lib/icons'
 import { compressImage } from '../lib/imageCompression'
 import PropertySearchSelect from '../components/PropertySearchSelect'
 import ChatComposer from '../components/ChatComposer'
@@ -44,6 +46,20 @@ export default function BuilderDashboard({ profile }) {
   const [chatSending, setChatSending] = useState(false)
   const [unreadMentions, setUnreadMentions] = useState(0)
   const [chatLightboxUrl, setChatLightboxUrl] = useState(null)
+  // Direct Messages, alongside the division channel above -- see
+  // scripts/add_pmms_dm_messages_table.sql. chatTab picks between the two;
+  // dmView further splits DM into "who have I messaged" vs "an open
+  // thread", since there's no room on a phone screen to show both like
+  // the Admin/Manager rail does.
+  const [chatTab, setChatTab] = useState('channel') // 'channel' | 'dm'
+  const [dmView, setDmView] = useState('list') // 'list' | 'thread'
+  const [conversations, setConversations] = useState([])
+  const [dmContacts, setDmContacts] = useState([])
+  const [activeContact, setActiveContact] = useState(null)
+  const [dmMessages, setDmMessages] = useState([])
+  const [dmSending, setDmSending] = useState(false)
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [contactSearch, setContactSearch] = useState('')
   const [fromLocation, setFromLocation] = useState(null)
   const [customLocation, setCustomLocation] = useState('')
   const [miles, setMiles] = useState(0)
@@ -129,22 +145,30 @@ export default function BuilderDashboard({ profile }) {
     // browser can report "granted" with nothing ever subscribed) -- this
     // is the real check for whether the button should offer to enable.
     hasActivePushSubscription().then(setPushEnabled)
-    countUnreadMentions(chatDivision, profile.id).then(setUnreadMentions)
+    refreshUnreadBadge()
     // Polled rather than pushed -- notifications are created by an admin
     // action elsewhere, so this is the only way this session finds out
     // about a new one without the builder manually refreshing. Available
     // jobs are polled the same way, for the same reason -- no realtime
     // infrastructure exists anywhere in this app, so this is how a job
     // someone else claimed disappears from here without a manual refresh.
-    // The unread-mentions badge (Team Chat) is polled here too rather
-    // than via its own Realtime subscription, since it needs to update
-    // even while the chat view itself isn't open.
+    // The Team Chat badge (mentions + Direct Messages combined) is polled
+    // here too rather than via its own Realtime subscription, since it
+    // needs to update even while the chat view itself isn't open.
     const interval = setInterval(() => {
       fetchNotifications(); fetchAvailableJobs()
-      countUnreadMentions(chatDivision, profile.id).then(setUnreadMentions)
+      refreshUnreadBadge()
     }, 45000)
     return () => clearInterval(interval)
   }, [])
+
+  async function refreshUnreadBadge() {
+    const [mentions, dms] = await Promise.all([
+      countUnreadMentions(chatDivision, profile.id),
+      countUnreadDms(profile.id),
+    ])
+    setUnreadMentions(mentions + dms)
+  }
 
   useEffect(() => {
     if (page === 'new-ticket') {
@@ -178,6 +202,57 @@ export default function BuilderDashboard({ profile }) {
       return unsubscribe
     }
   }, [page])
+
+  // Direct Messages: loaded whenever the team-chat page is open regardless
+  // of which tab is active, so switching from Channel to Direct Messages
+  // is instant. One subscription for every DM this builder sends/receives
+  // (RLS already scopes what Realtime delivers), same pattern as
+  // AdminTeamChat.jsx.
+  const activeContactRef = useRef(activeContact)
+  useEffect(() => { activeContactRef.current = activeContact }, [activeContact])
+
+  useEffect(() => {
+    if (page !== 'team-chat') return
+    refreshConversations()
+    fetchDmContacts().then(setDmContacts)
+
+    const unsubscribe = subscribeToDm(
+      (newMessage) => {
+        setDmMessages(prev => {
+          const inThisThread = activeContactRef.current && (
+            (newMessage.sender_id === profile.id && newMessage.recipient_id === activeContactRef.current.id) ||
+            (newMessage.sender_id === activeContactRef.current.id && newMessage.recipient_id === profile.id)
+          )
+          if (!inThisThread) return prev
+          if (newMessage.recipient_id === profile.id) markThreadRead(profile.id, newMessage.sender_id)
+          return [...prev, newMessage]
+        })
+        refreshConversations()
+      },
+      () => refreshConversations()
+    )
+    return unsubscribe
+  }, [page])
+
+  async function refreshConversations() {
+    setConversations(await fetchConversations(profile.id))
+  }
+
+  async function openDm(contact) {
+    setChatTab('dm')
+    setDmView('thread')
+    setActiveContact(contact)
+    setDmMessages(await fetchThreadMessages(profile.id, contact.id))
+    await markThreadRead(profile.id, contact.id)
+    refreshConversations()
+  }
+
+  async function handleSendDm(body, _mentionedIds, photoFile) {
+    if (!activeContact) return
+    setDmSending(true)
+    await postDm({ senderId: profile.id, senderName: profile.name, recipientId: activeContact.id, body, photoFile })
+    setDmSending(false)
+  }
 
   async function fetchChatMembers() {
     // Builders can only SELECT their own row in public.staff -- this
@@ -2253,74 +2328,246 @@ export default function BuilderDashboard({ profile }) {
           view: a builder only ever has one channel (their resolved
           division, defaulting to Maintenance), so there's nothing to
           pick between. Realtime, not polling -- this app's first use of
-          Supabase Realtime (see lib/chat.js). */}
+          Supabase Realtime (see lib/chat.js). Direct Messages sits
+          alongside it as a second tab (see lib/dm.js) -- a private
+          one-to-one thread with any other staff member, not division-
+          scoped like the channel above. */}
       {page === 'team-chat' && (
         <div style={{ position: 'fixed', top: 'var(--pmms-banner-offset, 0px)', left: 0, right: 0, bottom: 0, background: COLORS.slate100, zIndex: 50, display: 'flex', flexDirection: 'column', fontFamily: 'system-ui, sans-serif' }}>
 
           {/* Header */}
           <div style={{ background: COLORS.white, borderBottom: `1px solid ${COLORS.slate200}`, padding: '14px 20px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <button onClick={() => setPage('jobs')} style={{ background: COLORS.slate100, border: 'none', borderRadius: '8px', padding: '8px 14px', fontSize: '13px', fontWeight: 700, color: COLORS.slate500, cursor: 'pointer' }}>
+            <button
+              onClick={() => (chatTab === 'dm' && dmView === 'thread') ? setDmView('list') : setPage('jobs')}
+              style={{ background: COLORS.slate100, border: 'none', borderRadius: '8px', padding: '8px 14px', fontSize: '13px', fontWeight: 700, color: COLORS.slate500, cursor: 'pointer' }}
+            >
               ← Back
             </button>
-            <div>
+            {chatTab === 'channel' && (
               <p style={{ margin: 0, fontSize: '15px', fontWeight: 800, color: COLORS.slate900 }}>💬 {chatDivision} Team Chat</p>
-            </div>
-          </div>
-
-          {/* Messages */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {chatMessages.length === 0 && (
-              <p style={{ margin: 'auto', color: COLORS.slate400, fontSize: '13px' }}>No messages yet -- say hello 👋</p>
             )}
-            {chatMessages.map((m, i) => {
-              const isMine = m.sender_id === profile.id
-              const seenBy = i === chatMessages.length - 1
-                ? chatMembers
-                    .filter(mem => mem.id !== m.sender_id && mem.id !== profile.id && chatReads[mem.id] && new Date(chatReads[mem.id]) >= new Date(m.created_at))
-                    .map(mem => mem.name)
-                : []
-              return (
-                <div key={m.id} style={{ alignSelf: isMine ? 'flex-end' : 'flex-start', maxWidth: '80%' }}>
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'baseline', flexDirection: isMine ? 'row-reverse' : 'row' }}>
-                    <span style={{ fontSize: '12px', fontWeight: 800, color: isMine ? COLORS.slate900 : colorForSender(m.sender_id) }}>{isMine ? 'You' : m.sender_name}</span>
-                    <span style={{ fontSize: '11px', color: COLORS.slate400 }}>{formatUKDateTime(m.created_at)}</span>
-                  </div>
-                  {m.body && (
-                    <div style={{
-                      marginTop: '2px', padding: '8px 12px', fontSize: '13.5px', lineHeight: 1.4,
-                      background: isMine ? COLORS.greenDark : COLORS.white, color: isMine ? COLORS.white : COLORS.gray700,
-                      border: isMine ? 'none' : `1px solid ${COLORS.slate200}`,
-                      borderRadius: isMine ? '12px 4px 12px 12px' : '4px 12px 12px 12px',
-                    }}>
-                      {m.body}
-                    </div>
-                  )}
-                  {m.photo_url && (
-                    <img
-                      src={m.photo_url}
-                      alt=""
-                      onClick={() => setChatLightboxUrl(m.photo_url)}
-                      style={{ marginTop: '4px', maxWidth: '200px', maxHeight: '200px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, display: 'block', cursor: 'pointer' }}
-                    />
-                  )}
-                  {seenBy.length > 0 && (
-                    <p style={{ margin: '4px 0 0', fontSize: '11px', color: COLORS.slate400, textAlign: isMine ? 'right' : 'left' }}>Seen by {seenBy.join(', ')}</p>
-                  )}
-                </div>
-              )
-            })}
+            {chatTab === 'dm' && dmView === 'list' && (
+              <p style={{ margin: 0, fontSize: '15px', fontWeight: 800, color: COLORS.slate900 }}>Direct Messages</p>
+            )}
+            {chatTab === 'dm' && dmView === 'thread' && activeContact && (
+              <div>
+                <p style={{ margin: 0, fontSize: '15px', fontWeight: 800, color: COLORS.slate900 }}>{activeContact.name}</p>
+                <p style={{ margin: '2px 0 0', fontSize: '10.5px', fontWeight: 800, color: COLORS.greenDark, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <NavIcon name="lock" size={10} /> Private thread
+                </p>
+              </div>
+            )}
           </div>
 
-          {/* Composer */}
-          <div style={{ background: COLORS.white, borderTop: `1px solid ${COLORS.slate200}`, padding: '10px 14px 14px' }}>
-            <ChatComposer
-              members={chatMembers.filter(m => m.id !== profile.id)}
-              onSend={handleSendChatMessage}
-              sending={chatSending}
-              inputStyle={{ flex: 1, padding: '10px 14px', borderRadius: '20px', border: `1px solid ${COLORS.slate200}`, fontSize: '13.5px', fontFamily: 'inherit' }}
-              sendButtonStyle={{ width: '40px', height: '40px', borderRadius: '50%', border: 'none', background: COLORS.greenDark, color: COLORS.white, fontSize: '14px', fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
-            />
-          </div>
+          {/* Tabs -- hidden inside an open DM thread to keep focus on the conversation */}
+          {!(chatTab === 'dm' && dmView === 'thread') && (
+            <div style={{ display: 'flex', gap: '8px', padding: '10px 20px 0', background: COLORS.white, borderBottom: `1px solid ${COLORS.slate200}` }}>
+              <button
+                onClick={() => setChatTab('channel')}
+                style={{
+                  padding: '8px 4px', marginBottom: '-1px', background: 'none', border: 'none', cursor: 'pointer',
+                  fontSize: '13px', fontWeight: 700, color: chatTab === 'channel' ? COLORS.greenDark : COLORS.slate400,
+                  borderBottom: chatTab === 'channel' ? `2px solid ${COLORS.greenDark}` : '2px solid transparent',
+                }}
+              >
+                Channel
+              </button>
+              <button
+                onClick={() => setChatTab('dm')}
+                style={{
+                  padding: '8px 4px', marginBottom: '-1px', background: 'none', border: 'none', cursor: 'pointer',
+                  fontSize: '13px', fontWeight: 700, color: chatTab === 'dm' ? COLORS.greenDark : COLORS.slate400,
+                  borderBottom: chatTab === 'dm' ? `2px solid ${COLORS.greenDark}` : '2px solid transparent',
+                  display: 'flex', alignItems: 'center', gap: '6px',
+                }}
+              >
+                Direct Messages
+                {conversations.some(c => c.unreadCount > 0) && (
+                  <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: COLORS.red600 }} />
+                )}
+              </button>
+            </div>
+          )}
+
+          {chatTab === 'channel' && (
+            <>
+              {/* Messages */}
+              <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {chatMessages.length === 0 && (
+                  <p style={{ margin: 'auto', color: COLORS.slate400, fontSize: '13px' }}>No messages yet -- say hello 👋</p>
+                )}
+                {chatMessages.map((m, i) => {
+                  const isMine = m.sender_id === profile.id
+                  const seenBy = i === chatMessages.length - 1
+                    ? chatMembers
+                        .filter(mem => mem.id !== m.sender_id && mem.id !== profile.id && chatReads[mem.id] && new Date(chatReads[mem.id]) >= new Date(m.created_at))
+                        .map(mem => mem.name)
+                    : []
+                  return (
+                    <div key={m.id} style={{ alignSelf: isMine ? 'flex-end' : 'flex-start', maxWidth: '80%' }}>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'baseline', flexDirection: isMine ? 'row-reverse' : 'row' }}>
+                        <span style={{ fontSize: '12px', fontWeight: 800, color: isMine ? COLORS.slate900 : colorForSender(m.sender_id) }}>{isMine ? 'You' : m.sender_name}</span>
+                        <span style={{ fontSize: '11px', color: COLORS.slate400 }}>{formatUKDateTime(m.created_at)}</span>
+                      </div>
+                      {m.body && (
+                        <div style={{
+                          marginTop: '2px', padding: '8px 12px', fontSize: '13.5px', lineHeight: 1.4,
+                          background: isMine ? COLORS.greenDark : COLORS.white, color: isMine ? COLORS.white : COLORS.gray700,
+                          border: isMine ? 'none' : `1px solid ${COLORS.slate200}`,
+                          borderRadius: isMine ? '12px 4px 12px 12px' : '4px 12px 12px 12px',
+                        }}>
+                          {m.body}
+                        </div>
+                      )}
+                      {m.photo_url && (
+                        <img
+                          src={m.photo_url}
+                          alt=""
+                          onClick={() => setChatLightboxUrl(m.photo_url)}
+                          style={{ marginTop: '4px', maxWidth: '200px', maxHeight: '200px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, display: 'block', cursor: 'pointer' }}
+                        />
+                      )}
+                      {seenBy.length > 0 && (
+                        <p style={{ margin: '4px 0 0', fontSize: '11px', color: COLORS.slate400, textAlign: isMine ? 'right' : 'left' }}>Seen by {seenBy.join(', ')}</p>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* Composer */}
+              <div style={{ background: COLORS.white, borderTop: `1px solid ${COLORS.slate200}`, padding: '10px 14px 14px' }}>
+                <ChatComposer
+                  members={chatMembers.filter(m => m.id !== profile.id)}
+                  onSend={handleSendChatMessage}
+                  sending={chatSending}
+                  inputStyle={{ flex: 1, padding: '10px 14px', borderRadius: '20px', border: `1px solid ${COLORS.slate200}`, fontSize: '13.5px', fontFamily: 'inherit' }}
+                  sendButtonStyle={{ width: '40px', height: '40px', borderRadius: '50%', border: 'none', background: COLORS.greenDark, color: COLORS.white, fontSize: '14px', fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
+                />
+              </div>
+            </>
+          )}
+
+          {chatTab === 'dm' && dmView === 'list' && (
+            <div style={{ flex: 1, overflowY: 'auto' }}>
+              <button
+                onClick={() => { setPickerOpen(true); setContactSearch('') }}
+                style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', textAlign: 'left', padding: '14px 20px', background: COLORS.white, border: 'none', borderBottom: `1px solid ${COLORS.slate200}`, cursor: 'pointer', fontFamily: 'inherit' }}
+              >
+                <span style={{ width: '32px', height: '32px', borderRadius: '50%', background: COLORS.green50, color: COLORS.greenDark, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: 800, flexShrink: 0 }}>+</span>
+                <span style={{ fontSize: '13.5px', fontWeight: 700, color: COLORS.greenDark }}>New message</span>
+              </button>
+              {conversations.length === 0 && (
+                <p style={{ margin: '40px 20px', textAlign: 'center', color: COLORS.slate400, fontSize: '13px' }}>No conversations yet</p>
+              )}
+              {conversations.map(c => {
+                const otherName = c.lastMessage.sender_id === c.otherId ? c.lastMessage.sender_name : (dmContacts.find(dc => dc.id === c.otherId)?.name || '...')
+                return (
+                  <button
+                    key={c.otherId}
+                    onClick={() => openDm({ id: c.otherId, name: otherName })}
+                    style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', textAlign: 'left', padding: '12px 20px', background: COLORS.white, border: 'none', borderBottom: `1px solid ${COLORS.slate200}`, cursor: 'pointer', fontFamily: 'inherit' }}
+                  >
+                    <Avatar name={otherName} size={38} />
+                    <span style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ display: 'block', fontSize: '13.5px', fontWeight: 700, color: COLORS.slate900 }}>{otherName}</span>
+                      <span style={{ display: 'block', fontSize: '12px', color: COLORS.slate400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {c.lastMessage.body || (c.lastMessage.photo_url ? 'Photo' : '')}
+                      </span>
+                    </span>
+                    {c.unreadCount > 0 && (
+                      <span style={{ background: COLORS.red600, color: COLORS.white, fontSize: '11px', fontWeight: 800, borderRadius: '999px', minWidth: '20px', textAlign: 'center', padding: '1px 6px', flexShrink: 0 }}>{c.unreadCount}</span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+
+          {chatTab === 'dm' && dmView === 'thread' && activeContact && (
+            <>
+              <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {dmMessages.length === 0 && (
+                  <p style={{ margin: 'auto', color: COLORS.slate400, fontSize: '13px' }}>No messages yet -- say hello 👋</p>
+                )}
+                {dmMessages.map((m, i) => {
+                  const isMine = m.sender_id === profile.id
+                  return (
+                    <div key={m.id} style={{ alignSelf: isMine ? 'flex-end' : 'flex-start', maxWidth: '80%' }}>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'baseline', flexDirection: isMine ? 'row-reverse' : 'row' }}>
+                        <span style={{ fontSize: '12px', fontWeight: 800, color: isMine ? COLORS.slate900 : colorForSender(m.sender_id) }}>{isMine ? 'You' : m.sender_name}</span>
+                        <span style={{ fontSize: '11px', color: COLORS.slate400 }}>{formatUKDateTime(m.created_at)}</span>
+                      </div>
+                      {m.body && (
+                        <div style={{
+                          marginTop: '2px', padding: '8px 12px', fontSize: '13.5px', lineHeight: 1.4,
+                          background: isMine ? COLORS.greenDark : COLORS.white, color: isMine ? COLORS.white : COLORS.gray700,
+                          border: isMine ? 'none' : `1px solid ${COLORS.slate200}`,
+                          borderRadius: isMine ? '12px 4px 12px 12px' : '4px 12px 12px 12px',
+                        }}>
+                          {m.body}
+                        </div>
+                      )}
+                      {m.photo_url && (
+                        <img
+                          src={m.photo_url}
+                          alt=""
+                          onClick={() => setChatLightboxUrl(m.photo_url)}
+                          style={{ marginTop: '4px', maxWidth: '200px', maxHeight: '200px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, display: 'block', cursor: 'pointer' }}
+                        />
+                      )}
+                      {i === dmMessages.length - 1 && isMine && m.read_at && (
+                        <p style={{ margin: '4px 0 0', fontSize: '11px', color: COLORS.slate400, textAlign: 'right' }}>Seen by {activeContact.name}</p>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+
+              <div style={{ background: COLORS.white, borderTop: `1px solid ${COLORS.slate200}`, padding: '10px 14px 14px' }}>
+                <ChatComposer
+                  members={[]}
+                  onSend={handleSendDm}
+                  sending={dmSending}
+                  placeholder={`Message ${activeContact.name}...`}
+                  inputStyle={{ flex: 1, padding: '10px 14px', borderRadius: '20px', border: `1px solid ${COLORS.slate200}`, fontSize: '13.5px', fontFamily: 'inherit' }}
+                  sendButtonStyle={{ width: '40px', height: '40px', borderRadius: '50%', border: 'none', background: COLORS.greenDark, color: COLORS.white, fontSize: '14px', fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
+                />
+              </div>
+            </>
+          )}
+
+          {pickerOpen && (
+            <div
+              onClick={() => setPickerOpen(false)}
+              style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.35)', display: 'flex', alignItems: 'flex-end', zIndex: 60 }}
+            >
+              <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxHeight: '70vh', background: COLORS.white, borderRadius: '16px 16px 0 0', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                <p style={{ margin: 0, padding: '16px 20px', fontSize: '14px', fontWeight: 800, color: COLORS.slate900, borderBottom: `1px solid ${COLORS.slate200}` }}>New direct message</p>
+                <div style={{ padding: '12px 16px' }}>
+                  <input
+                    autoFocus
+                    value={contactSearch}
+                    onChange={(e) => setContactSearch(e.target.value)}
+                    placeholder="Search staff by name..."
+                    style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13.5px', fontFamily: 'inherit', boxSizing: 'border-box' }}
+                  />
+                </div>
+                <div style={{ overflowY: 'auto', paddingBottom: '12px' }}>
+                  {dmContacts.filter(c => c.name.toLowerCase().includes(contactSearch.toLowerCase())).map(c => (
+                    <button
+                      key={c.id}
+                      onClick={() => { setPickerOpen(false); openDm(c) }}
+                      style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', textAlign: 'left', padding: '10px 20px', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}
+                    >
+                      <Avatar name={c.name} size={34} />
+                      <span style={{ fontSize: '13.5px', fontWeight: 600, color: COLORS.slate900 }}>{c.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
 
           <PhotoLightbox url={chatLightboxUrl} onClose={() => setChatLightboxUrl(null)} />
         </div>
