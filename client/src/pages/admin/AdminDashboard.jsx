@@ -11,10 +11,17 @@ const DEFAULT_NEW_PROPERTY_WINDOW_HOURS = 48
 // alertCount only ever renders while collapsed: the point is to let an
 // admin collapse a normally-quiet section without silently losing sight
 // of it if something in it later needs attention.
-function DashboardSection({ id, title, background, alertCount = 0, children }) {
+// defaultCollapsed only applies the first time this browser ever sees this
+// section (no localStorage key yet) -- the AI Daily Briefing below uses it
+// to start quiet sections out of the way, but never fights a preference
+// someone already set by clicking a section themselves.
+function DashboardSection({ id, title, background, alertCount = 0, defaultCollapsed = false, children }) {
   const storageKey = `pmms_dashboard_collapsed_${id}`
   const [collapsed, setCollapsed] = useState(() => {
-    try { return localStorage.getItem(storageKey) === 'true' } catch { return false }
+    try {
+      const stored = localStorage.getItem(storageKey)
+      return stored === null ? defaultCollapsed : stored === 'true'
+    } catch { return defaultCollapsed }
   })
 
   function toggle() {
@@ -29,6 +36,7 @@ function DashboardSection({ id, title, background, alertCount = 0, children }) {
     <div style={{ borderRadius: '16px', marginBottom: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
       <div
         onClick={toggle}
+        data-dashboard-section={id}
         style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px',
           padding: '10px 20px', cursor: 'pointer', userSelect: 'none',
@@ -58,6 +66,56 @@ function DashboardSection({ id, title, background, alertCount = 0, children }) {
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+// Free, rule-based summary of the exact numbers already computed for the
+// sections below -- no new data, no external AI/API cost, same approach as
+// the AI Trial pages (see client/src/pages/admin/ai-trial/keywordEngine.js).
+// Ranks flagged items first so what needs attention doesn't require
+// scanning every section; clicking any line jumps to and opens/closes that
+// section by simply re-clicking its own header (see data-dashboard-section
+// on DashboardSection above) rather than duplicating its toggle state here.
+function AiDailyBriefing({ lines }) {
+  const flaggedCount = lines.filter(l => l.tone !== 'quiet').length
+
+  function handleLineClick(target) {
+    const header = document.querySelector(`[data-dashboard-section="${target}"]`)
+    header?.click()
+    header?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  }
+
+  const toneColour = { critical: COLORS.red600, warning: COLORS.amber600, quiet: COLORS.slate400 }
+
+  return (
+    <div style={{
+      borderRadius: '14px', padding: '18px 20px', marginBottom: '16px',
+      background: `linear-gradient(135deg, ${COLORS.indigo100} 0%, ${COLORS.violet100} 100%)`,
+      border: `1px solid ${COLORS.indigo100}`,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+        <span style={{ fontSize: '15px' }}>✨</span>
+        <span style={{ fontSize: '12px', fontWeight: 800, color: COLORS.indigo700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>AI Daily Briefing</span>
+      </div>
+      <p style={{ margin: '0 0 10px', fontSize: '11px', color: COLORS.indigo700, opacity: 0.75 }}>
+        Free, rule-based -- built from the same numbers as the sections below. {flaggedCount} need a look, {lines.length - flaggedCount} don't.
+      </p>
+      {lines.map((line, i) => (
+        <div
+          key={i}
+          onClick={() => handleLineClick(line.target)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 0', cursor: 'pointer',
+            borderTop: i === 0 ? 'none' : `1px solid rgba(67,56,202,0.1)`,
+            opacity: line.tone === 'quiet' ? 0.6 : 1,
+          }}
+        >
+          <span style={{ width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0, background: toneColour[line.tone] }} />
+          <span style={{ flex: 1, fontSize: '13px', color: '#1e1b4b', fontWeight: line.tone === 'quiet' ? 400 : 500 }}>{line.text}</span>
+          <span style={{ fontSize: '12px', color: line.tone === 'quiet' ? COLORS.slate400 : COLORS.violet600, flexShrink: 0 }}>→</span>
+        </div>
+      ))}
     </div>
   )
 }
@@ -279,6 +337,47 @@ export default function AdminDashboard({ profile, onNavigate }) {
 
   const avgResponseMs = computeAvgResponseMs(tickets)
 
+  // Same visibility rules as the sections themselves below -- a line for a
+  // section this profile can't see (and couldn't click through to) would
+  // just be confusing.
+  const complianceVisible = !profile.division || profile.division === 'Compliance'
+  const voidGardensVisible = !profile.division
+
+  const p1UnassignedCount = tickets.filter(t => (
+    t.status === 'Pending' && (t.priority_override || priorityTierLabel(t.priority_score, p1Threshold, p2Threshold)) === 'P1 Critical'
+  )).length
+  const stuckCount = kpis.find(k => k.label === 'Stuck')?.value || 0
+  const completedToday = completionKpis.find(k => k.label === 'Today')?.value || 0
+  const completedThisMonth = completionKpis.find(k => k.label === 'This Month')?.value || 0
+
+  const flaggedLines = []
+  const quietLines = []
+
+  if (stuckCount > 0) flaggedLines.push({ target: 'pipeline', tone: 'critical', text: <><b>{stuckCount} ticket{stuckCount === 1 ? '' : 's'}</b> {stuckCount === 1 ? 'is' : 'are'} stuck — no update in longer than usual, worth a check.</> })
+  if (p1UnassignedCount > 0) flaggedLines.push({ target: 'pipeline', tone: 'critical', text: <><b>{p1UnassignedCount} P1 Critical ticket{p1UnassignedCount === 1 ? '' : 's'}</b> {p1UnassignedCount === 1 ? 'is' : 'are'} still unassigned.</> })
+  if (stuckCount === 0 && p1UnassignedCount === 0) quietLines.push({ target: 'pipeline', tone: 'quiet', text: <>Ticket Pipeline — no updates. {totalTicketsCount} total, {completedToday} completed today.</> })
+
+  if (complianceVisible) {
+    if (complianceCounts.expired > 0) flaggedLines.push({ target: 'compliance', tone: 'warning', text: <><b>{complianceCounts.expired} compliance certificate{complianceCounts.expired === 1 ? '' : 's'}</b> {complianceCounts.expired === 1 ? 'has' : 'have'} expired.</> })
+    else quietLines.push({ target: 'compliance', tone: 'quiet', text: <>Compliance — no updates. {complianceCounts.dueSoon} due soon.</> })
+  }
+
+  if (voidGardensVisible) {
+    if (voidAgingCounts.overdue > 0) flaggedLines.push({ target: 'void-aging', tone: 'warning', text: <><b>{voidAgingCounts.overdue} void room{voidAgingCounts.overdue === 1 ? '' : 's'}</b> {voidAgingCounts.overdue === 1 ? 'is' : 'are'} overdue for turnaround.</> })
+    else quietLines.push({ target: 'void-aging', tone: 'quiet', text: <>Void Aging — no updates. {voidAgingCounts.aging} aging, nothing overdue.</> })
+
+    if (gardenAgingCounts.overdue > 0) flaggedLines.push({ target: 'gardens', tone: 'warning', text: <><b>{gardenAgingCounts.overdue} garden{gardenAgingCounts.overdue === 1 ? '' : 's'}</b> {gardenAgingCounts.overdue === 1 ? 'is' : 'are'} overdue for attention.</> })
+    else quietLines.push({ target: 'gardens', tone: 'quiet', text: <>Gardens — no updates. {gardenAgingCounts.aging} due soon, nothing overdue.</> })
+  }
+
+  quietLines.push({ target: 'properties', tone: 'quiet', text: <>Properties — no updates. {totalPropertiesCount} total, {newPropertiesCount} new recently.</> })
+  quietLines.push({ target: 'jobs-completed', tone: 'quiet', text: <>Jobs Completed — no updates. {completedThisMonth} this month.</> })
+
+  if (flaggedLocationsCount > 0) flaggedLines.push({ target: 'sign-off-mileage', tone: 'warning', text: <><b>{flaggedLocationsCount} clocking location{flaggedLocationsCount === 1 ? '' : 's'}</b> flagged for review.</> })
+  else quietLines.push({ target: 'sign-off-mileage', tone: 'quiet', text: <>Sign-Off &amp; Mileage — no updates. {pendingSignOffCount} pending sign-off, nothing flagged.</> })
+
+  const briefingLines = [...flaggedLines, ...quietLines]
+
   if (loading) return (
     <div style={{ minHeight: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <p style={{ color: COLORS.slate400, fontWeight: 600, fontFamily: 'system-ui' }}>Loading tickets...</p>
@@ -287,6 +386,8 @@ export default function AdminDashboard({ profile, onNavigate }) {
 
   return (
     <div>
+      <AiDailyBriefing lines={briefingLines} />
+
       <DashboardSection id="pipeline" title="Ticket Pipeline" background={COLORS.white} alertCount={kpis.find(k => k.label === 'Stuck')?.value || 0}>
         <div style={{ width: '100%' }}>
           <KpiTiles
@@ -296,7 +397,7 @@ export default function AdminDashboard({ profile, onNavigate }) {
         </div>
       </DashboardSection>
 
-      <DashboardSection id="properties" title="Properties" background={COLORS.white}>
+      <DashboardSection id="properties" title="Properties" background={COLORS.white} defaultCollapsed>
         <button
           onClick={() => onNavigate?.('properties')}
           style={{
@@ -346,7 +447,7 @@ export default function AdminDashboard({ profile, onNavigate }) {
           Compliance Manager alike -- only Housekeeping/other divisions
           don't need it. Void Aging and Gardens are Maintenance-only. */}
       {(!profile.division || profile.division === 'Compliance') && (
-        <DashboardSection id="compliance" title="Compliance" background={COLORS.white} alertCount={complianceCounts.expired}>
+        <DashboardSection id="compliance" title="Compliance" background={COLORS.white} alertCount={complianceCounts.expired} defaultCollapsed>
           <div style={{ width: '100%' }}>
             <KpiTiles
               kpis={complianceKpis}
@@ -357,7 +458,7 @@ export default function AdminDashboard({ profile, onNavigate }) {
       )}
 
       {!profile.division && (
-        <DashboardSection id="void-aging" title="Void Aging" background={COLORS.white} alertCount={voidAgingCounts.overdue}>
+        <DashboardSection id="void-aging" title="Void Aging" background={COLORS.white} alertCount={voidAgingCounts.overdue} defaultCollapsed>
           <div style={{ width: '100%' }}>
             <KpiTiles
               kpis={voidAgingKpis}
@@ -368,7 +469,7 @@ export default function AdminDashboard({ profile, onNavigate }) {
       )}
 
       {!profile.division && (
-        <DashboardSection id="gardens" title="Gardens" background={COLORS.white} alertCount={gardenAgingCounts.overdue}>
+        <DashboardSection id="gardens" title="Gardens" background={COLORS.white} alertCount={gardenAgingCounts.overdue} defaultCollapsed>
           <div style={{ width: '100%' }}>
             <KpiTiles
               kpis={gardenAgingKpis}
@@ -378,7 +479,7 @@ export default function AdminDashboard({ profile, onNavigate }) {
         </DashboardSection>
       )}
 
-      <DashboardSection id="jobs-completed" title="Jobs Completed" background={COLORS.slate50}>
+      <DashboardSection id="jobs-completed" title="Jobs Completed" background={COLORS.slate50} defaultCollapsed>
         {completionKpis.map(kpi => (
           <button
             key={kpi.label}
@@ -391,7 +492,7 @@ export default function AdminDashboard({ profile, onNavigate }) {
         ))}
       </DashboardSection>
 
-      <DashboardSection id="sign-off-mileage" title="Sign-Off & Mileage" background={COLORS.slate50} alertCount={flaggedLocationsCount}>
+      <DashboardSection id="sign-off-mileage" title="Sign-Off & Mileage" background={COLORS.slate50} alertCount={flaggedLocationsCount} defaultCollapsed>
         <button
           onClick={() => onNavigate?.('sign-off')}
           style={{
