@@ -127,6 +127,22 @@ function isNavItemVisible(item, profile) {
 export default function AdminDashboard({ profile }) {
   const [currentPage, setCurrentPage] = useState('dashboard')
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  // Desktop-only -- the mobile drawer (SidebarContent's other instance,
+  // rendered without allowCollapse) always shows full labels regardless of
+  // this, since it's a temporary overlay you explicitly open, not a
+  // persistent rail competing for screen space. Persisted the same way the
+  // dashboard's per-section collapse state already is.
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try { return localStorage.getItem('pmms_sidebar_collapsed') === 'true' } catch { return false }
+  })
+
+  function toggleSidebarCollapsed() {
+    setSidebarCollapsed(prev => {
+      const next = !prev
+      try { localStorage.setItem('pmms_sidebar_collapsed', String(next)) } catch { /* ignore */ }
+      return next
+    })
+  }
   const [pendingSignOffCount, setPendingSignOffCount] = useState(0)
   const [totalTicketsCount, setTotalTicketsCount] = useState(0)
   const [chatUnreadTotal, setChatUnreadTotal] = useState(0)
@@ -232,15 +248,26 @@ export default function AdminDashboard({ profile }) {
   // A real nested component, instantiated twice (desktop sidebar + mobile
   // drawer, below) -- React gives each JSX usage its own hook state, so
   // popoverOpen/popoverRef/triggerRef are automatically independent between
-  // the two without any extra work.
-  function SidebarContent() {
+  // the two without any extra work. allowCollapse is true only for the
+  // desktop instance -- see sidebarCollapsed's own comment above.
+  function SidebarContent({ allowCollapse = false }) {
     const [popoverOpen, setPopoverOpen] = useState(false)
     const [returning, setReturning] = useState(false)
     // Lazy-initialized so reopening the sidebar while already on an AI
     // Trial page doesn't collapse the section you're currently in.
     const [aiTrialOpen, setAiTrialOpen] = useState(() => AI_TRIAL_CHILD_KEYS.includes(currentPage))
+    const isCollapsed = allowCollapse && sidebarCollapsed
     const impersonationMarker = getImpersonationMarker()
     const popoverRef = useRef(null)
+
+    function handleNavItemClick(item) {
+      if (item.children) {
+        if (isCollapsed) { setSidebarCollapsed(false); setAiTrialOpen(true) }
+        else setAiTrialOpen(o => !o)
+      } else {
+        goToPage(item.key)
+      }
+    }
 
     async function handleReturnToAdmin() {
       setReturning(true)
@@ -276,15 +303,29 @@ export default function AdminDashboard({ profile }) {
 
     return (
       <>
+        {allowCollapse && (
+          <button
+            onClick={toggleSidebarCollapsed}
+            title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            style={{
+              position: 'absolute', top: '16px', right: '-12px', width: '24px', height: '24px', borderRadius: '50%',
+              background: COLORS.white, border: `1px solid ${COLORS.slate200}`, boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '11px', color: COLORS.brandNavy, zIndex: 10,
+            }}
+          >
+            {isCollapsed ? '▶' : '◀'}
+          </button>
+        )}
+
         <button
           onClick={() => goToPage('dashboard')}
-          style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'none', border: 'none', padding: '20px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.1)', width: '100%', textAlign: 'left' }}
+          style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'none', border: 'none', padding: '20px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.1)', width: '100%', textAlign: 'left', justifyContent: isCollapsed ? 'center' : 'flex-start' }}
         >
-          <img src={gbchLogo} alt="GBCH" style={{ height: '32px' }} />
-          <span style={{ fontSize: '15px', fontWeight: 800, color: COLORS.white }}>PMMS</span>
+          <img src={gbchLogo} alt="GBCH" style={{ height: '32px', flexShrink: 0 }} />
+          {!isCollapsed && <span style={{ fontSize: '15px', fontWeight: 800, color: COLORS.white, whiteSpace: 'nowrap' }}>PMMS</span>}
         </button>
 
-        {impersonationMarker && (
+        {!isCollapsed && impersonationMarker && (
           <div style={{ padding: '10px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
             <p style={{ margin: '0 0 6px', fontSize: '12px', color: 'rgba(255,255,255,0.7)', fontWeight: 600 }}>
               Viewing as {impersonationMarker.targetName}
@@ -302,84 +343,95 @@ export default function AdminDashboard({ profile }) {
           </div>
         )}
 
-        <nav style={{ flex: 1, padding: '10px', overflowY: 'auto' }}>
-          {mainNavItems.map(item => (
-            <Fragment key={item.key}>
-              {item.children ? (
-                <>
-                  <button
-                    onClick={() => setAiTrialOpen(o => !o)}
-                    style={navButtonStyle(item.children.some(c => c.key === currentPage))}
-                  >
-                    <span style={navIconStyle}>{item.icon}</span>
-                    <span style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label}</span>
-                      <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.5)', transform: aiTrialOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s ease' }}>▶</span>
-                    </span>
-                  </button>
-                  {aiTrialOpen && item.children.filter(child => isNavItemVisible(child, profile)).map(child => (
+        <nav style={{ flex: 1, padding: '10px', overflowY: 'auto', overflowX: 'hidden' }}>
+          {mainNavItems.map(item => {
+            // Collapsed mode drops full count badges for a small corner dot
+            // instead -- "something here needs attention," without the
+            // space a 2-digit number badge would need on a 40px-wide rail.
+            const alertCount = item.key === 'sign-off' ? pendingSignOffCount
+              : item.key === 'pipeline' ? totalTicketsCount
+              : item.key === 'team-chat' ? chatUnreadTotal
+              : 0
+
+            return (
+              <Fragment key={item.key}>
+                {item.children ? (
+                  <>
+                    <div className={isCollapsed ? 'pmms-nav-tooltip-wrap' : undefined}>
+                      <button
+                        onClick={() => handleNavItemClick(item)}
+                        style={{ ...navButtonStyle(item.children.some(c => c.key === currentPage)), justifyContent: isCollapsed ? 'center' : 'flex-start', padding: isCollapsed ? '9px 0' : '7px 12px' }}
+                      >
+                        <span style={navIconStyle}>{item.icon}</span>
+                        {!isCollapsed && (
+                          <span style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label}</span>
+                            <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.5)', transform: aiTrialOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s ease' }}>▶</span>
+                          </span>
+                        )}
+                      </button>
+                      {isCollapsed && <span className="pmms-nav-tooltip">{item.label}</span>}
+                    </div>
+                    {aiTrialOpen && !isCollapsed && item.children.filter(child => isNavItemVisible(child, profile)).map(child => (
+                      <button
+                        key={child.key}
+                        onClick={() => goToPage(child.key)}
+                        style={{ ...navButtonStyle(currentPage === child.key), paddingLeft: '34px', fontSize: '13px' }}
+                      >
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{child.label}</span>
+                      </button>
+                    ))}
+                  </>
+                ) : (
+                  <div className={isCollapsed ? 'pmms-nav-tooltip-wrap' : undefined}>
                     <button
-                      key={child.key}
-                      onClick={() => goToPage(child.key)}
-                      style={{ ...navButtonStyle(currentPage === child.key), paddingLeft: '34px', fontSize: '13px' }}
+                      onClick={() => goToPage(item.key)}
+                      style={{ ...navButtonStyle(currentPage === item.key), justifyContent: isCollapsed ? 'center' : 'flex-start', padding: isCollapsed ? '9px 0' : '7px 12px' }}
                     >
-                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{child.label}</span>
+                      <span style={{ ...navIconStyle, position: 'relative' }}>
+                        {item.icon}
+                        {isCollapsed && alertCount > 0 && (
+                          <span style={{ position: 'absolute', top: '-3px', right: '-1px', width: '8px', height: '8px', borderRadius: '50%', background: COLORS.red600, border: `1.5px solid ${COLORS.brandNavy}` }} />
+                        )}
+                      </span>
+                      {!isCollapsed && (
+                        <span style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label}</span>
+                          {alertCount > 0 && (
+                            <span
+                              style={{
+                                background: COLORS.red600, color: COLORS.white, fontSize: '11px', fontWeight: 800,
+                                borderRadius: '999px', padding: '1px 8px', marginLeft: '8px', minWidth: '20px', textAlign: 'center', flexShrink: 0,
+                              }}
+                            >
+                              {alertCount}
+                            </span>
+                          )}
+                        </span>
+                      )}
                     </button>
-                  ))}
-                </>
-              ) : (
-                <button
-                  onClick={() => goToPage(item.key)}
-                  style={navButtonStyle(currentPage === item.key)}
-                >
-                  <span style={navIconStyle}>{item.icon}</span>
-                  <span style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label}</span>
-                    {item.key === 'sign-off' && pendingSignOffCount > 0 && (
-                      <span
-                        style={{
-                          background: COLORS.red600, color: COLORS.white, fontSize: '11px', fontWeight: 800,
-                          borderRadius: '999px', padding: '1px 8px', marginLeft: '8px', minWidth: '20px', textAlign: 'center', flexShrink: 0,
-                        }}
-                      >
-                        {pendingSignOffCount}
-                      </span>
-                    )}
-                    {item.key === 'pipeline' && totalTicketsCount > 0 && (
-                      <span
-                        style={{
-                          background: COLORS.red600, color: COLORS.white, fontSize: '11px', fontWeight: 800,
-                          borderRadius: '999px', padding: '1px 8px', marginLeft: '8px', minWidth: '20px', textAlign: 'center', flexShrink: 0,
-                        }}
-                      >
-                        {totalTicketsCount}
-                      </span>
-                    )}
-                    {item.key === 'team-chat' && chatUnreadTotal > 0 && (
-                      <span
-                        style={{
-                          background: COLORS.red600, color: COLORS.white, fontSize: '11px', fontWeight: 800,
-                          borderRadius: '999px', padding: '1px 8px', marginLeft: '8px', minWidth: '20px', textAlign: 'center', flexShrink: 0,
-                        }}
-                      >
-                        {chatUnreadTotal}
-                      </span>
-                    )}
-                  </span>
-                </button>
-              )}
-              {DIVIDER_AFTER_KEYS.includes(item.key) && (
-                <div style={{ borderTop: '1px solid rgba(255,255,255,0.12)', margin: '6px 4px' }} />
-              )}
-            </Fragment>
-          ))}
+                    {isCollapsed && <span className="pmms-nav-tooltip">{item.label}</span>}
+                  </div>
+                )}
+                {DIVIDER_AFTER_KEYS.includes(item.key) && (
+                  <div style={{ borderTop: '1px solid rgba(255,255,255,0.12)', margin: '6px 4px' }} />
+                )}
+              </Fragment>
+            )
+          })}
         </nav>
 
         <div style={{ padding: '16px', borderTop: '1px solid rgba(255,255,255,0.1)', position: 'relative' }}>
           {popoverOpen && (
             <div
               ref={popoverRef}
-              style={{
+              style={isCollapsed ? {
+                // Flyout to the right instead of stretching across the
+                // 64px rail, which is too narrow for the item list.
+                position: 'absolute', left: '60px', bottom: '16px', width: '200px',
+                background: COLORS.brandNavyPanel, border: '1px solid rgba(255,255,255,0.16)', borderRadius: '10px',
+                padding: '6px', boxShadow: '0 12px 28px rgba(0,0,0,0.35)', display: 'flex', flexDirection: 'column', zIndex: 30,
+              } : {
                 position: 'absolute', left: '16px', right: '16px', bottom: 'calc(100% + 8px)',
                 background: COLORS.brandNavyPanel, border: '1px solid rgba(255,255,255,0.16)', borderRadius: '10px',
                 padding: '6px', boxShadow: '0 12px 28px rgba(0,0,0,0.35)', display: 'flex', flexDirection: 'column', zIndex: 30,
@@ -403,26 +455,33 @@ export default function AdminDashboard({ profile }) {
             </div>
           )}
 
-          <button
-            ref={triggerRef}
-            onClick={() => setPopoverOpen(o => !o)}
-            style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', background: 'none', border: 'none', padding: '4px', margin: '-4px -4px 10px -4px', borderRadius: '8px', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}
-          >
-            {resolveStaffPhotoUrl(profile.photo_url) ? (
-              <img src={resolveStaffPhotoUrl(profile.photo_url)} alt="" style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
-            ) : (
-              <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'rgba(255,255,255,0.15)', color: COLORS.white, fontSize: '13px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                {(profile.name || '?').split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase()}
-              </div>
-            )}
-            <div style={{ minWidth: 0, flex: 1 }}>
-              <p style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: COLORS.white, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{profile.name}</p>
-              <p style={{ margin: 0, fontSize: '12px', color: 'rgba(255,255,255,0.6)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{profile.job_title}</p>
-            </div>
-            <span style={{ flexShrink: 0, color: 'rgba(255,255,255,0.6)', fontSize: '11px', transform: popoverOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }}>▲</span>
-          </button>
+          <div className={isCollapsed ? 'pmms-nav-tooltip-wrap' : undefined}>
+            <button
+              ref={triggerRef}
+              onClick={() => setPopoverOpen(o => !o)}
+              style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', background: 'none', border: 'none', padding: '4px', margin: '-4px -4px 10px -4px', borderRadius: '8px', cursor: 'pointer', textAlign: isCollapsed ? 'center' : 'left', fontFamily: 'inherit', justifyContent: isCollapsed ? 'center' : 'flex-start' }}
+            >
+              {resolveStaffPhotoUrl(profile.photo_url) ? (
+                <img src={resolveStaffPhotoUrl(profile.photo_url)} alt="" style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+              ) : (
+                <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'rgba(255,255,255,0.15)', color: COLORS.white, fontSize: '13px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  {(profile.name || '?').split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase()}
+                </div>
+              )}
+              {!isCollapsed && (
+                <>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <p style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: COLORS.white, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{profile.name}</p>
+                    <p style={{ margin: 0, fontSize: '12px', color: 'rgba(255,255,255,0.6)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{profile.job_title}</p>
+                  </div>
+                  <span style={{ flexShrink: 0, color: 'rgba(255,255,255,0.6)', fontSize: '11px', transform: popoverOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }}>▲</span>
+                </>
+              )}
+            </button>
+            {isCollapsed && <span className="pmms-nav-tooltip" style={{ bottom: 0, top: 'auto', transform: 'none' }}>{profile.name}</span>}
+          </div>
 
-          {pushNotificationsSupported() && (
+          {!isCollapsed && pushNotificationsSupported() && (
             <button
               onClick={handleEnableNotifications}
               disabled={pushEnabled}
@@ -431,7 +490,7 @@ export default function AdminDashboard({ profile }) {
               🔔 {pushEnabled ? 'Notifications: On' : 'Enable Notifications'}
             </button>
           )}
-          {pushError && <p style={{ margin: '8px 0 0 0', fontSize: '11px', color: COLORS.red300 }}>{pushError}</p>}
+          {!isCollapsed && pushError && <p style={{ margin: '8px 0 0 0', fontSize: '11px', color: COLORS.red300 }}>{pushError}</p>}
         </div>
       </>
     )
@@ -454,9 +513,14 @@ export default function AdminDashboard({ profile }) {
       {/* Desktop sidebar */}
       <div
         className="admin-sidebar-desktop"
-        style={{ width: '240px', minWidth: '240px', background: COLORS.brandNavy, display: 'flex', flexDirection: 'column', position: 'sticky', top: 'var(--pmms-banner-offset, 0px)', height: 'calc(100vh - var(--pmms-banner-offset, 0px))' }}
+        style={{
+          width: sidebarCollapsed ? '64px' : '240px', minWidth: sidebarCollapsed ? '64px' : '240px',
+          background: COLORS.brandNavy, display: 'flex', flexDirection: 'column', position: 'sticky',
+          top: 'var(--pmms-banner-offset, 0px)', height: 'calc(100vh - var(--pmms-banner-offset, 0px))',
+          transition: 'width 0.2s ease, min-width 0.2s ease',
+        }}
       >
-        <SidebarContent />
+        <SidebarContent allowCollapse />
       </div>
 
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', paddingTop: 'var(--pmms-banner-offset, 0px)' }}>
