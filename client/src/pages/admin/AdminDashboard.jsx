@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { COLORS } from '../../lib/colors'
 import { priorityTierLabel, fetchFlaggedClockingCount, isTicketStuck, KpiTiles, fetchComplianceAgingCounts, fetchVoidAgingCounts, fetchGardenReviewAging, computeAvgResponseMs, formatDuration, fetchPriorityThresholds } from './shared'
+import { NavIcon } from '../../lib/icons'
 
 const DEFAULT_NEW_PROPERTY_WINDOW_HOURS = 48
 
@@ -70,16 +71,13 @@ function DashboardSection({ id, title, background, alertCount = 0, defaultCollap
   )
 }
 
-// Free, rule-based summary of the exact numbers already computed for the
-// sections below -- no new data, no external AI/API cost, same approach as
-// the AI Trial pages (see client/src/pages/admin/ai-trial/keywordEngine.js).
 // Ranks flagged items first so what needs attention doesn't require
-// scanning every section; clicking any line jumps to and opens/closes that
-// section by simply re-clicking its own header (see data-dashboard-section
-// on DashboardSection above) rather than duplicating its toggle state here.
-function AiDailyBriefing({ lines }) {
-  const flaggedCount = lines.filter(l => l.tone !== 'quiet').length
-
+// scanning every section below; clicking any line jumps to and opens/closes
+// that section by simply re-clicking its own header (see
+// data-dashboard-section on DashboardSection above) rather than duplicating
+// its toggle state here. Built entirely from the same numbers those
+// sections already compute.
+function DailyBriefing({ lines }) {
   function handleLineClick(target) {
     const header = document.querySelector(`[data-dashboard-section="${target}"]`)
     header?.click()
@@ -95,11 +93,11 @@ function AiDailyBriefing({ lines }) {
       border: `1px solid ${COLORS.indigo100}`,
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-        <span style={{ fontSize: '15px' }}>✨</span>
-        <span style={{ fontSize: '12px', fontWeight: 800, color: COLORS.indigo700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>AI Daily Briefing</span>
+        <span style={{ color: COLORS.indigo700, display: 'flex' }}><NavIcon name="sunrise" size={16} /></span>
+        <span style={{ fontSize: '12px', fontWeight: 800, color: COLORS.indigo700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Daily Briefing</span>
       </div>
       <p style={{ margin: '0 0 10px', fontSize: '11px', color: COLORS.indigo700, opacity: 0.75 }}>
-        Free, rule-based -- built from the same numbers as the sections below. {flaggedCount} need a look, {lines.length - flaggedCount} don't.
+        What's worth a look across the dashboard this morning.
       </p>
       {lines.map((line, i) => (
         <div
@@ -386,7 +384,7 @@ export default function AdminDashboard({ profile, onNavigate }) {
 
   return (
     <div>
-      <AiDailyBriefing lines={briefingLines} />
+      <DailyBriefing lines={briefingLines} />
 
       <DashboardSection id="pipeline" title="Ticket Pipeline" background={COLORS.white} alertCount={kpis.find(k => k.label === 'Stuck')?.value || 0}>
         <div style={{ width: '100%' }}>
