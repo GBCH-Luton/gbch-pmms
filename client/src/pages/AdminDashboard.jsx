@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef, Fragment, lazy, Suspense } from 'react'
 import { createPortal } from 'react-dom'
+import { NavIcon } from '../lib/icons'
 import { supabase } from '../lib/supabase'
 import { COLORS } from '../lib/colors'
 import { logLoginEvent } from '../lib/loginEvents'
@@ -45,25 +46,25 @@ const NAV_ITEMS = [
   // Grouped by what they're actually for: core ticket lifecycle first,
   // then property/division monitoring, then people-ops, then stock, then
   // reports/config at the bottom (2026-07-22 reorder).
-  { key: 'dashboard', label: 'Dashboard', icon: '🏠', Component: AdminDashboardPage },
+  { key: 'dashboard', label: 'Dashboard', icon: 'dashboard', Component: AdminDashboardPage },
   // RLS on pmms.chat_messages is the real restriction (division-scoped),
   // not this nav item -- visible to any admin/manager, no divisions/
   // divisionOnly gating needed here.
-  { key: 'team-chat', label: 'Team Chat', icon: '💬', Component: AdminTeamChat },
-  { key: 'pipeline', label: 'Pipeline', icon: '🛠️', Component: AdminPipeline },
-  { key: 'raise-ticket', label: 'Log a Ticket', icon: '📝', Component: AdminRaiseTicket },
-  { key: 'sign-off', label: 'Sign-Off', icon: '✅', Component: AdminSignOff },
-  ...(EVENTS_FEATURE_ENABLED ? [{ key: 'events', label: 'Events', icon: '📅', Component: AdminEvents }] : []),
-  { key: 'properties', label: 'Properties', icon: '🏢', Component: AdminProperties },
-  { key: 'voids', label: 'Voids', icon: '🔑', Component: AdminVoids, divisions: ['Maintenance'] },
+  { key: 'team-chat', label: 'Team Chat', icon: 'chat', Component: AdminTeamChat },
+  { key: 'pipeline', label: 'Pipeline', icon: 'pipeline', Component: AdminPipeline },
+  { key: 'raise-ticket', label: 'Log a Ticket', icon: 'ticket', Component: AdminRaiseTicket },
+  { key: 'sign-off', label: 'Sign-Off', icon: 'check', Component: AdminSignOff },
+  ...(EVENTS_FEATURE_ENABLED ? [{ key: 'events', label: 'Events', icon: 'calendar', Component: AdminEvents }] : []),
+  { key: 'properties', label: 'Properties', icon: 'building', Component: AdminProperties },
+  { key: 'voids', label: 'Voids', icon: 'key', Component: AdminVoids, divisions: ['Maintenance'] },
   // Division dashboards, grouped together in this order -- Landlord
   // Liaison goes here too once it exists.
-  { key: 'compliance', label: 'Compliance', icon: '🛡️', Component: AdminCompliance, divisions: ['Maintenance', 'Compliance'] },
-  { key: 'housekeeping', label: 'Housekeeping', icon: '🧹', Component: AdminHousekeeping, divisionOnly: 'Housekeeping' },
-  { key: 'builders', label: 'Staff', icon: '👥', Component: AdminBuilders },
-  { key: 'clocking', label: 'Clocking', icon: '⏱️', Component: AdminClocking },
-  { key: 'stock', label: 'Stock', icon: '📦', Component: AdminStock, divisions: ['Maintenance'] },
-  { key: 'reports', label: 'Reports', icon: '📈', Component: AdminReports },
+  { key: 'compliance', label: 'Compliance', icon: 'shield', Component: AdminCompliance, divisions: ['Maintenance', 'Compliance'] },
+  { key: 'housekeeping', label: 'Housekeeping', icon: 'broom', Component: AdminHousekeeping, divisionOnly: 'Housekeeping' },
+  { key: 'builders', label: 'Staff', icon: 'users', Component: AdminBuilders },
+  { key: 'clocking', label: 'Clocking', icon: 'clock', Component: AdminClocking },
+  { key: 'stock', label: 'Stock', icon: 'box', Component: AdminStock, divisions: ['Maintenance'] },
+  { key: 'reports', label: 'Reports', icon: 'chart', Component: AdminReports },
   // Trial section, admin-only while it's being tried out and shown to
   // managers -- free, rule-based (no external AI service, no cost), see
   // client/src/pages/admin/ai-trial/keywordEngine.js. Each child also
@@ -71,7 +72,7 @@ const NAV_ITEMS = [
   // check below (activeNavItem + isNavItemVisible) still holds if one is
   // ever resolved directly by key.
   {
-    key: 'ai-trial', label: 'AI Trial', icon: '✨', adminOnly: true,
+    key: 'ai-trial', label: 'AI Trial', icon: 'sparkle', adminOnly: true,
     children: [
       { key: 'ai-ticket', label: 'Ticket Logging', Component: AiTicketLogging, adminOnly: true },
       { key: 'ai-priority', label: 'Priority Scoring', Component: AiPriorityScoring, adminOnly: true },
@@ -82,10 +83,10 @@ const NAV_ITEMS = [
   // These three are rendered in the profile popover, not the main nav list
   // (see SidebarContent) -- still present here so NAV_ITEMS/isNavItemVisible
   // keep working as the single source of truth for routing + visibility.
-  { key: 'settings', label: 'Settings', icon: '⚙️', Component: AdminSettings },
-  { key: 'admin', label: 'Admin', icon: '🔐', Component: AdminAccess, adminOnly: true },
-  { key: 'view-as', label: 'View As...', icon: '👁️', Component: AdminViewAs, adminOnly: true },
-  { key: 'help', label: 'Help & Guide', icon: '📖', Component: AdminHelp, adminOnly: true },
+  { key: 'settings', label: 'Settings', icon: 'gear', Component: AdminSettings },
+  { key: 'admin', label: 'Admin', icon: 'lock', Component: AdminAccess, adminOnly: true },
+  { key: 'view-as', label: 'View As...', icon: 'eye', Component: AdminViewAs, adminOnly: true },
+  { key: 'help', label: 'Help & Guide', icon: 'book', Component: AdminHelp, adminOnly: true },
 ]
 
 const POPOVER_ITEM_KEYS = ['settings', 'admin', 'view-as', 'help']
@@ -380,7 +381,7 @@ export default function AdminDashboard({ profile }) {
                         onClick={() => handleNavItemClick(item)}
                         style={{ ...navButtonStyle(item.children.some(c => c.key === currentPage)), justifyContent: isCollapsed ? 'center' : 'flex-start', padding: isCollapsed ? '9px 0' : '7px 12px' }}
                       >
-                        <span style={navIconStyle}>{item.icon}</span>
+                        <span style={navIconStyle}><NavIcon name={item.icon} /></span>
                         {!isCollapsed && (
                           <span style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label}</span>
@@ -406,7 +407,7 @@ export default function AdminDashboard({ profile }) {
                       style={{ ...navButtonStyle(currentPage === item.key), justifyContent: isCollapsed ? 'center' : 'flex-start', padding: isCollapsed ? '9px 0' : '7px 12px' }}
                     >
                       <span style={{ ...navIconStyle, position: 'relative' }}>
-                        {item.icon}
+                        <NavIcon name={item.icon} />
                         {isCollapsed && alertCount > 0 && (
                           <span style={{ position: 'absolute', top: '-3px', right: '-1px', width: '8px', height: '8px', borderRadius: '50%', background: COLORS.red600, border: `1.5px solid ${COLORS.brandNavy}` }} />
                         )}
@@ -459,13 +460,13 @@ export default function AdminDashboard({ profile }) {
                   onClick={() => handlePopoverNav(item.key)}
                   style={navButtonStyle(currentPage === item.key)}
                 >
-                  <span style={navIconStyle}>{item.icon}</span>
+                  <span style={navIconStyle}><NavIcon name={item.icon} /></span>
                   <span>{item.label}</span>
                 </button>
               ))}
               <div style={{ borderTop: '1px solid rgba(255,255,255,0.16)', margin: '4px 6px' }} />
               <button onClick={handlePopoverSignOut} style={navButtonStyle(false)}>
-                <span style={navIconStyle}>🚪</span>
+                <span style={navIconStyle}><NavIcon name="logout" /></span>
                 <span>Sign out</span>
               </button>
             </div>
