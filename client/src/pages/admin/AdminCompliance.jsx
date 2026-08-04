@@ -111,6 +111,15 @@ export default function AdminCompliance({ onNavigate, initialTierFilter, onIniti
     return true
   }), [rows, tierFilter, certTypeFilter, propertyFilter])
 
+  // Same "Showing: ... (count)" banner as AdminProperties.jsx's town
+  // filter -- combines whichever of the 3 filters are active into one
+  // label rather than a separate count next to each dropdown.
+  const activeFilterLabel = [
+    tierFilter !== 'All' ? tierFilter : null,
+    certTypeFilter !== 'All' ? COMPLIANCE_TYPES.find(t => t.key === certTypeFilter)?.title : null,
+    propertyFilter ? properties.find(p => String(p.id) === String(propertyFilter))?.address : null,
+  ].filter(Boolean).join(' · ') || null
+
   function sortValue(r, column) {
     switch (column) {
       case 'property': return (r.property.address || '').toLowerCase()
@@ -202,6 +211,18 @@ export default function AdminCompliance({ onNavigate, initialTierFilter, onIniti
           Clear filters
         </button>
       </div>
+
+      {activeFilterLabel && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', background: COLORS.teal50, border: `1px solid ${COLORS.teal300}`, borderRadius: '10px', padding: '10px 16px', marginBottom: '16px', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '13px', fontWeight: 700, color: COLORS.teal700 }}>Showing: {activeFilterLabel} ({filteredRows.length})</span>
+          <button
+            onClick={clearFilters}
+            style={{ background: 'none', border: 'none', color: COLORS.teal700, fontSize: '13px', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}
+          >
+            Clear filter
+          </button>
+        </div>
+      )}
 
       <div style={{ background: COLORS.white, borderRadius: '16px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
