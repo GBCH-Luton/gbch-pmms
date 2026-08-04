@@ -16,6 +16,7 @@ import { supabase } from '../../lib/supabase'
 import { COLORS } from '../../lib/colors'
 import { modalLabelStyle, modalErrorStyle, GARDEN_STATE_OPTIONS, GARDEN_STATE_STYLES, formatUKDate } from './shared'
 import { compressImage } from '../../lib/imageCompression'
+import { getSignedUrl } from '../../lib/storage'
 
 const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', fontFamily: 'inherit', boxSizing: 'border-box', marginBottom: '14px' }
 const readRowStyle = { display: 'flex', justifyContent: 'space-between', gap: '12px', padding: '8px 0' }
@@ -93,7 +94,7 @@ export default function PropertyGardensTab({ property, onFieldsSaved }) {
       return
     }
 
-    const photoUrl = supabase.storage.from('property-photos').getPublicUrl(path).data.publicUrl
+    const photoUrl = await getSignedUrl('property-photos', path)
     const err = await saveFields({ [side === 'front' ? 'garden_front_photo_url' : 'garden_back_photo_url']: photoUrl })
     setUploading(false)
     if (err) setPhotoError(err)

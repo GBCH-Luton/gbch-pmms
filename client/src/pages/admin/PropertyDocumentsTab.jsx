@@ -28,6 +28,7 @@ import {
   modalCancelBtnStyle, modalConfirmBtnStyle, formatUKDate,
 } from './shared'
 import { compressImage } from '../../lib/imageCompression'
+import { getSignedUrl } from '../../lib/storage'
 
 const CATEGORIES = ['Safety', 'Maintenance', 'Legal', 'Tenant', 'Other']
 const FILTER_TABS = ['All', ...CATEGORIES]
@@ -102,7 +103,7 @@ function DocumentFormModal({ property, profile, doc, onClose, onSaved }) {
 
     if (uploadError) { setError(`Upload failed: ${uploadError.message}`); return }
 
-    const url = supabase.storage.from('property-docs').getPublicUrl(path).data.publicUrl
+    const url = await getSignedUrl('property-docs', path)
     set('file_url', url)
   }
 

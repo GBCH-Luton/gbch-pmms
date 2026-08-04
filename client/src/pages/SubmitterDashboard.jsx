@@ -15,6 +15,7 @@ import { supabase } from '../lib/supabase'
 import { COLORS } from '../lib/colors'
 import { logLoginEvent } from '../lib/loginEvents'
 import { compressImage } from '../lib/imageCompression'
+import { getSignedUrl } from '../lib/storage'
 import { fetchMaintenanceCategories, sortedCategoryEntries, isUnlistedTag, unlistedTagFor, unlistedLabelFor, calculatePriorityScore } from '../lib/maintenanceCategories'
 import { attachBuilderSafeProperties } from '../lib/properties'
 import { statusColour, statusLabel } from './admin/shared'
@@ -129,7 +130,7 @@ function NewReportForm({ profile, onSubmitted }) {
         setError(`Photo upload failed: ${uploadError.message}`)
         return
       }
-      photoUrl = supabase.storage.from('ticket-photos').getPublicUrl(path).data.publicUrl
+      photoUrl = await getSignedUrl('ticket-photos', path)
     }
 
     const { data, error: insertError } = await supabase

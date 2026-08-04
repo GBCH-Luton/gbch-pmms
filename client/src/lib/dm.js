@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
 import { compressImage } from './imageCompression'
+import { getSignedUrl } from './storage'
 
 const MESSAGE_LIMIT = 200
 const CONVERSATION_SCAN_LIMIT = 500
@@ -77,7 +78,7 @@ export async function postDm({ senderId, senderName, recipientId, body, photoFil
     const path = `${senderId}/${Date.now()}-${compressed.name}`
     const { error: uploadError } = await supabase.storage.from('chat-photos').upload(path, compressed)
     if (uploadError) return { error: `Photo upload failed: ${uploadError.message}` }
-    photoUrl = supabase.storage.from('chat-photos').getPublicUrl(path).data.publicUrl
+    photoUrl = await getSignedUrl('chat-photos', path)
   }
 
   const { data, error } = await supabase

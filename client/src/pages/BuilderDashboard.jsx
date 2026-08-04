@@ -13,6 +13,7 @@ import { fetchChannelMessages, subscribeToChannel, postMessage, markChannelRead,
 import { fetchDmContacts, fetchConversations, fetchThreadMessages, subscribeToDm, postDm, markThreadRead, countUnreadDms } from '../lib/dm'
 import { NavIcon } from '../lib/icons'
 import { compressImage } from '../lib/imageCompression'
+import { getSignedUrl } from '../lib/storage'
 import PropertySearchSelect from '../components/PropertySearchSelect'
 import ChatComposer from '../components/ChatComposer'
 import PhotoLightbox from '../components/PhotoLightbox'
@@ -574,7 +575,7 @@ export default function BuilderDashboard({ profile }) {
         setCompleteError(`Photo upload failed: ${uploadError.message}`)
         return
       }
-      photoUrl = supabase.storage.from('ticket-photos').getPublicUrl(path).data.publicUrl
+      photoUrl = await getSignedUrl('ticket-photos', path)
     }
 
     const now = new Date().toISOString()
@@ -738,7 +739,7 @@ export default function BuilderDashboard({ profile }) {
         setNoAccessError(`Photo upload failed: ${uploadError.message}`)
         return
       }
-      photoUrl = supabase.storage.from('ticket-photos').getPublicUrl(path).data.publicUrl
+      photoUrl = await getSignedUrl('ticket-photos', path)
     }
 
     const now = new Date().toISOString()
@@ -965,7 +966,7 @@ export default function BuilderDashboard({ profile }) {
         return
       }
 
-      photoUrl = supabase.storage.from('ticket-photos').getPublicUrl(path).data.publicUrl
+      photoUrl = await getSignedUrl('ticket-photos', path)
     }
 
     const { data, error } = await supabase
@@ -1064,7 +1065,7 @@ export default function BuilderDashboard({ profile }) {
           setTicketError(`Media upload failed: ${uploadError.message}`)
           return
         }
-        photoUrl = supabase.storage.from('ticket-photos').getPublicUrl(path).data.publicUrl
+        photoUrl = await getSignedUrl('ticket-photos', path)
       }
 
       const { data, error } = await supabase

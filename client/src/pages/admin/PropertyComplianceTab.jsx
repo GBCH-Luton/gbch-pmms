@@ -20,6 +20,7 @@ import { supabase } from '../../lib/supabase'
 import { COLORS } from '../../lib/colors'
 import { modalLabelStyle, modalErrorStyle, formatUKDate, COMPLIANCE_TYPES, RAG_STYLES, RagPill, computeComplianceAging } from './shared'
 import { compressImage } from '../../lib/imageCompression'
+import { getSignedUrl } from '../../lib/storage'
 
 function ComplianceCard({ type, record, onUpload, onSave, thresholdDays }) {
   const [expiryDate, setExpiryDate] = useState(record?.expiry_date || '')
@@ -216,7 +217,7 @@ export default function PropertyComplianceTab({ property }) {
     const { error: uploadError } = await supabase.storage.from('property-docs').upload(path, compressed)
     if (uploadError) return `Upload failed: ${uploadError.message}`
 
-    const certUrl = supabase.storage.from('property-docs').getPublicUrl(path).data.publicUrl
+    const certUrl = await getSignedUrl('property-docs', path)
     return upsertRecord(certType, { cert_url: certUrl })
   }
 

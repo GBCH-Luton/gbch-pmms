@@ -33,6 +33,7 @@ import {
   modalCancelBtnStyle, modalConfirmBtnStyle, formatUKDate,
 } from './shared'
 import { compressImage } from '../../lib/imageCompression'
+import { getSignedUrl } from '../../lib/storage'
 
 const ASSET_CATEGORIES = ['Boiler', 'Fire Alarm', 'Electrical Panel', 'Lift', 'Hot Water Tank', 'Ventilation', 'Plumbing', 'Door Entry', 'CCTV', 'Other']
 const CURRENT_STATUSES = ['Operational', 'Needs Repair', 'End of Life']
@@ -120,7 +121,7 @@ function AssetFormModal({ property, asset, onClose, onSaved, onDeleted }) {
 
     if (uploadError) { setError(`Photo upload failed: ${uploadError.message}`); return }
 
-    const url = supabase.storage.from('property-docs').getPublicUrl(path).data.publicUrl
+    const url = await getSignedUrl('property-docs', path)
     set('asset_photo_url', url)
   }
 

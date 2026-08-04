@@ -27,6 +27,7 @@ import { supabase } from '../../lib/supabase'
 import { COLORS } from '../../lib/colors'
 import { modalLabelStyle, modalErrorStyle } from './shared'
 import { compressImage } from '../../lib/imageCompression'
+import { getSignedUrl } from '../../lib/storage'
 
 const LEASE_TYPES = ['Fixed Term', 'Rolling', 'Assured Shorthold', 'Other']
 const LEASE_STATUSES = ['Active', 'Expiring', 'Renewed', 'Terminated']
@@ -210,7 +211,7 @@ function DocUpload({ label, urlKey, property, onSave, bucketFolder }) {
       return
     }
 
-    const url = supabase.storage.from('property-docs').getPublicUrl(path).data.publicUrl
+    const url = await getSignedUrl('property-docs', path)
     const err = await onSave({ [urlKey]: url })
     setUploading(false)
     if (err) setError(err)

@@ -6,6 +6,7 @@ import { fetchComplianceCheckTypes } from '../../lib/compliance'
 import { fetchMaintenanceCategories, sortedCategoryEntries, UNLISTED_MARKER_PREFIX, isUnlistedTag, unlistedTagFor, unlistedLabelFor, calculatePriorityScore } from '../../lib/maintenanceCategories'
 import { fetchDivisions } from '../../lib/divisions'
 import { compressImage } from '../../lib/imageCompression'
+import { getSignedUrl } from '../../lib/storage'
 import PropertySearchSelect from '../../components/PropertySearchSelect'
 import VoiceInputButton from '../../components/VoiceInputButton'
 
@@ -237,7 +238,7 @@ export default function AdminRaiseTicket({ profile }) {
         return
       }
 
-      photoUrl = supabase.storage.from('ticket-photos').getPublicUrl(path).data.publicUrl
+      photoUrl = await getSignedUrl('ticket-photos', path)
     }
 
     const { data, error } = await supabase
@@ -350,7 +351,7 @@ export default function AdminRaiseTicket({ profile }) {
           setTicketError(`Media upload failed: ${uploadError.message}`)
           return
         }
-        photoUrl = supabase.storage.from('ticket-photos').getPublicUrl(path).data.publicUrl
+        photoUrl = await getSignedUrl('ticket-photos', path)
       }
 
       const { data, error } = await supabase

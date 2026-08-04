@@ -17,6 +17,7 @@ import { supabase } from '../../lib/supabase'
 import { COLORS } from '../../lib/colors'
 import { modalLabelStyle, modalErrorStyle, fetchAssignableStaffForCategory } from './shared'
 import { compressImage } from '../../lib/imageCompression'
+import { getSignedUrl } from '../../lib/storage'
 
 const PROPERTY_TYPES = ['House', 'Flat', 'HMO', 'Specialist Supported Living', 'Commercial', 'Other']
 const TENURE_TYPES = ['Freehold', 'Leasehold', 'Rented']
@@ -381,7 +382,7 @@ export default function PropertyCoreTab({ property, onFieldsSaved, profile }) {
       return
     }
 
-    const photoUrl = supabase.storage.from('property-photos').getPublicUrl(path).data.publicUrl
+    const photoUrl = await getSignedUrl('property-photos', path)
     const err = await saveFields({ cover_photo_url: photoUrl })
     setPhotoUploading(false)
     if (err) setPhotoError(err)
