@@ -331,12 +331,14 @@ export default function AdminDashboard({ profile }) {
             onClick={toggleSidebarCollapsed}
             title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             style={{
-              position: 'absolute', top: '16px', right: '-12px', width: '24px', height: '24px', borderRadius: '50%',
-              background: COLORS.white, border: `1px solid ${COLORS.slate200}`, boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '11px', color: COLORS.brandNavy, zIndex: 10,
+              position: 'absolute', top: '50%', right: '-12px', transform: 'translateY(-50%)', width: '24px', height: '24px', borderRadius: '50%',
+              background: COLORS.brandNavy, border: `1px solid rgba(255,255,255,0.18)`, boxShadow: '0 2px 6px rgba(0,0,0,0.25)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: COLORS.white, zIndex: 10,
             }}
           >
-            {isCollapsed ? '▶' : '◀'}
+            <span style={{ display: 'flex', transform: isCollapsed ? 'rotate(180deg)' : 'none' }}>
+              <NavIcon name="chevronLeft" size={13} />
+            </span>
           </button>
         )}
 

@@ -99,6 +99,9 @@ const PATHS = {
       <line x1="3" y1="20" x2="21" y2="20" />
     </>
   ),
+  chevronLeft: (
+    <polyline points="15,5 9,12 15,19" />
+  ),
   sparkle: (
     <>
       <path d="M12 3 L13.6 9 L20 10.5 L13.6 12 L12 18 L10.4 12 L4 10.5 L10.4 9 Z" />
