@@ -194,7 +194,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
         id, ticket_number, status, category, description, room, priority_score, priority_override, mileage_logged,
         no_access_flag, no_access_note, hold_reason, hold_note, completion_note, photo_url, completion_photo_url,
         completed_at, created_at, status_changed_at, first_assigned_at, assigned_builder_id, property_id, event_id,
-        raised_by_name
+        raised_by_name, cancel_type, cancel_reason, cancel_duplicate_ref
       `)
       .order('created_at', { ascending: false })
 
@@ -931,8 +931,17 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
 
                             <div style={expandSectionStyle}>
                               <p style={expandSectionTitleStyle}>Notes &amp; Flags</p>
-                              {!t.no_access_flag && !(t.status === 'On Hold' && t.hold_reason) && !t.completion_note && (
+                              {!t.no_access_flag && !(t.status === 'On Hold' && t.hold_reason) && !t.completion_note && !t.cancel_reason && (
                                 <p style={{ fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic', margin: 0 }}>No notes on this ticket</p>
+                              )}
+
+                              {t.status === 'Cancelled' && t.cancel_reason && (
+                                <div style={{ padding: '8px 10px', background: COLORS.red50, border: `1px solid ${COLORS.red200}`, borderRadius: '8px', marginBottom: '8px' }}>
+                                  <p style={{ margin: 0, fontSize: '11px', fontWeight: 800, color: COLORS.red600 }}>
+                                    Cancelled — {t.cancel_type}{t.cancel_duplicate_ref ? ` (duplicate of #${t.cancel_duplicate_ref})` : ''}
+                                  </p>
+                                  <p style={{ margin: '2px 0 0 0', fontSize: '12px', color: COLORS.red900 }}>{t.cancel_reason}</p>
+                                </div>
                               )}
 
                               {t.no_access_flag && (
