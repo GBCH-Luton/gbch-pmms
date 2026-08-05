@@ -8,10 +8,17 @@ import { COLORS } from '../lib/colors'
 // first time this session) 404s. Not a real bug, just a stale tab. Chrome
 // and Firefox word the resulting TypeError differently, hence two patterns.
 const STALE_CHUNK_PATTERN = /(error loading|failed to fetch) dynamically imported module/i
-const RELOAD_ATTEMPTED_KEY = 'pmms_chunk_reload_attempted'
+const LAST_RELOAD_KEY = 'pmms_chunk_reload_at'
+// If a stale-chunk error happens again within this window, the reload we
+// just did didn't fix it -- likely a genuinely broken deploy -- so stop
+// looping. Past this window, treat it as a brand new, unrelated deploy
+// (a tab commonly lives across several deploys in one browsing session)
+// and give it its own fresh reload attempt rather than staying silent
+// forever because some earlier deploy already used up a one-per-tab flag.
+const RELOOP_GUARD_MS = 15000
 
 export default class ErrorBoundary extends Component {
-  state = { hasError: false, isStaleChunk: false }
+  state = { hasError: false, isStaleChunk: false, reloadLooped: false }
 
   static getDerivedStateFromError(error) {
     return { hasError: true, isStaleChunk: STALE_CHUNK_PATTERN.test(error?.message || '') }
@@ -23,22 +30,26 @@ export default class ErrorBoundary extends Component {
       context: { componentStack: info.componentStack },
     })
 
-    // Reload once, automatically, instead of showing a scary "something
-    // went wrong" card for what's really just "you need the newer
-    // version" -- guarded by sessionStorage so a genuinely broken deploy
-    // (reload hits the same error again) falls through to the normal
-    // error card rather than looping forever.
     const isStaleChunk = STALE_CHUNK_PATTERN.test(error.message || '')
-    if (isStaleChunk && !sessionStorage.getItem(RELOAD_ATTEMPTED_KEY)) {
-      sessionStorage.setItem(RELOAD_ATTEMPTED_KEY, '1')
-      window.location.reload()
+    if (!isStaleChunk) return
+
+    const lastReload = Number(sessionStorage.getItem(LAST_RELOAD_KEY) || 0)
+    const loopedRecently = Date.now() - lastReload < RELOOP_GUARD_MS
+    if (loopedRecently) {
+      this.setState({ reloadLooped: true })
+      return
     }
+
+    // Reload once, automatically, instead of showing a scary "something
+    // went wrong" card for what's really just "you need the newer version".
+    sessionStorage.setItem(LAST_RELOAD_KEY, String(Date.now()))
+    window.location.reload()
   }
 
   render() {
     if (!this.state.hasError) return this.props.children
 
-    if (this.state.isStaleChunk && sessionStorage.getItem(RELOAD_ATTEMPTED_KEY) === '1') {
+    if (this.state.isStaleChunk && !this.state.reloadLooped) {
       return (
         <div style={{
           minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
