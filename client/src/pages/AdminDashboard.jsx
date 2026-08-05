@@ -36,13 +36,14 @@ const AdminViewAs = lazy(() => import('./admin/AdminViewAs'))
 const AdminTeamChat = lazy(() => import('./admin/AdminTeamChat'))
 const AiTicketLogging = lazy(() => import('./admin/ai-trial/AiTicketLogging'))
 const AiPriorityScoring = lazy(() => import('./admin/ai-trial/AiPriorityScoring'))
-const AiReports = lazy(() => import('./admin/ai-trial/AiReports'))
 const AiComplianceDigest = lazy(() => import('./admin/ai-trial/AiComplianceDigest'))
 
 // Keys of every AI Trial submenu child -- used to auto-expand that section
 // in the sidebar if you're already on one of its pages, and to resolve
 // currentPage -> nav item for the ones nested under 'ai-trial' below.
-const AI_TRIAL_CHILD_KEYS = ['ai-ticket', 'ai-priority', 'ai-reports', 'ai-compliance']
+// 'ai-reports' merged into the real Reports page (see AdminReports.jsx) --
+// no longer a separate AI Trial child.
+const AI_TRIAL_CHILD_KEYS = ['ai-ticket', 'ai-priority', 'ai-compliance']
 
 const NAV_ITEMS = [
   // Grouped by what they're actually for: core ticket lifecycle first,
@@ -78,7 +79,6 @@ const NAV_ITEMS = [
     children: [
       { key: 'ai-ticket', label: 'Ticket Logging', Component: AiTicketLogging, adminOnly: true },
       { key: 'ai-priority', label: 'Priority Scoring', Component: AiPriorityScoring, adminOnly: true },
-      { key: 'ai-reports', label: 'Reports', Component: AiReports, adminOnly: true },
       { key: 'ai-compliance', label: 'Compliance Digest', Component: AiComplianceDigest, adminOnly: true },
     ],
   },
