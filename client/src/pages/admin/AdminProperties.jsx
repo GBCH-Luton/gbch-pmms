@@ -251,7 +251,7 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
       .from('tickets')
       .select('property_id')
       .in('property_id', propertyIds)
-      .neq('status', 'Completed')
+      .not('status', 'in', '("Completed","Archived","Cancelled")')
 
     if (error || !data) { setOpenTicketCounts({}); return }
 
@@ -300,7 +300,7 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
         created_at, completed_at, assigned_builder_id
       `)
       .eq('property_id', property.id)
-      .neq('status', 'Completed')
+      .not('status', 'in', '("Completed","Archived","Cancelled")')
       .order('priority_score', { ascending: false })
 
     if (error || !data) { setSelectedOpenTickets([]); return }
