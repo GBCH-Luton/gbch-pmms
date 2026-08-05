@@ -571,6 +571,11 @@ export default function BuilderDashboard({ profile }) {
       return
     }
 
+    if (!photoFile) {
+      setCompleteError('Please add a photo of the completed work before closing this ticket.')
+      return
+    }
+
     setCompleteSubmitting(true)
 
     let photoUrl = null
@@ -1772,7 +1777,7 @@ export default function BuilderDashboard({ profile }) {
             <div>
               <p style={{ margin: '0 0 2px 0', fontSize: '16px', fontWeight: 800, color: COLORS.slate900 }}>Confirm job complete</p>
               <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate500 }}>
-                {isRoutineVisit ? 'Work through the checklist, then add a note and a photo if you have one' : 'Add a note on the work done, and a photo if you have one'}
+                {isRoutineVisit ? 'Work through the checklist, then add a note and a photo of the completed work' : 'Add a note on the work done, and a photo of the completed work'}
               </p>
             </div>
 
@@ -1810,7 +1815,7 @@ export default function BuilderDashboard({ profile }) {
               onClick={() => document.getElementById('complete-photo-input').click()}
               style={{ width: '100%', height: '44px', borderRadius: '10px', border: `2px dashed ${COLORS.slate300}`, background: COLORS.white, color: COLORS.slate500, fontSize: '13px', fontWeight: 600, cursor: 'pointer', boxSizing: 'border-box' }}
             >
-              {completePhotoFile ? 'Change photo' : 'Add a photo (optional)'}
+              {completePhotoFile ? 'Change photo' : '📷 Add a photo (required)'}
             </button>
             {completePhotoPreview && (
               <img src={completePhotoPreview} alt="Completed job preview" style={{ width: '100%', borderRadius: '10px', display: 'block' }} />
