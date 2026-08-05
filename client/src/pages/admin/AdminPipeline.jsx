@@ -7,6 +7,7 @@ import PropertySearchSelect from '../../components/PropertySearchSelect'
 import { fetchAllMaintenanceCategoryNames } from '../../lib/maintenanceCategories'
 import { fetchDivisions } from '../../lib/divisions'
 import PrintableTicketReport from '../../components/PrintableTicketReport'
+import AttachmentMedia from '../../components/AttachmentMedia'
 import {
   priorityTierLabel, priorityBadgeStyle, statusColour, statusLabel, formatUKDate, formatUKDateTime, formatDurationDays, formatDuration,
   filterSelectStyle, thStyle, tdStyle, actionBtnStyle,
@@ -864,16 +865,16 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
                               {(t.photo_url || t.completion_photo_url) ? (
                                 <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                                   {t.photo_url && (
-                                    <a href={t.photo_url} target="_blank" rel="noreferrer">
+                                    <div>
                                       <p style={expandLabelStyle}>Reported Photo</p>
-                                      <img src={t.photo_url} alt="Reported fault" style={{ width: '140px', height: '140px', objectFit: 'cover', borderRadius: '10px', border: `1px solid ${COLORS.slate200}` }} />
-                                    </a>
+                                      <AttachmentMedia url={t.photo_url} alt="Reported fault" style={{ width: '140px', height: '140px', objectFit: 'cover', borderRadius: '10px', border: `1px solid ${COLORS.slate200}` }} />
+                                    </div>
                                   )}
                                   {t.completion_photo_url && (
-                                    <a href={t.completion_photo_url} target="_blank" rel="noreferrer">
+                                    <div>
                                       <p style={expandLabelStyle}>Completion Photo</p>
-                                      <img src={t.completion_photo_url} alt="Completed job" style={{ width: '140px', height: '140px', objectFit: 'cover', borderRadius: '10px', border: `1px solid ${COLORS.slate200}` }} />
-                                    </a>
+                                      <AttachmentMedia url={t.completion_photo_url} alt="Completed job" style={{ width: '140px', height: '140px', objectFit: 'cover', borderRadius: '10px', border: `1px solid ${COLORS.slate200}` }} />
+                                    </div>
                                   )}
                                 </div>
                               ) : (

@@ -17,6 +17,7 @@ import { getSignedUrl } from '../lib/storage'
 import PropertySearchSelect from '../components/PropertySearchSelect'
 import ChatComposer from '../components/ChatComposer'
 import PhotoLightbox from '../components/PhotoLightbox'
+import AttachmentMedia from '../components/AttachmentMedia'
 import VoiceInputButton from '../components/VoiceInputButton'
 import gbchLogo from '../assets/gbch-logo.svg'
 
@@ -1576,7 +1577,7 @@ export default function BuilderDashboard({ profile }) {
       {selectedTicket.photo_url && (
         <div style={{ background: COLORS.white, borderRadius: '16px', padding: '20px', marginBottom: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
           <p style={{ margin: '0 0 14px 0', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Photo</p>
-          <img src={selectedTicket.photo_url} alt="Ticket attachment" style={{ width: '100%', borderRadius: '10px', display: 'block' }} />
+          <AttachmentMedia url={selectedTicket.photo_url} alt="Ticket attachment" style={{ width: '100%', borderRadius: '10px', display: 'block' }} />
         </div>
       )}
 
@@ -3264,7 +3265,7 @@ export default function BuilderDashboard({ profile }) {
                   <p style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: 700, color: COLORS.slate900 }}>{t.property?.address}</p>
                   <p style={{ margin: '0 0 12px 0', fontSize: '13px', color: COLORS.slate500 }}>{t.description}{t.room ? ` — ${t.room}` : ''}</p>
                   {t.photo_url && (
-                    <img src={t.photo_url} alt="Ticket attachment" style={{ width: '100%', borderRadius: '10px', display: 'block' }} />
+                    <AttachmentMedia url={t.photo_url} alt="Ticket attachment" style={{ width: '100%', borderRadius: '10px', display: 'block' }} linkImages={false} controls={false} />
                   )}
                 </div>
               </div>

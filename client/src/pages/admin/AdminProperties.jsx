@@ -33,6 +33,7 @@ import PropertyRoomsTab from './PropertyRoomsTab'
 import PropertyRestrictionsTab from './PropertyRestrictionsTab'
 import PropertyGardensTab from './PropertyGardensTab'
 import { fetchTowns, DEFAULT_TOWNS } from '../../lib/towns'
+import AttachmentMedia from '../../components/AttachmentMedia'
 
 const PROPERTY_TYPES = ['House', 'Flat', 'HMO', 'Commercial', 'Other']
 const ALL_PROFILE_TABS = ['Core', 'Compliance', 'Assets', 'Maintenance', 'Lease & Legal', 'Documents', 'Notes', 'Rooms', 'Restrictions', 'Gardens']
@@ -128,8 +129,8 @@ function TicketDetailModal({ ticket, onClose, p1Threshold, p2Threshold }) {
         )}
 
         {(ticket.completion_photo_url || ticket.photo_url) && (
-          <img
-            src={ticket.completion_photo_url || ticket.photo_url}
+          <AttachmentMedia
+            url={ticket.completion_photo_url || ticket.photo_url}
             alt="Ticket"
             style={{ width: '100%', maxHeight: '220px', objectFit: 'cover', borderRadius: '10px', display: 'block', marginTop: '14px' }}
           />
