@@ -54,7 +54,7 @@ function toLocalInputValue(ms) {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`
 }
 
-export default function AdminClocking({ profile }) {
+export default function AdminClocking({ profile, onNavigate }) {
   const [loading, setLoading] = useState(true)
   const [liveSessions, setLiveSessions] = useState([])
   const [completedRows, setCompletedRows] = useState([])
@@ -327,7 +327,10 @@ export default function AdminClocking({ profile }) {
               >
                 <div>
                   <strong style={{ display: 'block', fontSize: '13px', color: COLORS.slate900 }}>{row.builderName}</strong>
-                  <span style={{ fontSize: '12px', color: COLORS.slate500 }}>
+                  <span
+                    onClick={onNavigate ? () => onNavigate('pipeline', { ticketNumber: row.ticket.ticket_number }) : undefined}
+                    style={{ fontSize: '12px', color: onNavigate ? COLORS.blue700 : COLORS.slate500, cursor: onNavigate ? 'pointer' : 'default', fontWeight: onNavigate ? 600 : 400 }}
+                  >
                     #{row.ticket.ticket_number} · {row.ticket.property?.address} — {row.ticket.room || '—'} → {row.ticket.description}
                   </span>
                   {overrun && (
@@ -417,9 +420,12 @@ export default function AdminClocking({ profile }) {
               )}
               {filteredCompletedRows.map(row => (
                 <tr key={row.ticket.id} style={{ borderBottom: `1px solid ${COLORS.slate100}` }}>
-                  <td style={tdStyle}>
+                  <td
+                    style={{ ...tdStyle, ...(onNavigate ? { cursor: 'pointer' } : {}) }}
+                    onClick={onNavigate ? () => onNavigate('pipeline', { ticketNumber: row.ticket.ticket_number }) : undefined}
+                  >
                     <span style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: COLORS.slate400 }}>#{row.ticket.ticket_number}</span>
-                    <span style={{ display: 'block', fontWeight: 700, color: COLORS.slate900 }}>{row.ticket.property?.address}</span>
+                    <span style={{ display: 'block', fontWeight: 700, color: onNavigate ? COLORS.blue700 : COLORS.slate900 }}>{row.ticket.property?.address}</span>
                     <span style={{ display: 'block', fontSize: '12px', color: COLORS.slate500 }}>{row.ticket.room || '—'} → {row.ticket.description}</span>
                   </td>
                   <td style={tdStyle}>{row.builderName}</td>

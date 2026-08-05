@@ -526,7 +526,6 @@ export default function BuilderDashboard({ profile }) {
       setClockInError("Couldn't get your location. Make sure location is turned on and you have signal, then try again.")
       return
     }
-    setClockingIn(false)
 
     const now = new Date().toISOString()
     const previousStatus = selectedTicket.status
@@ -539,6 +538,7 @@ export default function BuilderDashboard({ profile }) {
 
     if (ticketError) {
       console.error('Failed to update ticket on clock-in:', ticketError)
+      setClockingIn(false)
       return
     }
 
@@ -558,6 +558,14 @@ export default function BuilderDashboard({ profile }) {
 
     await fetchTickets()
     setSelectedTicket(prev => ({ ...prev, status: 'In Progress' }))
+    // Only cleared at the very end -- the button (disabled while this is
+    // true) must stay locked for the ticket update + work_sessions insert
+    // above too, not just the GPS fetch. Clearing it right after the GPS
+    // fetch left a window where a fast double-tap on the button fired this
+    // whole function twice, inserting two work_sessions rows for the same
+    // clock-in that a later clock-out then both closed at once -- found
+    // live on a real ticket, its "Total Time" roughly doubled as a result.
+    setClockingIn(false)
   }
 
   useEffect(() => {
@@ -725,7 +733,6 @@ export default function BuilderDashboard({ profile }) {
       setClockInError("Couldn't get your location. Make sure location is turned on and you have signal, then try again.")
       return
     }
-    setClockingIn(false)
 
     const now = new Date().toISOString()
     const previousStatus = selectedTicket.status
@@ -738,6 +745,7 @@ export default function BuilderDashboard({ profile }) {
 
     if (ticketError) {
       console.error('Failed to resume ticket:', ticketError)
+      setClockingIn(false)
       return
     }
 
@@ -757,6 +765,10 @@ export default function BuilderDashboard({ profile }) {
 
     await fetchTickets()
     setSelectedTicket(prev => ({ ...prev, status: 'In Progress', hold_reason: null, hold_note: null }))
+    // See handleClockIn's matching comment -- stays locked through the
+    // writes above, not just the GPS fetch, to prevent the same
+    // double-tap-creates-two-sessions bug.
+    setClockingIn(false)
   }
 
   async function handleNoAccess(note, photoFile) {

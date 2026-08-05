@@ -160,6 +160,7 @@ export default function AdminDashboard({ profile }) {
   const [pipelineInitialFilter, setPipelineInitialFilter] = useState(null)
   const [pipelineInitialPriorityFilter, setPipelineInitialPriorityFilter] = useState(null)
   const [pipelineInitialStuckFilter, setPipelineInitialStuckFilter] = useState(null)
+  const [pipelineInitialTicketNumber, setPipelineInitialTicketNumber] = useState(null)
   const [propertiesInitialFilter, setPropertiesInitialFilter] = useState(null)
   const [complianceInitialTierFilter, setComplianceInitialTierFilter] = useState(null)
   const [voidsInitialTierFilter, setVoidsInitialTierFilter] = useState(null)
@@ -241,6 +242,9 @@ export default function AdminDashboard({ profile }) {
     }
     if (key === 'pipeline' && opts.stuckOnly) {
       setPipelineInitialStuckFilter(true)
+    }
+    if (key === 'pipeline' && opts.ticketNumber) {
+      setPipelineInitialTicketNumber(opts.ticketNumber)
     }
     if (key === 'properties' && opts.filterMode) {
       setPropertiesInitialFilter({ mode: opts.filterMode })
@@ -609,7 +613,8 @@ export default function AdminDashboard({ profile }) {
               initialStatusFilter={currentPage === 'pipeline' ? pipelineInitialFilter : null}
               initialPriorityFilter={currentPage === 'pipeline' ? pipelineInitialPriorityFilter : null}
               initialStuckFilter={currentPage === 'pipeline' ? pipelineInitialStuckFilter : null}
-              onInitialFilterConsumed={() => { setPipelineInitialFilter(null); setPipelineInitialPriorityFilter(null); setPipelineInitialStuckFilter(null) }}
+              initialTicketNumberSearch={currentPage === 'pipeline' ? pipelineInitialTicketNumber : null}
+              onInitialFilterConsumed={() => { setPipelineInitialFilter(null); setPipelineInitialPriorityFilter(null); setPipelineInitialStuckFilter(null); setPipelineInitialTicketNumber(null) }}
               initialPropertiesFilter={currentPage === 'properties' ? propertiesInitialFilter : null}
               onPropertiesFilterConsumed={() => setPropertiesInitialFilter(null)}
               initialTierFilter={currentPage === 'compliance' ? complianceInitialTierFilter : currentPage === 'voids' ? voidsInitialTierFilter : null}

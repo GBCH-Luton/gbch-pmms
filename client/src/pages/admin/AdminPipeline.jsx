@@ -23,10 +23,16 @@ const expandValueStyle = { margin: '0 0 10px 0', fontSize: '13px', fontWeight: 6
 const expandSectionStyle = { background: COLORS.white, borderRadius: '12px', padding: '16px', border: `1px solid ${COLORS.slate200}` }
 const expandSectionTitleStyle = { margin: '0 0 12px 0', fontSize: '11px', fontWeight: 800, color: COLORS.slate500, textTransform: 'uppercase', letterSpacing: '0.05em' }
 
-export default function AdminPipeline({ profile, onTicketsChanged, initialStatusFilter, initialPriorityFilter, initialStuckFilter, onInitialFilterConsumed }) {
+export default function AdminPipeline({ profile, onTicketsChanged, initialStatusFilter, initialPriorityFilter, initialStuckFilter, initialTicketNumberSearch, onInitialFilterConsumed }) {
   const [tickets, setTickets] = useState([])
   const [loading, setLoading] = useState(true)
   const [expandedTicketId, setExpandedTicketId] = useState(null)
+  // Captured into local state at mount rather than re-read from the prop
+  // later -- the parent (AdminDashboard.jsx) nulls the prop out as soon as
+  // onInitialFilterConsumed fires, which happens before tickets have even
+  // loaded, so there'd be nothing left to match against once fetchTickets
+  // resolves if this only ever read the prop directly.
+  const [pendingExpandTicketNumber, setPendingExpandTicketNumber] = useState(null)
   const [sortColumn, setSortColumn] = useState(null)
   const [sortDirection, setSortDirection] = useState('asc')
   const [builders, setBuilders] = useState([])
@@ -131,8 +137,21 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
     if (initialStatusFilter) setStatusFilter(initialStatusFilter)
     if (initialPriorityFilter) setPriorityFilter(initialPriorityFilter)
     if (initialStuckFilter) setStuckOnlyFilter(true)
-    if (initialStatusFilter || initialPriorityFilter || initialStuckFilter) onInitialFilterConsumed?.()
+    if (initialTicketNumberSearch) {
+      setTicketNumberSearch(String(initialTicketNumberSearch))
+      setPendingExpandTicketNumber(initialTicketNumberSearch)
+    }
+    if (initialStatusFilter || initialPriorityFilter || initialStuckFilter || initialTicketNumberSearch) onInitialFilterConsumed?.()
   }, [])
+
+  // Runs once fetchTickets (triggered by the mount effect above) actually
+  // resolves -- can't expand a row before its id is known.
+  useEffect(() => {
+    if (pendingExpandTicketNumber == null || tickets.length === 0) return
+    const match = tickets.find(t => String(t.ticket_number) === String(pendingExpandTicketNumber))
+    if (match) setExpandedTicketId(match.id)
+    setPendingExpandTicketNumber(null)
+  }, [tickets, pendingExpandTicketNumber])
 
   async function fetchStuckThresholds() {
     const { data } = await supabase
