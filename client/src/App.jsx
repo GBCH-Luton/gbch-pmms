@@ -178,8 +178,10 @@ export default function App() {
     <>
       {/* AdminDashboard's own sidebar has a "Return to my account" button
           (guaranteed visible, no z-index/layout fights); BuilderDashboard
-          has no equivalent chrome yet, so it still needs the banner. */}
-      {profile?.role === 'builder' && <ImpersonationBanner />}
+          and SubmitterDashboard have no equivalent chrome, so they still
+          need the banner. (Found live: submitter was missing here entirely
+          -- View As a submitter never showed any way back, not flaky.) */}
+      {(profile?.role === 'builder' || profile?.role === 'submitter') && <ImpersonationBanner />}
       <Suspense fallback={<SplashScreen />}>
       <Routes>
       <Route path="/login" element={!session ? <Login /> : <Navigate to={homeForRole()} replace />} />

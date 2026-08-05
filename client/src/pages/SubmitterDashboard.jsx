@@ -68,7 +68,7 @@ export default function SubmitterDashboard({ profile }) {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: COLORS.slate100, fontFamily: 'system-ui, sans-serif' }}>
+    <div style={{ minHeight: '100vh', background: COLORS.slate100, fontFamily: 'system-ui, sans-serif', paddingTop: 'var(--pmms-banner-offset, 0px)' }}>
       <div style={{ background: COLORS.brandNavy, padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <img src={gbchLogo} alt="GBCH" style={{ height: '28px' }} />
