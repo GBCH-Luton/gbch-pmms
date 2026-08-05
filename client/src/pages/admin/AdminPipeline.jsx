@@ -512,7 +512,13 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
     // Cancelled specifically (the option is still right there in the
     // dropdown), never actually removed from the data.
     if (statusFilter === 'All' && t.status === 'Cancelled') return false
-    if (statusFilter !== 'All' && t.status !== statusFilter) return false
+    // Not a real ticket status -- a dropdown/KPI-tile value meaning
+    // "Completed, whether or not it's since been signed off (Archived)",
+    // so the Dashboard/Pipeline "Completed" tiles can count and link to
+    // the same set of jobs instead of the tile undercounting anything
+    // already signed off.
+    if (statusFilter === 'CompletedAll' && t.status !== 'Completed' && t.status !== 'Archived') return false
+    if (statusFilter !== 'All' && statusFilter !== 'CompletedAll' && t.status !== statusFilter) return false
     if (propertyFilter && String(t.property_id) !== String(propertyFilter)) return false
     if (categoryFilter !== 'All' && t.category !== categoryFilter) return false
     if (divisionFilter !== 'All' && resolveCategoryDivision(t.category, categoriesSettingsRow) !== divisionFilter) return false
@@ -583,7 +589,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
     { label: 'Unassigned', value: tickets.filter(t => t.status === 'Pending').length, colour: COLORS.red600, statusFilter: 'Pending' },
     { label: 'In Progress', value: tickets.filter(t => t.status === 'In Progress').length, colour: COLORS.teal600, statusFilter: 'In Progress' },
     { label: 'On Hold', value: tickets.filter(t => t.status === 'On Hold').length, colour: COLORS.amber500, statusFilter: 'On Hold' },
-    { label: 'Completed', value: tickets.filter(t => t.status === 'Completed').length, colour: COLORS.green600, statusFilter: 'Completed' },
+    { label: 'Completed', value: tickets.filter(t => t.status === 'Completed' || t.status === 'Archived').length, colour: COLORS.green600, statusFilter: 'CompletedAll' },
     { label: 'P1 Critical', value: tickets.filter(t => effectiveTier(t) === 'P1 Critical').length, colour: COLORS.red600, statusFilter: 'All', priorityFilter: 'P1 Critical' },
     { label: 'Stuck', value: tickets.filter(t => isTicketStuck(t, stuckThresholds, Date.now(), p1Threshold, p2Threshold)).length, colour: COLORS.red600, statusFilter: 'All', stuckOnly: true },
   ]
@@ -621,8 +627,9 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
           <option value="Assigned">Assigned</option>
           <option value="In Progress">In Progress</option>
           <option value="On Hold">On Hold</option>
-          <option value="Completed">Completed</option>
-          <option value="Archived">Archived</option>
+          <option value="Completed">Completed (awaiting sign-off)</option>
+          <option value="Archived">Archived (signed off)</option>
+          <option value="CompletedAll">Completed (all, incl. signed off)</option>
           <option value="Cancelled">Cancelled</option>
         </select>
         <div style={{ width: '220px' }}>

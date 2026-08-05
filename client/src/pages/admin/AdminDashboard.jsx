@@ -281,7 +281,14 @@ export default function AdminDashboard({ profile, onNavigate }) {
     { label: 'Unassigned', value: tickets.filter(t => t.status === 'Pending').length, colour: COLORS.red600, statusFilter: 'Pending' },
     { label: 'In Progress', value: tickets.filter(t => t.status === 'In Progress').length, colour: COLORS.teal600, statusFilter: 'In Progress' },
     { label: 'On Hold', value: tickets.filter(t => t.status === 'On Hold').length, colour: COLORS.amber500, statusFilter: 'On Hold' },
-    { label: 'Completed', value: tickets.filter(t => t.status === 'Completed').length, colour: COLORS.green600, statusFilter: 'Completed' },
+    // 'Completed' alone undercounts -- a signed-off job moves to 'Archived',
+    // so a job finished this morning and signed off by lunchtime would drop
+    // out of this tile entirely even though it's very much still completed
+    // (found live: 2 real completions, tile showed 1 because one had
+    // already been signed off). 'CompletedAll' is a Pipeline-only sentinel
+    // status value (see AdminPipeline.jsx) that matches both, so the number
+    // shown here always equals what you land on after clicking the tile.
+    { label: 'Completed', value: tickets.filter(t => t.status === 'Completed' || t.status === 'Archived').length, colour: COLORS.green600, statusFilter: 'CompletedAll' },
     {
       // Matches the Pipeline page's own "effective tier" logic exactly
       // (priority_override wins over the raw score) so this count always
@@ -301,13 +308,13 @@ export default function AdminDashboard({ profile, onNavigate }) {
     },
   ]
 
-  const completedTickets = tickets.filter(t => t.status === 'Completed' && t.completed_at)
+  const completedTickets = tickets.filter(t => (t.status === 'Completed' || t.status === 'Archived') && t.completed_at)
 
   const completionKpis = [
     { label: 'Today', value: completedTickets.filter(t => isSameDay(new Date(t.completed_at), now)).length },
     { label: 'This Week', value: completedTickets.filter(t => new Date(t.completed_at) >= weekStart).length },
     { label: 'This Month', value: completedTickets.filter(t => new Date(t.completed_at) >= monthStart).length },
-  ].map(kpi => ({ ...kpi, statusFilter: 'Completed' }))
+  ].map(kpi => ({ ...kpi, statusFilter: 'CompletedAll' }))
 
   const complianceKpis = [
     { label: 'Expired Certs', value: complianceCounts.expired, colour: COLORS.red600, tierFilter: 'Expired' },
