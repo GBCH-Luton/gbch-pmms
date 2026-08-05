@@ -16,7 +16,15 @@ const DEFAULT_CLOCK_DISTANCE_THRESHOLD_M = 250
 // or clock-out time in the timesheet, when that event has a recorded
 // location. Opens the in-app map modal instead of a new browser tab.
 function LocationCell({ distance, thresholdM, lat, lng, onOpenMap }) {
-  if (lat == null || lng == null) return null
+  // getCurrentPositionSafe() (lib/geo.js) never blocks clocking in/out --
+  // it resolves to null on denial/timeout/no GPS lock rather than making
+  // the builder wait or fail. That's silent by design at the point of
+  // clocking in, but silently blank here (no button, no text) read as a
+  // rendering glitch rather than "location wasn't captured" -- found live
+  // on a real record with a clock-out location but no clock-in one.
+  if (lat == null || lng == null) {
+    return <span style={{ display: 'block', marginTop: '2px', fontSize: '11px', color: COLORS.slate300, fontStyle: 'italic' }}>No location captured</span>
+  }
   const tooFar = distance != null && distance > thresholdM
   return (
     <div style={{ fontFamily: 'system-ui', marginTop: '2px' }}>
