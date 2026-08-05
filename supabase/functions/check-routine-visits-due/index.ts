@@ -126,6 +126,7 @@ Deno.serve(async (req: Request) => {
           property_id: property.id,
           assigned_builder_id: property.assigned_cleaner_id,
           estimated_minutes: estimatedMinutes,
+          assign_type: 'Auto',
           priority_score: routineVisitScore,
         })
 

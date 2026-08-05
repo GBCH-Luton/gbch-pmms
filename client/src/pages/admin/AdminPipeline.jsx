@@ -39,6 +39,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
   const [reassignOptions, setReassignOptions] = useState([])
 
   const [statusFilter, setStatusFilter] = useState('All')
+  const [assignTypeFilter, setAssignTypeFilter] = useState('All')
   const [propertyFilter, setPropertyFilter] = useState('') // '' = All Properties -- PropertySearchSelect's own "cleared" state
   const [categoryFilter, setCategoryFilter] = useState('All')
   const [builderFilter, setBuilderFilter] = useState('All')
@@ -211,7 +212,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
       .select(`
         id, ticket_number, status, category, description, room, priority_score, priority_override, mileage_logged,
         no_access_flag, no_access_note, hold_reason, hold_note, completion_note, photo_url, completion_photo_url,
-        completed_at, created_at, status_changed_at, first_assigned_at, assigned_builder_id, estimated_minutes, property_id, event_id,
+        completed_at, created_at, status_changed_at, first_assigned_at, assigned_builder_id, estimated_minutes, assign_type, property_id, event_id,
         raised_by_name, cancel_type, cancel_reason, cancel_duplicate_ref
       `)
       .order('created_at', { ascending: false })
@@ -265,6 +266,10 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
       .update({
         assigned_builder_id: reassignBuilderId,
         estimated_minutes: reassignEstimatedMinutes !== '' ? Number(reassignEstimatedMinutes) : null,
+        // A manager choosing the builder here -- explicit, not just left at
+        // its previous value, so taking over an auto-routed job (e.g. a
+        // Cleaners Rota visit) correctly flips its Assign Type to Manual.
+        assign_type: 'Manual',
         ...(promoteToAssigned ? { status: 'Assigned', status_changed_at: new Date().toISOString(), stuck_alert_sent_at: null, first_assigned_at: new Date().toISOString() } : {}),
       })
       .eq('id', t.id)
@@ -364,6 +369,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
         .from('tickets')
         .update({
           assigned_builder_id: bulkReassignBuilderId,
+          assign_type: 'Manual',
           ...(promoteToAssigned ? { status: 'Assigned', status_changed_at: new Date().toISOString(), stuck_alert_sent_at: null, first_assigned_at: new Date().toISOString() } : {}),
         })
         .eq('id', t.id)
@@ -567,6 +573,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
     if (categoryFilter !== 'All' && t.category !== categoryFilter) return false
     if (divisionFilter !== 'All' && resolveCategoryDivision(t.category, categoriesSettingsRow) !== divisionFilter) return false
     if (builderFilter !== 'All' && t.assigned_builder_id !== builderFilter) return false
+    if (assignTypeFilter !== 'All' && (t.assign_type || 'Manual') !== assignTypeFilter) return false
     if (priorityFilter !== 'All' && effectiveTier(t) !== priorityFilter) return false
     if (ticketNumberSearch.trim() && !String(t.ticket_number).includes(ticketNumberSearch.trim())) return false
     if (stuckOnlyFilter && !isTicketStuck(t, stuckThresholds, Date.now(), p1Threshold, p2Threshold)) return false
@@ -582,6 +589,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
       case 'room': return (t.room || '').toLowerCase()
       case 'priority': return t.priority_score || 0
       case 'status': return (t.status || '').toLowerCase()
+      case 'assignType': return (t.assign_type || 'Manual').toLowerCase()
       case 'logDate': return new Date(t.created_at).getTime()
       default: return ''
     }
@@ -617,6 +625,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
     setCategoryFilter('All')
     setDivisionFilter('All')
     setBuilderFilter('All')
+    setAssignTypeFilter('All')
     setPriorityFilter('All')
     setTicketNumberSearch('')
     setStuckOnlyFilter(false)
@@ -703,6 +712,11 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
           <option value="P1 Critical">P1 Critical</option>
           <option value="P2 Urgent">P2 Urgent</option>
           <option value="P3 Routine">P3 Routine</option>
+        </select>
+        <select value={assignTypeFilter} onChange={(e) => setAssignTypeFilter(e.target.value)} style={filterSelectStyle}>
+          <option value="All">Auto + Manual</option>
+          <option value="Auto">Auto-assigned only</option>
+          <option value="Manual">Manually assigned only</option>
         </select>
         <label style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 12px', borderRadius: '10px', border: `1px solid ${COLORS.amber200}`, background: COLORS.amber50, color: COLORS.amber800, fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
           <input type="checkbox" checked={stuckOnlyFilter} onChange={(e) => setStuckOnlyFilter(e.target.checked)} />
@@ -810,6 +824,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
                 <th style={{ ...thStyle, cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('room')}>Area{sortArrow('room')}</th>
                 <th style={{ ...thStyle, cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('priority')}>Priority{sortArrow('priority')}</th>
                 <th style={{ ...thStyle, cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('status')}>Status{sortArrow('status')}</th>
+                <th style={{ ...thStyle, cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('assignType')}>Assign Type{sortArrow('assignType')}</th>
                 <th style={{ ...thStyle, cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('logDate')}>Log Date{sortArrow('logDate')}</th>
                 <th style={{ ...thStyle, width: '32px' }} />
               </tr>
@@ -817,7 +832,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
             <tbody>
               {sortedTickets.length === 0 && (
                 <tr>
-                  <td colSpan={8} style={{ padding: '32px', textAlign: 'center', color: COLORS.slate400, fontWeight: 600 }}>
+                  <td colSpan={9} style={{ padding: '32px', textAlign: 'center', color: COLORS.slate400, fontWeight: 600 }}>
                     No tickets match these filters.
                   </td>
                 </tr>
@@ -889,6 +904,20 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
                         )}
                       </td>
                       <td style={tdStyle}>
+                        {t.assigned_builder_id ? (
+                          <span style={{
+                            display: 'inline-block', fontSize: '11px', fontWeight: 700,
+                            color: t.assign_type === 'Auto' ? COLORS.teal700 : COLORS.slate500,
+                            background: t.assign_type === 'Auto' ? COLORS.teal100 : COLORS.slate100,
+                            padding: '3px 10px', borderRadius: '20px',
+                          }}>
+                            {t.assign_type === 'Auto' ? 'Auto' : 'Manual'}
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: '11px', color: COLORS.slate300 }}>—</span>
+                        )}
+                      </td>
+                      <td style={tdStyle}>
                         <span style={{ color: COLORS.slate600 }}>{formatUKDate(t.created_at)}</span>
                       </td>
                       <td style={{ ...tdStyle, textAlign: 'center', color: COLORS.slate400, fontWeight: 700 }}>
@@ -897,7 +926,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
                     </tr>
                     {isExpanded && (
                       <tr style={{ borderBottom: `2px solid ${COLORS.red600}` }}>
-                        <td colSpan={8} style={{ padding: 0, background: COLORS.red50, boxShadow: `inset 4px 0 0 ${COLORS.red600}` }}>
+                        <td colSpan={9} style={{ padding: 0, background: COLORS.red50, boxShadow: `inset 4px 0 0 ${COLORS.red600}` }}>
                           <div style={{ padding: '18px 20px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
 
                             <div style={expandSectionStyle}>

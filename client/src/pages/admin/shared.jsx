@@ -941,6 +941,9 @@ export async function autoReassignDepartingStaffTickets(staffId, staffName, prof
       .from('tickets')
       .update({
         assigned_builder_id: newBuilder.id,
+        // Picked by this least-busy-eligible-builder logic, not a manager
+        // -- see AdminPipeline.jsx's Assign Type column/filter.
+        assign_type: 'Auto',
         ...(promoteToAssigned ? { status: 'Assigned', status_changed_at: new Date().toISOString(), stuck_alert_sent_at: null, first_assigned_at: new Date().toISOString() } : {}),
       })
       .eq('id', t.id)
