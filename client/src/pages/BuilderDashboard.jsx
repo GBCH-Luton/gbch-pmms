@@ -72,6 +72,13 @@ export default function BuilderDashboard({ profile }) {
   const [fromLocation, setFromLocation] = useState(null)
   const [customLocation, setCustomLocation] = useState('')
   const [miles, setMiles] = useState(0)
+  // A GPS fix is now required to clock in/resume -- directors' call: a
+  // builder can step outside for signal, so "no signal" shouldn't be an
+  // acceptable reason to start work with no location on record. Shared
+  // between handleClockIn and handleResumeWork since only one can ever be
+  // showing at a time (selectedTicket is singular).
+  const [clockingIn, setClockingIn] = useState(false)
+  const [clockInError, setClockInError] = useState('')
   const [comments, setComments] = useState([])
   const [commentText, setCommentText] = useState('')
   const [commentError, setCommentError] = useState('')
@@ -287,6 +294,8 @@ export default function BuilderDashboard({ profile }) {
     setFromLocation(null)
     setCustomLocation('')
     setMiles(0)
+    setClockingIn(false)
+    setClockInError('')
     setShowPauseReasons(false)
     setPauseReason(null)
     setPauseNote('')
@@ -509,9 +518,18 @@ export default function BuilderDashboard({ profile }) {
 
   async function handleClockIn(transitStart, milesLogged) {
     if (tickets.some(t => t.status === 'In Progress' && t.id !== selectedTicket.id)) return
+    setClockInError('')
+    setClockingIn(true)
+    const position = await getCurrentPositionSafe()
+    if (!position) {
+      setClockingIn(false)
+      setClockInError("Couldn't get your location. Make sure location is turned on and you have signal, then try again.")
+      return
+    }
+    setClockingIn(false)
+
     const now = new Date().toISOString()
     const previousStatus = selectedTicket.status
-    const position = await getCurrentPositionSafe()
 
     const { error: ticketError } = await supabase
       .schema('pmms')
@@ -699,9 +717,18 @@ export default function BuilderDashboard({ profile }) {
 
   async function handleResumeWork() {
     if (tickets.some(t => t.status === 'In Progress' && t.id !== selectedTicket.id)) return
+    setClockInError('')
+    setClockingIn(true)
+    const position = await getCurrentPositionSafe()
+    if (!position) {
+      setClockingIn(false)
+      setClockInError("Couldn't get your location. Make sure location is turned on and you have signal, then try again.")
+      return
+    }
+    setClockingIn(false)
+
     const now = new Date().toISOString()
     const previousStatus = selectedTicket.status
-    const position = await getCurrentPositionSafe()
 
     const { error: ticketError } = await supabase
       .schema('pmms')
@@ -1689,10 +1716,12 @@ export default function BuilderDashboard({ profile }) {
 
             <button
               onClick={() => handleClockIn(fromLocation === 'Somewhere else' ? customLocation : fromLocation, miles)}
-              style={{ width: '100%', padding: '16px', background: COLORS.teal600, color: COLORS.white, border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: 700, cursor: 'pointer' }}
+              disabled={clockingIn}
+              style={{ width: '100%', padding: '16px', background: COLORS.teal600, color: COLORS.white, border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: 700, cursor: clockingIn ? 'not-allowed' : 'pointer', opacity: clockingIn ? 0.7 : 1 }}
             >
-              ✓ I've arrived — start work
+              {clockingIn ? 'Getting your location…' : "✓ I've arrived — start work"}
             </button>
+            {clockInError && <p style={{ margin: 0, fontSize: '13px', color: COLORS.red500, fontWeight: 600 }}>{clockInError}</p>}
 
             {isRoutineVisit && (
               selectedTicket.delay_reason_status === 'pending' ? (
@@ -2013,12 +2042,16 @@ export default function BuilderDashboard({ profile }) {
                 </p>
               </div>
             ) : (
-              <button
-                onClick={handleResumeWork}
-                style={{ width: '100%', padding: '16px', background: COLORS.teal600, color: COLORS.white, border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: 700, cursor: 'pointer' }}
-              >
-                ✓ Back on site — restart work
-              </button>
+              <>
+                <button
+                  onClick={handleResumeWork}
+                  disabled={clockingIn}
+                  style={{ width: '100%', padding: '16px', background: COLORS.teal600, color: COLORS.white, border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: 700, cursor: clockingIn ? 'not-allowed' : 'pointer', opacity: clockingIn ? 0.7 : 1 }}
+                >
+                  {clockingIn ? 'Getting your location…' : '✓ Back on site — restart work'}
+                </button>
+                {clockInError && <p style={{ margin: 0, fontSize: '13px', color: COLORS.red500, fontWeight: 600 }}>{clockInError}</p>}
+              </>
             )}
           </div>
         )}

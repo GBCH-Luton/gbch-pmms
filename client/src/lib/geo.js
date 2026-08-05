@@ -38,9 +38,13 @@ export function distanceMetres(lat1, lon1, lat2, lon2) {
   return R * c
 }
 
-// Best-effort current position -- resolves to null (never rejects) if the
-// user denies permission, the browser doesn't support it, or it times out,
-// so clocking in/out is never blocked by a location prompt.
+// Never rejects -- resolves to null if the user denies permission, the
+// browser doesn't support it, or it times out, so a caller is never left
+// handling a thrown error just to find out location isn't available. Most
+// callers (clock-out, completion, pause, no-access) treat null as fine and
+// carry on -- clocking IN specifically requires a real position before
+// starting the job (BuilderDashboard.jsx's handleClockIn/handleResumeWork),
+// since "no signal" is something a builder can walk outside and fix.
 export function getCurrentPositionSafe(timeoutMs = 8000) {
   return new Promise((resolve) => {
     if (!('geolocation' in navigator)) { resolve(null); return }
