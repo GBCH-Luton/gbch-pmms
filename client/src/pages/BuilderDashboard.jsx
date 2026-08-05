@@ -852,7 +852,7 @@ export default function BuilderDashboard({ profile }) {
   }
 
   function floorContextLabel(property) {
-    return property?.layout_type === 'Flat' ? 'Which part of the flat?' : 'Which floor?'
+    return (property?.layout_type === 'Flat' ? 'Which part of the flat?' : 'Which floor?') + ' (optional)'
   }
 
   function choiceButtonStyle(active, align = 'left') {
@@ -961,8 +961,10 @@ export default function BuilderDashboard({ profile }) {
   function ticketRoomString() {
     if (ticketRoom === 'Other Area...') return ticketOtherArea
     if (ticketRoom === 'Garden') return ticketRoom
-    if (ticketRoom === 'Bedroom' && ticketRoomCode.trim()) return `${ticketRoom} (${ticketRoomContext}) - ${ticketRoomCode.trim()}`
-    return `${ticketRoom} (${ticketRoomContext})`
+    if (ticketRoom === 'Bedroom' && ticketRoomCode.trim()) {
+      return ticketRoomContext ? `${ticketRoom} (${ticketRoomContext}) - ${ticketRoomCode.trim()}` : `${ticketRoom} - ${ticketRoomCode.trim()}`
+    }
+    return ticketRoomContext ? `${ticketRoom} (${ticketRoomContext})` : ticketRoom
   }
 
   async function handleSubmitTicket(skipDuplicateCheck) {
@@ -1257,11 +1259,14 @@ export default function BuilderDashboard({ profile }) {
     .sort((a, b) => new Date(b.completed_at) - new Date(a.completed_at))
     .slice(0, 10)
 
+  // Which floor is a nice-to-have, not a blocker -- most properties don't
+  // have real Floor Layout data entered yet (see PropertyCoreTab.jsx), so
+  // forcing a Ground/First Floor guess out of whoever's raising the ticket
+  // just to get past this step isn't worth it. Room itself is still
+  // required; floor context is optional extra detail if they know it.
   const ticketStep2Complete = ticketRoom === 'Other Area...'
     ? !!ticketOtherArea.trim()
-    : ticketRoom === 'Garden'
-    ? true
-    : !!(ticketRoom && ticketRoomContext)
+    : !!ticketRoom
 
   const ticketStep4Complete = !!ticketIssueTag && (!isUnlistedTag(ticketIssueTag) || !!ticketIssueOther.trim())
 
