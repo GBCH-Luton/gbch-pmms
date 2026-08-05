@@ -18,9 +18,10 @@ import { compressImage } from '../lib/imageCompression'
 import { getSignedUrl } from '../lib/storage'
 import { fetchMaintenanceCategories, sortedCategoryEntries, isUnlistedTag, unlistedTagFor, unlistedLabelFor, calculatePriorityScore } from '../lib/maintenanceCategories'
 import { attachBuilderSafeProperties } from '../lib/properties'
-import { statusColour, statusLabel } from './admin/shared'
+import { statusColour, statusLabel, postSystemComment, postAuditEvent } from './admin/shared'
 import PropertySearchSelect from '../components/PropertySearchSelect'
 import VoiceInputButton from '../components/VoiceInputButton'
+import AttachmentMedia from '../components/AttachmentMedia'
 import gbchLogo from '../assets/gbch-logo.svg'
 
 const ROOM_OPTIONS = ['Kitchen', 'Bathroom', 'Communal Area', 'Bedroom', 'Hallways / Stairs', 'Garden', 'Other Area...']
@@ -262,6 +263,9 @@ function MyReportsList({ profile }) {
   const [loading, setLoading] = useState(true)
   const [expandedId, setExpandedId] = useState(null)
   const [comments, setComments] = useState([])
+  const [confirmArchiveId, setConfirmArchiveId] = useState(null)
+  const [archivingId, setArchivingId] = useState(null)
+  const [archiveError, setArchiveError] = useState('')
 
   useEffect(() => {
     fetchMine()
@@ -272,12 +276,40 @@ function MyReportsList({ profile }) {
     const { data, error } = await supabase
       .schema('pmms')
       .from('tickets')
-      .select('id, ticket_number, status, category, issue_tag, room, photo_url, created_at, property_id')
+      .select('id, ticket_number, status, category, issue_tag, room, photo_url, completion_note, completion_photo_url, created_at, property_id')
       .eq('raised_by', profile.id)
       .order('created_at', { ascending: false })
 
     if (!error) setTickets(await attachBuilderSafeProperties(data || []))
     setLoading(false)
+  }
+
+  // Directors' rule: only the person who raised a ticket signs it off --
+  // for a Ticket Submitter that means right here on their own report, since
+  // this narrow dashboard has no separate Sign-Off page. Same archive +
+  // system comment + audit trail as AdminSignOff.jsx's verifyAndArchive,
+  // allowed by the matching RLS in scripts/add_raiser_only_signoff.sql.
+  async function handleVerifyArchive(ticket) {
+    setArchiveError('')
+    setArchivingId(ticket.id)
+
+    const { error } = await supabase
+      .schema('pmms')
+      .from('tickets')
+      .update({ status: 'Archived', status_changed_at: new Date().toISOString(), stuck_alert_sent_at: null })
+      .eq('id', ticket.id)
+
+    if (error) {
+      setArchiveError(error.message)
+      setArchivingId(null)
+      return
+    }
+
+    await postSystemComment(ticket.id, profile, `Verified and archived by ${profile.name}.`)
+    await postAuditEvent(ticket.id, profile, 'Status Changed', `Completed → Archived (verified by ${profile.name})`)
+    setArchivingId(null)
+    setConfirmArchiveId(null)
+    await fetchMine()
   }
 
   async function toggleExpand(ticket) {
@@ -335,6 +367,35 @@ function MyReportsList({ profile }) {
                       <span style={{ color: COLORS.slate600 }}>{c.body}</span>
                     </div>
                   ))}
+                </div>
+              )}
+
+              {t.status === 'Completed' && (
+                <div style={{ marginTop: '14px', paddingTop: '14px', borderTop: `1px solid ${COLORS.slate100}` }}>
+                  <p style={{ margin: '0 0 8px 0', fontSize: '11px', fontWeight: 700, color: COLORS.purple600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Ready for your sign-off</p>
+                  {t.completion_note && <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: COLORS.slate600 }}>{t.completion_note}</p>}
+                  {t.completion_photo_url && (
+                    <AttachmentMedia url={t.completion_photo_url} alt="Completed work" style={{ width: '100%', maxHeight: '200px', objectFit: 'cover', borderRadius: '10px', marginBottom: '8px' }} />
+                  )}
+
+                  {archiveError && confirmArchiveId === t.id && (
+                    <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: COLORS.red600, fontWeight: 600 }}>{archiveError}</p>
+                  )}
+
+                  {confirmArchiveId === t.id ? (
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button
+                        onClick={() => handleVerifyArchive(t)}
+                        disabled={archivingId === t.id}
+                        style={{ ...choiceBtn(true), flex: 1, opacity: archivingId === t.id ? 0.6 : 1, cursor: archivingId === t.id ? 'not-allowed' : 'pointer' }}
+                      >
+                        {archivingId === t.id ? 'Confirming...' : 'Confirm sign-off'}
+                      </button>
+                      <button onClick={() => setConfirmArchiveId(null)} style={{ ...choiceBtn(false), flex: 1 }}>Cancel</button>
+                    </div>
+                  ) : (
+                    <button onClick={() => setConfirmArchiveId(t.id)} style={{ ...choiceBtn(true), width: '100%' }}>✓ Verify &amp; Sign Off</button>
+                  )}
                 </div>
               )}
             </div>

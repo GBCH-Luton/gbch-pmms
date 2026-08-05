@@ -18,7 +18,6 @@ export default function AdminSignOff({ profile, onTicketsChanged }) {
 
   const [propertyFilter, setPropertyFilter] = useState('')
   const [ticketNumberFilter, setTicketNumberFilter] = useState('')
-  const [raiserFilter, setRaiserFilter] = useState('All')
 
   const [reopenModalTicket, setReopenModalTicket] = useState(null)
   const [reopenReason, setReopenReason] = useState('')
@@ -44,6 +43,11 @@ export default function AdminSignOff({ profile, onTicketsChanged }) {
   }
 
   async function fetchPending() {
+    // Directors' rule: only the person who raised a ticket can sign it off
+    // -- enforced for real by RLS (see scripts/add_raiser_only_signoff.sql,
+    // the archive write itself is rejected otherwise), scoped here too so
+    // this page only ever shows tickets you could actually act on, not
+    // every admin/manager's completed work as unactionable clutter.
     const { data: ticketsData, error: ticketsError } = await supabase
       .schema('pmms')
       .from('tickets')
@@ -51,6 +55,7 @@ export default function AdminSignOff({ profile, onTicketsChanged }) {
         id, ticket_number, category, description, room, issue_tag, completion_note, completion_photo_url, photo_url, assigned_builder_id, property_id, raised_by, raised_by_name, checklist_responses
       `)
       .eq('status', 'Completed')
+      .eq('raised_by', profile.id)
       .order('completed_at', { ascending: false })
 
     const { data: staffData, error: staffError } = await supabase
@@ -155,22 +160,11 @@ export default function AdminSignOff({ profile, onTicketsChanged }) {
     </div>
   )
 
-  // Derived from whichever tickets are actually pending sign-off right now,
-  // not a full staff fetch -- keeps the dropdown short and relevant instead
-  // of listing every builder/admin who has never raised anything.
-  const raisers = Object.values(
-    tickets.reduce((acc, t) => {
-      if (t.raised_by) acc[t.raised_by] = { id: t.raised_by, name: t.raised_by_name || 'Unknown' }
-      return acc
-    }, {})
-  ).sort((a, b) => a.name.localeCompare(b.name))
-
   const filteredTickets = tickets.filter(t => {
     // property_id off the ticket is a number -- compare as strings so "3"
     // matches 3. Empty propertyFilter means "All Properties" (no filter).
     if (propertyFilter && String(t.property_id) !== String(propertyFilter)) return false
     if (ticketNumberFilter.trim() && !String(t.id).includes(ticketNumberFilter.trim())) return false
-    if (raiserFilter !== 'All' && String(t.raised_by) !== String(raiserFilter)) return false
     return true
   })
 
@@ -180,7 +174,7 @@ export default function AdminSignOff({ profile, onTicketsChanged }) {
         <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '32px', height: '32px', borderRadius: '50%', background: COLORS.purple100, color: COLORS.purple600, fontSize: '16px' }}>✓</span>
         <div>
           <h1 style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: COLORS.slate900 }}>Pending Sign-Off ({filteredTickets.length} ticket{filteredTickets.length === 1 ? '' : 's'})</h1>
-          <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate500 }}>Completed repairs awaiting office verification before archiving.</p>
+          <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate500 }}>Tickets you raised, completed and awaiting your verification before archiving.</p>
         </div>
       </div>
 
@@ -188,12 +182,6 @@ export default function AdminSignOff({ profile, onTicketsChanged }) {
         <div style={{ width: '220px' }}>
           <PropertySearchSelect properties={properties} value={propertyFilter} onChange={setPropertyFilter} placeholder="All Properties" />
         </div>
-        <select value={raiserFilter} onChange={(e) => setRaiserFilter(e.target.value)} style={filterSelectStyle}>
-          <option value="All">All Raisers</option>
-          {raisers.map(r => (
-            <option key={r.id} value={r.id}>{r.name}</option>
-          ))}
-        </select>
         <input
           type="text"
           value={ticketNumberFilter}
@@ -201,9 +189,9 @@ export default function AdminSignOff({ profile, onTicketsChanged }) {
           placeholder="Search ticket #..."
           style={{ ...filterSelectStyle, cursor: 'text', width: '160px' }}
         />
-        {(propertyFilter || ticketNumberFilter || raiserFilter !== 'All') && (
+        {(propertyFilter || ticketNumberFilter) && (
           <button
-            onClick={() => { setPropertyFilter(''); setTicketNumberFilter(''); setRaiserFilter('All') }}
+            onClick={() => { setPropertyFilter(''); setTicketNumberFilter('') }}
             style={{ ...filterSelectStyle, background: COLORS.white }}
           >
             Clear filters
@@ -226,7 +214,6 @@ export default function AdminSignOff({ profile, onTicketsChanged }) {
                 <span style={{ display: 'block', fontSize: '14px', fontWeight: 700, color: COLORS.slate900 }}>{t.property?.address}</span>
                 <span style={{ display: 'block', fontSize: '13px', color: COLORS.slate600 }}>{t.room ? `${t.room} — ` : ''}{t.issue_tag || t.category}</span>
                 <span style={{ display: 'block', fontSize: '13px', color: COLORS.purple700, fontWeight: 600, marginTop: '2px' }}>Completed by {t.builderName || 'Unknown'}</span>
-                <span style={{ display: 'block', fontSize: '12px', color: COLORS.slate500, marginTop: '1px' }}>Raised by {t.raised_by_name || 'Unknown'}</span>
                 {workedMsByTicket[t.id] != null && (
                   <span style={{ display: 'inline-block', marginTop: '6px', fontSize: '11px', fontWeight: 700, color: COLORS.teal600, background: COLORS.teal50, padding: '2px 8px', borderRadius: '20px' }}>
                     ⏱ {formatDuration(workedMsByTicket[t.id])} worked
