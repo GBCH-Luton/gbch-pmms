@@ -25,6 +25,13 @@ import gbchLogo from '../assets/gbch-logo.svg'
 // self-serve "Log a Ticket" form back into the nav menu.
 const SHOW_LOG_TICKET_NAV = false
 
+// Hidden 2026-08-03 at the managers' request -- they want assignment to
+// stay manager-controlled rather than builders self-claiming unassigned
+// jobs. Not removed -- the page, the claim flow, and fetchAvailableJobs()
+// are all still here, just unreachable from the nav/dashboard tile. Flip
+// back to true to bring it back.
+const SHOW_AVAILABLE_JOBS_NAV = false
+
 // Sandbox-only prototype (see lib/simsMaterialsBridge.js) -- not
 // production-bound, not required for either PMMS or SIMS's launch.
 const SIMS_MATERIALS_PROTOTYPE_ENABLED = true
@@ -1315,15 +1322,17 @@ export default function BuilderDashboard({ profile }) {
                   📝 Log a Ticket
                 </button>
               )}
-              <button
-                onClick={() => { setPage('available-jobs'); setMenuOpen(false) }}
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: COLORS.white, cursor: 'pointer', textAlign: 'left' }}
-              >
-                <span>🧰 Available Jobs</span>
-                {availableJobs.length > 0 && (
-                  <span style={{ background: COLORS.red600, color: COLORS.white, fontSize: '11px', fontWeight: 800, padding: '2px 8px', borderRadius: '999px' }}>{availableJobs.length}</span>
-                )}
-              </button>
+              {SHOW_AVAILABLE_JOBS_NAV && (
+                <button
+                  onClick={() => { setPage('available-jobs'); setMenuOpen(false) }}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: COLORS.white, cursor: 'pointer', textAlign: 'left' }}
+                >
+                  <span>🧰 Available Jobs</span>
+                  {availableJobs.length > 0 && (
+                    <span style={{ background: COLORS.red600, color: COLORS.white, fontSize: '11px', fontWeight: 800, padding: '2px 8px', borderRadius: '999px' }}>{availableJobs.length}</span>
+                  )}
+                </button>
+              )}
               <button
                 onClick={() => { setPage('my-reports'); setMenuOpen(false) }}
                 style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: COLORS.white, cursor: 'pointer', textAlign: 'left' }}
@@ -1388,13 +1397,15 @@ export default function BuilderDashboard({ profile }) {
           <div style={{ fontSize: '28px', fontWeight: 800 }}>{urgentTickets.length}</div>
           <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Urgent</div>
         </button>
-        <button
-          onClick={() => setPage('available-jobs')}
-          style={{ width: '100%', padding: '14px', background: COLORS.violet500, color: COLORS.white, border: 'none', borderRadius: '12px', cursor: 'pointer', textAlign: 'center' }}
-        >
-          <div style={{ fontSize: '28px', fontWeight: 800 }}>{availableJobs.length}</div>
-          <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Available Jobs</div>
-        </button>
+        {SHOW_AVAILABLE_JOBS_NAV && (
+          <button
+            onClick={() => setPage('available-jobs')}
+            style={{ width: '100%', padding: '14px', background: COLORS.violet500, color: COLORS.white, border: 'none', borderRadius: '12px', cursor: 'pointer', textAlign: 'center' }}
+          >
+            <div style={{ fontSize: '28px', fontWeight: 800 }}>{availableJobs.length}</div>
+            <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Available Jobs</div>
+          </button>
+        )}
         <button
           onClick={() => setStatusFilter('TODO')}
           style={{ width: '100%', padding: '14px', background: COLORS.blue500, color: COLORS.white, border: 'none', borderRadius: '12px', cursor: 'pointer', textAlign: 'center' }}
