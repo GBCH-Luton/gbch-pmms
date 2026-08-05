@@ -24,7 +24,7 @@ import { thStyle, tdStyle, actionBtnStyle, STAFF_AVAILABILITY_OPTIONS, STAFF_AVA
 
 const BUILT_IN_ROLES = ['Admin', 'Builder', 'Cleaner', 'Support Worker']
 
-export default function AdminBuilders({ profile }) {
+export default function AdminBuilders({ profile, initialStaffId, onInitialStaffIdConsumed }) {
   const [staffList, setStaffList] = useState([])
   const [tickets, setTickets] = useState([])
   const [customRoles, setCustomRoles] = useState([])
@@ -34,6 +34,15 @@ export default function AdminBuilders({ profile }) {
 
   useEffect(() => {
     fetchData()
+    // Jumped straight here from elsewhere (e.g. Reports' Staff Workload
+    // table) with a specific person already in mind -- same "consume an
+    // initial value passed down from the dashboard shell" pattern Pipeline/
+    // Properties/Compliance already use.
+    if (initialStaffId) {
+      setSelectedStaffId(initialStaffId)
+      onInitialStaffIdConsumed?.()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   async function fetchData() {

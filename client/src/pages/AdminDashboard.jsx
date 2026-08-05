@@ -174,6 +174,7 @@ export default function AdminDashboard({ profile }) {
   const [propertiesInitialFilter, setPropertiesInitialFilter] = useState(null)
   const [complianceInitialTierFilter, setComplianceInitialTierFilter] = useState(null)
   const [voidsInitialTierFilter, setVoidsInitialTierFilter] = useState(null)
+  const [buildersInitialStaffId, setBuildersInitialStaffId] = useState(null)
   const [pushEnabled, setPushEnabled] = useState(false)
   const [pushError, setPushError] = useState('')
 
@@ -285,6 +286,9 @@ export default function AdminDashboard({ profile }) {
     }
     if (key === 'voids' && opts.tierFilter) {
       setVoidsInitialTierFilter(opts.tierFilter)
+    }
+    if (key === 'builders' && opts.staffId) {
+      setBuildersInitialStaffId(opts.staffId)
     }
   }
 
@@ -657,6 +661,8 @@ export default function AdminDashboard({ profile }) {
               onPropertiesFilterConsumed={() => setPropertiesInitialFilter(null)}
               initialTierFilter={currentPage === 'compliance' ? complianceInitialTierFilter : currentPage === 'voids' ? voidsInitialTierFilter : null}
               onInitialTierFilterConsumed={() => { setComplianceInitialTierFilter(null); setVoidsInitialTierFilter(null) }}
+              initialStaffId={currentPage === 'builders' ? buildersInitialStaffId : null}
+              onInitialStaffIdConsumed={() => setBuildersInitialStaffId(null)}
             />
           </Suspense>
         </div>
