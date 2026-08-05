@@ -10,6 +10,7 @@ import { supabase } from '../../lib/supabase'
 import { COLORS } from '../../lib/colors'
 import { attachProperties } from '../../lib/properties'
 import { fetchAllMaintenanceCategoryNames } from '../../lib/maintenanceCategories'
+import BuilderProfileModal from './BuilderProfileModal'
 import {
   formatDuration, filterSelectStyle, thStyle, tdStyle,
   fetchAssignableBuilders, fetchAssignableStaffForDivision, resolveCategoryDivision, computeAvgTurnaroundMs, computeAvgResponseMs, buildWeeklyTrend,
@@ -139,6 +140,8 @@ export default function AdminReports({ profile, onNavigate }) {
   const [categoryFilter, setCategoryFilter] = useState('All')
   const [builderFilter, setBuilderFilter] = useState('All')
   const [breakdownMode, setBreakdownMode] = useState('category')
+
+  const [builderProfileId, setBuilderProfileId] = useState(null)
 
   const [aiQuestion, setAiQuestion] = useState('')
   const [aiLoading, setAiLoading] = useState(false)
@@ -464,7 +467,7 @@ export default function AdminReports({ profile, onNavigate }) {
               <tbody>
                 {workload.map(w => (
                   <tr key={w.id} style={{ borderBottom: `1px solid ${COLORS.slate100}` }}>
-                    <td style={tdStyle}>{w.name}</td>
+                    <td style={{ ...tdStyle, color: COLORS.blue700, fontWeight: 700, cursor: 'pointer' }} onClick={() => setBuilderProfileId(w.id)}>{w.name}</td>
                     <td
                       style={{ ...tdStyle, ...(onNavigate ? { cursor: 'pointer', color: COLORS.blue700, fontWeight: 700 } : {}) }}
                       onClick={() => goToPipeline({ builderId: w.id, fromDate, toDate })}
@@ -486,6 +489,8 @@ export default function AdminReports({ profile, onNavigate }) {
           </div>
         )}
       </div>
+
+      <BuilderProfileModal builderId={builderProfileId} onClose={() => setBuilderProfileId(null)} />
     </div>
   )
 }
