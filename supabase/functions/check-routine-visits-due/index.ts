@@ -49,6 +49,20 @@ Deno.serve(async (req: Request) => {
       .maybeSingle()
     const flagDays = flagDaysRow?.setting_value != null ? Number(flagDaysRow.setting_value) : 12
 
+    // Manager-only field the ticket-assignment UI collects everywhere else
+    // (see AdminRaiseTicket.jsx/AdminPipeline.jsx) -- these tickets are
+    // created and assigned by this cron job with no manager involved, so
+    // there's no assignment step to type one into. Settings > Routine
+    // Cleaning Visits configures it instead, applied to every visit this
+    // function creates.
+    const { data: estimatedMinutesRow } = await adminClient
+      .schema('pmms')
+      .from('settings')
+      .select('setting_value')
+      .eq('setting_key', 'routine_visit_estimated_minutes')
+      .maybeSingle()
+    const estimatedMinutes = estimatedMinutesRow?.setting_value != null ? Number(estimatedMinutesRow.setting_value) : 30
+
     // Pulled live so a future tweak to this subcategory's score in
     // Settings > Maintenance Categories is picked up automatically,
     // without needing this function edited too.
@@ -111,6 +125,7 @@ Deno.serve(async (req: Request) => {
           status: 'Assigned',
           property_id: property.id,
           assigned_builder_id: property.assigned_cleaner_id,
+          estimated_minutes: estimatedMinutes,
           priority_score: routineVisitScore,
         })
 

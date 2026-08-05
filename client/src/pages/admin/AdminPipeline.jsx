@@ -236,6 +236,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
   async function submitReassign() {
     if (!reassignBuilderId) { setReassignError('Please select a builder.'); return }
     if (!reassignReason.trim()) { setReassignError('Please enter a reason.'); return }
+    if (reassignEstimatedMinutes === '') { setReassignError('Please enter an estimated time for this job.'); return }
 
     const t = reassignModalTicket
     const promoteToAssigned = t.status === 'Pending'
@@ -1055,7 +1056,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
                 app. Compared against actual time worked later on the
                 Clocking page, so a small job that quietly ran long stands
                 out instead of blending into the timesheet. */}
-            <label style={modalLabelStyle}>Estimated time (minutes, optional)</label>
+            <label style={modalLabelStyle}>Estimated time (minutes, required)</label>
             <input
               type="number"
               min="0"

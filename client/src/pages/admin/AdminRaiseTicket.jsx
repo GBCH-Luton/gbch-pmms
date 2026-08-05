@@ -204,6 +204,11 @@ export default function AdminRaiseTicket({ profile }) {
   async function handleSubmitTicket(skipDuplicateCheck) {
     setTicketError('')
 
+    if (assignedBuilderId && estimatedMinutes === '') {
+      setTicketError('Please enter an estimated time for this job.')
+      return
+    }
+
     const finalIssueTag = isUnlistedTag(ticketIssueTag) ? `[Unlisted: ${ticketCategory}] ${ticketIssueOther}` : ticketIssueTag
     const priorityScore = calculatePriorityScore(maintenanceCategories, ticketCategory, ticketIssueTag) + (selectedTicketProperty?.high_vulnerability ? 30 : 0)
     const roomString = ticketRoomString()
@@ -327,6 +332,11 @@ export default function AdminRaiseTicket({ profile }) {
 
   async function handleSubmitCompliance() {
     if (!complianceCheckType || complianceResults.length === 0 || complianceResults.some(r => r === null)) return
+
+    if (assignedBuilderId && estimatedMinutes === '') {
+      setTicketError('Please enter an estimated time for this job.')
+      return
+    }
 
     setComplianceSubmitting(true)
     setTicketError('')
@@ -688,7 +698,7 @@ export default function AdminRaiseTicket({ profile }) {
                       builder. Used to compare against actual time worked
                       (Clocking page) later, e.g. a 15-minute job that
                       quietly took an hour. */}
-                  <p style={fieldLabelStyle}>Estimated time (minutes, optional)</p>
+                  <p style={fieldLabelStyle}>Estimated time (minutes, required)</p>
                   <input
                     type="number"
                     min="0"
@@ -995,7 +1005,7 @@ export default function AdminRaiseTicket({ profile }) {
 
                   {/* Manager-only, applied to every ticket this compliance
                       batch creates -- never shown to or fetched by the builder. */}
-                  <p style={fieldLabelStyle}>Estimated time per ticket (minutes, optional)</p>
+                  <p style={fieldLabelStyle}>Estimated time per ticket (minutes, required)</p>
                   <input
                     type="number"
                     min="0"

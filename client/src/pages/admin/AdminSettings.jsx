@@ -133,6 +133,11 @@ export default function AdminSettings() {
 
   const [routineVisitFlagDays, setRoutineVisitFlagDays] = useState(12)
   const [routineVisitAlertsEnabled, setRoutineVisitAlertsEnabled] = useState(true)
+  // These jobs are created by check-routine-visits-due (pg_cron, no
+  // manager in the loop) -- the estimated-time field on Log a Ticket/
+  // Reassign can't reach a ticket that's never opened in that UI, so this
+  // is the equivalent for the one auto-routed path that exists today.
+  const [routineVisitEstimatedMinutes, setRoutineVisitEstimatedMinutes] = useState(30)
   const [routineVisitSaving, setRoutineVisitSaving] = useState(false)
   const [routineVisitSaved, setRoutineVisitSaved] = useState(false)
 
@@ -203,6 +208,7 @@ export default function AdminSettings() {
       if (map.void_alerts_enabled != null) setVoidAlertsEnabled(map.void_alerts_enabled)
       if (map.routine_visit_flag_days != null) setRoutineVisitFlagDays(map.routine_visit_flag_days)
       if (map.routine_visit_alerts_enabled != null) setRoutineVisitAlertsEnabled(map.routine_visit_alerts_enabled)
+      if (map.routine_visit_estimated_minutes != null) setRoutineVisitEstimatedMinutes(map.routine_visit_estimated_minutes)
       if (map.garden_review_days != null) setGardenReviewDays(map.garden_review_days)
       if (map.garden_review_alerts_enabled != null) setGardenReviewAlertsEnabled(map.garden_review_alerts_enabled)
       if (Array.isArray(map.routine_visit_checklist)) setRoutineVisitChecklist(map.routine_visit_checklist)
@@ -584,6 +590,7 @@ export default function AdminSettings() {
     setRoutineVisitSaved(false)
     await saveSetting('routine_visit_flag_days', Number(routineVisitFlagDays))
     await saveSetting('routine_visit_alerts_enabled', routineVisitAlertsEnabled)
+    await saveSetting('routine_visit_estimated_minutes', Number(routineVisitEstimatedMinutes))
     setRoutineVisitSaving(false)
     setRoutineVisitSaved(true)
     setTimeout(() => setRoutineVisitSaved(false), 2000)
@@ -1295,6 +1302,20 @@ export default function AdminSettings() {
           <input type="checkbox" checked={routineVisitAlertsEnabled} onChange={(e) => setRoutineVisitAlertsEnabled(e.target.checked)} />
           Automatically create routine visit jobs
         </label>
+
+        {/* These jobs go straight to the assigned cleaner with no manager
+            in the loop, so there's no assignment step to type an estimate
+            into -- this is the closest equivalent, applied to every job
+            this automation creates rather than left blank. */}
+        <div style={{ marginBottom: '16px', maxWidth: '260px' }}>
+          <label style={fieldLabelStyle}>Estimated time for each auto-created visit (minutes)</label>
+          <input
+            type="number"
+            value={routineVisitEstimatedMinutes}
+            onChange={(e) => setRoutineVisitEstimatedMinutes(e.target.value)}
+            style={inputStyle}
+          />
+        </div>
 
         <button onClick={saveRoutineVisitAlerts} disabled={routineVisitSaving} style={{ ...saveBtnStyle, opacity: routineVisitSaving ? 0.6 : 1, cursor: routineVisitSaving ? 'not-allowed' : 'pointer' }}>
           {routineVisitSaving ? 'Saving...' : 'Save Routine Visit Settings'}
