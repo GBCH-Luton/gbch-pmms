@@ -141,7 +141,7 @@ export default function AdminClocking({ profile }) {
     const { data: completedTicketsRaw } = await supabase
       .schema('pmms')
       .from('tickets')
-      .select('id, ticket_number, category, description, room, mileage_logged, assigned_builder_id, property_id')
+      .select('id, ticket_number, category, description, room, mileage_logged, estimated_minutes, assigned_builder_id, property_id')
       .in('status', ['Completed', 'Archived'])
     const completedTickets = await attachProperties(completedTicketsRaw || [], 'address, postcode, latitude, longitude')
 
@@ -435,6 +435,11 @@ export default function AdminClocking({ profile }) {
                     {formatDuration(row.totalMs)}
                     {row.sessions.length > 1 && (
                       <span style={{ display: 'block', fontSize: '10px', color: COLORS.slate400, fontWeight: 600 }}>{row.sessions.length} sessions</span>
+                    )}
+                    {row.ticket.estimated_minutes != null && (
+                      <span style={{ display: 'block', marginTop: '2px', fontSize: '10px', fontWeight: 700, color: row.totalMs > row.ticket.estimated_minutes * 60000 ? COLORS.red600 : COLORS.slate400 }}>
+                        Est. {formatDuration(row.ticket.estimated_minutes * 60000)}
+                      </span>
                     )}
                   </td>
                   <td style={tdStyle}>{(row.ticket.mileage_logged || 0).toFixed(1)}</td>

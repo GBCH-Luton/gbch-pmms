@@ -63,6 +63,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
   const [reassignModalTicket, setReassignModalTicket] = useState(null)
   const [reassignBuilderId, setReassignBuilderId] = useState('')
   const [reassignReason, setReassignReason] = useState('')
+  const [reassignEstimatedMinutes, setReassignEstimatedMinutes] = useState('')
   const [reassignError, setReassignError] = useState('')
   const [reassignSendPush, setReassignSendPush] = useState(false)
 
@@ -137,6 +138,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
     if (reassignModalTicket) {
       setReassignBuilderId(reassignModalTicket.assigned_builder_id || '')
       setReassignReason('')
+      setReassignEstimatedMinutes(reassignModalTicket.estimated_minutes != null ? String(reassignModalTicket.estimated_minutes) : '')
       setReassignError('')
       setReassignOptions([])
       fetchAssignableStaffForCategory(reassignModalTicket.category).then(setReassignOptions)
@@ -193,7 +195,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
       .select(`
         id, ticket_number, status, category, description, room, priority_score, priority_override, mileage_logged,
         no_access_flag, no_access_note, hold_reason, hold_note, completion_note, photo_url, completion_photo_url,
-        completed_at, created_at, status_changed_at, first_assigned_at, assigned_builder_id, property_id, event_id,
+        completed_at, created_at, status_changed_at, first_assigned_at, assigned_builder_id, estimated_minutes, property_id, event_id,
         raised_by_name, cancel_type, cancel_reason, cancel_duplicate_ref
       `)
       .order('created_at', { ascending: false })
@@ -245,6 +247,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
       .from('tickets')
       .update({
         assigned_builder_id: reassignBuilderId,
+        estimated_minutes: reassignEstimatedMinutes !== '' ? Number(reassignEstimatedMinutes) : null,
         ...(promoteToAssigned ? { status: 'Assigned', status_changed_at: new Date().toISOString(), stuck_alert_sent_at: null, first_assigned_at: new Date().toISOString() } : {}),
       })
       .eq('id', t.id)
@@ -910,6 +913,13 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
                                 <p style={expandValueStyle}>Unassigned</p>
                               )}
 
+                              {t.estimated_minutes != null && (
+                                <>
+                                  <p style={expandLabelStyle}>Estimated Time</p>
+                                  <p style={expandValueStyle}>{formatDuration(t.estimated_minutes * 60000)}</p>
+                                </>
+                              )}
+
                               <p style={expandLabelStyle}>Priority Score</p>
                               <p style={expandValueStyle}>{t.priority_score} pts</p>
 
@@ -1039,6 +1049,21 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
               rows={2}
               placeholder="e.g. Closer to site, has the right skillset..."
               style={modalTextareaStyle}
+            />
+
+            {/* Manager-only -- never shown on the builder's side of the
+                app. Compared against actual time worked later on the
+                Clocking page, so a small job that quietly ran long stands
+                out instead of blending into the timesheet. */}
+            <label style={modalLabelStyle}>Estimated time (minutes, optional)</label>
+            <input
+              type="number"
+              min="0"
+              step="5"
+              value={reassignEstimatedMinutes}
+              onChange={(e) => setReassignEstimatedMinutes(e.target.value)}
+              placeholder="e.g. 30"
+              style={{ width: '100%', height: '40px', padding: '0 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', boxSizing: 'border-box' }}
             />
 
             <label style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '10px 0 0 0', fontSize: '13px', fontWeight: 600, color: COLORS.slate900, cursor: 'pointer' }}>

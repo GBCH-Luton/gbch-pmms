@@ -85,6 +85,7 @@ export default function AdminRaiseTicket({ profile }) {
   // Admin-only additions
   const [builders, setBuilders] = useState([])
   const [assignedBuilderId, setAssignedBuilderId] = useState('')
+  const [estimatedMinutes, setEstimatedMinutes] = useState('')
   const [sendPushOnAssign, setSendPushOnAssign] = useState(false)
   const [priorityOverride, setPriorityOverride] = useState('')
   const [department, setDepartment] = useState('')
@@ -130,6 +131,7 @@ export default function AdminRaiseTicket({ profile }) {
       : ticketCategory
 
     setAssignedBuilderId('')
+    setEstimatedMinutes('')
 
     if (!category) { setBuilders([]); return }
     fetchAssignableStaffForCategory(category).then(setBuilders)
@@ -256,6 +258,7 @@ export default function AdminRaiseTicket({ profile }) {
         priority_score: priorityScore,
         priority_override: priorityOverride || null,
         assigned_builder_id: assignedBuilderId || null,
+        estimated_minutes: assignedBuilderId && estimatedMinutes !== '' ? Number(estimatedMinutes) : null,
         department: department || null,
         event_id: selectedEventId || null,
         status: assignedBuilderId ? 'Assigned' : 'Pending',
@@ -370,6 +373,7 @@ export default function AdminRaiseTicket({ profile }) {
           photo_url: photoUrl,
           priority_override: priorityOverride || null,
           assigned_builder_id: assignedBuilderId || null,
+          estimated_minutes: assignedBuilderId && estimatedMinutes !== '' ? Number(estimatedMinutes) : null,
           department: department || null,
           status: assignedBuilderId ? 'Assigned' : 'Pending',
           first_assigned_at: assignedBuilderId ? new Date().toISOString() : null,
@@ -674,10 +678,27 @@ export default function AdminRaiseTicket({ profile }) {
                 ))}
               </select>
               {assignedBuilderId && (
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 14px 0', fontSize: '13px', fontWeight: 600, color: COLORS.slate900, cursor: 'pointer' }}>
-                  <input type="checkbox" checked={sendPushOnAssign} onChange={(e) => setSendPushOnAssign(e.target.checked)} />
-                  Also send a push notification
-                </label>
+                <>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 14px 0', fontSize: '13px', fontWeight: 600, color: COLORS.slate900, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={sendPushOnAssign} onChange={(e) => setSendPushOnAssign(e.target.checked)} />
+                    Also send a push notification
+                  </label>
+
+                  {/* Manager-only -- never shown to or fetched by the
+                      builder. Used to compare against actual time worked
+                      (Clocking page) later, e.g. a 15-minute job that
+                      quietly took an hour. */}
+                  <p style={fieldLabelStyle}>Estimated time (minutes, optional)</p>
+                  <input
+                    type="number"
+                    min="0"
+                    step="5"
+                    value={estimatedMinutes}
+                    onChange={(e) => setEstimatedMinutes(e.target.value)}
+                    placeholder="e.g. 30"
+                    style={{ ...fieldSelectStyle, marginBottom: '14px' }}
+                  />
+                </>
               )}
 
               <p style={fieldLabelStyle}>Priority override</p>
@@ -966,10 +987,25 @@ export default function AdminRaiseTicket({ profile }) {
                 ))}
               </select>
               {assignedBuilderId && (
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 14px 0', fontSize: '13px', fontWeight: 600, color: COLORS.slate900, cursor: 'pointer' }}>
-                  <input type="checkbox" checked={sendPushOnAssign} onChange={(e) => setSendPushOnAssign(e.target.checked)} />
-                  Also send a push notification
-                </label>
+                <>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 14px 0', fontSize: '13px', fontWeight: 600, color: COLORS.slate900, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={sendPushOnAssign} onChange={(e) => setSendPushOnAssign(e.target.checked)} />
+                    Also send a push notification
+                  </label>
+
+                  {/* Manager-only, applied to every ticket this compliance
+                      batch creates -- never shown to or fetched by the builder. */}
+                  <p style={fieldLabelStyle}>Estimated time per ticket (minutes, optional)</p>
+                  <input
+                    type="number"
+                    min="0"
+                    step="5"
+                    value={estimatedMinutes}
+                    onChange={(e) => setEstimatedMinutes(e.target.value)}
+                    placeholder="e.g. 30"
+                    style={{ ...fieldSelectStyle, marginBottom: '14px' }}
+                  />
+                </>
               )}
 
               <p style={fieldLabelStyle}>Priority override</p>
