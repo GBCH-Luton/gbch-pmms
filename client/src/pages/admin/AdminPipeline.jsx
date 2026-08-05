@@ -91,6 +91,15 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
   const [priorityReason, setPriorityReason] = useState('')
   const [priorityError, setPriorityError] = useState('')
 
+  // Separate from the Reassign modal on purpose -- correcting an estimate
+  // on a ticket that's already correctly assigned (most commonly one the
+  // Cleaners Rota cron auto-created) shouldn't require picking a builder
+  // again and writing a reassignment reason for a no-op reassignment.
+  const [editEstimateModalTicket, setEditEstimateModalTicket] = useState(null)
+  const [editEstimateValue, setEditEstimateValue] = useState('')
+  const [editEstimateError, setEditEstimateError] = useState('')
+  const [editEstimateSaving, setEditEstimateSaving] = useState(false)
+
   const [historyModalTicket, setHistoryModalTicket] = useState(null)
   const [historyEvents, setHistoryEvents] = useState([])
 
@@ -170,6 +179,13 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
       })
     }
   }, [bulkReassignOpen])
+
+  useEffect(() => {
+    if (editEstimateModalTicket) {
+      setEditEstimateValue(editEstimateModalTicket.estimated_minutes != null ? String(editEstimateModalTicket.estimated_minutes) : '')
+      setEditEstimateError('')
+    }
+  }, [editEstimateModalTicket])
 
   useEffect(() => {
     if (priorityModalTicket) {
@@ -408,6 +424,30 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
     await postAuditEvent(t.id, profile, 'Status Changed', `${statusLabel(t.status)} → Cancelled (${cancelType}${dupNote}). Reason: ${cancelReason.trim()}`)
     await fetchTickets()
     closeCancelModal()
+  }
+
+  function openEditEstimateModal(ticket) { setEditEstimateModalTicket(ticket) }
+  function closeEditEstimateModal() { setEditEstimateModalTicket(null) }
+
+  async function submitEditEstimate() {
+    if (editEstimateValue === '') { setEditEstimateError('Please enter an estimated time.'); return }
+
+    const t = editEstimateModalTicket
+    const newMinutes = Number(editEstimateValue)
+
+    setEditEstimateSaving(true)
+    const { error } = await supabase
+      .schema('pmms')
+      .from('tickets')
+      .update({ estimated_minutes: newMinutes })
+      .eq('id', t.id)
+    setEditEstimateSaving(false)
+
+    if (error) { setEditEstimateError(error.message); return }
+
+    await postAuditEvent(t.id, profile, 'Estimate Updated', `Estimated time changed from ${t.estimated_minutes != null ? `${t.estimated_minutes}m` : 'not set'} to ${newMinutes}m.`)
+    await fetchTickets()
+    closeEditEstimateModal()
   }
 
   function openPriorityModal(ticket) { setPriorityModalTicket(ticket) }
@@ -994,6 +1034,9 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
                               {t.status !== 'Cancelled' && (
                                 <button onClick={() => openCancelModal(t)} style={{ ...actionBtnStyle, color: COLORS.red600, borderColor: COLORS.red200 }}>Cancel</button>
                               )}
+                              {t.assigned_builder_id && (
+                                <button onClick={() => openEditEstimateModal(t)} style={actionBtnStyle}>{t.estimated_minutes != null ? 'Edit Estimate' : 'Add Estimate'}</button>
+                              )}
                               <button onClick={() => openReassignModal(t)} style={{ ...actionBtnStyle, background: COLORS.blue700, color: COLORS.white, borderColor: COLORS.blue700 }}>Reassign</button>
                             </div>
                           </div>
@@ -1246,6 +1289,35 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
       )}
 
       {/* Priority override modal */}
+      {editEstimateModalTicket && (
+        <div style={modalOverlayStyle}>
+          <div style={modalCardStyle}>
+            <p style={modalTitleStyle}>Estimated Time — Ticket #{editEstimateModalTicket.ticket_number}</p>
+            <p style={modalSubtitleStyle}>{editEstimateModalTicket.property?.address}</p>
+
+            <label style={modalLabelStyle}>Estimated time (minutes)</label>
+            <input
+              type="number"
+              min="0"
+              step="5"
+              value={editEstimateValue}
+              onChange={(e) => setEditEstimateValue(e.target.value)}
+              placeholder="e.g. 30"
+              style={{ width: '100%', height: '40px', padding: '0 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', boxSizing: 'border-box' }}
+            />
+
+            {editEstimateError && <p style={modalErrorStyle}>{editEstimateError}</p>}
+
+            <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
+              <button onClick={closeEditEstimateModal} style={modalCancelBtnStyle}>Cancel</button>
+              <button onClick={submitEditEstimate} disabled={editEstimateSaving} style={{ ...modalConfirmBtnStyle, opacity: editEstimateSaving ? 0.6 : 1, cursor: editEstimateSaving ? 'not-allowed' : 'pointer' }}>
+                {editEstimateSaving ? 'Saving...' : 'Save'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {priorityModalTicket && (
         <div style={modalOverlayStyle}>
           <div style={modalCardStyle}>
