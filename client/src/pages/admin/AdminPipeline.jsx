@@ -193,7 +193,8 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
       .select(`
         id, ticket_number, status, category, description, room, priority_score, priority_override, mileage_logged,
         no_access_flag, no_access_note, hold_reason, hold_note, completion_note, photo_url, completion_photo_url,
-        completed_at, created_at, status_changed_at, first_assigned_at, assigned_builder_id, property_id, event_id
+        completed_at, created_at, status_changed_at, first_assigned_at, assigned_builder_id, property_id, event_id,
+        raised_by_name
       `)
       .order('created_at', { ascending: false })
 
@@ -505,6 +506,12 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
   }
 
   const filteredTickets = tickets.filter(t => {
+    // Cancelled tickets are a mistake/duplicate record, not active work --
+    // hidden from the default "All" view so they don't clutter the list a
+    // manager scans daily, but still fully visible by filtering Status to
+    // Cancelled specifically (the option is still right there in the
+    // dropdown), never actually removed from the data.
+    if (statusFilter === 'All' && t.status === 'Cancelled') return false
     if (statusFilter !== 'All' && t.status !== statusFilter) return false
     if (propertyFilter && String(t.property_id) !== String(propertyFilter)) return false
     if (categoryFilter !== 'All' && t.category !== categoryFilter) return false
@@ -846,6 +853,9 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
                               <p style={expandSectionTitleStyle}>Ticket Details</p>
                               <p style={expandLabelStyle}>Ticket</p>
                               <p style={expandValueStyle}>#{t.ticket_number} — {t.category}</p>
+
+                              <p style={expandLabelStyle}>Raised By</p>
+                              <p style={expandValueStyle}>{t.raised_by_name || 'Unknown'}</p>
 
                               {isCompliance && (
                                 <span style={{ display: 'inline-block', fontSize: '9px', fontWeight: 800, color: COLORS.orange700, background: COLORS.orange50, border: `1px solid ${COLORS.orange200}`, padding: '2px 6px', borderRadius: '20px', marginBottom: '8px' }}>
