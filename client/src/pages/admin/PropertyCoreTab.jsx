@@ -10,7 +10,9 @@
 //     (Job Detail alert banner + the +30 priority score bonus)
 // "Layout Type" (Studio/1-Bed/.../HMO) uses a NEW column, unit_layout_type,
 // so it doesn't collide with the existing layout_type column that drives
-// the Builder's floor/area picker (2-Floors/3-Floors/Flat).
+// the ticket form's floor/area picker (1-Floor/2-Floors/3-Floors/Flat,
+// exposed below as "Floor Layout") -- unrelated concepts that happened to
+// want the same obvious name.
 
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
@@ -23,6 +25,13 @@ const PROPERTY_TYPES = ['House', 'Flat', 'HMO', 'Specialist Supported Living', '
 const TENURE_TYPES = ['Freehold', 'Leasehold', 'Rented']
 const PROPERTY_STATUSES = ['Occupied', 'Void', 'Procured', 'Live']
 const UNIT_LAYOUT_TYPES = ['Studio', '1-Bed', '2-Bed', '3-Bed', '4-Bed', '5-Bed', 'HMO', 'Other']
+// Drives the floor/area choices a submitter or builder sees when logging a
+// ticket against this property (see floorContextOptions() in
+// AdminRaiseTicket.jsx / BuilderDashboard.jsx). Column defaults to
+// '2-Floors' in the DB, so a property nobody has touched this field on yet
+// just keeps showing the same generic Ground Floor/First Floor choice
+// tickets have always used -- nothing breaks, nothing is required.
+const FLOOR_LAYOUT_TYPES = ['1-Floor', '2-Floors', '3-Floors', 'Flat']
 const CONSTRUCTION_TYPES = ['Brick', 'Timber Frame', 'Concrete', 'Other']
 
 const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', fontFamily: 'inherit', boxSizing: 'border-box' }
@@ -449,6 +458,7 @@ export default function PropertyCoreTab({ property, onFieldsSaved, profile }) {
             onSave={saveFields}
             fields={[
               { key: 'num_floors', label: 'Number of Floors', type: 'number' },
+              { key: 'layout_type', label: 'Floor Layout (used in ticket logging)', type: 'select', options: FLOOR_LAYOUT_TYPES },
               { key: 'num_rooms', label: 'Number of Rooms (excl. bathrooms/kitchens)', type: 'number' },
               { key: 'num_bathrooms', label: 'Number of Bathrooms', type: 'number' },
               { key: 'num_kitchens', label: 'Number of Kitchens', type: 'number' },

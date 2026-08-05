@@ -846,8 +846,9 @@ export default function BuilderDashboard({ profile }) {
   function floorContextOptions(property) {
     if (!property) return ['Ground Floor', 'First Floor']
     if (property.layout_type === 'Flat') return ['Main Flat Space', 'En-Suite Area']
+    if (property.layout_type === '1-Floor') return ['Ground Floor']
     if (property.layout_type === '3-Floors') return ['Ground Floor', 'First Floor', 'Second Floor']
-    return ['Ground Floor', 'First Floor']
+    return ['Ground Floor', 'First Floor'] // '2-Floors' (the DB default) plus any property with no Floor Layout set yet
   }
 
   function floorContextLabel(property) {
@@ -2779,7 +2780,13 @@ export default function BuilderDashboard({ profile }) {
                               setTicketRoomCode('')
                               setTicketOtherArea('')
                               const opts = floorContextOptions(selectedTicketProperty)
-                              setTicketRoomContext(selectedTicketProperty?.layout_type === 'Flat' ? opts[0] : null)
+                              // A single-option property (e.g. a true
+                              // one-floor house) has nothing to actually
+                              // choose -- auto-fill it same as Flat already
+                              // defaulted to its first option, just without
+                              // leaving the picker up for a choice that
+                              // isn't really one.
+                              setTicketRoomContext(opts.length === 1 || selectedTicketProperty?.layout_type === 'Flat' ? opts[0] : null)
                             }}
                             style={choiceButtonStyle(active, 'center')}
                           >
@@ -2789,7 +2796,7 @@ export default function BuilderDashboard({ profile }) {
                       })}
                     </div>
 
-                    {ticketRoom && ticketRoom !== 'Other Area...' && ticketRoom !== 'Garden' && (
+                    {ticketRoom && ticketRoom !== 'Other Area...' && ticketRoom !== 'Garden' && floorContextOptions(selectedTicketProperty).length > 1 && (
                       <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: `1px dashed ${COLORS.slate200}` }}>
                         <p style={{ margin: '0 0 8px 0', fontSize: '11px', fontWeight: 600, color: COLORS.slate500, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                           {floorContextLabel(selectedTicketProperty)}
