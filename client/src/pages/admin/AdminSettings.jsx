@@ -164,6 +164,17 @@ export default function AdminSettings() {
   const [dashboardMetricsSaving, setDashboardMetricsSaving] = useState(false)
   const [dashboardMetricsSaved, setDashboardMetricsSaved] = useState(false)
 
+  // Left blank ('') rather than defaulted -- a real query with unpriced
+  // usage must show as "cost unknown" (see AdminReports.jsx's AI Usage
+  // table), not silently report $0. Rates are per Anthropic's published
+  // per-million-token pricing for whichever model ai-ask is using
+  // (currently Claude Haiku 4.5) -- check console.anthropic.com/settings/pricing
+  // for current figures when setting these.
+  const [aiInputCostPerMillion, setAiInputCostPerMillion] = useState('')
+  const [aiOutputCostPerMillion, setAiOutputCostPerMillion] = useState('')
+  const [aiPricingSaving, setAiPricingSaving] = useState(false)
+  const [aiPricingSaved, setAiPricingSaved] = useState(false)
+
   useEffect(() => {
     fetchSettings()
   }, [])
@@ -206,6 +217,8 @@ export default function AdminSettings() {
       if (map.compliance_alerts_enabled != null) setComplianceAlertsEnabled(map.compliance_alerts_enabled)
       if (map.void_aging_threshold_days != null) setVoidAgingThresholdDays(map.void_aging_threshold_days)
       if (map.void_alerts_enabled != null) setVoidAlertsEnabled(map.void_alerts_enabled)
+      if (map.ai_cost_per_million_input_tokens != null) setAiInputCostPerMillion(map.ai_cost_per_million_input_tokens)
+      if (map.ai_cost_per_million_output_tokens != null) setAiOutputCostPerMillion(map.ai_cost_per_million_output_tokens)
       if (map.routine_visit_flag_days != null) setRoutineVisitFlagDays(map.routine_visit_flag_days)
       if (map.routine_visit_alerts_enabled != null) setRoutineVisitAlertsEnabled(map.routine_visit_alerts_enabled)
       if (map.routine_visit_estimated_minutes != null) setRoutineVisitEstimatedMinutes(map.routine_visit_estimated_minutes)
@@ -679,6 +692,16 @@ export default function AdminSettings() {
     setDashboardMetricsSaving(false)
     setDashboardMetricsSaved(true)
     setTimeout(() => setDashboardMetricsSaved(false), 2000)
+  }
+
+  async function saveAiPricing() {
+    setAiPricingSaving(true)
+    setAiPricingSaved(false)
+    await saveSetting('ai_cost_per_million_input_tokens', aiInputCostPerMillion === '' ? null : Number(aiInputCostPerMillion))
+    await saveSetting('ai_cost_per_million_output_tokens', aiOutputCostPerMillion === '' ? null : Number(aiOutputCostPerMillion))
+    setAiPricingSaving(false)
+    setAiPricingSaved(true)
+    setTimeout(() => setAiPricingSaved(false), 2000)
   }
 
   if (loading) return (
@@ -1541,6 +1564,37 @@ export default function AdminSettings() {
           {dashboardMetricsSaving ? 'Saving...' : 'Save Dashboard Metrics'}
         </button>
         {dashboardMetricsSaved && <span style={savedTagStyle}>✓ Saved</span>}
+      </SettingsSection>
+
+      {/* Section 7: AI Usage Pricing */}
+      <SettingsSection
+        title="AI Usage Pricing"
+        subtitle="Cost per query on the Reports page's AI question box (Claude Haiku 4.5) is computed from these rates. Leave blank and cost shows as unknown rather than $0."
+        open={!!openSections['ai-pricing']}
+        onToggle={() => toggleSection('ai-pricing')}
+      >
+        <div style={{ marginBottom: '16px', maxWidth: '260px' }}>
+          <label style={fieldLabelStyle}>Input cost ($ per million tokens)</label>
+          <input
+            type="number" step="0.01" placeholder="e.g. 1.00"
+            value={aiInputCostPerMillion}
+            onChange={(e) => setAiInputCostPerMillion(e.target.value)}
+            style={inputStyle}
+          />
+        </div>
+        <div style={{ marginBottom: '16px', maxWidth: '260px' }}>
+          <label style={fieldLabelStyle}>Output cost ($ per million tokens)</label>
+          <input
+            type="number" step="0.01" placeholder="e.g. 5.00"
+            value={aiOutputCostPerMillion}
+            onChange={(e) => setAiOutputCostPerMillion(e.target.value)}
+            style={inputStyle}
+          />
+        </div>
+        <button onClick={saveAiPricing} disabled={aiPricingSaving} style={{ ...saveBtnStyle, opacity: aiPricingSaving ? 0.6 : 1, cursor: aiPricingSaving ? 'not-allowed' : 'pointer' }}>
+          {aiPricingSaving ? 'Saving...' : 'Save AI Pricing'}
+        </button>
+        {aiPricingSaved && <span style={savedTagStyle}>✓ Saved</span>}
       </SettingsSection>
 
       {pendingRemoval && (

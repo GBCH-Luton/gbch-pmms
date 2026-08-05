@@ -14,7 +14,7 @@ import BuilderProfileModal from './BuilderProfileModal'
 import {
   formatDuration, filterSelectStyle, thStyle, tdStyle,
   fetchAssignableBuilders, fetchAssignableStaffForDivision, resolveCategoryDivision, computeAvgTurnaroundMs, computeAvgResponseMs, buildWeeklyTrend,
-  isoDateNDaysAgo, todayIso, computeComplianceAging, COMPLIANCE_TYPES,
+  isoDateNDaysAgo, todayIso, extractFunctionError, formatUKDateTime,
 } from './shared'
 import SimpleBarChart from '../../components/SimpleBarChart'
 
@@ -31,102 +31,19 @@ function avgMsLabel(ms) {
 }
 
 // Moved here from the AI Trial menu's standalone "Reports" page (formerly
-// ai-trial/AiReports.jsx) so there's one Reports page, not two -- still the
-// same free, pattern-matched (not a real AI API call) question box it
-// always was. Matched against a small set of supported question patterns,
-// each backed by a real query against production data; anything outside
-// those 4 patterns says so rather than guessing.
+// ai-trial/AiReports.jsx) so there's one Reports page, not two. No longer
+// the free pattern-matcher it started as -- now backed by a real Claude
+// API call (supabase/functions/ai-ask), so it can answer any question
+// phrased any way instead of only 4 fixed shapes. That also means it now
+// costs real money per query (logged to pmms.ai_usage_log, see the AI
+// Usage table below), so it stays admin-only rather than opening up to
+// every manager who can see this page.
 const AI_EXAMPLE_QUESTIONS = [
   'Which properties have the most open tickets?',
   'What compliance is overdue or expiring soon?',
   'What is the most common issue category?',
   'Which builders have completed the most jobs?',
 ]
-
-const AI_PATTERNS = [
-  { test: /propert.*(most|top).*(ticket|issue)|which propert.*(most|open)/i, key: 'topProperties' },
-  { test: /compliance.*(overdue|expired|expiring|lapsing)|overdue.*compliance/i, key: 'complianceOverdue' },
-  { test: /(most common|top).*(issue|categor)/i, key: 'topCategory' },
-  { test: /builder.*(most|top).*(job|complet)|who.*most.*job/i, key: 'topBuilders' },
-]
-
-async function aiRunTopProperties() {
-  const { data } = await supabase.schema('pmms').from('tickets').select('id, property_id').not('status', 'in', '("Completed","Archived","Cancelled")')
-  if (!data?.length) return { summary: 'No open tickets right now.', rows: [] }
-
-  const counts = {}
-  data.forEach(t => { if (t.property_id) counts[t.property_id] = (counts[t.property_id] || 0) + 1 })
-  const withProps = await attachProperties(Object.keys(counts).map(id => ({ property_id: id })), 'address')
-  const rows = withProps.map(r => ({ label: r.property?.address || 'Unknown', value: counts[r.property_id] }))
-    .sort((a, b) => b.value - a.value).slice(0, 5)
-
-  return {
-    summary: rows.length ? `${rows[0].label} has the most open tickets right now, with ${rows[0].value}.` : 'No open tickets right now.',
-    columns: ['Property', 'Open tickets'], rows,
-  }
-}
-
-async function aiRunComplianceOverdue() {
-  const { data: properties } = await supabase.schema('pmms').from('properties').select('id, address, high_vulnerability')
-  const { data: records } = await supabase.schema('pmms').from('property_compliance').select('*')
-  const recordsByKey = {}
-  ;(records || []).forEach(r => { recordsByKey[`${r.property_id}:${r.cert_type}`] = r })
-
-  const flagged = []
-  ;(properties || []).forEach(p => {
-    COMPLIANCE_TYPES.forEach(type => {
-      const record = recordsByKey[`${p.id}:${type.key}`]
-      const aging = computeComplianceAging(record)
-      if (aging.tier === 'red' || aging.tier === 'amber') {
-        flagged.push({ label: `${p.address} — ${type.title}`, value: aging.label, vulnerable: p.high_vulnerability })
-      }
-    })
-  })
-
-  const vulnCount = flagged.filter(f => f.vulnerable).length
-  const summary = flagged.length
-    ? `${flagged.length} certificate${flagged.length === 1 ? '' : 's'} expired or expiring soon${vulnCount ? `, including ${vulnCount} at high-vulnerability properties` : ''}.`
-    : 'Nothing expired or expiring soon -- compliance looks current.'
-
-  return { summary, columns: ['Property / Certificate', 'Status'], rows: flagged.slice(0, 10).map(f => ({ label: f.label, value: f.value })) }
-}
-
-async function aiRunTopCategory() {
-  const { data } = await supabase.schema('pmms').from('tickets').select('category')
-  if (!data?.length) return { summary: 'No tickets logged yet.', rows: [] }
-
-  const counts = {}
-  data.forEach(t => { if (t.category) counts[t.category] = (counts[t.category] || 0) + 1 })
-  const rows = Object.entries(counts).map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value).slice(0, 5)
-
-  return {
-    summary: rows.length ? `${rows[0].label} is the most common issue category, with ${rows[0].value} ticket${rows[0].value === 1 ? '' : 's'} all-time.` : 'No tickets logged yet.',
-    columns: ['Category', 'Tickets (all-time)'], rows,
-  }
-}
-
-async function aiRunTopBuilders() {
-  const { data } = await supabase.schema('pmms').from('tickets').select('assigned_builder_id').eq('status', 'Completed')
-  if (!data?.length) return { summary: 'No completed jobs recorded yet.', rows: [] }
-
-  const counts = {}
-  data.forEach(t => { if (t.assigned_builder_id) counts[t.assigned_builder_id] = (counts[t.assigned_builder_id] || 0) + 1 })
-  const ids = Object.keys(counts)
-  if (!ids.length) return { summary: 'No completed jobs recorded yet.', rows: [] }
-
-  const { data: staffRows } = await supabase.from('staff').select('id, name').in('id', ids)
-  const nameById = {}
-  ;(staffRows || []).forEach(s => { nameById[s.id] = s.name })
-
-  const rows = ids.map(id => ({ label: nameById[id] || 'Unknown', value: counts[id] })).sort((a, b) => b.value - a.value).slice(0, 5)
-
-  return {
-    summary: rows.length ? `${rows[0].label} has completed the most jobs, with ${rows[0].value} all-time.` : 'No completed jobs recorded yet.',
-    columns: ['Builder', 'Completed jobs (all-time)'], rows,
-  }
-}
-
-const AI_RUNNERS = { topProperties: aiRunTopProperties, complianceOverdue: aiRunComplianceOverdue, topCategory: aiRunTopCategory, topBuilders: aiRunTopBuilders }
 
 export default function AdminReports({ profile, onNavigate }) {
   const [tickets, setTickets] = useState(null)
@@ -143,26 +60,46 @@ export default function AdminReports({ profile, onNavigate }) {
 
   const [builderProfileId, setBuilderProfileId] = useState(null)
 
+  const isAdmin = profile.role === 'admin'
+
   const [aiQuestion, setAiQuestion] = useState('')
   const [aiLoading, setAiLoading] = useState(false)
-  const [aiResult, setAiResult] = useState(null)
-  const [aiUnmatched, setAiUnmatched] = useState(false)
+  const [aiAnswer, setAiAnswer] = useState('')
+  const [aiError, setAiError] = useState('')
+  const [aiUsageLog, setAiUsageLog] = useState([])
 
   useEffect(() => {
     load()
+    if (isAdmin) loadAiUsage()
+    // isAdmin is derived from profile, which doesn't change within a
+    // session -- same one-time-on-mount intent as load() itself.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   async function handleAskAi() {
-    const match = AI_PATTERNS.find(p => p.test.test(aiQuestion))
-    setAiResult(null)
-    setAiUnmatched(false)
-
-    if (!match) { setAiUnmatched(true); return }
-
+    setAiAnswer('')
+    setAiError('')
     setAiLoading(true)
-    const data = await AI_RUNNERS[match.key]()
-    setAiResult(data)
+
+    const { data, error: fnError } = await supabase.functions.invoke('ai-ask', { body: { question: aiQuestion } })
+
     setAiLoading(false)
+
+    if (fnError) { setAiError(await extractFunctionError(fnError)); return }
+    if (data?.error) { setAiError(data.error); return }
+
+    setAiAnswer(data.answer)
+    loadAiUsage()
+  }
+
+  async function loadAiUsage() {
+    const { data } = await supabase
+      .schema('pmms')
+      .from('ai_usage_log')
+      .select('id, question, input_tokens, output_tokens, cost_usd, created_at')
+      .order('created_at', { ascending: false })
+      .limit(50)
+    setAiUsageLog(data || [])
   }
 
   async function load() {
@@ -292,56 +229,112 @@ export default function AdminReports({ profile, onNavigate }) {
     <div>
       <h2 style={{ margin: '0 0 16px 0', fontSize: '18px', fontWeight: 800, color: COLORS.slate900 }}>Reports</h2>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: COLORS.violet100, border: `1px solid ${COLORS.violet500}`, borderRadius: '12px', padding: '12px 16px', marginBottom: '12px' }}>
-        <span style={{ fontSize: '18px' }}>✨</span>
-        <p style={{ margin: 0, fontSize: '12.5px', color: COLORS.slate600, lineHeight: 1.5 }}>
-          <b style={{ color: COLORS.slate900 }}>AI Trial — pattern-matched, not a general question answerer yet.</b> Works for the 4 example questions below; anything else won't be understood.
-        </p>
-      </div>
+      {isAdmin && (
+        <>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: COLORS.violet100, border: `1px solid ${COLORS.violet500}`, borderRadius: '12px', padding: '12px 16px', marginBottom: '12px' }}>
+            <span style={{ fontSize: '18px' }}>✨</span>
+            <p style={{ margin: 0, fontSize: '12.5px', color: COLORS.slate600, lineHeight: 1.5 }}>
+              <b style={{ color: COLORS.slate900 }}>Ask AI (Claude Haiku 4.5)</b> — answers are generated from a snapshot of your real data. Review before relying on them for decisions; each question here has a small real cost (see AI Usage below).
+            </p>
+          </div>
 
-      <div style={cardStyle}>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <input
-            type="text"
-            value={aiQuestion}
-            onChange={(e) => setAiQuestion(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleAskAi()}
-            placeholder="e.g. Which properties have the most open tickets?"
-            style={{ flex: 1, height: '44px', padding: '0 14px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13.5px', boxSizing: 'border-box' }}
-          />
-          <button onClick={handleAskAi} disabled={!aiQuestion.trim() || aiLoading} style={{ padding: '0 20px', borderRadius: '10px', border: 'none', background: COLORS.teal700, color: COLORS.white, fontWeight: 700, fontSize: '13px', cursor: 'pointer', opacity: !aiQuestion.trim() || aiLoading ? 0.5 : 1 }}>
-            {aiLoading ? '...' : 'Ask →'}
-          </button>
-        </div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '12px' }}>
-          {AI_EXAMPLE_QUESTIONS.map(q => (
-            <button key={q} onClick={() => { setAiQuestion(q); setAiResult(null); setAiUnmatched(false) }} style={{ fontSize: '11.5px', padding: '5px 10px', borderRadius: '999px', border: `1px solid ${COLORS.slate200}`, background: COLORS.slate50, color: COLORS.slate600, cursor: 'pointer' }}>
-              {q}
-            </button>
-          ))}
-        </div>
-      </div>
+          <div style={cardStyle}>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <input
+                type="text"
+                value={aiQuestion}
+                onChange={(e) => setAiQuestion(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && !aiLoading && aiQuestion.trim() && handleAskAi()}
+                placeholder="e.g. Which properties have the most open tickets?"
+                style={{ flex: 1, height: '44px', padding: '0 14px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13.5px', boxSizing: 'border-box' }}
+              />
+              <button onClick={handleAskAi} disabled={!aiQuestion.trim() || aiLoading} style={{ padding: '0 20px', borderRadius: '10px', border: 'none', background: COLORS.teal700, color: COLORS.white, fontWeight: 700, fontSize: '13px', cursor: 'pointer', opacity: !aiQuestion.trim() || aiLoading ? 0.5 : 1 }}>
+                {aiLoading ? '...' : 'Ask →'}
+              </button>
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '12px' }}>
+              {AI_EXAMPLE_QUESTIONS.map(q => (
+                <button key={q} onClick={() => { setAiQuestion(q); setAiAnswer(''); setAiError('') }} style={{ fontSize: '11.5px', padding: '5px 10px', borderRadius: '999px', border: `1px solid ${COLORS.slate200}`, background: COLORS.slate50, color: COLORS.slate600, cursor: 'pointer' }}>
+                  {q}
+                </button>
+              ))}
+            </div>
+          </div>
 
-      {aiUnmatched && (
-        <div style={cardStyle}>
-          <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate600 }}>I can currently only answer the 4 example questions above -- try one of those, or phrase your question similarly.</p>
-        </div>
-      )}
-
-      {aiResult && (
-        <div style={cardStyle}>
-          <p style={{ margin: '0 0 16px 0', fontSize: '14px', fontWeight: 700, color: COLORS.slate900 }}>{aiResult.summary}</p>
-          {aiResult.rows.length > 0 && (
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead><tr><th style={thStyle}>{aiResult.columns[0]}</th><th style={thStyle}>{aiResult.columns[1]}</th></tr></thead>
-              <tbody>
-                {aiResult.rows.map((r, i) => (
-                  <tr key={i}><td style={tdStyle}>{r.label}</td><td style={tdStyle}>{r.value}</td></tr>
-                ))}
-              </tbody>
-            </table>
+          {aiError && (
+            <div style={{ ...cardStyle, background: COLORS.red50, border: `1px solid ${COLORS.red200}` }}>
+              <p style={{ margin: 0, fontSize: '13px', color: COLORS.red900 }}>{aiError}</p>
+            </div>
           )}
-        </div>
+
+          {aiAnswer && (
+            <div style={cardStyle}>
+              <p style={{ margin: 0, fontSize: '14px', color: COLORS.slate900, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{aiAnswer}</p>
+            </div>
+          )}
+
+          <div style={cardStyle}>
+            <p style={cardLabelStyle}>AI Usage</p>
+            {aiUsageLog.length === 0 ? (
+              <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>No AI questions asked yet.</p>
+            ) : (
+              (() => {
+                const now = Date.now()
+                const weekAgo = now - 7 * 86400000
+                const monthAgo = now - 30 * 86400000
+                const sumCost = (rows) => rows.reduce((sum, r) => sum + (r.cost_usd ?? 0), 0)
+                const hasUnpriced = aiUsageLog.some(r => r.cost_usd == null)
+                const weekRows = aiUsageLog.filter(r => new Date(r.created_at).getTime() >= weekAgo)
+                const monthRows = aiUsageLog.filter(r => new Date(r.created_at).getTime() >= monthAgo)
+                return (
+                  <>
+                    <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
+                      <div style={tileStyle(COLORS.slate500)}>
+                        <p style={tileLabelStyle}>Queries (last 50)</p>
+                        <p style={tileValueStyle}>{aiUsageLog.length}</p>
+                      </div>
+                      <div style={tileStyle(COLORS.teal600)}>
+                        <p style={tileLabelStyle}>Cost, Last 7 Days</p>
+                        <p style={tileValueStyle}>${sumCost(weekRows).toFixed(2)}</p>
+                      </div>
+                      <div style={tileStyle(COLORS.purple600)}>
+                        <p style={tileLabelStyle}>Cost, Last 30 Days</p>
+                        <p style={tileValueStyle}>${sumCost(monthRows).toFixed(2)}</p>
+                      </div>
+                    </div>
+                    {hasUnpriced && (
+                      <p style={{ margin: '0 0 12px 0', fontSize: '12px', color: COLORS.amber700 }}>
+                        Some queries show no cost because pricing isn't set yet -- see Settings &gt; AI Usage Pricing.
+                      </p>
+                    )}
+                    <div style={{ overflowX: 'auto' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <thead>
+                          <tr>
+                            <th style={thStyle}>Asked</th>
+                            <th style={thStyle}>Question</th>
+                            <th style={thStyle}>Tokens (in / out)</th>
+                            <th style={thStyle}>Cost</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {aiUsageLog.map(r => (
+                            <tr key={r.id}>
+                              <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>{formatUKDateTime(r.created_at)}</td>
+                              <td style={tdStyle}>{r.question}</td>
+                              <td style={tdStyle}>{r.input_tokens ?? '—'} / {r.output_tokens ?? '—'}</td>
+                              <td style={tdStyle}>{r.cost_usd != null ? `$${r.cost_usd.toFixed(4)}` : '—'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
+                )
+              })()
+            )}
+          </div>
+        </>
       )}
 
       <div style={{ ...cardStyle, display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
