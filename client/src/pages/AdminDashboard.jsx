@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef, Fragment, lazy, Suspense } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { createPortal } from 'react-dom'
 import { NavIcon } from '../lib/icons'
 import { supabase } from '../lib/supabase'
@@ -128,7 +129,14 @@ function isNavItemVisible(item, profile) {
 }
 
 export default function AdminDashboard({ profile }) {
-  const [currentPage, setCurrentPage] = useState('dashboard')
+  // Kept in the URL (?page=...), not plain useState -- so a browser refresh
+  // (which fully reboots the SPA and loses all in-memory state) lands back
+  // on the same admin page instead of always resetting to the dashboard
+  // home tab. replace: true on every navigation (see goToPage) so clicking
+  // around the sidebar doesn't pile up browser-back history entries -- this
+  // is only meant to survive a refresh, not become a back-button feature.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const currentPage = searchParams.get('page') || 'dashboard'
   const [sidebarOpen, setSidebarOpen] = useState(false)
   // Desktop-only -- the mobile drawer (SidebarContent's other instance,
   // rendered without allowCollapse) always shows full labels regardless of
@@ -219,7 +227,11 @@ export default function AdminDashboard({ profile }) {
   }
 
   function goToPage(key, opts = {}) {
-    setCurrentPage(key)
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev)
+      next.set('page', key)
+      return next
+    }, { replace: true })
     setSidebarOpen(false)
     if (key === 'pipeline' && opts.statusFilter) {
       setPipelineInitialFilter(opts.statusFilter)
