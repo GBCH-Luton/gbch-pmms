@@ -23,7 +23,11 @@ const expandValueStyle = { margin: '0 0 10px 0', fontSize: '13px', fontWeight: 6
 const expandSectionStyle = { background: COLORS.white, borderRadius: '12px', padding: '16px', border: `1px solid ${COLORS.slate200}` }
 const expandSectionTitleStyle = { margin: '0 0 12px 0', fontSize: '11px', fontWeight: 800, color: COLORS.slate500, textTransform: 'uppercase', letterSpacing: '0.05em' }
 
-export default function AdminPipeline({ profile, onTicketsChanged, initialStatusFilter, initialPriorityFilter, initialStuckFilter, initialTicketNumberSearch, onInitialFilterConsumed }) {
+export default function AdminPipeline({
+  profile, onTicketsChanged, initialStatusFilter, initialPriorityFilter, initialStuckFilter, initialTicketNumberSearch,
+  initialCategoryFilter, initialDivisionFilter, initialBuilderFilter, initialPropertyFilter, initialFromDate, initialToDate,
+  onInitialFilterConsumed,
+}) {
   const [tickets, setTickets] = useState([])
   const [loading, setLoading] = useState(true)
   const [expandedTicketId, setExpandedTicketId] = useState(null)
@@ -141,7 +145,16 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
       setTicketNumberSearch(String(initialTicketNumberSearch))
       setPendingExpandTicketNumber(initialTicketNumberSearch)
     }
-    if (initialStatusFilter || initialPriorityFilter || initialStuckFilter || initialTicketNumberSearch) onInitialFilterConsumed?.()
+    if (initialCategoryFilter) setCategoryFilter(initialCategoryFilter)
+    if (initialDivisionFilter) setDivisionFilter(initialDivisionFilter)
+    if (initialBuilderFilter) setBuilderFilter(initialBuilderFilter)
+    if (initialPropertyFilter) setPropertyFilter(initialPropertyFilter)
+    if (initialFromDate) setFromDate(initialFromDate)
+    if (initialToDate) setToDate(initialToDate)
+    if (
+      initialStatusFilter || initialPriorityFilter || initialStuckFilter || initialTicketNumberSearch
+      || initialCategoryFilter || initialDivisionFilter || initialBuilderFilter || initialPropertyFilter || initialFromDate || initialToDate
+    ) onInitialFilterConsumed?.()
   }, [])
 
   // Runs once fetchTickets (triggered by the mount effect above) actually
@@ -587,7 +600,10 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
     // the same set of jobs instead of the tile undercounting anything
     // already signed off.
     if (statusFilter === 'CompletedAll' && t.status !== 'Completed' && t.status !== 'Archived') return false
-    if (statusFilter !== 'All' && statusFilter !== 'CompletedAll' && t.status !== statusFilter) return false
+    // Reports' "Currently Open" tile's exact definition (see AdminReports.jsx)
+    // -- also a sentinel, not a real status.
+    if (statusFilter === 'OpenAll' && (t.status === 'Completed' || t.status === 'Archived' || t.status === 'Cancelled')) return false
+    if (statusFilter !== 'All' && statusFilter !== 'CompletedAll' && statusFilter !== 'OpenAll' && t.status !== statusFilter) return false
     if (propertyFilter && String(t.property_id) !== String(propertyFilter)) return false
     if (categoryFilter !== 'All' && t.category !== categoryFilter) return false
     if (divisionFilter !== 'All' && resolveCategoryDivision(t.category, categoriesSettingsRow) !== divisionFilter) return false
@@ -596,8 +612,16 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
     if (priorityFilter !== 'All' && effectiveTier(t) !== priorityFilter) return false
     if (ticketNumberSearch.trim() && !String(t.ticket_number).includes(ticketNumberSearch.trim())) return false
     if (stuckOnlyFilter && !isTicketStuck(t, stuckThresholds, Date.now(), p1Threshold, p2Threshold)) return false
-    if (fromDate && new Date(t.created_at).getTime() < new Date(fromDate).getTime()) return false
-    if (toDate && new Date(t.created_at).getTime() > new Date(toDate).getTime() + 86400000 - 1) return false
+    // Reports' date range means two different things depending which set
+    // you're looking at -- "raised in range" (created_at) vs "completed in
+    // range" (completed_at). Once the status filter has narrowed down to
+    // completed-ish tickets, the date range that actually matches what a
+    // Reports tile/chart bar shows is completed_at, not created_at -- e.g.
+    // clicking a specific week's "Completed" bar should land on exactly
+    // that week's completions, not whatever was merely created that week.
+    const dateField = (statusFilter === 'Completed' || statusFilter === 'Archived' || statusFilter === 'CompletedAll') ? 'completed_at' : 'created_at'
+    if (fromDate && (!t[dateField] || new Date(t[dateField]).getTime() < new Date(fromDate).getTime())) return false
+    if (toDate && (!t[dateField] || new Date(t[dateField]).getTime() > new Date(toDate).getTime() + 86400000 - 1)) return false
     return true
   })
 
@@ -695,6 +719,7 @@ export default function AdminPipeline({ profile, onTicketsChanged, initialStatus
       <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
         <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={filterSelectStyle}>
           <option value="All">All Statuses</option>
+          <option value="OpenAll">Open (excl. completed/cancelled)</option>
           <option value="Pending">Unassigned</option>
           <option value="Assigned">Assigned</option>
           <option value="In Progress">In Progress</option>

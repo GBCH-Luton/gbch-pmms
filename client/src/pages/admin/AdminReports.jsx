@@ -29,7 +29,7 @@ function avgMsLabel(ms) {
   return formatDuration(ms)
 }
 
-export default function AdminReports({ profile }) {
+export default function AdminReports({ profile, onNavigate }) {
   const [tickets, setTickets] = useState(null)
   const [loadError, setLoadError] = useState('')
   const [builders, setBuilders] = useState([])
@@ -139,7 +139,10 @@ export default function AdminReports({ profile }) {
     if (!propertyCounts[t.property_id]) propertyCounts[t.property_id] = { address: t.property?.address || 'Unknown property', count: 0 }
     propertyCounts[t.property_id].count += 1
   })
-  const recurringProperties = Object.values(propertyCounts).sort((a, b) => b.count - a.count).slice(0, 10)
+  const recurringProperties = Object.entries(propertyCounts)
+    .map(([id, v]) => ({ id, ...v }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 10)
 
   // Staff workload within the selected range.
   const workload = builders
@@ -150,6 +153,21 @@ export default function AdminReports({ profile }) {
     })
     .filter(w => w.assignedCount > 0 || w.completedCount > 0)
     .sort((a, b) => b.assignedCount - a.assignedCount)
+
+  // Every click-through in this page routes through here, so the current
+  // Category/Staff filters this report is already scoped to always carry
+  // over into Pipeline too (extra's own category/division/builderId, if
+  // any, wins over these -- e.g. a specific breakdown bar's category).
+  function goToPipeline(extra) {
+    if (!onNavigate) return
+    onNavigate('pipeline', {
+      ...(categoryFilter !== 'All' ? { category: categoryFilter } : {}),
+      ...(builderFilter !== 'All' ? { builderId: builderFilter } : {}),
+      ...extra,
+    })
+  }
+
+  const clickableTileStyle = (colour) => ({ ...tileStyle(colour), cursor: onNavigate ? 'pointer' : 'default' })
 
   return (
     <div>
@@ -175,23 +193,25 @@ export default function AdminReports({ profile }) {
       </div>
 
       <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
-        <div style={tileStyle(COLORS.slate500)}>
+        <div style={clickableTileStyle(COLORS.slate500)} onClick={() => goToPipeline({ fromDate, toDate })}>
           <p style={tileLabelStyle}>Tickets Raised (Range)</p>
           <p style={tileValueStyle}>{createdInRange.length}</p>
         </div>
-        <div style={tileStyle(COLORS.green600)}>
+        <div style={clickableTileStyle(COLORS.green600)} onClick={() => goToPipeline({ statusFilter: 'CompletedAll', fromDate, toDate })}>
           <p style={tileLabelStyle}>Completed (Range)</p>
           <p style={tileValueStyle}>{completedInRange.length}</p>
         </div>
-        <div style={tileStyle(COLORS.teal600)}>
+        <div style={clickableTileStyle(COLORS.teal600)} onClick={() => goToPipeline({ statusFilter: 'OpenAll' })}>
           <p style={tileLabelStyle}>Currently Open</p>
           <p style={tileValueStyle}>{currentlyOpen.length}</p>
         </div>
-        <div style={tileStyle(COLORS.purple600)}>
+        <div style={clickableTileStyle(COLORS.purple600)} onClick={() => goToPipeline({ statusFilter: 'CompletedAll', fromDate, toDate })}>
           <p style={tileLabelStyle}>Avg. Turnaround</p>
           <p style={tileValueStyle}>{avgMsLabel(avgTurnaroundMs)}</p>
         </div>
-        <div style={tileStyle(COLORS.blue600)}>
+        {/* No Pipeline equivalent for "assigned within range" (first_assigned_at)
+            to link to exactly -- Raised (Range) is the closest available set. */}
+        <div style={clickableTileStyle(COLORS.blue600)} onClick={() => goToPipeline({ fromDate, toDate })}>
           <p style={tileLabelStyle}>Avg. Response Time</p>
           <p style={tileValueStyle}>{avgMsLabel(avgResponseMs)}</p>
         </div>
@@ -205,6 +225,11 @@ export default function AdminReports({ profile }) {
             { name: 'Raised', color: COLORS.blue500 },
             { name: 'Completed', color: COLORS.green600 },
           ]}
+          onBarClick={(week, seriesIdx) => goToPipeline(
+            seriesIdx === 0
+              ? { fromDate: week.weekStartIso, toDate: week.weekEndIso }
+              : { statusFilter: 'CompletedAll', fromDate: week.weekStartIso, toDate: week.weekEndIso }
+          )}
         />
       </div>
 
@@ -219,6 +244,11 @@ export default function AdminReports({ profile }) {
         <SimpleBarChart
           data={breakdownChartData}
           series={[{ name: breakdownMode === 'division' ? 'Division' : 'Category', color: COLORS.teal600 }]}
+          onBarClick={(bar) => goToPipeline(
+            breakdownMode === 'division'
+              ? { division: bar.label, fromDate, toDate }
+              : { category: bar.label, fromDate, toDate }
+          )}
         />
       </div>
 
@@ -229,8 +259,12 @@ export default function AdminReports({ profile }) {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {recurringProperties.map((p, idx) => (
-              <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: `1px solid ${COLORS.slate100}` }}>
-                <span style={{ fontSize: '13px', fontWeight: 600, color: COLORS.slate900 }}>{p.address}</span>
+              <div
+                key={idx}
+                onClick={() => goToPipeline({ propertyId: p.id })}
+                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: `1px solid ${COLORS.slate100}`, cursor: onNavigate ? 'pointer' : 'default' }}
+              >
+                <span style={{ fontSize: '13px', fontWeight: 600, color: onNavigate ? COLORS.blue700 : COLORS.slate900 }}>{p.address}</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   {p.count >= 3 && (
                     <span style={{ fontSize: '10px', fontWeight: 800, color: COLORS.red600, background: COLORS.red100, padding: '2px 8px', borderRadius: '20px' }}>⚠ Recurring</span>
@@ -263,8 +297,18 @@ export default function AdminReports({ profile }) {
                 {workload.map(w => (
                   <tr key={w.id} style={{ borderBottom: `1px solid ${COLORS.slate100}` }}>
                     <td style={tdStyle}>{w.name}</td>
-                    <td style={tdStyle}>{w.assignedCount}</td>
-                    <td style={tdStyle}>{w.completedCount}</td>
+                    <td
+                      style={{ ...tdStyle, ...(onNavigate ? { cursor: 'pointer', color: COLORS.blue700, fontWeight: 700 } : {}) }}
+                      onClick={() => goToPipeline({ builderId: w.id, fromDate, toDate })}
+                    >
+                      {w.assignedCount}
+                    </td>
+                    <td
+                      style={{ ...tdStyle, ...(onNavigate ? { cursor: 'pointer', color: COLORS.blue700, fontWeight: 700 } : {}) }}
+                      onClick={() => goToPipeline({ builderId: w.id, statusFilter: 'CompletedAll', fromDate, toDate })}
+                    >
+                      {w.completedCount}
+                    </td>
                     <td style={tdStyle}>{avgMsLabel(w.avgMs)}</td>
                     <td style={tdStyle}>{avgMsLabel(w.avgResponseMs)}</td>
                   </tr>

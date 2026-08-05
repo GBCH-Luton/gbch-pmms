@@ -577,7 +577,18 @@ export function buildWeeklyTrend(fromDate, toDate, createdList, completedList) {
       const c = new Date(t.completed_at)
       return c >= weekStart && c < weekEnd
     }).length
-    return { label: shortDateLabel(weekStart), values: [createdCount, completedCount] }
+    // weekStartIso/weekEndIso: extra fields riding along on each bucket
+    // purely for AdminReports.jsx's "click a bar to view those tickets in
+    // Pipeline" links -- SimpleBarChart itself never reads them, and
+    // BuilderProfilePage.jsx's own trend chart (buildWeeklyTrend's other
+    // caller) just ignores them, same as it already ignores `values`
+    // shape details it doesn't need.
+    return {
+      label: shortDateLabel(weekStart),
+      values: [createdCount, completedCount],
+      weekStartIso: weekStart.toISOString().slice(0, 10),
+      weekEndIso: new Date(weekEnd.getTime() - 86400000).toISOString().slice(0, 10),
+    }
   })
 }
 

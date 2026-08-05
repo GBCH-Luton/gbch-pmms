@@ -161,6 +161,16 @@ export default function AdminDashboard({ profile }) {
   const [pipelineInitialPriorityFilter, setPipelineInitialPriorityFilter] = useState(null)
   const [pipelineInitialStuckFilter, setPipelineInitialStuckFilter] = useState(null)
   const [pipelineInitialTicketNumber, setPipelineInitialTicketNumber] = useState(null)
+  // Reports/Clocking's "jump to Pipeline with this filter already applied"
+  // links (see AdminReports.jsx's KPI tiles, chart bars, and table rows)
+  // route through these same five, rather than one bespoke prop per
+  // possible combination.
+  const [pipelineInitialCategory, setPipelineInitialCategory] = useState(null)
+  const [pipelineInitialDivision, setPipelineInitialDivision] = useState(null)
+  const [pipelineInitialBuilder, setPipelineInitialBuilder] = useState(null)
+  const [pipelineInitialProperty, setPipelineInitialProperty] = useState(null)
+  const [pipelineInitialFromDate, setPipelineInitialFromDate] = useState(null)
+  const [pipelineInitialToDate, setPipelineInitialToDate] = useState(null)
   const [propertiesInitialFilter, setPropertiesInitialFilter] = useState(null)
   const [complianceInitialTierFilter, setComplianceInitialTierFilter] = useState(null)
   const [voidsInitialTierFilter, setVoidsInitialTierFilter] = useState(null)
@@ -245,6 +255,24 @@ export default function AdminDashboard({ profile }) {
     }
     if (key === 'pipeline' && opts.ticketNumber) {
       setPipelineInitialTicketNumber(opts.ticketNumber)
+    }
+    if (key === 'pipeline' && opts.category) {
+      setPipelineInitialCategory(opts.category)
+    }
+    if (key === 'pipeline' && opts.division) {
+      setPipelineInitialDivision(opts.division)
+    }
+    if (key === 'pipeline' && opts.builderId) {
+      setPipelineInitialBuilder(opts.builderId)
+    }
+    if (key === 'pipeline' && opts.propertyId) {
+      setPipelineInitialProperty(opts.propertyId)
+    }
+    if (key === 'pipeline' && opts.fromDate) {
+      setPipelineInitialFromDate(opts.fromDate)
+    }
+    if (key === 'pipeline' && opts.toDate) {
+      setPipelineInitialToDate(opts.toDate)
     }
     if (key === 'properties' && opts.filterMode) {
       setPropertiesInitialFilter({ mode: opts.filterMode })
@@ -614,7 +642,17 @@ export default function AdminDashboard({ profile }) {
               initialPriorityFilter={currentPage === 'pipeline' ? pipelineInitialPriorityFilter : null}
               initialStuckFilter={currentPage === 'pipeline' ? pipelineInitialStuckFilter : null}
               initialTicketNumberSearch={currentPage === 'pipeline' ? pipelineInitialTicketNumber : null}
-              onInitialFilterConsumed={() => { setPipelineInitialFilter(null); setPipelineInitialPriorityFilter(null); setPipelineInitialStuckFilter(null); setPipelineInitialTicketNumber(null) }}
+              initialCategoryFilter={currentPage === 'pipeline' ? pipelineInitialCategory : null}
+              initialDivisionFilter={currentPage === 'pipeline' ? pipelineInitialDivision : null}
+              initialBuilderFilter={currentPage === 'pipeline' ? pipelineInitialBuilder : null}
+              initialPropertyFilter={currentPage === 'pipeline' ? pipelineInitialProperty : null}
+              initialFromDate={currentPage === 'pipeline' ? pipelineInitialFromDate : null}
+              initialToDate={currentPage === 'pipeline' ? pipelineInitialToDate : null}
+              onInitialFilterConsumed={() => {
+                setPipelineInitialFilter(null); setPipelineInitialPriorityFilter(null); setPipelineInitialStuckFilter(null); setPipelineInitialTicketNumber(null)
+                setPipelineInitialCategory(null); setPipelineInitialDivision(null); setPipelineInitialBuilder(null); setPipelineInitialProperty(null)
+                setPipelineInitialFromDate(null); setPipelineInitialToDate(null)
+              }}
               initialPropertiesFilter={currentPage === 'properties' ? propertiesInitialFilter : null}
               onPropertiesFilterConsumed={() => setPropertiesInitialFilter(null)}
               initialTierFilter={currentPage === 'compliance' ? complianceInitialTierFilter : currentPage === 'voids' ? voidsInitialTierFilter : null}

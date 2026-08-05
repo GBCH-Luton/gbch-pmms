@@ -8,12 +8,16 @@ import { COLORS } from '../lib/colors'
 //
 // data:   [{ label: string, values: number[] }]  -- one entry per x-axis tick
 // series: [{ name: string, color: string }]      -- one entry per bar in a group
+// onBarClick?: (dataItem, seriesIndex) => void    -- optional; when given, every
+//   individual bar becomes clickable (data items can carry extra fields like a
+//   week's ISO date range purely for the caller's own use -- this component
+//   never reads anything but label/values off them).
 
 const CHART_HEIGHT = 180
 const BAR_GAP = 4
 const GROUP_GAP = 18
 
-export default function SimpleBarChart({ data, series, height = CHART_HEIGHT }) {
+export default function SimpleBarChart({ data, series, height = CHART_HEIGHT, onBarClick }) {
   if (!data || data.length === 0) {
     return <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>No data for this range.</p>
   }
@@ -47,7 +51,13 @@ export default function SimpleBarChart({ data, series, height = CHART_HEIGHT }) 
                 const y = height - barHeight
                 return (
                   <g key={s.name}>
-                    <rect x={x} y={y} width={barWidth} height={barHeight} rx={3} fill={s.color} />
+                    <rect
+                      x={x} y={y} width={barWidth} height={barHeight} rx={3} fill={s.color}
+                      style={onBarClick && value > 0 ? { cursor: 'pointer' } : undefined}
+                      onClick={onBarClick && value > 0 ? () => onBarClick(d, seriesIdx) : undefined}
+                    >
+                      {onBarClick && value > 0 && <title>{`${s.name}: ${value} -- click to view in Pipeline`}</title>}
+                    </rect>
                     {value > 0 && (
                       <text x={x + barWidth / 2} y={y - 4} textAnchor="middle" fontSize="10" fontWeight="700" fill={COLORS.slate600}>
                         {value}
