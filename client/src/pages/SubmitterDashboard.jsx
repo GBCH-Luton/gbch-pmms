@@ -1,14 +1,20 @@
 // Minimal shell for the 'submitter' access level (PMMS Role accessLevel
 // 'submitter', e.g. "Ticket Submitter" on the Admin > Access page) -- an
 // internal stand-in for the future standalone Support system. Until that
-// exists, a real staff member is given this role so they can raise tickets
-// and see only their own submissions' status/comments, without the full
-// Manager-level access that "Log a Ticket" would otherwise require. See
-// scripts/add_submitter_role.sql for the matching RLS.
+// exists, a real staff member is given this role so they can raise tickets,
+// track their own submissions through the pipeline, and sign off their own
+// completed work, without the full Manager-level access that "Log a
+// Ticket"/Pipeline/Sign-Off would otherwise require. See
+// scripts/add_submitter_role.sql and scripts/add_raiser_only_signoff.sql
+// for the matching RLS -- this page's 3 tabs are deliberately built as a
+// simplified preview of what a real future Support-system dashboard for
+// this kind of staff member would look like, not a throwaway test harness.
 //
-// Deliberately just two things: raise a ticket, see your own tickets.
-// No assignment, no priority override, no Events, no compliance mode --
-// those stay Manager/Admin-only in AdminRaiseTicket.jsx.
+// Three things: raise a ticket (NewReportForm), track them through
+// Pending/Active/Completed/Archived (PipelineList), sign off your own
+// completed work (SignOffList). No assignment, no priority override, no
+// Events, no compliance mode -- those stay Manager/Admin-only in
+// AdminRaiseTicket.jsx.
 
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
@@ -18,7 +24,7 @@ import { compressImage } from '../lib/imageCompression'
 import { getSignedUrl } from '../lib/storage'
 import { fetchMaintenanceCategories, sortedCategoryEntries, isUnlistedTag, unlistedTagFor, unlistedLabelFor, calculatePriorityScore } from '../lib/maintenanceCategories'
 import { attachBuilderSafeProperties } from '../lib/properties'
-import { statusColour, statusLabel, postSystemComment, postAuditEvent } from './admin/shared'
+import { statusColour, statusLabel, postSystemComment, postAuditEvent, KpiTiles } from './admin/shared'
 import PropertySearchSelect from '../components/PropertySearchSelect'
 import VoiceInputButton from '../components/VoiceInputButton'
 import AttachmentMedia from '../components/AttachmentMedia'
@@ -37,8 +43,23 @@ const inputStyle = { width: '100%', height: '44px', padding: '0 12px', borderRad
 const cardStyle = { background: COLORS.white, borderRadius: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', padding: '20px', marginBottom: '16px' }
 
 export default function SubmitterDashboard({ profile }) {
-  const [tab, setTab] = useState('new') // 'new' | 'mine'
+  const [tab, setTab] = useState('new') // 'new' | 'pipeline' | 'signoff'
   const [signingOut, setSigningOut] = useState(false)
+  const [signOffCount, setSignOffCount] = useState(0)
+
+  useEffect(() => {
+    fetchSignOffCount()
+  }, [])
+
+  async function fetchSignOffCount() {
+    const { count } = await supabase
+      .schema('pmms')
+      .from('tickets')
+      .select('id', { count: 'exact', head: true })
+      .eq('raised_by', profile.id)
+      .eq('status', 'Completed')
+    setSignOffCount(count || 0)
+  }
 
   async function handleSignOut() {
     setSigningOut(true)
@@ -67,10 +88,20 @@ export default function SubmitterDashboard({ profile }) {
 
         <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
           <button onClick={() => setTab('new')} style={{ ...choiceBtn(tab === 'new'), flex: 1 }}>Report an Issue</button>
-          <button onClick={() => setTab('mine')} style={{ ...choiceBtn(tab === 'mine'), flex: 1 }}>My Reports</button>
+          <button onClick={() => setTab('pipeline')} style={{ ...choiceBtn(tab === 'pipeline'), flex: 1 }}>Pipeline</button>
+          <button onClick={() => setTab('signoff')} style={{ ...choiceBtn(tab === 'signoff'), flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+            Sign Off
+            {signOffCount > 0 && (
+              <span style={{ background: tab === 'signoff' ? 'rgba(255,255,255,0.3)' : COLORS.red600, color: COLORS.white, fontSize: '10px', fontWeight: 800, borderRadius: '999px', minWidth: '17px', padding: '1px 5px' }}>
+                {signOffCount}
+              </span>
+            )}
+          </button>
         </div>
 
-        {tab === 'new' ? <NewReportForm profile={profile} onSubmitted={() => setTab('mine')} /> : <MyReportsList profile={profile} />}
+        {tab === 'new' && <NewReportForm profile={profile} onSubmitted={() => setTab('pipeline')} />}
+        {tab === 'pipeline' && <PipelineList profile={profile} />}
+        {tab === 'signoff' && <SignOffList profile={profile} onChanged={fetchSignOffCount} />}
       </div>
     </div>
   )
@@ -258,14 +289,28 @@ function NewReportForm({ profile, onSubmitted }) {
   )
 }
 
-function MyReportsList({ profile }) {
+// Groups the real ticket lifecycle into 4 tiles a single submitter's
+// volume actually warrants -- Assigned/In Progress/On Hold all read as
+// "someone's on it" from a reporter's point of view, not 3 separate
+// numbers to parse. Cancelled is deliberately excluded from "Total" and
+// hidden from the default list, same convention AdminPipeline.jsx uses
+// for its own list -- a mistaken/duplicate cancel shouldn't clutter the
+// view, but it's still one tap away.
+const PIPELINE_FILTERS = {
+  All: (t) => t.status !== 'Cancelled',
+  Pending: (t) => t.status === 'Pending',
+  Active: (t) => ['Assigned', 'In Progress', 'On Hold'].includes(t.status),
+  Completed: (t) => t.status === 'Completed',
+  Archived: (t) => t.status === 'Archived',
+  Cancelled: (t) => t.status === 'Cancelled',
+}
+
+function PipelineList({ profile }) {
   const [tickets, setTickets] = useState([])
   const [loading, setLoading] = useState(true)
+  const [statusFilter, setStatusFilter] = useState('All')
   const [expandedId, setExpandedId] = useState(null)
   const [comments, setComments] = useState([])
-  const [confirmArchiveId, setConfirmArchiveId] = useState(null)
-  const [archivingId, setArchivingId] = useState(null)
-  const [archiveError, setArchiveError] = useState('')
 
   useEffect(() => {
     fetchMine()
@@ -276,40 +321,12 @@ function MyReportsList({ profile }) {
     const { data, error } = await supabase
       .schema('pmms')
       .from('tickets')
-      .select('id, ticket_number, status, category, issue_tag, room, photo_url, completion_note, completion_photo_url, created_at, property_id')
+      .select('id, ticket_number, status, category, issue_tag, room, created_at, property_id')
       .eq('raised_by', profile.id)
       .order('created_at', { ascending: false })
 
     if (!error) setTickets(await attachBuilderSafeProperties(data || []))
     setLoading(false)
-  }
-
-  // Directors' rule: only the person who raised a ticket signs it off --
-  // for a Ticket Submitter that means right here on their own report, since
-  // this narrow dashboard has no separate Sign-Off page. Same archive +
-  // system comment + audit trail as AdminSignOff.jsx's verifyAndArchive,
-  // allowed by the matching RLS in scripts/add_raiser_only_signoff.sql.
-  async function handleVerifyArchive(ticket) {
-    setArchiveError('')
-    setArchivingId(ticket.id)
-
-    const { error } = await supabase
-      .schema('pmms')
-      .from('tickets')
-      .update({ status: 'Archived', status_changed_at: new Date().toISOString(), stuck_alert_sent_at: null })
-      .eq('id', ticket.id)
-
-    if (error) {
-      setArchiveError(error.message)
-      setArchivingId(null)
-      return
-    }
-
-    await postSystemComment(ticket.id, profile, `Verified and archived by ${profile.name}.`)
-    await postAuditEvent(ticket.id, profile, 'Status Changed', `Completed → Archived (verified by ${profile.name})`)
-    setArchivingId(null)
-    setConfirmArchiveId(null)
-    await fetchMine()
   }
 
   async function toggleExpand(ticket) {
@@ -332,6 +349,16 @@ function MyReportsList({ profile }) {
     )
   }
 
+  const kpis = [
+    { label: 'Total', value: tickets.filter(PIPELINE_FILTERS.All).length, colour: COLORS.slate500, key: 'All' },
+    { label: 'Pending', value: tickets.filter(PIPELINE_FILTERS.Pending).length, colour: COLORS.red600, key: 'Pending' },
+    { label: 'Active', value: tickets.filter(PIPELINE_FILTERS.Active).length, colour: COLORS.teal600, key: 'Active' },
+    { label: 'Completed', value: tickets.filter(PIPELINE_FILTERS.Completed).length, colour: COLORS.purple600, key: 'Completed' },
+    { label: 'Archived', value: tickets.filter(PIPELINE_FILTERS.Archived).length, colour: COLORS.green600, key: 'Archived' },
+  ]
+
+  const filteredTickets = tickets.filter(PIPELINE_FILTERS[statusFilter])
+
   if (tickets.length === 0) {
     return (
       <div style={{ background: COLORS.white, borderRadius: '16px', padding: '40px', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
@@ -341,67 +368,193 @@ function MyReportsList({ profile }) {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-      {tickets.map(t => (
-        <div key={t.id} style={cardStyle}>
-          <div onClick={() => toggleExpand(t)} style={{ cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
-            <div style={{ minWidth: 0 }}>
-              <p style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 700, color: COLORS.slate900 }}>#{t.ticket_number} · {t.category}</p>
-              <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: COLORS.slate500 }}>{t.property?.address || 'Unknown property'} · {t.room}</p>
-              <p style={{ margin: 0, fontSize: '11px', color: COLORS.slate400 }}>{new Date(t.created_at).toLocaleDateString()}</p>
-            </div>
-            <span style={{ flexShrink: 0, fontSize: '11px', fontWeight: 800, color: COLORS.white, background: statusColour(t.status), padding: '4px 10px', borderRadius: '999px' }}>
-              {statusLabel(t.status)}
-            </span>
-          </div>
+    <div>
+      <KpiTiles kpis={kpis} onTileClick={(kpi) => setStatusFilter(kpi.key)} />
 
-          {expandedId === t.id && (
-            <div style={{ marginTop: '14px', paddingTop: '14px', borderTop: `1px solid ${COLORS.slate100}` }}>
-              {comments.length === 0 ? (
-                <p style={{ margin: 0, fontSize: '12px', color: COLORS.slate400, fontStyle: 'italic' }}>No updates yet.</p>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {comments.map(c => (
-                    <div key={c.id} style={{ fontSize: '12px' }}>
-                      <span style={{ fontWeight: 700, color: COLORS.slate900 }}>{c.author_name}: </span>
-                      <span style={{ color: COLORS.slate600 }}>{c.body}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {t.status === 'Completed' && (
-                <div style={{ marginTop: '14px', paddingTop: '14px', borderTop: `1px solid ${COLORS.slate100}` }}>
-                  <p style={{ margin: '0 0 8px 0', fontSize: '11px', fontWeight: 700, color: COLORS.purple600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Ready for your sign-off</p>
-                  {t.completion_note && <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: COLORS.slate600 }}>{t.completion_note}</p>}
-                  {t.completion_photo_url && (
-                    <AttachmentMedia url={t.completion_photo_url} alt="Completed work" style={{ width: '100%', maxHeight: '200px', objectFit: 'cover', borderRadius: '10px', marginBottom: '8px' }} />
-                  )}
-
-                  {archiveError && confirmArchiveId === t.id && (
-                    <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: COLORS.red600, fontWeight: 600 }}>{archiveError}</p>
-                  )}
-
-                  {confirmArchiveId === t.id ? (
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <button
-                        onClick={() => handleVerifyArchive(t)}
-                        disabled={archivingId === t.id}
-                        style={{ ...choiceBtn(true), flex: 1, opacity: archivingId === t.id ? 0.6 : 1, cursor: archivingId === t.id ? 'not-allowed' : 'pointer' }}
-                      >
-                        {archivingId === t.id ? 'Confirming...' : 'Confirm sign-off'}
-                      </button>
-                      <button onClick={() => setConfirmArchiveId(null)} style={{ ...choiceBtn(false), flex: 1 }}>Cancel</button>
-                    </div>
-                  ) : (
-                    <button onClick={() => setConfirmArchiveId(t.id)} style={{ ...choiceBtn(true), width: '100%' }}>✓ Verify &amp; Sign Off</button>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
+      {statusFilter !== 'All' && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', background: COLORS.teal50, border: `1px solid ${COLORS.teal300}`, borderRadius: '10px', padding: '10px 16px', marginBottom: '16px' }}>
+          <span style={{ fontSize: '13px', fontWeight: 700, color: COLORS.teal700 }}>Showing: {statusFilter} ({filteredTickets.length})</span>
+          <button onClick={() => setStatusFilter('All')} style={{ background: 'none', border: 'none', color: COLORS.teal700, fontSize: '13px', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}>
+            Clear filter
+          </button>
         </div>
-      ))}
+      )}
+
+      {filteredTickets.length === 0 ? (
+        <div style={{ background: COLORS.white, borderRadius: '16px', padding: '40px', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+          <p style={{ margin: 0, fontSize: '14px', color: COLORS.slate400, fontStyle: 'italic' }}>No tickets match this filter.</p>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {filteredTickets.map(t => (
+            <div key={t.id} style={cardStyle}>
+              <div onClick={() => toggleExpand(t)} style={{ cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
+                <div style={{ minWidth: 0 }}>
+                  <p style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 700, color: COLORS.slate900 }}>#{t.ticket_number} · {t.category}</p>
+                  <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: COLORS.slate500 }}>{t.property?.address || 'Unknown property'} · {t.room}</p>
+                  <p style={{ margin: 0, fontSize: '11px', color: COLORS.slate400 }}>{new Date(t.created_at).toLocaleDateString()}</p>
+                </div>
+                <span style={{ flexShrink: 0, fontSize: '11px', fontWeight: 800, color: COLORS.white, background: statusColour(t.status), padding: '4px 10px', borderRadius: '999px' }}>
+                  {statusLabel(t.status)}
+                </span>
+              </div>
+
+              {expandedId === t.id && (
+                <div style={{ marginTop: '14px', paddingTop: '14px', borderTop: `1px solid ${COLORS.slate100}` }}>
+                  {comments.length === 0 ? (
+                    <p style={{ margin: 0, fontSize: '12px', color: COLORS.slate400, fontStyle: 'italic' }}>No updates yet.</p>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {comments.map(c => (
+                        <div key={c.id} style={{ fontSize: '12px' }}>
+                          <span style={{ fontWeight: 700, color: COLORS.slate900 }}>{c.author_name}: </span>
+                          <span style={{ color: COLORS.slate600 }}>{c.body}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Directors' rule: only the person who raised a ticket signs it off -- for
+// a Ticket Submitter that means right here, since this narrow dashboard has
+// no separate admin-style Sign-Off page. Same archive + system comment +
+// audit trail as AdminSignOff.jsx's verifyAndArchive, allowed by the
+// matching RLS in scripts/add_raiser_only_signoff.sql. Shows the same
+// before/after evidence (reported photo vs completion photo) the real
+// Sign-Off page shows, since that's the actual point of this step -- a
+// considered check, not a rubber stamp.
+function SignOffList({ profile, onChanged }) {
+  const [tickets, setTickets] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [confirmId, setConfirmId] = useState(null)
+  const [archivingId, setArchivingId] = useState(null)
+  const [archiveError, setArchiveError] = useState('')
+
+  useEffect(() => {
+    fetchPending()
+  }, [])
+
+  async function fetchPending() {
+    setLoading(true)
+    const { data, error } = await supabase
+      .schema('pmms')
+      .from('tickets')
+      .select('id, ticket_number, category, issue_tag, room, photo_url, completion_note, completion_photo_url, created_at, property_id')
+      .eq('raised_by', profile.id)
+      .eq('status', 'Completed')
+      .order('created_at', { ascending: false })
+
+    if (!error) setTickets(await attachBuilderSafeProperties(data || []))
+    setLoading(false)
+  }
+
+  async function handleVerifyArchive(ticket) {
+    setArchiveError('')
+    setArchivingId(ticket.id)
+
+    const { error } = await supabase
+      .schema('pmms')
+      .from('tickets')
+      .update({ status: 'Archived', status_changed_at: new Date().toISOString(), stuck_alert_sent_at: null })
+      .eq('id', ticket.id)
+
+    if (error) {
+      setArchiveError(error.message)
+      setArchivingId(null)
+      return
+    }
+
+    await postSystemComment(ticket.id, profile, `Verified and archived by ${profile.name}.`)
+    await postAuditEvent(ticket.id, profile, 'Status Changed', `Completed → Archived (verified by ${profile.name})`)
+    setArchivingId(null)
+    setConfirmId(null)
+    await fetchPending()
+    onChanged?.()
+  }
+
+  if (loading) {
+    return (
+      <div style={{ minHeight: '160px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <p style={{ color: COLORS.slate400, fontWeight: 600, fontFamily: 'system-ui' }}>Loading...</p>
+      </div>
+    )
+  }
+
+  if (tickets.length === 0) {
+    return (
+      <div style={{ background: COLORS.white, borderRadius: '16px', padding: '40px', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+        <p style={{ margin: 0, fontSize: '14px', color: COLORS.slate400, fontStyle: 'italic' }}>All clear — nothing awaiting your sign-off.</p>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: COLORS.slate500 }}>
+        These have been marked complete. Check the work before signing off -- once archived, a ticket is closed for good.
+      </p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        {tickets.map(t => (
+          <div key={t.id} style={cardStyle}>
+            <p style={{ margin: '0 0 2px 0', fontSize: '13px', fontWeight: 700, color: COLORS.slate900 }}>#{t.ticket_number} · {t.category}</p>
+            <p style={{ margin: '0 0 12px 0', fontSize: '12px', color: COLORS.slate500 }}>{t.property?.address || 'Unknown property'} · {t.room}</p>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
+              <div>
+                <p style={{ margin: '0 0 6px 0', fontSize: '10px', fontWeight: 800, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.05em' }}>You reported</p>
+                {t.photo_url ? (
+                  <AttachmentMedia url={t.photo_url} alt="Reported issue" style={{ width: '100%', height: '110px', objectFit: 'cover', borderRadius: '8px' }} />
+                ) : (
+                  <div style={{ width: '100%', height: '110px', borderRadius: '8px', background: COLORS.slate50, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <span style={{ fontSize: '11px', color: COLORS.slate400, fontStyle: 'italic' }}>No photo</span>
+                  </div>
+                )}
+              </div>
+              <div>
+                <p style={{ margin: '0 0 6px 0', fontSize: '10px', fontWeight: 800, color: COLORS.green600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Completed work</p>
+                {t.completion_photo_url ? (
+                  <AttachmentMedia url={t.completion_photo_url} alt="Completed work" style={{ width: '100%', height: '110px', objectFit: 'cover', borderRadius: '8px' }} />
+                ) : (
+                  <div style={{ width: '100%', height: '110px', borderRadius: '8px', background: COLORS.slate50, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <span style={{ fontSize: '11px', color: COLORS.slate400, fontStyle: 'italic' }}>No photo</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {t.completion_note && (
+              <p style={{ margin: '0 0 12px 0', fontSize: '12px', color: COLORS.slate600, background: COLORS.slate50, borderRadius: '8px', padding: '8px 10px' }}>{t.completion_note}</p>
+            )}
+
+            {archiveError && confirmId === t.id && (
+              <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: COLORS.red600, fontWeight: 600 }}>{archiveError}</p>
+            )}
+
+            {confirmId === t.id ? (
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  onClick={() => handleVerifyArchive(t)}
+                  disabled={archivingId === t.id}
+                  style={{ ...choiceBtn(true), flex: 1, opacity: archivingId === t.id ? 0.6 : 1, cursor: archivingId === t.id ? 'not-allowed' : 'pointer' }}
+                >
+                  {archivingId === t.id ? 'Confirming...' : 'Confirm sign-off'}
+                </button>
+                <button onClick={() => setConfirmId(null)} style={{ ...choiceBtn(false), flex: 1 }}>Cancel</button>
+              </div>
+            ) : (
+              <button onClick={() => setConfirmId(t.id)} style={{ ...choiceBtn(true), width: '100%' }}>✓ Verify &amp; Sign Off</button>
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
