@@ -1654,13 +1654,14 @@ export default function BuilderDashboard({ profile }) {
                 {[
                   { key: 'Home', icon: '🏠' },
                   { key: 'Office / depot', icon: '🏢' },
+                  { key: 'Already on site', icon: '📍' },
                   { key: 'Somewhere else', icon: '✏️' },
                 ].map(option => {
                   const active = fromLocation === option.key
                   return (
                     <button
                       key={option.key}
-                      onClick={() => setFromLocation(option.key)}
+                      onClick={() => { setFromLocation(option.key); if (option.key === 'Already on site') setMiles(0) }}
                       style={{
                         width: '100%',
                         padding: '12px',
@@ -1690,33 +1691,50 @@ export default function BuilderDashboard({ profile }) {
               )}
             </div>
 
-            <div>
-              <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: COLORS.slate500, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Miles driven to get here</p>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', overflow: 'hidden' }}>
-                <button
-                  onClick={() => setMiles(m => Math.max(0, m - 0.5))}
-                  style={{ width: '40px', height: '40px', borderRadius: '50%', background: COLORS.slate500, color: COLORS.white, border: 'none', fontSize: '18px', fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
-                >
-                  −
-                </button>
-                <input
-                  type="number"
-                  step="0.5"
-                  value={miles}
-                  onChange={(e) => setMiles(parseFloat(e.target.value) || 0)}
-                  style={{ flex: 1, minWidth: 0, textAlign: 'center', padding: '10px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '16px', fontWeight: 700, boxSizing: 'border-box' }}
-                />
-                <button
-                  onClick={() => setMiles(m => m + 0.5)}
-                  style={{ width: '40px', height: '40px', borderRadius: '50%', background: COLORS.slate500, color: COLORS.white, border: 'none', fontSize: '18px', fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
-                >
-                  +
-                </button>
+            {fromLocation === 'Already on site' ? (
+              <div style={{ padding: '12px 14px', borderRadius: '10px', background: COLORS.slate50, border: `1px solid ${COLORS.slate200}` }}>
+                <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate600, fontWeight: 600 }}>📍 0 miles — you're already at this property.</p>
               </div>
-            </div>
+            ) : (
+              <div>
+                <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: COLORS.slate500, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Miles driven to get here</p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', overflow: 'hidden' }}>
+                  <button
+                    onClick={() => setMiles(m => Math.max(0, m - 0.5))}
+                    style={{ width: '40px', height: '40px', borderRadius: '50%', background: COLORS.slate500, color: COLORS.white, border: 'none', fontSize: '18px', fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
+                  >
+                    −
+                  </button>
+                  <input
+                    type="number"
+                    step="0.5"
+                    value={miles}
+                    onChange={(e) => setMiles(parseFloat(e.target.value) || 0)}
+                    style={{ flex: 1, minWidth: 0, textAlign: 'center', padding: '10px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '16px', fontWeight: 700, boxSizing: 'border-box' }}
+                  />
+                  <button
+                    onClick={() => setMiles(m => m + 0.5)}
+                    style={{ width: '40px', height: '40px', borderRadius: '50%', background: COLORS.slate500, color: COLORS.white, border: 'none', fontSize: '18px', fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+            )}
 
             <button
-              onClick={() => handleClockIn(fromLocation === 'Somewhere else' ? customLocation : fromLocation, miles)}
+              onClick={() => {
+                if (!fromLocation) { setClockInError("Please select where you're coming from."); return }
+                if (fromLocation === 'Somewhere else' && !customLocation.trim()) { setClockInError('Please type where you\'re coming from.'); return }
+                // "Already on site" is the one legitimate reason to submit
+                // 0 miles (e.g. a second ticket at a property they never
+                // left) -- any other path with 0 still on the stepper means
+                // they haven't actually entered anything, not that the
+                // trip was genuinely free.
+                if (fromLocation !== 'Already on site' && miles === 0) { setClockInError("Please enter the miles driven, or select 'Already on site' if you didn't travel."); return }
+                setClockInError('')
+                handleClockIn(fromLocation === 'Somewhere else' ? customLocation : fromLocation, miles)
+              }}
               disabled={clockingIn}
               style={{ width: '100%', padding: '16px', background: COLORS.teal600, color: COLORS.white, border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: 700, cursor: clockingIn ? 'not-allowed' : 'pointer', opacity: clockingIn ? 0.7 : 1 }}
             >
