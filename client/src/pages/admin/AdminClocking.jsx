@@ -182,7 +182,7 @@ export default function AdminClocking({ profile, onNavigate }) {
       .maybeSingle()
     setDailyClockInDeadline(deadlineRow?.setting_value || '09:00')
 
-    // --- Section 0: Today's Attendance (day-level clock in/out, separate
+    // --- Today's Attendance (day-level clock in/out, separate
     // from the per-job sessions below) -- one row per assignable builder,
     // whether or not they've clocked in yet, so a manager can override
     // either direction. `.or(...)` pulls in today's rows by work_date PLUS
@@ -502,8 +502,89 @@ export default function AdminClocking({ profile, onNavigate }) {
   return (
     <div>
 
-      {/* Section 0: Today's Attendance -- the day-level shift, separate
-          from the per-job sessions in Section 1 below. */}
+      {/* Section 0: Average Time by Job Type */}
+      <div style={{ background: COLORS.white, borderRadius: '16px', padding: '20px', marginBottom: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+        <h2 style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: 800, color: COLORS.slate900 }}>Average Time by Job Type</h2>
+        <p style={{ margin: '0 0 14px 0', fontSize: '13px', color: COLORS.slate500 }}>Based on completed jobs with recorded clock times.</p>
+
+        {categoryEntries.length === 0 ? (
+          <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>No completed jobs with recorded time yet.</p>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
+            {categoryEntries.map(([category, stats]) => (
+              <div key={category} style={{ background: COLORS.teal600, borderRadius: '16px', padding: '16px', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+                <span style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.85)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{category}</span>
+                <strong style={{ display: 'block', fontSize: '28px', fontWeight: 800, color: COLORS.white, marginTop: '8px' }}>{formatDuration(stats.totalMs / stats.count)}</strong>
+                <span style={{ display: 'block', fontSize: '11px', color: 'rgba(255,255,255,0.75)', marginTop: '4px' }}>avg over {stats.count} job{stats.count === 1 ? '' : 's'}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Section 1: Currently Clocked In */}
+      <div style={{ background: COLORS.white, borderRadius: '16px', padding: '20px', marginBottom: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+        <h2 style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: 800, color: COLORS.slate900 }}>Currently Clocked In</h2>
+        <p style={{ margin: '0 0 14px 0', fontSize: '13px', color: COLORS.slate500 }}>Live running timers. A red row means the job has been running past 8 hours — the builder may have forgotten to clock out.</p>
+
+        {liveSessions.length === 0 && (
+          <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>Nobody is clocked in right now.</p>
+        )}
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {liveSessions.map(row => {
+            const elapsedMs = Date.now() - new Date(row.session.started_at).getTime()
+            const overrun = elapsedMs > EIGHT_HOURS_MS
+            const tooFar = row.clockInDistance != null && row.clockInDistance > distanceThresholdM
+            const hasPin = row.session.clock_in_lat != null && row.session.clock_in_lng != null
+            return (
+              <div
+                key={row.session.id}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px',
+                  borderRadius: '12px', padding: '12px 14px',
+                  background: overrun ? COLORS.red50 : COLORS.teal50,
+                  border: overrun ? `1px solid ${COLORS.red200}` : `1px solid ${COLORS.teal300}`,
+                }}
+              >
+                <div>
+                  <strong style={{ display: 'block', fontSize: '13px', color: COLORS.slate900 }}>{row.builderName}</strong>
+                  <span
+                    onClick={onNavigate ? () => onNavigate('pipeline', { ticketNumber: row.ticket.ticket_number }) : undefined}
+                    style={{ fontSize: '12px', color: onNavigate ? COLORS.blue700 : COLORS.slate500, cursor: onNavigate ? 'pointer' : 'default', fontWeight: onNavigate ? 600 : 400 }}
+                  >
+                    #{row.ticket.ticket_number} · {row.ticket.property?.address} — {row.ticket.room || '—'} → {row.ticket.description}
+                  </span>
+                  {overrun && (
+                    <span style={{ display: 'block', marginTop: '4px', fontSize: '11px', fontWeight: 800, color: COLORS.red600 }}>
+                      ⏱ Over 8h — check builder hasn't forgotten to clock out
+                    </span>
+                  )}
+                  {tooFar && (
+                    <span style={{ display: 'block', marginTop: '4px', fontSize: '11px', fontWeight: 800, color: COLORS.red600 }}>
+                      ⚠ Clocked in {formatDistanceMetres(row.clockInDistance)} from the property
+                    </span>
+                  )}
+                  {hasPin && (
+                    <button
+                      onClick={() => openPinMap(row.session.clock_in_lat, row.session.clock_in_lng)}
+                      style={{ display: 'inline-block', marginTop: '4px', background: 'none', border: 'none', padding: 0, fontSize: '11px', fontWeight: 700, color: COLORS.blue700, cursor: 'pointer' }}
+                    >
+                      📍 View clock-in location
+                    </button>
+                  )}
+                </div>
+                <span style={{ fontFamily: 'monospace', fontSize: '16px', fontWeight: 800, color: overrun ? COLORS.red600 : COLORS.teal600, whiteSpace: 'nowrap' }}>
+                  {formatDuration(elapsedMs)}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Section 2: Today's Attendance -- the day-level shift, separate
+          from the per-job sessions in Section 1 above. */}
       <div style={{ background: COLORS.white, borderRadius: '16px', padding: '20px', marginBottom: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
         <h2 style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: 800, color: COLORS.slate900 }}>Today's Attendance</h2>
         <p style={{ margin: '0 0 14px 0', fontSize: '13px', color: COLORS.slate500 }}>Day-level clock in/out. Builders can't see their jobs at all until they clock in for the day.</p>
@@ -576,87 +657,6 @@ export default function AdminClocking({ profile, onNavigate }) {
             </tbody>
           </table>
         </div>
-      </div>
-
-      {/* Section 1: Currently Clocked In */}
-      <div style={{ background: COLORS.white, borderRadius: '16px', padding: '20px', marginBottom: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-        <h2 style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: 800, color: COLORS.slate900 }}>Currently Clocked In</h2>
-        <p style={{ margin: '0 0 14px 0', fontSize: '13px', color: COLORS.slate500 }}>Live running timers. A red row means the job has been running past 8 hours — the builder may have forgotten to clock out.</p>
-
-        {liveSessions.length === 0 && (
-          <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>Nobody is clocked in right now.</p>
-        )}
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {liveSessions.map(row => {
-            const elapsedMs = Date.now() - new Date(row.session.started_at).getTime()
-            const overrun = elapsedMs > EIGHT_HOURS_MS
-            const tooFar = row.clockInDistance != null && row.clockInDistance > distanceThresholdM
-            const hasPin = row.session.clock_in_lat != null && row.session.clock_in_lng != null
-            return (
-              <div
-                key={row.session.id}
-                style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px',
-                  borderRadius: '12px', padding: '12px 14px',
-                  background: overrun ? COLORS.red50 : COLORS.teal50,
-                  border: overrun ? `1px solid ${COLORS.red200}` : `1px solid ${COLORS.teal300}`,
-                }}
-              >
-                <div>
-                  <strong style={{ display: 'block', fontSize: '13px', color: COLORS.slate900 }}>{row.builderName}</strong>
-                  <span
-                    onClick={onNavigate ? () => onNavigate('pipeline', { ticketNumber: row.ticket.ticket_number }) : undefined}
-                    style={{ fontSize: '12px', color: onNavigate ? COLORS.blue700 : COLORS.slate500, cursor: onNavigate ? 'pointer' : 'default', fontWeight: onNavigate ? 600 : 400 }}
-                  >
-                    #{row.ticket.ticket_number} · {row.ticket.property?.address} — {row.ticket.room || '—'} → {row.ticket.description}
-                  </span>
-                  {overrun && (
-                    <span style={{ display: 'block', marginTop: '4px', fontSize: '11px', fontWeight: 800, color: COLORS.red600 }}>
-                      ⏱ Over 8h — check builder hasn't forgotten to clock out
-                    </span>
-                  )}
-                  {tooFar && (
-                    <span style={{ display: 'block', marginTop: '4px', fontSize: '11px', fontWeight: 800, color: COLORS.red600 }}>
-                      ⚠ Clocked in {formatDistanceMetres(row.clockInDistance)} from the property
-                    </span>
-                  )}
-                  {hasPin && (
-                    <button
-                      onClick={() => openPinMap(row.session.clock_in_lat, row.session.clock_in_lng)}
-                      style={{ display: 'inline-block', marginTop: '4px', background: 'none', border: 'none', padding: 0, fontSize: '11px', fontWeight: 700, color: COLORS.blue700, cursor: 'pointer' }}
-                    >
-                      📍 View clock-in location
-                    </button>
-                  )}
-                </div>
-                <span style={{ fontFamily: 'monospace', fontSize: '16px', fontWeight: 800, color: overrun ? COLORS.red600 : COLORS.teal600, whiteSpace: 'nowrap' }}>
-                  {formatDuration(elapsedMs)}
-                </span>
-              </div>
-            )
-          })}
-        </div>
-      </div>
-
-      {/* Section 2: Average Time by Job Type */}
-      <div style={{ background: COLORS.white, borderRadius: '16px', padding: '20px', marginBottom: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-        <h2 style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: 800, color: COLORS.slate900 }}>Average Time by Job Type</h2>
-        <p style={{ margin: '0 0 14px 0', fontSize: '13px', color: COLORS.slate500 }}>Based on completed jobs with recorded clock times.</p>
-
-        {categoryEntries.length === 0 ? (
-          <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>No completed jobs with recorded time yet.</p>
-        ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
-            {categoryEntries.map(([category, stats]) => (
-              <div key={category} style={{ background: COLORS.teal600, borderRadius: '16px', padding: '16px', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-                <span style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.85)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{category}</span>
-                <strong style={{ display: 'block', fontSize: '28px', fontWeight: 800, color: COLORS.white, marginTop: '8px' }}>{formatDuration(stats.totalMs / stats.count)}</strong>
-                <span style={{ display: 'block', fontSize: '11px', color: 'rgba(255,255,255,0.75)', marginTop: '4px' }}>avg over {stats.count} job{stats.count === 1 ? '' : 's'}</span>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
 
       {/* Section 3: Completed Job Timesheet */}
