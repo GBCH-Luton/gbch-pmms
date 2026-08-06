@@ -74,8 +74,19 @@ const DASHBOARD_TOP_CARD_HEIGHT = '420px'
 function DailyBriefing({ lines }) {
   function handleLineClick(target) {
     const header = document.querySelector(`[data-dashboard-section="${target}"]`)
-    header?.click()
-    header?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    if (!header) return
+    header.click()
+    // The section's expand is a CSS transition (see DashboardSection's
+    // grid-template-rows), not instant -- scrolling right away measures
+    // the still-collapsed height and lands exactly at the title, with the
+    // content that's about to appear still below the fold. Wait for the
+    // 220ms transition to finish, then scroll the header to the TOP of
+    // the viewport (not 'nearest') so there's actually room below it to
+    // see what's inside, even when the section sits at the bottom of the
+    // page.
+    setTimeout(() => {
+      header.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 260)
   }
 
   const toneColour = { critical: COLORS.red600, warning: COLORS.amber600, quiet: COLORS.slate400 }
