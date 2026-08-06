@@ -209,25 +209,44 @@
 
   /* ===================== PRINT / PDF ===================== */
   @media print {
-    @page { size: A4; margin: 14mm 12mm; }
+    /* Slim margins to maximise usable width -- A4 at these margins gives
+       ~718px to work with, which is BELOW the 760px breakpoint the
+       on-screen two-column layout normally needs. Left un-forced, print
+       would silently fall back to the single (stacked) column below,
+       which is exactly what made a step's mock + text add up taller
+       than one page instead of sitting side by side. */
+    @page { size: A4; margin: 12mm 10mm; }
     * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
     body { background: #fff; }
     .wrap { max-width: none; padding: 0; }
     .tabs, .disclaimer, .print-hint { display: none !important; }
-    header.hero { border-bottom: none; margin-bottom: 8px; padding-bottom: 0; }
+    header.hero { border-bottom: none; margin-bottom: 6px; padding-bottom: 0; }
     /* Both tracks print in full, one after another, regardless of which
        tab is on screen -- a single Print/Save-as-PDF then covers the
        whole guide instead of only whichever track happened to be open. */
     .track { display: block !important; }
     #track-manager { break-before: page; }
     .track-intro { break-after: avoid; }
+    /* Forced side-by-side regardless of the 760px breakpoint (see @page
+       note above) -- a step's total HEIGHT is bounded by whichever
+       column is taller, not the sum of both stacked on top of each
+       other, which is what actually keeps one step on one page. */
+    .step {
+      break-inside: avoid; padding: 0; border-top: none;
+      display: grid !important; grid-template-columns: 220px 1fr !important;
+      gap: 14px !important; align-items: start !important;
+    }
+    .step.reverse { grid-template-columns: 1fr 220px !important; }
+    .step.reverse .step-mock { order: 2 !important; }
     /* One step per printed page: break-before on every step except the
        very first in each track avoids a blank trailing page at the end. */
-    .step { break-inside: avoid; padding: 0; border-top: none; grid-template-columns: 1fr !important; }
     .step + .step { break-before: page; }
-    .step.reverse .step-mock { order: 0 !important; }
-    .step-mock { margin-bottom: 14px; }
     .phone, .browser { box-shadow: none; border: 1px solid #cbd5e1; }
+    /* The on-screen 420px minimum exists so a short screen (e.g. just
+       the late-clock-in banner) doesn't look empty next to a taller one
+       beside it -- irrelevant on paper, and worth reclaiming the height
+       for since every millimetre counts against the one-page budget. */
+    .phone .screen { min-height: 0 !important; }
   }
 </style>
 </head>
