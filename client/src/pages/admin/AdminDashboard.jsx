@@ -160,7 +160,7 @@ function TeamWhereabouts({ profile, onNavigate }) {
     const deadline = deadlineRow?.setting_value || '09:00'
 
     const [{ data: attendanceData }, { data: activityData }, { data: openSessions }] = await Promise.all([
-      supabase.schema('pmms').from('daily_attendance').select('id, staff_id, clock_in_at, late_flag, clock_out_at').or(`work_date.eq.${todayKey},clock_out_at.is.null`),
+      supabase.schema('pmms').from('daily_attendance').select('id, staff_id, clock_in_at, late_flag, clock_out_at, early_leave_reason').or(`work_date.eq.${todayKey},clock_out_at.is.null`),
       supabase.schema('pmms').from('activity_log').select('id, staff_id, activity_type, note, started_at, ended_at, ticket_id').or(`started_at.gte.${todayKey}T00:00:00,ended_at.is.null`),
       supabase.schema('pmms').from('work_sessions').select('id, ticket_id, builder_id').is('ended_at', null),
     ])
@@ -209,7 +209,13 @@ function TeamWhereabouts({ profile, onNavigate }) {
         id: `${a.id}-in`, time: a.clock_in_at, staffId: a.staff_id, staffName: b.name, tone: 'in',
         text: a.late_flag ? `clocked in (${minutesLate(a.clock_in_at, deadline)}m late)` : 'clocked in',
       })
-      if (a.clock_out_at) entries.push({ id: `${a.id}-out`, time: a.clock_out_at, staffId: a.staff_id, staffName: b.name, tone: 'out', text: 'clocked out' })
+      if (a.clock_out_at) {
+        entries.push({
+          id: `${a.id}-out`, time: a.clock_out_at, staffId: a.staff_id, staffName: b.name,
+          tone: a.early_leave_reason ? 'early' : 'out',
+          text: a.early_leave_reason ? `clocked out — left early: ${a.early_leave_reason}` : 'clocked out',
+        })
+      }
     })
     ;(activityData || []).forEach(a => {
       const b = assignableBuilders.find(x => x.id === a.staff_id)
@@ -234,7 +240,7 @@ function TeamWhereabouts({ profile, onNavigate }) {
     setLoading(false)
   }
 
-  const toneDot = { in: COLORS.green600, out: COLORS.slate900, away: COLORS.violet600, back: COLORS.slate900 }
+  const toneDot = { in: COLORS.green600, out: COLORS.slate900, away: COLORS.violet600, back: COLORS.slate900, early: COLORS.amber700 }
   const chipStyle = { off: { bg: COLORS.slate100, fg: COLORS.slate400 }, available: { bg: COLORS.blue50, fg: COLORS.blue700 }, job: { bg: COLORS.teal50, fg: COLORS.teal700 }, away: { bg: COLORS.violet100, fg: COLORS.violet600 } }
 
   const visibleBuilders = filterStaffId === 'All' ? builders : builders.filter(b => b.id === filterStaffId)
@@ -292,7 +298,7 @@ function TeamWhereabouts({ profile, onNavigate }) {
                 <span style={{ width: '7px', height: '7px', borderRadius: '50%', marginTop: '5px', flexShrink: 0, background: toneDot[e.tone] }} />
                 <div style={{ flex: 1 }}>
                   <span style={{ fontSize: '12.5px', fontWeight: 700, color: COLORS.slate900 }}>{e.staffName}</span>
-                  <span style={{ fontSize: '12.5px', color: COLORS.slate600 }}> — {e.text}</span>
+                  <span style={{ fontSize: '12.5px', color: e.tone === 'early' ? COLORS.amber700 : COLORS.slate600, fontWeight: e.tone === 'early' ? 700 : 400 }}> — {e.text}</span>
                   {e.ticketNumber != null && (
                     <span
                       onClick={() => onNavigate?.('pipeline', { ticketNumber: e.ticketNumber })}

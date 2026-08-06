@@ -195,7 +195,7 @@ export default function AdminClocking({ profile, onNavigate }) {
     const { data: attendanceData } = await supabase
       .schema('pmms')
       .from('daily_attendance')
-      .select('id, staff_id, work_date, clock_in_at, late_flag, clock_out_at, manual_override')
+      .select('id, staff_id, work_date, clock_in_at, late_flag, clock_out_at, manual_override, early_leave_reason')
       .or(`work_date.eq.${todayKey},clock_out_at.is.null`)
       .order('clock_in_at', { ascending: false })
 
@@ -537,7 +537,16 @@ export default function AdminClocking({ profile, onNavigate }) {
                   </td>
                   <td style={{ ...tdStyle, fontFamily: 'monospace', fontSize: '12px' }}>
                     {row.shift?.clock_out_at
-                      ? formatUKDateTime(row.shift.clock_out_at)
+                      ? (
+                        <>
+                          {formatUKDateTime(row.shift.clock_out_at)}
+                          {row.shift.early_leave_reason && (
+                            <span style={{ display: 'block', fontSize: '10px', fontWeight: 700, color: COLORS.amber700, fontFamily: 'system-ui' }}>
+                              ⚠ Left early: {row.shift.early_leave_reason}
+                            </span>
+                          )}
+                        </>
+                      )
                       : row.shift
                         ? <span style={{ color: COLORS.teal600, fontWeight: 700, fontFamily: 'system-ui' }}>Still clocked in</span>
                         : <span style={{ color: COLORS.slate300 }}>—</span>}
@@ -901,7 +910,13 @@ export default function AdminClocking({ profile, onNavigate }) {
               const events = []
               if (historyModalRow.shift) {
                 events.push({ time: historyModalRow.shift.clock_in_at, label: 'Clocked in for the day', tone: 'in' })
-                if (historyModalRow.shift.clock_out_at) events.push({ time: historyModalRow.shift.clock_out_at, label: 'Clocked out for the day', tone: 'out' })
+                if (historyModalRow.shift.clock_out_at) {
+                  events.push({
+                    time: historyModalRow.shift.clock_out_at,
+                    label: historyModalRow.shift.early_leave_reason ? `Clocked out for the day — left early: ${historyModalRow.shift.early_leave_reason}` : 'Clocked out for the day',
+                    tone: historyModalRow.shift.early_leave_reason ? 'early' : 'out',
+                  })
+                }
               }
               ;(historyModalRow.todaysActivity || []).forEach(a => {
                 const verb = a.activity_type === 'Travel' ? 'Left site' : 'Started break'
@@ -920,7 +935,7 @@ export default function AdminClocking({ profile, onNavigate }) {
                       <span style={{ fontFamily: 'monospace', fontSize: '12px', color: COLORS.slate400, flexShrink: 0, width: '52px' }}>
                         {formatUKDateTime(e.time).split(' ').slice(-1)[0]}
                       </span>
-                      <span style={{ fontSize: '13px', fontWeight: 600, color: e.tone === 'away' ? COLORS.violet600 : COLORS.slate900 }}>{e.label}</span>
+                      <span style={{ fontSize: '13px', fontWeight: 600, color: e.tone === 'away' ? COLORS.violet600 : e.tone === 'early' ? COLORS.amber700 : COLORS.slate900 }}>{e.label}</span>
                     </div>
                   ))}
                 </div>

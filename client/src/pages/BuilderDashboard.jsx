@@ -90,10 +90,16 @@ export default function BuilderDashboard({ profile }) {
   const [todayShift, setTodayShift] = useState(null)
   const [shiftLoading, setShiftLoading] = useState(true)
   const [dailyClockInDeadline, setDailyClockInDeadline] = useState('09:00')
+  const [dailyClockOutDeadline, setDailyClockOutDeadline] = useState('17:00')
   const [clockingInForDay, setClockingInForDay] = useState(false)
   const [clockInForDayError, setClockInForDayError] = useState('')
   const [clockingOutForDay, setClockingOutForDay] = useState(false)
   const [clockOutForDayError, setClockOutForDayError] = useState('')
+  // Symmetric with the late clock-in flag -- clocking out before
+  // dailyClockOutDeadline requires a reason, captured here before the
+  // clock-out actually goes through.
+  const [earlyLeavePromptOpen, setEarlyLeavePromptOpen] = useState(false)
+  const [earlyLeaveReason, setEarlyLeaveReason] = useState('')
 
   // Mid-day presence, independent of both the shift above and any job's
   // own work_session -- a materials run or a break doesn't pause or
@@ -188,6 +194,8 @@ export default function BuilderDashboard({ profile }) {
     fetchRoutineVisitChecklistTemplate()
     supabase.schema('pmms').from('settings').select('setting_value').eq('setting_key', 'daily_clock_in_deadline').maybeSingle()
       .then(({ data }) => { if (data?.setting_value) setDailyClockInDeadline(data.setting_value) })
+    supabase.schema('pmms').from('settings').select('setting_value').eq('setting_key', 'daily_clock_out_reminder_time').maybeSingle()
+      .then(({ data }) => { if (data?.setting_value) setDailyClockOutDeadline(data.setting_value) })
     // Permission alone doesn't mean a subscription actually exists (a
     // browser can report "granted" with nothing ever subscribed) -- this
     // is the real check for whether the button should offer to enable.
@@ -591,7 +599,7 @@ export default function BuilderDashboard({ profile }) {
     setTodayShift(data)
   }
 
-  async function handleClockOutForDay() {
+  function attemptClockOutForDay() {
     setClockOutForDayError('')
     const stillWorking = tickets.find(t => t.status === 'In Progress')
     if (stillWorking) {
@@ -602,7 +610,24 @@ export default function BuilderDashboard({ profile }) {
       setClockOutForDayError("You're still logged as away -- tap \"I'm Back\" before clocking out for the day.")
       return
     }
+    // Same "clearly not just normal variation" framing as the late
+    // clock-in flag -- ask why, rather than silently letting a much
+    // shorter-than-expected day pass with no record of the reason.
+    if (ukTimeHHMM() < dailyClockOutDeadline) {
+      setEarlyLeaveReason('')
+      setEarlyLeavePromptOpen(true)
+      return
+    }
+    submitClockOutForDay(null)
+  }
 
+  function submitEarlyLeave() {
+    if (!earlyLeaveReason.trim()) { setClockOutForDayError('Please give a reason for finishing early.'); return }
+    submitClockOutForDay(earlyLeaveReason.trim())
+  }
+
+  async function submitClockOutForDay(earlyReason) {
+    setClockOutForDayError('')
     setClockingOutForDay(true)
     // Unlike clocking IN for the day, a missing GPS fix here doesn't block
     // clocking out -- same asymmetry as the existing per-job clock-out,
@@ -612,11 +637,17 @@ export default function BuilderDashboard({ profile }) {
     const { error } = await supabase
       .schema('pmms')
       .from('daily_attendance')
-      .update({ clock_out_at: new Date().toISOString(), clock_out_lat: position?.latitude ?? null, clock_out_lng: position?.longitude ?? null })
+      .update({
+        clock_out_at: new Date().toISOString(),
+        clock_out_lat: position?.latitude ?? null,
+        clock_out_lng: position?.longitude ?? null,
+        ...(earlyReason ? { early_leave_reason: earlyReason } : {}),
+      })
       .eq('id', todayShift.id)
 
     setClockingOutForDay(false)
     if (error) { setClockOutForDayError(error.message); return }
+    setEarlyLeavePromptOpen(false)
     setTodayShift(null)
   }
 
@@ -1646,7 +1677,7 @@ export default function BuilderDashboard({ profile }) {
                 Leaving Site
               </button>
               <button
-                onClick={handleClockOutForDay}
+                onClick={attemptClockOutForDay}
                 disabled={clockingOutForDay}
                 style={{ padding: '8px 14px', background: COLORS.slate900, color: COLORS.white, border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: clockingOutForDay ? 'not-allowed' : 'pointer', opacity: clockingOutForDay ? 0.7 : 1 }}
               >
@@ -1697,6 +1728,33 @@ export default function BuilderDashboard({ profile }) {
                 style={{ flex: 2, padding: '10px', background: COLORS.teal600, color: COLORS.white, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: startingActivity ? 'not-allowed' : 'pointer', opacity: startingActivity ? 0.7 : 1 }}
               >
                 {startingActivity ? 'Starting…' : 'Start'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {earlyLeavePromptOpen && (
+          <div style={{ marginTop: '8px', background: COLORS.white, border: `1px solid ${COLORS.amber300}`, borderRadius: '12px', padding: '14px' }}>
+            <p style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: COLORS.amber800 }}>⚠ You're finishing before {dailyClockOutDeadline}</p>
+            <p style={{ margin: '0 0 10px 0', fontSize: '12px', color: COLORS.slate500 }}>Just so your manager knows why -- e.g. "all jobs done", "doctor's appointment".</p>
+            <input
+              type="text"
+              value={earlyLeaveReason}
+              onChange={(e) => setEarlyLeaveReason(e.target.value)}
+              placeholder="Reason for finishing early..."
+              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '14px', boxSizing: 'border-box', marginBottom: '10px' }}
+            />
+            {clockOutForDayError && <p style={{ margin: '0 0 10px 0', fontSize: '12px', color: COLORS.red500, fontWeight: 600 }}>{clockOutForDayError}</p>}
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button onClick={() => setEarlyLeavePromptOpen(false)} style={{ flex: 1, padding: '10px', background: COLORS.slate100, color: COLORS.slate600, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
+                Cancel
+              </button>
+              <button
+                onClick={submitEarlyLeave}
+                disabled={clockingOutForDay}
+                style={{ flex: 2, padding: '10px', background: COLORS.slate900, color: COLORS.white, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: clockingOutForDay ? 'not-allowed' : 'pointer', opacity: clockingOutForDay ? 0.7 : 1 }}
+              >
+                {clockingOutForDay ? 'Clocking out…' : 'Confirm Clock Out'}
               </button>
             </div>
           </div>
