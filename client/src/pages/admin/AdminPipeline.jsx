@@ -1107,7 +1107,12 @@ export default function AdminPipeline({
                               {t.status !== 'Cancelled' && (
                                 <button onClick={() => openCancelModal(t)} style={{ ...actionBtnStyle, color: COLORS.red600, borderColor: COLORS.red200 }}>Cancel</button>
                               )}
-                              {t.assigned_builder_id && (
+                              {/* Archived tickets are locked (RLS: once
+                                  signed off, only the raiser can still edit
+                                  a ticket -- same rule behind raiser-only
+                                  sign-off). Hidden here to match, rather
+                                  than showing a button that fails on save. */}
+                              {t.assigned_builder_id && t.status !== 'Archived' && (
                                 <button onClick={() => openEditEstimateModal(t)} style={actionBtnStyle}>{t.estimated_minutes != null ? 'Edit Estimate' : 'Add Estimate'}</button>
                               )}
                               <button onClick={() => openReassignModal(t)} style={{ ...actionBtnStyle, background: COLORS.blue700, color: COLORS.white, borderColor: COLORS.blue700 }}>Reassign</button>
