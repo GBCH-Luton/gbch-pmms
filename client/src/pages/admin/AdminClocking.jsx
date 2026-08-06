@@ -436,11 +436,28 @@ export default function AdminClocking({ profile, onNavigate }) {
                     {row.sessions.length > 1 && (
                       <span style={{ display: 'block', fontSize: '10px', color: COLORS.slate400, fontWeight: 600 }}>{row.sessions.length} sessions</span>
                     )}
-                    {row.ticket.estimated_minutes != null && (
-                      <span style={{ display: 'block', marginTop: '2px', fontSize: '10px', fontWeight: 700, color: row.totalMs > row.ticket.estimated_minutes * 60000 ? COLORS.red600 : COLORS.slate400 }}>
-                        Est. {formatDuration(row.ticket.estimated_minutes * 60000)}
-                      </span>
-                    )}
+                    {row.ticket.estimated_minutes != null && (() => {
+                      const estimatedMs = row.ticket.estimated_minutes * 60000
+                      const over = row.totalMs > estimatedMs
+                      // A job clocked in only right before finishing (worked
+                      // off the clock, then tapped Clock In/Out a minute
+                      // apart at the end) passes the GPS/distance checks
+                      // just fine -- both taps are real, at the real
+                      // property. The only thing that can catch it is
+                      // "this took far less time than a job like this
+                      // should," same idea as flagging an over-run, just
+                      // the other direction. Under half the estimate is
+                      // the same "clearly not just normal variation"
+                      // threshold in spirit as the over-run side already
+                      // used (any overrun at all).
+                      const suspiciouslyShort = row.totalMs < estimatedMs * 0.5
+                      return (
+                        <span style={{ display: 'block', marginTop: '2px', fontSize: '10px', fontWeight: 700, color: over || suspiciouslyShort ? COLORS.red600 : COLORS.slate400 }}>
+                          Est. {formatDuration(estimatedMs)}
+                          {suspiciouslyShort && ' — much shorter than estimated, check they were clocked in the whole job'}
+                        </span>
+                      )
+                    })()}
                   </td>
                   <td style={tdStyle}>{(row.ticket.mileage_logged || 0).toFixed(1)}</td>
                   <td style={tdStyle}>
