@@ -44,19 +44,6 @@
   h1 { font-size: clamp(24px, 4vw, 32px); font-weight: 800; margin: 0 0 10px 0; letter-spacing: -0.01em; }
   .sub { font-size: 15px; color: var(--guide-text-dim); max-width: 640px; margin: 0; }
 
-  .disclaimer {
-    display: flex; gap: 12px; align-items: flex-start;
-    background: var(--guide-surface-2); border: 1px solid var(--guide-border);
-    border-radius: 12px; padding: 14px 16px; margin: 20px 0 0 0; font-size: 13px; color: var(--guide-text-dim);
-  }
-  .disclaimer b { color: var(--guide-text); }
-
-  .print-hint {
-    display: flex; gap: 10px; align-items: center;
-    background: var(--guide-accent-bg); border: 1px solid var(--guide-accent); border-radius: 12px;
-    padding: 12px 16px; margin: 12px 0 0 0; font-size: 13px; color: var(--guide-accent-dark); font-weight: 600;
-  }
-
   .track-intro { font-size: 14px; color: var(--guide-text-dim); margin: 8px 0 28px 0; max-width: 680px; }
 
   /* Step card */
@@ -165,7 +152,6 @@
     * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
     body { background: #fff; }
     .wrap { max-width: none; padding: 0; }
-    .disclaimer, .print-hint { display: none !important; }
     header.hero { border-bottom: none; margin-bottom: 6px; padding-bottom: 0; }
     .step {
       break-inside: avoid; padding: 0; border-top: none;
@@ -187,13 +173,6 @@
     <p class="eyebrow">GBCH PMMS &middot; Builder App Guide</p>
     <h1>How a Builder Uses the App</h1>
     <p class="sub">Exactly what a builder sees on their phone, step by step, from clocking in for the day to clocking out.</p>
-    <div class="disclaimer">
-      <span style="font-size:18px;">&#9432;</span>
-      <span><b>These are recreated mockups, not live screenshots</b> &mdash; built from the same colours, wording and layout as the real, already-deployed code, since screenshots of a running app weren't available when this was written. Every screen, label and button shown here matches what's actually live in production as of 2026-08-06.</span>
-    </div>
-    <div class="print-hint">
-      🖨️ <span>To save as PDF: <b>Print this page</b> (Ctrl/Cmd+P) &rarr; destination "Save as PDF" &rarr; make sure <b>"Background graphics"</b> is turned on so the phone mockups render.</span>
-    </div>
   </header>
 
   <section>
