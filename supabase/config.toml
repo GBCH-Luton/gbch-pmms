@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.check-routine-visits-due]
 verify_jwt = false
+
+[functions.check-garden-service-due]
+verify_jwt = false

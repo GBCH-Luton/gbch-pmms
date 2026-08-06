@@ -408,6 +408,16 @@ export async function fetchRoutineVisitAging() {
   }).sort((a, b) => (b.daysSince ?? -1) - (a.daysSince ?? -1))
 }
 
+// UK growing-season convention shared with check-garden-service-due --
+// Mar-Oct counts as summer (shorter interval), Nov-Feb as winter (longer).
+// Uses the viewer's own local month, not Europe/London -- unlike the
+// UK_DATE_FORMATTER helpers below, a month-granularity boundary doesn't
+// need timezone precision the way a specific timestamp does.
+function isUkSummerMonth(date) {
+  const month = date.getMonth() + 1
+  return month >= 3 && month <= 10
+}
+
 // Portfolio-wide "which gardens need review" counts, for the dashboard's
 // Gardens section -- same shape and same 0.5x-threshold "aging" bucket
 // convention as fetchVoidAgingCounts(), so a manager reads both the same
@@ -421,13 +431,15 @@ export async function fetchGardenReviewAging() {
     .select('id, garden_last_attended_date')
     .eq('has_garden', true)
 
-  const { data: thresholdRow } = await supabase
+  const { data: settingsRows } = await supabase
     .schema('pmms')
     .from('settings')
-    .select('setting_value')
-    .eq('setting_key', 'garden_review_days')
-    .maybeSingle()
-  const thresholdDays = thresholdRow?.setting_value != null ? Number(thresholdRow.setting_value) : 30
+    .select('setting_key, setting_value')
+    .in('setting_key', ['garden_service_days_summer', 'garden_service_days_winter'])
+  const settingsMap = Object.fromEntries((settingsRows || []).map(r => [r.setting_key, r.setting_value]))
+  const summerDays = settingsMap.garden_service_days_summer != null ? Number(settingsMap.garden_service_days_summer) : 90
+  const winterDays = settingsMap.garden_service_days_winter != null ? Number(settingsMap.garden_service_days_winter) : 180
+  const thresholdDays = isUkSummerMonth(new Date()) ? summerDays : winterDays
 
   const nowMs = Date.now()
   const counts = { overdue: 0, aging: 0, recent: 0 }

@@ -141,8 +141,9 @@ export default function AdminSettings() {
   const [routineVisitSaving, setRoutineVisitSaving] = useState(false)
   const [routineVisitSaved, setRoutineVisitSaved] = useState(false)
 
-  const [gardenReviewDays, setGardenReviewDays] = useState(30)
-  const [gardenReviewAlertsEnabled, setGardenReviewAlertsEnabled] = useState(true)
+  const [gardenServiceDaysSummer, setGardenServiceDaysSummer] = useState(90)
+  const [gardenServiceDaysWinter, setGardenServiceDaysWinter] = useState(180)
+  const [gardenAutoTicketEnabled, setGardenAutoTicketEnabled] = useState(true)
   const [gardenReviewSaving, setGardenReviewSaving] = useState(false)
   const [gardenReviewSaved, setGardenReviewSaved] = useState(false)
 
@@ -222,8 +223,9 @@ export default function AdminSettings() {
       if (map.routine_visit_flag_days != null) setRoutineVisitFlagDays(map.routine_visit_flag_days)
       if (map.routine_visit_alerts_enabled != null) setRoutineVisitAlertsEnabled(map.routine_visit_alerts_enabled)
       if (map.routine_visit_estimated_minutes != null) setRoutineVisitEstimatedMinutes(map.routine_visit_estimated_minutes)
-      if (map.garden_review_days != null) setGardenReviewDays(map.garden_review_days)
-      if (map.garden_review_alerts_enabled != null) setGardenReviewAlertsEnabled(map.garden_review_alerts_enabled)
+      if (map.garden_service_days_summer != null) setGardenServiceDaysSummer(map.garden_service_days_summer)
+      if (map.garden_service_days_winter != null) setGardenServiceDaysWinter(map.garden_service_days_winter)
+      if (map.garden_auto_ticket_enabled != null) setGardenAutoTicketEnabled(map.garden_auto_ticket_enabled)
       if (Array.isArray(map.routine_visit_checklist)) setRoutineVisitChecklist(map.routine_visit_checklist)
       if (Array.isArray(map.towns) && map.towns.length > 0) setTowns(map.towns)
       if (map.clock_overrun_hours != null) setClockOverrunHours(map.clock_overrun_hours)
@@ -612,8 +614,9 @@ export default function AdminSettings() {
   async function saveGardenReviewSettings() {
     setGardenReviewSaving(true)
     setGardenReviewSaved(false)
-    await saveSetting('garden_review_days', Number(gardenReviewDays))
-    await saveSetting('garden_review_alerts_enabled', gardenReviewAlertsEnabled)
+    await saveSetting('garden_service_days_summer', Number(gardenServiceDaysSummer))
+    await saveSetting('garden_service_days_winter', Number(gardenServiceDaysWinter))
+    await saveSetting('garden_auto_ticket_enabled', gardenAutoTicketEnabled)
     setGardenReviewSaving(false)
     setGardenReviewSaved(true)
     setTimeout(() => setGardenReviewSaved(false), 2000)
@@ -1349,23 +1352,34 @@ export default function AdminSettings() {
       {/* Section 4f2: Gardens */}
       <SettingsSection
         title="Gardens"
-        subtitle="How many days after a garden was last attended to before it's flagged for review on the dashboard. Change this by hand for the season -- e.g. shorter in summer, longer in winter."
+        subtitle="How often a garden needs servicing, based on the current UK season (Mar-Oct counts as summer, Nov-Feb as winter). Drives both the dashboard's Overdue Gardens tile and the daily auto-ticket check below -- no more switching a single number by hand as the seasons change."
         open={!!openSections['garden-review']}
         onToggle={() => toggleSection('garden-review')}
       >
-        <div style={{ marginBottom: '16px', maxWidth: '260px' }}>
-          <label style={fieldLabelStyle}>Days since last attended before flagged for review</label>
-          <input
-            type="number"
-            value={gardenReviewDays}
-            onChange={(e) => setGardenReviewDays(e.target.value)}
-            style={inputStyle}
-          />
+        <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginBottom: '16px' }}>
+          <div style={{ maxWidth: '260px' }}>
+            <label style={fieldLabelStyle}>Summer service interval (days)</label>
+            <input
+              type="number"
+              value={gardenServiceDaysSummer}
+              onChange={(e) => setGardenServiceDaysSummer(e.target.value)}
+              style={inputStyle}
+            />
+          </div>
+          <div style={{ maxWidth: '260px' }}>
+            <label style={fieldLabelStyle}>Winter service interval (days)</label>
+            <input
+              type="number"
+              value={gardenServiceDaysWinter}
+              onChange={(e) => setGardenServiceDaysWinter(e.target.value)}
+              style={inputStyle}
+            />
+          </div>
         </div>
 
         <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: 600, color: COLORS.slate900, marginBottom: '16px' }}>
-          <input type="checkbox" checked={gardenReviewAlertsEnabled} onChange={(e) => setGardenReviewAlertsEnabled(e.target.checked)} />
-          Flag overdue gardens on the dashboard
+          <input type="checkbox" checked={gardenAutoTicketEnabled} onChange={(e) => setGardenAutoTicketEnabled(e.target.checked)} />
+          Automatically raise a ticket when a garden becomes due (lands unassigned -- a manager still picks who does it)
         </label>
 
         <button onClick={saveGardenReviewSettings} disabled={gardenReviewSaving} style={{ ...saveBtnStyle, opacity: gardenReviewSaving ? 0.6 : 1, cursor: gardenReviewSaving ? 'not-allowed' : 'pointer' }}>
