@@ -516,6 +516,22 @@ export function ukDateTimeInputValueToMs(value) {
   return guessMs - (shownAsUtcMs - guessMs)
 }
 
+// "Which UK calendar day is this" (for daily_attendance.work_date and
+// grouping builder activity by day) -- same ukPartsOf() UK-pinned reading
+// as everything else here, not the device's own local date.
+export function ukDateKey(ms = Date.now()) {
+  const p = ukPartsOf(ms)
+  return `${p.year}-${p.month}-${p.day}`
+}
+
+// "HH:mm" in UK wall-clock time -- used to compare a clock-in against an
+// HH:mm settings threshold (e.g. daily_clock_in_deadline) without pulling
+// in a date library just to compare two times of day.
+export function ukTimeHHMM(ms = Date.now()) {
+  const p = ukPartsOf(ms)
+  return `${p.hour}:${p.minute}`
+}
+
 export const filterSelectStyle = { padding: '8px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', fontWeight: 600, color: COLORS.slate900, background: COLORS.slate50, cursor: 'pointer' }
 export const thStyle = { padding: '10px 14px', textAlign: 'left', fontSize: '10px', fontWeight: 800, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }
 export const tdStyle = { padding: '12px 14px', verticalAlign: 'top', fontSize: '13px' }

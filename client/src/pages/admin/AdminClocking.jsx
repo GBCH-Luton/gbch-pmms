@@ -5,6 +5,7 @@ import { distanceMetres, googleMapsEmbedLink, googleMapsRouteEmbedLink, metresTo
 import { attachProperties } from '../../lib/properties'
 import {
   thStyle, tdStyle, actionBtnStyle, filterSelectStyle, formatUKDate, formatUKDateTime, toUkDateTimeInputValue, ukDateTimeInputValueToMs,
+  ukDateKey, ukTimeHHMM,
   modalOverlayStyle, modalCardStyle, modalTitleStyle, modalLabelStyle,
   modalErrorStyle, modalCancelBtnStyle, modalConfirmBtnStyle, fetchAssignableBuilders, fetchAssignableStaffForDivision,
 } from './shared'
@@ -73,6 +74,13 @@ export default function AdminClocking({ profile, onNavigate }) {
 
   const [mapModal, setMapModal] = useState(null)
 
+  const [attendanceRows, setAttendanceRows] = useState([])
+  const [dailyClockInDeadline, setDailyClockInDeadline] = useState('09:00')
+  const [overrideModal, setOverrideModal] = useState(null) // { mode: 'in' | 'out', staffId, staffName, rowId }
+  const [overrideNote, setOverrideNote] = useState('')
+  const [overrideError, setOverrideError] = useState('')
+  const [overrideSaving, setOverrideSaving] = useState(false)
+
   function openPinMap(lat, lng) {
     setMapModal({ mode: 'pin', embedUrl: googleMapsEmbedLink(lat, lng) })
   }
@@ -119,7 +127,36 @@ export default function AdminClocking({ profile, onNavigate }) {
     const { data: builderData } = await supabase
       .from('staff')
       .select('id, name, home_postcode, home_latitude, home_longitude')
-    setBuilders(await (profile.division ? fetchAssignableStaffForDivision(profile.division) : fetchAssignableBuilders()))
+    const assignableBuilders = await (profile.division ? fetchAssignableStaffForDivision(profile.division) : fetchAssignableBuilders())
+    setBuilders(assignableBuilders)
+
+    const { data: deadlineRow } = await supabase
+      .schema('pmms')
+      .from('settings')
+      .select('setting_value')
+      .eq('setting_key', 'daily_clock_in_deadline')
+      .maybeSingle()
+    setDailyClockInDeadline(deadlineRow?.setting_value || '09:00')
+
+    // --- Section 0: Today's Attendance (day-level clock in/out, separate
+    // from the per-job sessions below) -- one row per assignable builder,
+    // whether or not they've clocked in yet, so a manager can override
+    // either direction. `.or(...)` pulls in today's rows by work_date PLUS
+    // any still-open row regardless of date, so a forgotten clock-out from
+    // a previous day doesn't just silently vanish from view.
+    const todayKey = ukDateKey()
+    const { data: attendanceData } = await supabase
+      .schema('pmms')
+      .from('daily_attendance')
+      .select('id, staff_id, work_date, clock_in_at, late_flag, clock_out_at, manual_override')
+      .or(`work_date.eq.${todayKey},clock_out_at.is.null`)
+      .order('clock_in_at', { ascending: false })
+
+    setAttendanceRows(assignableBuilders.map(b => ({
+      staffId: b.id,
+      staffName: b.name,
+      shift: (attendanceData || []).find(a => a.staff_id === b.id) || null,
+    })))
 
     // --- Section 1: currently clocked in (open work_sessions) ---
     const { data: openSessions } = await supabase
@@ -259,6 +296,57 @@ export default function AdminClocking({ profile, onNavigate }) {
   function openEditModal(row) { setEditRow(row) }
   function closeEditModal() { setEditRow(null) }
 
+  function openOverrideModal(mode, attendanceRow) {
+    setOverrideModal({ mode, staffId: attendanceRow.staffId, staffName: attendanceRow.staffName, rowId: attendanceRow.shift?.id })
+    setOverrideNote('')
+    setOverrideError('')
+  }
+  function closeOverrideModal() { setOverrideModal(null) }
+
+  // Escape hatch for when a builder genuinely can't clock themselves in or
+  // out (dead phone, no signal, etc.) and the dashboard gate would
+  // otherwise strand them all day -- a manager can do it for them, with a
+  // required note so there's always a reason on record for why a shift
+  // wasn't self-reported.
+  async function submitOverride() {
+    if (!overrideNote.trim()) { setOverrideError('Please add a note explaining the override.'); return }
+    setOverrideSaving(true)
+
+    if (overrideModal.mode === 'in') {
+      const now = new Date()
+      const { error } = await supabase
+        .schema('pmms')
+        .from('daily_attendance')
+        .insert({
+          staff_id: overrideModal.staffId,
+          work_date: ukDateKey(now.getTime()),
+          clock_in_at: now.toISOString(),
+          late_flag: ukTimeHHMM(now.getTime()) > dailyClockInDeadline,
+          manual_override: true,
+          override_note: overrideNote.trim(),
+          override_by: profile.id,
+        })
+      setOverrideSaving(false)
+      if (error) { setOverrideError(error.message); return }
+    } else {
+      const { error } = await supabase
+        .schema('pmms')
+        .from('daily_attendance')
+        .update({
+          clock_out_at: new Date().toISOString(),
+          manual_override: true,
+          override_note: overrideNote.trim(),
+          override_by: profile.id,
+        })
+        .eq('id', overrideModal.rowId)
+      setOverrideSaving(false)
+      if (error) { setOverrideError(error.message); return }
+    }
+
+    closeOverrideModal()
+    await fetchAll()
+  }
+
   async function submitEdit() {
     if (!editClockIn || !editClockOut) { setEditError('Please fill in both times.'); return }
 
@@ -333,6 +421,58 @@ export default function AdminClocking({ profile, onNavigate }) {
 
   return (
     <div>
+
+      {/* Section 0: Today's Attendance -- the day-level shift, separate
+          from the per-job sessions in Section 1 below. */}
+      <div style={{ background: COLORS.white, borderRadius: '16px', padding: '20px', marginBottom: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+        <h2 style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: 800, color: COLORS.slate900 }}>Today's Attendance</h2>
+        <p style={{ margin: '0 0 14px 0', fontSize: '13px', color: COLORS.slate500 }}>Day-level clock in/out. Builders can't see their jobs at all until they clock in for the day.</p>
+
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ background: COLORS.slate50, borderBottom: `1px solid ${COLORS.slate200}` }}>
+                <th style={thStyle}>Builder</th>
+                <th style={thStyle}>Clocked In</th>
+                <th style={thStyle}>Clocked Out</th>
+                <th style={{ ...thStyle, textAlign: 'right' }}>Override</th>
+              </tr>
+            </thead>
+            <tbody>
+              {attendanceRows.map(row => (
+                <tr key={row.staffId} style={{ borderBottom: `1px solid ${COLORS.slate100}` }}>
+                  <td style={tdStyle}>{row.staffName}</td>
+                  <td style={{ ...tdStyle, fontFamily: 'monospace', fontSize: '12px' }}>
+                    {row.shift ? (
+                      <>
+                        {formatUKDateTime(row.shift.clock_in_at)}
+                        {row.shift.late_flag && <span style={{ display: 'block', fontSize: '10px', fontWeight: 800, color: COLORS.amber700 }}>⚠ Late</span>}
+                        {row.shift.manual_override && <span style={{ display: 'block', fontSize: '10px', fontWeight: 700, color: COLORS.slate400 }}>Manager override</span>}
+                      </>
+                    ) : (
+                      <span style={{ color: COLORS.slate300 }}>Not clocked in</span>
+                    )}
+                  </td>
+                  <td style={{ ...tdStyle, fontFamily: 'monospace', fontSize: '12px' }}>
+                    {row.shift?.clock_out_at
+                      ? formatUKDateTime(row.shift.clock_out_at)
+                      : row.shift
+                        ? <span style={{ color: COLORS.teal600, fontWeight: 700, fontFamily: 'system-ui' }}>Still clocked in</span>
+                        : <span style={{ color: COLORS.slate300 }}>—</span>}
+                  </td>
+                  <td style={{ ...tdStyle, textAlign: 'right' }}>
+                    {row.shift && !row.shift.clock_out_at ? (
+                      <button onClick={() => openOverrideModal('out', row)} style={actionBtnStyle}>Clock Out For Them</button>
+                    ) : (
+                      <button onClick={() => openOverrideModal('in', row)} style={actionBtnStyle}>Clock In For Them</button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
       {/* Section 1: Currently Clocked In */}
       <div style={{ background: COLORS.white, borderRadius: '16px', padding: '20px', marginBottom: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
@@ -573,6 +713,35 @@ export default function AdminClocking({ profile, onNavigate }) {
               <button onClick={closeEditModal} style={modalCancelBtnStyle}>Cancel</button>
               <button onClick={submitEdit} disabled={editSaving} style={{ ...modalConfirmBtnStyle, opacity: editSaving ? 0.6 : 1, cursor: editSaving ? 'not-allowed' : 'pointer' }}>
                 {editSaving ? 'Saving...' : 'Save Correction'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {overrideModal && (
+        <div style={modalOverlayStyle}>
+          <div style={modalCardStyle}>
+            <p style={modalTitleStyle}>{overrideModal.mode === 'in' ? 'Clock In' : 'Clock Out'} — {overrideModal.staffName}</p>
+            <p style={{ margin: '2px 0 12px 0', fontSize: '13px', color: COLORS.slate500 }}>
+              For when they genuinely can't do it themselves (dead phone, no signal, etc.) -- add a reason so there's a record of why.
+            </p>
+
+            <label style={modalLabelStyle}>Reason</label>
+            <textarea
+              value={overrideNote}
+              onChange={(e) => setOverrideNote(e.target.value)}
+              placeholder="e.g. Phone dead, called in at 8:50am"
+              rows={3}
+              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', fontFamily: 'inherit', boxSizing: 'border-box', resize: 'vertical' }}
+            />
+
+            {overrideError && <p style={modalErrorStyle}>{overrideError}</p>}
+
+            <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
+              <button onClick={closeOverrideModal} style={modalCancelBtnStyle}>Cancel</button>
+              <button onClick={submitOverride} disabled={overrideSaving} style={{ ...modalConfirmBtnStyle, opacity: overrideSaving ? 0.6 : 1, cursor: overrideSaving ? 'not-allowed' : 'pointer' }}>
+                {overrideSaving ? 'Saving...' : `Confirm ${overrideModal.mode === 'in' ? 'Clock In' : 'Clock Out'}`}
               </button>
             </div>
           </div>

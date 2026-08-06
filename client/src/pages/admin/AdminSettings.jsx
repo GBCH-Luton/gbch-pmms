@@ -34,7 +34,7 @@ const expandToggleBtnStyle = { width: '32px', height: '32px', borderRadius: '8px
 const orderInputStyle = { width: '40px', height: '32px', padding: 0, borderRadius: '8px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', fontWeight: 700, color: COLORS.slate600, textAlign: 'center', boxSizing: 'border-box', flexShrink: 0 }
 const removeBtnStyle = { padding: '8px 14px', background: COLORS.white, color: COLORS.red600, border: `1px solid ${COLORS.red200}`, borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', flexShrink: 0, marginLeft: 'auto' }
 
-const SECTION_IDS = ['priority-thresholds', 'issue-scores', 'compliance-types', 'clocking-rules', 'stuck-ticket-alerts', 'compliance-alerts', 'dashboard-metrics']
+const SECTION_IDS = ['priority-thresholds', 'issue-scores', 'compliance-types', 'clocking-rules', 'daily-attendance', 'stuck-ticket-alerts', 'compliance-alerts', 'dashboard-metrics']
 
 function SettingsSection({ title, subtitle, headerExtra, open, onToggle, children }) {
   return (
@@ -115,6 +115,11 @@ export default function AdminSettings() {
   const [clockDistanceThresholdM, setClockDistanceThresholdM] = useState(250)
   const [clockingSaving, setClockingSaving] = useState(false)
   const [clockingSaved, setClockingSaved] = useState(false)
+
+  const [dailyClockInDeadline, setDailyClockInDeadline] = useState('09:00')
+  const [dailyClockOutReminderTime, setDailyClockOutReminderTime] = useState('17:00')
+  const [dailyAttendanceSaving, setDailyAttendanceSaving] = useState(false)
+  const [dailyAttendanceSaved, setDailyAttendanceSaved] = useState(false)
 
   const [stuckThresholds, setStuckThresholds] = useState(DEFAULT_STUCK_THRESHOLDS)
   const [stuckAlertsEnabled, setStuckAlertsEnabled] = useState(true)
@@ -228,6 +233,8 @@ export default function AdminSettings() {
       if (map.clock_overrun_hours != null) setClockOverrunHours(map.clock_overrun_hours)
       if (map.done_window_hours != null) setDoneWindowHours(map.done_window_hours)
       if (map.clock_distance_threshold_meters != null) setClockDistanceThresholdM(map.clock_distance_threshold_meters)
+      if (map.daily_clock_in_deadline != null) setDailyClockInDeadline(map.daily_clock_in_deadline)
+      if (map.daily_clock_out_reminder_time != null) setDailyClockOutReminderTime(map.daily_clock_out_reminder_time)
       if (map.new_property_window_hours != null) setNewPropertyWindowHours(map.new_property_window_hours)
       if (map.dashboard_total_tickets_period != null) setTotalTicketsPeriod(map.dashboard_total_tickets_period)
       if (Array.isArray(map.divisions) && map.divisions.length > 0) setDivisions(map.divisions)
@@ -557,6 +564,16 @@ export default function AdminSettings() {
     setClockingSaving(false)
     setClockingSaved(true)
     setTimeout(() => setClockingSaved(false), 2000)
+  }
+
+  async function saveDailyAttendanceSettings() {
+    setDailyAttendanceSaving(true)
+    setDailyAttendanceSaved(false)
+    await saveSetting('daily_clock_in_deadline', dailyClockInDeadline)
+    await saveSetting('daily_clock_out_reminder_time', dailyClockOutReminderTime)
+    setDailyAttendanceSaving(false)
+    setDailyAttendanceSaved(true)
+    setTimeout(() => setDailyAttendanceSaved(false), 2000)
   }
 
   function updateStuckThresholdCell(status, tier, field, value) {
@@ -1159,6 +1176,42 @@ export default function AdminSettings() {
           {clockingSaving ? 'Saving...' : 'Save Clocking Rules'}
         </button>
         {clockingSaved && <span style={savedTagStyle}>✓ Saved</span>}
+      </SettingsSection>
+
+      {/* Section 4a2: Daily Attendance */}
+      <SettingsSection
+        title="Daily Attendance"
+        subtitle="Builders must clock in for the day before they can see their jobs or dashboard at all -- separate from clocking in/out of an individual job."
+        open={!!openSections['daily-attendance']}
+        onToggle={() => toggleSection('daily-attendance')}
+      >
+        <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginBottom: '16px' }}>
+          <div style={{ flex: '1 1 200px' }}>
+            <label style={fieldLabelStyle}>Clock-in deadline (UK time)</label>
+            <input
+              type="time"
+              value={dailyClockInDeadline}
+              onChange={(e) => setDailyClockInDeadline(e.target.value)}
+              style={inputStyle}
+            />
+            <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: COLORS.slate400 }}>Clocking in after this time is flagged as late on the Clocking page.</p>
+          </div>
+          <div style={{ flex: '1 1 200px' }}>
+            <label style={fieldLabelStyle}>Clock-out reminder (UK time)</label>
+            <input
+              type="time"
+              value={dailyClockOutReminderTime}
+              onChange={(e) => setDailyClockOutReminderTime(e.target.value)}
+              style={inputStyle}
+            />
+            <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: COLORS.slate400 }}>A builder still clocked in for the day past this time gets a one-off push reminder to clock out.</p>
+          </div>
+        </div>
+
+        <button onClick={saveDailyAttendanceSettings} disabled={dailyAttendanceSaving} style={{ ...saveBtnStyle, opacity: dailyAttendanceSaving ? 0.6 : 1, cursor: dailyAttendanceSaving ? 'not-allowed' : 'pointer' }}>
+          {dailyAttendanceSaving ? 'Saving...' : 'Save Daily Attendance Settings'}
+        </button>
+        {dailyAttendanceSaved && <span style={savedTagStyle}>✓ Saved</span>}
       </SettingsSection>
 
       {/* Section 4b: Stuck Ticket Alerts */}

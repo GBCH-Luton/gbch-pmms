@@ -7,7 +7,7 @@ import { fetchMaintenanceCategories, fetchAllMaintenanceCategoryNames, sortedCat
 import { attachBuilderSafeProperties } from '../lib/properties'
 import { logLoginEvent } from '../lib/loginEvents'
 import { pushNotificationsSupported, hasActivePushSubscription, enablePushNotifications } from '../lib/pushNotifications'
-import { pushEmergencyAlert, priorityTierLabel, fetchPriorityThresholds, Avatar, formatUKDate, formatUKDateTime } from './admin/shared'
+import { pushEmergencyAlert, priorityTierLabel, fetchPriorityThresholds, Avatar, formatUKDate, formatUKDateTime, ukDateKey, ukTimeHHMM } from './admin/shared'
 import { fetchAvailableMaterials, logMaterialUsage } from '../lib/simsMaterialsBridge'
 import { fetchChannelMessages, subscribeToChannel, postMessage, markChannelRead, markChannelReadRemote, fetchChannelReads, countUnreadMentions, colorForSender } from '../lib/chat'
 import { fetchDmContacts, fetchConversations, fetchThreadMessages, subscribeToDm, postDm, markThreadRead, countUnreadDms } from '../lib/dm'
@@ -79,6 +79,21 @@ export default function BuilderDashboard({ profile }) {
   // showing at a time (selectedTicket is singular).
   const [clockingIn, setClockingIn] = useState(false)
   const [clockInError, setClockInError] = useState('')
+
+  // Day-level shift, separate from per-job clocking above -- gates the
+  // whole dashboard (see the early return right after the loading check)
+  // until a builder clocks in for the day. "Currently on shift" == the
+  // most recent pmms.daily_attendance row with clock_out_at still null,
+  // same open/closed convention as pmms.work_sessions.ended_at, rather
+  // than a work_date match -- so a shift that runs past midnight UK time
+  // doesn't spuriously ask for a second clock-in.
+  const [todayShift, setTodayShift] = useState(null)
+  const [shiftLoading, setShiftLoading] = useState(true)
+  const [dailyClockInDeadline, setDailyClockInDeadline] = useState('09:00')
+  const [clockingInForDay, setClockingInForDay] = useState(false)
+  const [clockInForDayError, setClockInForDayError] = useState('')
+  const [clockingOutForDay, setClockingOutForDay] = useState(false)
+  const [clockOutForDayError, setClockOutForDayError] = useState('')
   const [comments, setComments] = useState([])
   const [commentText, setCommentText] = useState('')
   const [commentError, setCommentError] = useState('')
@@ -155,8 +170,11 @@ export default function BuilderDashboard({ profile }) {
     fetchTickets()
     fetchNotifications()
     fetchAvailableJobs()
+    fetchTodayShift()
     fetchPriorityThresholds().then(({ p1, p2 }) => { setP1Threshold(p1); setP2Threshold(p2) })
     fetchRoutineVisitChecklistTemplate()
+    supabase.schema('pmms').from('settings').select('setting_value').eq('setting_key', 'daily_clock_in_deadline').maybeSingle()
+      .then(({ data }) => { if (data?.setting_value) setDailyClockInDeadline(data.setting_value) })
     // Permission alone doesn't mean a subscription actually exists (a
     // browser can report "granted" with nothing ever subscribed) -- this
     // is the real check for whether the button should offer to enable.
@@ -514,6 +532,75 @@ export default function BuilderDashboard({ profile }) {
         action,
         summary,
       })
+  }
+
+  async function fetchTodayShift() {
+    const { data } = await supabase
+      .schema('pmms')
+      .from('daily_attendance')
+      .select('id, work_date, clock_in_at, late_flag')
+      .eq('staff_id', profile.id)
+      .is('clock_out_at', null)
+      .order('clock_in_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    setTodayShift(data || null)
+    setShiftLoading(false)
+  }
+
+  async function handleClockInForDay() {
+    setClockInForDayError('')
+    setClockingInForDay(true)
+    const position = await getCurrentPositionSafe()
+    if (!position) {
+      setClockingInForDay(false)
+      setClockInForDayError("Couldn't get your location. Make sure location is turned on and you have signal, then try again.")
+      return
+    }
+
+    const now = new Date()
+    const { data, error } = await supabase
+      .schema('pmms')
+      .from('daily_attendance')
+      .insert({
+        staff_id: profile.id,
+        work_date: ukDateKey(now.getTime()),
+        clock_in_at: now.toISOString(),
+        clock_in_lat: position.latitude,
+        clock_in_lng: position.longitude,
+        late_flag: ukTimeHHMM(now.getTime()) > dailyClockInDeadline,
+      })
+      .select('id, work_date, clock_in_at, late_flag')
+      .single()
+
+    setClockingInForDay(false)
+    if (error) { setClockInForDayError(error.message); return }
+    setTodayShift(data)
+  }
+
+  async function handleClockOutForDay() {
+    setClockOutForDayError('')
+    const stillWorking = tickets.find(t => t.status === 'In Progress')
+    if (stillWorking) {
+      setClockOutForDayError(`Job #${stillWorking.ticket_number} is still in progress -- pause or complete it before clocking out for the day.`)
+      return
+    }
+
+    setClockingOutForDay(true)
+    // Unlike clocking IN for the day, a missing GPS fix here doesn't block
+    // clocking out -- same asymmetry as the existing per-job clock-out,
+    // which only ever requires a fix on the way in.
+    const position = await getCurrentPositionSafe()
+
+    const { error } = await supabase
+      .schema('pmms')
+      .from('daily_attendance')
+      .update({ clock_out_at: new Date().toISOString(), clock_out_lat: position?.latitude ?? null, clock_out_lng: position?.longitude ?? null })
+      .eq('id', todayShift.id)
+
+    setClockingOutForDay(false)
+    if (error) { setClockOutForDayError(error.message); return }
+    setTodayShift(null)
   }
 
   async function handleClockIn(transitStart, milesLogged) {
@@ -1265,9 +1352,35 @@ export default function BuilderDashboard({ profile }) {
 
   const ticketStep4Complete = !!ticketIssueTag && (!isUnlistedTag(ticketIssueTag) || !!ticketIssueOther.trim())
 
-  if (loading) return (
+  if (loading || shiftLoading) return (
     <div style={{ minHeight: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: COLORS.slate100 }}>
       <p style={{ color: COLORS.slate400, fontWeight: 600, fontFamily: 'system-ui' }}>Loading your jobs...</p>
+    </div>
+  )
+
+  // Gates the whole dashboard -- no job list, no other pages -- until the
+  // builder clocks in for the day. Directors' call: they couldn't tell
+  // where a builder was or whether they'd started work, so the day itself
+  // now has its own clock-in, separate from (and required before) clocking
+  // into any individual job.
+  if (!todayShift) return (
+    <div style={{ minHeight: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: COLORS.slate100, fontFamily: 'system-ui, sans-serif', padding: '20px' }}>
+      <div style={{ width: '100%', maxWidth: '360px', background: COLORS.white, borderRadius: '20px', padding: '28px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', textAlign: 'center' }}>
+        <img src={gbchLogo} alt="GBCH" style={{ height: '44px', marginBottom: '16px' }} />
+        <p style={{ margin: '0 0 6px 0', fontSize: '18px', fontWeight: 800, color: COLORS.slate900 }}>Good {new Date().getHours() < 12 ? 'morning' : 'afternoon'}, {profile.name.split(' ')[0]}</p>
+        <p style={{ margin: '0 0 24px 0', fontSize: '13px', color: COLORS.slate500, lineHeight: 1.5 }}>Clock in to start your working day and see your jobs.</p>
+        <button
+          onClick={handleClockInForDay}
+          disabled={clockingInForDay}
+          style={{ width: '100%', padding: '16px', background: COLORS.teal600, color: COLORS.white, border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: 700, cursor: clockingInForDay ? 'not-allowed' : 'pointer', opacity: clockingInForDay ? 0.7 : 1 }}
+        >
+          {clockingInForDay ? 'Getting your location…' : '✓ Clock In for the Day'}
+        </button>
+        {clockInForDayError && <p style={{ margin: '12px 0 0 0', fontSize: '13px', color: COLORS.red500, fontWeight: 600 }}>{clockInForDayError}</p>}
+        <button onClick={handleSignOut} style={{ marginTop: '18px', background: 'none', border: 'none', fontSize: '12px', color: COLORS.slate400, cursor: 'pointer', textDecoration: 'underline' }}>
+          Sign out
+        </button>
+      </div>
     </div>
   )
 
@@ -1412,6 +1525,25 @@ export default function BuilderDashboard({ profile }) {
             {pushError && <p style={{ margin: '8px 4px 0 4px', fontSize: '12px', color: COLORS.red300 }}>{pushError}</p>}
           </div>
         )}
+      </div>
+
+      {/* Day shift banner -- only ever reachable once past the daily
+          clock-in gate above, so todayShift is always set here. */}
+      <div style={{ maxWidth: '600px', margin: '10px auto 0 auto', padding: '0 16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap', background: todayShift.late_flag ? COLORS.amber50 : COLORS.slate50, border: `1px solid ${todayShift.late_flag ? COLORS.amber300 : COLORS.slate200}`, borderRadius: '12px', padding: '10px 14px' }}>
+          <span style={{ fontSize: '13px', fontWeight: 600, color: todayShift.late_flag ? COLORS.amber900 : COLORS.slate600 }}>
+            {todayShift.late_flag ? '⚠ ' : '🟢 '}Clocked in since {formatUKDateTime(todayShift.clock_in_at).split(' ').slice(-1)[0]}
+            {todayShift.late_flag && ' (late)'}
+          </span>
+          <button
+            onClick={handleClockOutForDay}
+            disabled={clockingOutForDay}
+            style={{ padding: '8px 14px', background: COLORS.slate900, color: COLORS.white, border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: clockingOutForDay ? 'not-allowed' : 'pointer', opacity: clockingOutForDay ? 0.7 : 1 }}
+          >
+            {clockingOutForDay ? 'Clocking out…' : 'Clock Out for the Day'}
+          </button>
+        </div>
+        {clockOutForDayError && <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: COLORS.red500, fontWeight: 600 }}>{clockOutForDayError}</p>}
       </div>
 
       {/* Metric tiles */}
