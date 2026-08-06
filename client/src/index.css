@@ -58,6 +58,44 @@ body {
   }
 }
 
+/* Slim, unobtrusive scrollbars app-wide -- Windows Chrome falls back to a
+   wide, classic arrow-button scrollbar wherever an accessibility setting
+   ("always show scrollbars") is on, which reads as broken/ugly against
+   this app's design, especially where several panels scroll internally at
+   once on a shorter laptop screen (sidebar nav, in-page tables/cards).
+   Chromium respects this override regardless of that OS setting. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(15, 23, 42, 0.22) transparent;
+}
+*::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgba(15, 23, 42, 0.22);
+  border-radius: 999px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(15, 23, 42, 0.38);
+}
+
+/* The sidebar nav sits on a dark navy background -- the dark-on-transparent
+   thumb above would be nearly invisible there, so it gets a light,
+   translucent-white variant instead. */
+.pmms-sidebar-nav {
+  scrollbar-color: rgba(255, 255, 255, 0.28) transparent;
+}
+.pmms-sidebar-nav::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.28);
+}
+.pmms-sidebar-nav::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.45);
+}
+
 /* PrintableTicketReport.jsx: the standard "print only this element" trick --
    hides literally everything in the page except .pmms-print-area, regardless
    of z-index/overlay stacking elsewhere in the app, then re-hides the

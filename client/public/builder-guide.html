@@ -30,6 +30,16 @@
     line-height: 1.5;
   }
 
+  /* This page is embedded via iframe in AdminBuilderGuide.jsx, its own
+     separate document -- the parent app's scrollbar styling can't reach in
+     here, so it needs its own copy to avoid the same wide arrow-button
+     scrollbar the parent app fixed. */
+  html { scrollbar-width: thin; scrollbar-color: rgba(15,23,42,0.22) transparent; }
+  ::-webkit-scrollbar { width: 9px; height: 9px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(15,23,42,0.22); border-radius: 999px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(15,23,42,0.38); }
+
   .wrap { max-width: 980px; margin: 0 auto; padding: 28px 20px 80px; }
 
   header.hero {

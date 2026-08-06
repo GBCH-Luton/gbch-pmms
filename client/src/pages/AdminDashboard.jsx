@@ -298,7 +298,7 @@ export default function AdminDashboard({ profile }) {
   }
 
   const navButtonStyle = (active) => ({
-    display: 'flex', alignItems: 'center', gap: '10px', width: '100%', textAlign: 'left', padding: '7px 12px', marginBottom: '1px',
+    display: 'flex', alignItems: 'center', gap: '10px', width: '100%', textAlign: 'left', padding: '6px 12px', marginBottom: '1px',
     borderRadius: '8px', border: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: active ? 700 : 400,
     background: active ? COLORS.greenDark : 'transparent', color: COLORS.white, fontFamily: 'inherit',
   })
@@ -397,7 +397,7 @@ export default function AdminDashboard({ profile }) {
 
         <button
           onClick={() => goToPage('dashboard')}
-          style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'none', border: 'none', padding: '20px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.1)', width: '100%', textAlign: 'left', justifyContent: isCollapsed ? 'center' : 'flex-start' }}
+          style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'none', border: 'none', padding: '16px 20px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.1)', width: '100%', textAlign: 'left', justifyContent: isCollapsed ? 'center' : 'flex-start' }}
         >
           <img src={gbchLogo} alt="GBCH" style={{ height: '32px', flexShrink: 0 }} />
           {!isCollapsed && <span style={{ fontSize: '15px', fontWeight: 800, color: COLORS.white, whiteSpace: 'nowrap' }}>PMMS</span>}
@@ -421,7 +421,7 @@ export default function AdminDashboard({ profile }) {
           </div>
         )}
 
-        <nav style={{ flex: 1, padding: '10px', overflowY: 'auto', overflowX: 'hidden' }}>
+        <nav className="pmms-sidebar-nav" style={{ flex: 1, padding: '8px 10px', overflowY: 'auto', overflowX: 'hidden' }}>
           {mainNavItems.map(item => {
             // Collapsed mode drops full count badges for a small corner dot
             // instead -- "something here needs attention," without the
@@ -438,7 +438,7 @@ export default function AdminDashboard({ profile }) {
                     <div onMouseEnter={(e) => showTip(e, item.label)} onMouseLeave={hideTip}>
                       <button
                         onClick={() => handleNavItemClick(item)}
-                        style={{ ...navButtonStyle(item.children.some(c => c.key === currentPage)), justifyContent: isCollapsed ? 'center' : 'flex-start', padding: isCollapsed ? '9px 0' : '7px 12px' }}
+                        style={{ ...navButtonStyle(item.children.some(c => c.key === currentPage)), justifyContent: isCollapsed ? 'center' : 'flex-start', padding: isCollapsed ? '8px 0' : '6px 12px' }}
                       >
                         <span style={navIconStyle}><NavIcon name={item.icon} /></span>
                         {!isCollapsed && (
@@ -463,7 +463,7 @@ export default function AdminDashboard({ profile }) {
                   <div onMouseEnter={(e) => showTip(e, item.label)} onMouseLeave={hideTip}>
                     <button
                       onClick={() => goToPage(item.key)}
-                      style={{ ...navButtonStyle(currentPage === item.key), justifyContent: isCollapsed ? 'center' : 'flex-start', padding: isCollapsed ? '9px 0' : '7px 12px' }}
+                      style={{ ...navButtonStyle(currentPage === item.key), justifyContent: isCollapsed ? 'center' : 'flex-start', padding: isCollapsed ? '8px 0' : '6px 12px' }}
                     >
                       <span style={{ ...navIconStyle, position: 'relative' }}>
                         <NavIcon name={item.icon} />
@@ -490,14 +490,14 @@ export default function AdminDashboard({ profile }) {
                   </div>
                 )}
                 {DIVIDER_AFTER_KEYS.includes(item.key) && (
-                  <div style={{ borderTop: '1px solid rgba(255,255,255,0.12)', margin: '6px 4px' }} />
+                  <div style={{ borderTop: '1px solid rgba(255,255,255,0.12)', margin: '4px 4px' }} />
                 )}
               </Fragment>
             )
           })}
         </nav>
 
-        <div style={{ padding: '16px', borderTop: '1px solid rgba(255,255,255,0.1)', position: 'relative' }}>
+        <div style={{ padding: '12px 16px', borderTop: '1px solid rgba(255,255,255,0.1)', position: 'relative' }}>
           {popoverOpen && (
             <div
               ref={popoverRef}
