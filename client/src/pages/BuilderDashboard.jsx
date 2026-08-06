@@ -7,7 +7,7 @@ import { fetchMaintenanceCategories, fetchAllMaintenanceCategoryNames, sortedCat
 import { attachBuilderSafeProperties } from '../lib/properties'
 import { logLoginEvent } from '../lib/loginEvents'
 import { pushNotificationsSupported, hasActivePushSubscription, enablePushNotifications } from '../lib/pushNotifications'
-import { pushEmergencyAlert, priorityTierLabel, fetchPriorityThresholds, Avatar, formatUKDate, formatUKDateTime, ukDateKey, ukTimeHHMM } from './admin/shared'
+import { pushEmergencyAlert, priorityTierLabel, fetchPriorityThresholds, Avatar, formatUKDate, formatUKDateTime, ukDateKey, ukTimeHHMM, minutesLate } from './admin/shared'
 import { fetchAvailableMaterials, logMaterialUsage } from '../lib/simsMaterialsBridge'
 import { fetchChannelMessages, subscribeToChannel, postMessage, markChannelRead, markChannelReadRemote, fetchChannelReads, countUnreadMentions, colorForSender } from '../lib/chat'
 import { fetchDmContacts, fetchConversations, fetchThreadMessages, subscribeToDm, postDm, markThreadRead, countUnreadDms } from '../lib/dm'
@@ -1630,7 +1630,7 @@ export default function BuilderDashboard({ profile }) {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap', background: todayShift.late_flag ? COLORS.amber50 : COLORS.slate50, border: `1px solid ${todayShift.late_flag ? COLORS.amber300 : COLORS.slate200}`, borderRadius: '12px', padding: '10px 14px' }}>
             <span style={{ fontSize: '13px', fontWeight: 600, color: todayShift.late_flag ? COLORS.amber900 : COLORS.slate600 }}>
               {todayShift.late_flag ? '⚠ ' : '🟢 '}Clocked in since {formatUKDateTime(todayShift.clock_in_at).split(' ').slice(-1)[0]}
-              {todayShift.late_flag && ' (late)'}
+              {todayShift.late_flag && ` (${minutesLate(todayShift.clock_in_at, dailyClockInDeadline)}m late)`}
             </span>
             <div style={{ display: 'flex', gap: '8px' }}>
               <button

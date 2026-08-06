@@ -5,7 +5,7 @@ import { distanceMetres, googleMapsEmbedLink, googleMapsRouteEmbedLink, metresTo
 import { attachProperties } from '../../lib/properties'
 import {
   thStyle, tdStyle, actionBtnStyle, filterSelectStyle, formatUKDate, formatUKDateTime, toUkDateTimeInputValue, ukDateTimeInputValueToMs,
-  ukDateKey, ukTimeHHMM,
+  ukDateKey, ukTimeHHMM, minutesLate,
   modalOverlayStyle, modalCardStyle, modalTitleStyle, modalLabelStyle,
   modalErrorStyle, modalCancelBtnStyle, modalConfirmBtnStyle, fetchAssignableBuilders, fetchAssignableStaffForDivision,
 } from './shared'
@@ -528,7 +528,7 @@ export default function AdminClocking({ profile, onNavigate }) {
                     {row.shift ? (
                       <>
                         {formatUKDateTime(row.shift.clock_in_at)}
-                        {row.shift.late_flag && <span style={{ display: 'block', fontSize: '10px', fontWeight: 800, color: COLORS.amber700 }}>⚠ Late</span>}
+                        {row.shift.late_flag && <span style={{ display: 'block', fontSize: '10px', fontWeight: 800, color: COLORS.amber700 }}>⚠ {minutesLate(row.shift.clock_in_at, dailyClockInDeadline)}m late</span>}
                         {row.shift.manual_override && <span style={{ display: 'block', fontSize: '10px', fontWeight: 700, color: COLORS.slate400 }}>Manager override</span>}
                       </>
                     ) : (

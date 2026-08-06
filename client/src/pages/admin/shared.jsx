@@ -532,6 +532,18 @@ export function ukTimeHHMM(ms = Date.now()) {
   return `${p.hour}:${p.minute}`
 }
 
+// How many minutes after an "HH:mm" deadline a UK timestamp falls --
+// used to show "12m late" rather than just a bare late flag. Negative/
+// zero when on time; callers only display this when they already know
+// the shift was late (daily_attendance.late_flag), so a caller never
+// needs to handle "how early" as a separate case.
+export function minutesLate(isoString, deadlineHHMM) {
+  const p = ukPartsOf(new Date(isoString).getTime())
+  const clockInMinutes = Number(p.hour) * 60 + Number(p.minute)
+  const [dh, dm] = deadlineHHMM.split(':').map(Number)
+  return clockInMinutes - (dh * 60 + dm)
+}
+
 export const filterSelectStyle = { padding: '8px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', fontWeight: 600, color: COLORS.slate900, background: COLORS.slate50, cursor: 'pointer' }
 export const thStyle = { padding: '10px 14px', textAlign: 'left', fontSize: '10px', fontWeight: 800, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }
 export const tdStyle = { padding: '12px 14px', verticalAlign: 'top', fontSize: '13px' }
