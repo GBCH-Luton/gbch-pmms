@@ -30,6 +30,7 @@ const AdminReports = lazy(() => import('./admin/AdminReports'))
 const AdminSettings = lazy(() => import('./admin/AdminSettings'))
 const AdminAccess = lazy(() => import('./admin/AdminAccess'))
 const AdminHelp = lazy(() => import('./admin/AdminHelp'))
+const AdminBuilderGuide = lazy(() => import('./admin/AdminBuilderGuide'))
 const AdminHousekeeping = lazy(() => import('./admin/AdminHousekeeping'))
 const AdminEvents = lazy(() => import('./admin/AdminEvents'))
 const AdminViewAs = lazy(() => import('./admin/AdminViewAs'))
@@ -66,6 +67,10 @@ const NAV_ITEMS = [
   { key: 'housekeeping', label: 'Housekeeping', icon: 'broom', Component: AdminHousekeeping, divisionOnly: 'Housekeeping' },
   { key: 'builders', label: 'Staff', icon: 'users', Component: AdminBuilders },
   { key: 'clocking', label: 'Clocking', icon: 'clock', Component: AdminClocking },
+  // Read-only for admin AND manager -- deliberately not adminOnly, unlike
+  // Help & Guide below. No divisions/divisionOnly gating either: Daily
+  // Attendance is a company-wide layer, not Maintenance-specific.
+  { key: 'builder-guide', label: 'Builder App Guide', icon: 'phone', Component: AdminBuilderGuide },
   { key: 'stock', label: 'Stock', icon: 'box', Component: AdminStock, divisions: ['Maintenance'] },
   { key: 'reports', label: 'Reports', icon: 'chart', Component: AdminReports },
   // Trial section, admin-only while it's being tried out and shown to
@@ -96,9 +101,9 @@ const POPOVER_ITEM_KEYS = ['settings', 'admin', 'view-as', 'help']
 // Visual grouping dividers in the main nav: Dashboard alone, then the
 // ticket lifecycle (Pipeline/Log a Ticket/Sign-Off), then property/
 // division monitoring (Properties/Voids/Compliance/Housekeeping), then
-// people-ops (Staff/Clocking), then Stock/Reports, then the AI Trial
-// section set apart on its own.
-const DIVIDER_AFTER_KEYS = ['team-chat', 'sign-off', 'housekeeping', 'clocking', 'reports']
+// people-ops (Staff/Clocking/Builder App Guide), then Stock/Reports, then
+// the AI Trial section set apart on its own.
+const DIVIDER_AFTER_KEYS = ['team-chat', 'sign-off', 'housekeeping', 'builder-guide', 'reports']
 
 const PENDING_SIGN_OFF_POLL_MS = 20000
 

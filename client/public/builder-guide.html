@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PMMS Builder App Guide</title>
+<style>
+  :root {
+    --guide-bg: #f8fafc;
+    --guide-surface: #ffffff;
+    --guide-surface-2: #f1f5f9;
+    --guide-border: #e2e8f0;
+    --guide-text: #0f172a;
+    --guide-text-dim: #64748b;
+    --guide-text-faint: #94a3b8;
+    --guide-accent: #0d9488;
+    --guide-accent-dark: #0f766e;
+    --guide-accent-bg: #f0fdfa;
+    --frame-bezel: #1e293b;
+    --frame-bezel-2: #334155;
+    --shadow: 0 1px 3px rgba(15,23,42,0.08), 0 8px 24px rgba(15,23,42,0.06);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--guide-bg);
+    color: var(--guide-text);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    line-height: 1.5;
+  }
+
+  .wrap { max-width: 980px; margin: 0 auto; padding: 28px 20px 80px; }
+
+  header.hero {
+    padding: 8px 0 24px;
+    border-bottom: 1px solid var(--guide-border);
+    margin-bottom: 24px;
+  }
+  .eyebrow {
+    font-size: 12px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--guide-accent-dark); margin: 0 0 8px 0;
+  }
+  h1 { font-size: clamp(24px, 4vw, 32px); font-weight: 800; margin: 0 0 10px 0; letter-spacing: -0.01em; }
+  .sub { font-size: 15px; color: var(--guide-text-dim); max-width: 640px; margin: 0; }
+
+  .disclaimer {
+    display: flex; gap: 12px; align-items: flex-start;
+    background: var(--guide-surface-2); border: 1px solid var(--guide-border);
+    border-radius: 12px; padding: 14px 16px; margin: 20px 0 0 0; font-size: 13px; color: var(--guide-text-dim);
+  }
+  .disclaimer b { color: var(--guide-text); }
+
+  .print-hint {
+    display: flex; gap: 10px; align-items: center;
+    background: var(--guide-accent-bg); border: 1px solid var(--guide-accent); border-radius: 12px;
+    padding: 12px 16px; margin: 12px 0 0 0; font-size: 13px; color: var(--guide-accent-dark); font-weight: 600;
+  }
+
+  .track-intro { font-size: 14px; color: var(--guide-text-dim); margin: 8px 0 28px 0; max-width: 680px; }
+
+  /* Step card */
+  .step {
+    display: grid; grid-template-columns: 1fr; gap: 18px;
+    padding: 26px 0; border-top: 1px solid var(--guide-border);
+  }
+  .step:first-of-type { border-top: none; }
+  @media (min-width: 760px) {
+    .step { grid-template-columns: minmax(240px, 320px) 1fr; align-items: start; }
+    .step.reverse { grid-template-columns: 1fr minmax(240px, 320px); }
+    .step.reverse .step-mock { order: 2; }
+  }
+  .step-num {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 26px; height: 26px; border-radius: 50%; background: var(--guide-accent); color: #fff;
+    font-size: 12px; font-weight: 800; flex-shrink: 0;
+  }
+  .step-title { display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 800; margin: 0 0 8px 0; }
+  .step-body p { font-size: 14px; color: var(--guide-text-dim); margin: 0 0 8px 0; }
+  .step-body ul { margin: 8px 0 0 0; padding-left: 18px; font-size: 14px; color: var(--guide-text-dim); }
+  .step-body li { margin-bottom: 4px; }
+  .step-mock { display: flex; justify-content: center; }
+
+  .callout {
+    display: inline-block; margin-top: 10px; font-size: 12px; font-weight: 700;
+    padding: 5px 10px; border-radius: 999px;
+  }
+  .callout.tap { background: var(--guide-accent-bg); color: var(--guide-accent-dark); }
+  .callout.warn { background: #fffbeb; color: #92400e; }
+
+  /* Phone frame */
+  .phone {
+    width: 100%; max-width: 300px; background: var(--frame-bezel); border-radius: 34px; padding: 10px;
+    box-shadow: var(--shadow);
+  }
+  .phone .notch { width: 70px; height: 6px; background: var(--frame-bezel-2); border-radius: 4px; margin: 0 auto 8px; }
+  .phone .screen {
+    background: #f1f5f9; border-radius: 22px; overflow: hidden; font-family: system-ui, sans-serif;
+    min-height: 420px; display: flex; flex-direction: column;
+  }
+
+  /* ---- Mock UI atoms (recreations of the real app, real hex values) ---- */
+  .mock-header {
+    background: #ffffff; border-bottom: 1px solid #e2e8f0; padding: 12px 16px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .mock-logo { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 13px; color: #0f172a; }
+  .mock-logo .sq { width: 22px; height: 22px; border-radius: 6px; background: linear-gradient(135deg,#0D1B3E,#0D2F5E); }
+  .mock-icons { display: flex; gap: 10px; font-size: 15px; }
+
+  .mock-card {
+    background: #fff; border-radius: 14px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+  .mock-btn {
+    display: inline-block; border: none; border-radius: 10px; font-weight: 700; font-size: 13px;
+    padding: 10px 16px; text-align: center; cursor: default; font-family: inherit;
+  }
+  .mock-btn.primary { background: #0d9488; color: #fff; }
+  .mock-btn.dark { background: #0f172a; color: #fff; }
+  .mock-btn.ghost { background: #fff; color: #475569; border: 1px solid #e2e8f0; }
+  .mock-btn.block { display: block; width: 100%; }
+
+  .mock-banner {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;
+    border-radius: 12px; padding: 10px 14px; font-size: 12.5px; font-weight: 600;
+  }
+  .mock-banner.ok { background: #f8fafc; border: 1px solid #e2e8f0; color: #475569; }
+  .mock-banner.late { background: #fffbeb; border: 1px solid #fcd34d; color: #92400e; }
+  .mock-banner.away { background: #ede9fe; border: 1px solid #8b5cf6; color: #7c3aed; }
+
+  .mock-kpi-row { display: flex; gap: 6px; }
+  .mock-kpi { flex: 1; border-radius: 10px; padding: 10px 6px; text-align: center; color: #fff; }
+  .mock-kpi .n { font-size: 17px; font-weight: 800; display: block; }
+  .mock-kpi .l { font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+
+  .mock-ticket {
+    background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 12px; margin-top: 8px;
+  }
+  .mock-ticket .addr { font-weight: 700; font-size: 12px; color: #0f172a; }
+  .mock-ticket .meta { font-size: 10.5px; color: #64748b; margin-top: 2px; }
+
+  .mock-modal-overlay {
+    position: absolute; inset: 0; background: rgba(15,23,42,0.45); display: flex; align-items: center;
+    justify-content: center; padding: 14px;
+  }
+  .mock-modal {
+    background: #fff; border-radius: 14px; padding: 16px; width: 100%; max-width: 250px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+  }
+  .mock-modal-title { font-size: 13px; font-weight: 800; color: #0f172a; margin: 0 0 4px 0; }
+  .mock-modal-sub { font-size: 11px; color: #64748b; margin: 0 0 10px 0; }
+  .mock-input {
+    width: 100%; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 10px; font-size: 12px;
+    color: #0f172a; background: #fff; margin-bottom: 8px; font-family: inherit;
+  }
+
+  footer.end {
+    margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--guide-border);
+    font-size: 12.5px; color: var(--guide-text-faint); text-align: center;
+  }
+
+  /* ===================== PRINT / PDF ===================== */
+  @media print {
+    @page { size: A4; margin: 12mm 10mm; }
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    body { background: #fff; }
+    .wrap { max-width: none; padding: 0; }
+    .disclaimer, .print-hint { display: none !important; }
+    header.hero { border-bottom: none; margin-bottom: 6px; padding-bottom: 0; }
+    .step {
+      break-inside: avoid; padding: 0; border-top: none;
+      display: grid !important; grid-template-columns: 220px 1fr !important;
+      gap: 14px !important; align-items: start !important;
+    }
+    .step.reverse { grid-template-columns: 1fr 220px !important; }
+    .step.reverse .step-mock { order: 2 !important; }
+    .step + .step { break-before: page; }
+    .phone { box-shadow: none; border: 1px solid #cbd5e1; }
+    .phone .screen { min-height: 0 !important; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <p class="eyebrow">GBCH PMMS &middot; Builder App Guide</p>
+    <h1>How a Builder Uses the App</h1>
+    <p class="sub">Exactly what a builder sees on their phone, step by step, from clocking in for the day to clocking out.</p>
+    <div class="disclaimer">
+      <span style="font-size:18px;">&#9432;</span>
+      <span><b>These are recreated mockups, not live screenshots</b> &mdash; built from the same colours, wording and layout as the real, already-deployed code, since screenshots of a running app weren't available when this was written. Every screen, label and button shown here matches what's actually live in production as of 2026-08-06.</span>
+    </div>
+    <div class="print-hint">
+      🖨️ <span>To save as PDF: <b>Print this page</b> (Ctrl/Cmd+P) &rarr; destination "Save as PDF" &rarr; make sure <b>"Background graphics"</b> is turned on so the phone mockups render.</span>
+    </div>
+  </header>
+
+  <section>
+    <p class="track-intro">Follow these steps in order &mdash; this is exactly what a builder sees on their phone from the moment they open the app in the morning to the moment they finish for the day.</p>
+
+    <!-- Step 1 -->
+    <div class="step">
+      <div class="step-mock">
+        <div class="phone"><div class="notch"></div>
+          <div class="screen" style="align-items:center; justify-content:center; padding:20px; text-align:center;">
+            <div style="background:#fff; border-radius:20px; padding:28px 20px; box-shadow:0 4px 20px rgba(0,0,0,0.08); width:100%;">
+              <div style="width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,#0D1B3E,#0D2F5E);margin:0 auto 14px;"></div>
+              <p style="font-size:15px;font-weight:800;color:#0f172a;margin:0 0 6px 0;">Good morning, Dave</p>
+              <p style="font-size:11.5px;color:#64748b;margin:0 0 20px 0;line-height:1.5;">Clock in to start your working day and see your jobs.</p>
+              <button class="mock-btn primary block">✓ Clock In for the Day</button>
+              <p style="font-size:10px;color:#94a3b8;margin-top:14px;text-decoration:underline;">Sign out</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="step-body">
+        <p class="step-title"><span class="step-num">1</span> Open the app</p>
+        <p>This is the <b>first thing a builder sees every morning</b> &mdash; before their jobs, before anything else. They can't get past this screen without clocking in.</p>
+        <ul>
+          <li>It greets them by name and says "good morning" or "good afternoon" depending on the time.</li>
+          <li>They tap the big teal button to start their day.</li>
+        </ul>
+        <span class="callout tap">👉 Tap "Clock In for the Day"</span>
+      </div>
+    </div>
+
+    <!-- Step 2 -->
+    <div class="step reverse">
+      <div class="step-mock">
+        <div class="phone"><div class="notch"></div>
+          <div class="screen" style="position:relative;">
+            <div style="padding:20px;opacity:0.35;">
+              <div style="width:44px;height:44px;border-radius:10px;background:#0D1B3E;margin:0 auto;"></div>
+            </div>
+            <div style="position:absolute; left:10px; right:10px; top:60px; background:#fff; border-radius:12px; box-shadow:0 8px 24px rgba(0,0,0,0.18); padding:16px; font-size:11.5px;">
+              <p style="font-weight:700; color:#0f172a; margin:0 0 4px 0;">Allow "pmms" to use your location?</p>
+              <p style="color:#64748b; margin:0 0 12px 0;">This lets the app record where you clocked in from.</p>
+              <div style="display:flex; gap:8px;">
+                <div style="flex:1; text-align:center; padding:8px; border-radius:8px; background:#f1f5f9; color:#475569; font-weight:700;">Don't Allow</div>
+                <div style="flex:1; text-align:center; padding:8px; border-radius:8px; background:#0d9488; color:#fff; font-weight:700;">Allow</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="step-body">
+        <p class="step-title"><span class="step-num">2</span> Allow location when asked</p>
+        <p>Their phone asks for permission to share location. This is normal &mdash; it's how the app records where they clocked in from.</p>
+        <ul>
+          <li>They should always tap <b>Allow</b>, not "Don't Allow".</li>
+          <li>If they accidentally block it, clocking in won't work &mdash; they'll need to turn location on in their phone's Settings and try again.</li>
+        </ul>
+        <span class="callout tap">👉 Tap "Allow"</span>
+      </div>
+    </div>
+
+    <!-- Step 3 -->
+    <div class="step">
+      <div class="step-mock">
+        <div style="display:flex; flex-direction:column; gap:10px; align-items:center;">
+          <div class="phone"><div class="notch"></div>
+            <div class="screen">
+              <div class="mock-header">
+                <div class="mock-logo"><div class="sq"></div>PMMS</div>
+                <div class="mock-icons">🔔 ☰</div>
+              </div>
+              <div style="padding:10px 14px 0;">
+                <div class="mock-banner ok">
+                  <span>🟢 Clocked in since 08:03</span>
+                  <div style="display:flex; gap:6px;">
+                    <button class="mock-btn ghost" style="padding:6px 10px;font-size:10.5px;">Leaving Site</button>
+                    <button class="mock-btn dark" style="padding:6px 10px;font-size:10.5px;">Clock Out for the Day</button>
+                  </div>
+                </div>
+              </div>
+              <div style="padding:12px 14px;">
+                <div class="mock-kpi-row">
+                  <div class="mock-kpi" style="background:#0d9488;"><span class="n">2</span><span class="l">Working Now</span></div>
+                  <div class="mock-kpi" style="background:#3b82f6;"><span class="n">3</span><span class="l">To Do</span></div>
+                </div>
+                <div class="mock-ticket">
+                  <div class="addr">10 Red Rails, Luton</div>
+                  <div class="meta">Kitchen &middot; Leaking tap</div>
+                </div>
+                <div class="mock-ticket">
+                  <div class="addr">4 Alpine Way, Luton</div>
+                  <div class="meta">Garden &middot; Grass cutting</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <p style="font-size:11px; font-weight:700; color:var(--guide-text-faint); margin:2px 0 0 0;">&darr; if they clock in late, the bar looks like this instead &darr;</p>
+          <div class="phone" style="max-width:300px;"><div class="notch"></div>
+            <div class="screen" style="min-height:auto;">
+              <div class="mock-header">
+                <div class="mock-logo"><div class="sq"></div>PMMS</div>
+                <div class="mock-icons">🔔 ☰</div>
+              </div>
+              <div style="padding:10px 14px 14px;">
+                <div class="mock-banner late">
+                  <span>⚠ Clocked in since 09:03 (3m late)</span>
+                  <div style="display:flex; gap:6px;">
+                    <button class="mock-btn ghost" style="padding:6px 10px;font-size:10.5px;">Leaving Site</button>
+                    <button class="mock-btn dark" style="padding:6px 10px;font-size:10.5px;">Clock Out for the Day</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="step-body">
+        <p class="step-title"><span class="step-num">3</span> They're in for the day</p>
+        <p>Now they can see their jobs as normal. Notice the bar at the top &mdash; that's their reminder that they're clocked in, and it stays there all day.</p>
+        <ul>
+          <li>If they clocked in after <b>9:00am</b>, this bar turns orange and shows exactly how many minutes late it was (see the second screen alongside) &mdash; that's just for a manager to see, nothing the builder needs to do.</li>
+          <li>They tap into a job and clock in/out of it exactly like they always have &mdash; that part hasn't changed.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Step 4 -->
+    <div class="step reverse">
+      <div class="step-mock">
+        <div class="phone"><div class="notch"></div>
+          <div class="screen">
+            <div class="mock-header">
+              <div class="mock-logo"><div class="sq"></div>PMMS</div>
+              <div class="mock-icons">🔔 ☰</div>
+            </div>
+            <div style="padding:12px 14px;">
+              <div class="mock-card">
+                <p style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;margin:0 0 8px 0;">Where are you going?</p>
+                <div style="display:flex; gap:6px; margin-bottom:10px;">
+                  <div class="mock-btn" style="background:rgba(13,148,136,0.08); border:2px solid #0d9488; color:#0f172a; font-size:11px; flex:1;">🛒 Buying Materials</div>
+                  <div class="mock-btn ghost" style="font-size:11px; flex:1;">🍽️ Lunch Break</div>
+                </div>
+                <input class="mock-input" placeholder="Shop/destination name..." value="B&amp;Q Luton" readonly>
+                <div style="display:flex; gap:8px;">
+                  <div class="mock-btn ghost" style="flex:1;">Cancel</div>
+                  <div class="mock-btn primary" style="flex:2;">Start</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="step-body">
+        <p class="step-title"><span class="step-num">4</span> Popping out? Tell the app first</p>
+        <p>Going to buy materials, or taking a lunch break? They tap <b>"Leaving Site"</b> on the banner before going.</p>
+        <ul>
+          <li>Choose <b>Buying Materials</b> or <b>Lunch Break</b>.</li>
+          <li>If it's a materials run, they type the <b>shop name</b> in the box &mdash; e.g. "B&amp;Q Luton".</li>
+          <li>Then tap <b>Start</b>.</li>
+          <li>If they're mid-way through a job when they leave, the app quietly notes which job it was &mdash; a manager can see that later, the builder doesn't need to type it themselves.</li>
+        </ul>
+        <span class="callout tap">👉 Pick a reason, add a note, tap Start</span>
+      </div>
+    </div>
+
+    <!-- Step 5 -->
+    <div class="step">
+      <div class="step-mock">
+        <div class="phone"><div class="notch"></div>
+          <div class="screen">
+            <div class="mock-header">
+              <div class="mock-logo"><div class="sq"></div>PMMS</div>
+              <div class="mock-icons">🔔 ☰</div>
+            </div>
+            <div style="padding:10px 14px 0;">
+              <div class="mock-banner away">
+                <span>🚶 Away &mdash; Travelling: B&amp;Q Luton since 11:20</span>
+                <button class="mock-btn primary" style="padding:6px 10px;font-size:10.5px;">✓ I'm Back</button>
+              </div>
+            </div>
+            <div style="padding:12px 14px;">
+              <div class="mock-ticket">
+                <div class="addr">10 Red Rails, Luton</div>
+                <div class="meta">Kitchen &middot; Leaking tap &middot; In Progress</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="step-body">
+        <p class="step-title"><span class="step-num">5</span> The banner shows they're away</p>
+        <p>While they're out, the bar turns purple so it's obvious they're marked as away. Their job keeps running as normal underneath &mdash; this doesn't pause or affect anything on the job itself.</p>
+        <span class="callout tap">👉 When they're back, they tap "I'm Back"</span>
+      </div>
+    </div>
+
+    <!-- Step 6 -->
+    <div class="step reverse">
+      <div class="step-mock">
+        <div class="phone"><div class="notch"></div>
+          <div class="screen" style="position:relative;">
+            <div class="mock-header">
+              <div class="mock-logo"><div class="sq"></div>PMMS</div>
+              <div class="mock-icons">🔔 ☰</div>
+            </div>
+            <div style="padding:10px 14px 0;">
+              <div class="mock-banner ok">
+                <span>🟢 Clocked in since 08:03</span>
+              </div>
+            </div>
+            <div class="mock-modal-overlay">
+              <div class="mock-modal">
+                <p class="mock-modal-title">Job #14 is still in progress</p>
+                <p class="mock-modal-sub" style="color:#dc2626;font-weight:600;">Pause or complete it before clocking out for the day.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="step-body">
+        <p class="step-title"><span class="step-num">6</span> End of day &mdash; clock out</p>
+        <p>Once they've finished all their jobs, they tap <b>"Clock Out for the Day"</b> on the banner.</p>
+        <ul>
+          <li>If they still have a job showing "In Progress", it stops them and tells them to pause or complete that job first.</li>
+          <li>If they're still marked "Away", it asks them to tap "I'm Back" first.</li>
+        </ul>
+        <span class="callout warn">⚠ Finish or pause the job (and tap "I'm Back" if away) before clocking out</span>
+      </div>
+    </div>
+
+    <!-- Step 7 -->
+    <div class="step">
+      <div class="step-mock">
+        <div class="phone"><div class="notch"></div>
+          <div class="screen" style="position:relative;">
+            <div class="mock-header">
+              <div class="mock-logo"><div class="sq"></div>PMMS</div>
+              <div class="mock-icons">🔔 ☰</div>
+            </div>
+            <div style="padding:12px 14px;">
+              <div class="mock-card" style="border:1px solid #fcd34d;">
+                <p style="font-size:13px;font-weight:800;color:#92400e;margin:0 0 4px 0;">⚠ Finishing before 17:00</p>
+                <p style="font-size:11px;color:#64748b;margin:0 0 10px 0;">Just so their manager knows why &mdash; e.g. "all jobs done", "doctor's appointment".</p>
+                <input class="mock-input" placeholder="Reason for finishing early..." value="All jobs done for today" readonly>
+                <div style="display:flex; gap:8px;">
+                  <div class="mock-btn ghost" style="flex:1;">Cancel</div>
+                  <div class="mock-btn dark" style="flex:2;">Confirm Clock Out</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="step-body">
+        <p class="step-title"><span class="step-num">7</span> Clocking out early? Give a reason</p>
+        <p>If they tap "Clock Out for the Day" before <b>5:00pm</b>, the app asks why first &mdash; same idea as the late flag in the morning, just the other end of the day.</p>
+        <ul>
+          <li>They type a short reason &mdash; a sentence is plenty.</li>
+          <li>This only appears if finishing early. Clocking out at or after 5:00pm doesn't ask for anything.</li>
+        </ul>
+        <span class="callout warn">⚠ A reason is required before an early clock-out goes through</span>
+      </div>
+    </div>
+
+    <!-- Step 8 -->
+    <div class="step">
+      <div class="step-mock">
+        <div class="phone"><div class="notch"></div>
+          <div class="screen" style="align-items:center; justify-content:center; padding:20px; text-align:center;">
+            <div style="background:#fff; border-radius:20px; padding:28px 20px; box-shadow:0 4px 20px rgba(0,0,0,0.08); width:100%;">
+              <div style="width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,#0D1B3E,#0D2F5E);margin:0 auto 14px;"></div>
+              <p style="font-size:15px;font-weight:800;color:#0f172a;margin:0 0 6px 0;">Good afternoon, Dave</p>
+              <p style="font-size:11.5px;color:#64748b;margin:0 0 20px 0;line-height:1.5;">Clock in to start your working day and see your jobs.</p>
+              <button class="mock-btn primary block">✓ Clock In for the Day</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="step-body">
+        <p class="step-title"><span class="step-num">8</span> Done for the day</p>
+        <p>They're back at this same screen &mdash; that's normal, it just means they're successfully clocked out. They won't see their jobs again until they clock in tomorrow.</p>
+        <p>If they need to come back on for any reason (forgot something, asked to help with an urgent job), tapping "Clock In for the Day" again works the same way, any time of day.</p>
+      </div>
+    </div>
+  </section>
+
+  <footer class="end">GBCH PMMS &middot; Builder App Guide &middot; last updated 2026-08-06</footer>
+</div>
+</body>
+</html>

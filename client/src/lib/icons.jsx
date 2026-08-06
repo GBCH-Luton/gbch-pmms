@@ -148,6 +148,12 @@ const PATHS = {
       <line x1="12" y1="5" x2="12" y2="19" />
     </>
   ),
+  phone: (
+    <>
+      <rect x="7" y="2.5" width="10" height="19" rx="2" />
+      <line x1="7" y1="18" x2="17" y2="18" />
+    </>
+  ),
   logout: (
     <>
       <path d="M13 4 H6 a1 1 0 0 0-1 1 V19 a1 1 0 0 0 1 1 H13" />
