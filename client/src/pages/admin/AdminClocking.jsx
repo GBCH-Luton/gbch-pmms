@@ -505,14 +505,23 @@ export default function AdminClocking({ profile, onNavigate }) {
       {/* Section 0: Average Time by Job Type */}
       <div style={{ background: COLORS.white, borderRadius: '16px', padding: '20px', marginBottom: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
         <h2 style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: 800, color: COLORS.slate900 }}>Average Time by Job Type</h2>
-        <p style={{ margin: '0 0 14px 0', fontSize: '13px', color: COLORS.slate500 }}>Based on completed jobs with recorded clock times.</p>
+        <p style={{ margin: '0 0 14px 0', fontSize: '13px', color: COLORS.slate500 }}>Based on completed jobs with recorded clock times. {onNavigate ? 'Click a job type to see those jobs in Pipeline.' : ''}</p>
 
         {categoryEntries.length === 0 ? (
           <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>No completed jobs with recorded time yet.</p>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
             {categoryEntries.map(([category, stats]) => (
-              <div key={category} style={{ background: COLORS.teal600, borderRadius: '16px', padding: '16px', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+              <div
+                key={category}
+                onClick={onNavigate ? () => onNavigate('pipeline', { category, statusFilter: 'Completed' }) : undefined}
+                style={{
+                  background: COLORS.teal600, borderRadius: '16px', padding: '16px', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+                  cursor: onNavigate ? 'pointer' : 'default', transition: 'transform 0.12s ease, box-shadow 0.12s ease',
+                }}
+                onMouseEnter={onNavigate ? (e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 4px 10px rgba(0,0,0,0.12)' } : undefined}
+                onMouseLeave={onNavigate ? (e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.06)' } : undefined}
+              >
                 <span style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.85)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{category}</span>
                 <strong style={{ display: 'block', fontSize: '28px', fontWeight: 800, color: COLORS.white, marginTop: '8px' }}>{formatDuration(stats.totalMs / stats.count)}</strong>
                 <span style={{ display: 'block', fontSize: '11px', color: 'rgba(255,255,255,0.75)', marginTop: '4px' }}>avg over {stats.count} job{stats.count === 1 ? '' : 's'}</span>
