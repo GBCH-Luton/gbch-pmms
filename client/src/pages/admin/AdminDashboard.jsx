@@ -6,31 +6,18 @@ import { NavIcon } from '../../lib/icons'
 
 const DEFAULT_NEW_PROPERTY_WINDOW_HOURS = 48
 
-// Collapsed/expanded state persists per section in localStorage (keyed by
-// `id`, not the title text, so a future title rename doesn't reset
-// everyone's preference) -- every section starts expanded on first visit.
+// Collapsed/expanded state is deliberately session-only, not persisted --
+// every page load/refresh always comes back to the same layout (Ticket
+// Pipeline open, everything else collapsed), regardless of what an admin
+// clicked open or closed last time they were here.
 // alertCount only ever renders while collapsed: the point is to let an
 // admin collapse a normally-quiet section without silently losing sight
 // of it if something in it later needs attention.
-// defaultCollapsed only applies the first time this browser ever sees this
-// section (no localStorage key yet) -- the AI Daily Briefing below uses it
-// to start quiet sections out of the way, but never fights a preference
-// someone already set by clicking a section themselves.
 function DashboardSection({ id, title, background, alertCount = 0, defaultCollapsed = false, children }) {
-  const storageKey = `pmms_dashboard_collapsed_${id}`
-  const [collapsed, setCollapsed] = useState(() => {
-    try {
-      const stored = localStorage.getItem(storageKey)
-      return stored === null ? defaultCollapsed : stored === 'true'
-    } catch { return defaultCollapsed }
-  })
+  const [collapsed, setCollapsed] = useState(defaultCollapsed)
 
   function toggle() {
-    setCollapsed(prev => {
-      const next = !prev
-      try { localStorage.setItem(storageKey, String(next)) } catch { /* ignore */ }
-      return next
-    })
+    setCollapsed(prev => !prev)
   }
 
   return (
