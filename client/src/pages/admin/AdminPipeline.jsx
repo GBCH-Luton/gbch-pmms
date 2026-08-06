@@ -1116,7 +1116,7 @@ export default function AdminPipeline({
                                 <button onClick={() => openAddToEventModal(t)} style={actionBtnStyle}>{t.event_id ? 'Change Event' : 'Add to Event'}</button>
                               )}
                               {t.status !== 'Cancelled' && (
-                                <button onClick={() => openCancelModal(t)} style={{ ...actionBtnStyle, color: COLORS.red600, borderColor: COLORS.red200 }}>Cancel</button>
+                                <button onClick={() => openCancelModal(t)} style={{ ...actionBtnStyle, color: COLORS.red600, borderColor: COLORS.red200 }}>Cancel Ticket</button>
                               )}
                               {/* Archived tickets are locked (RLS: once
                                   signed off, only the raiser can still edit
