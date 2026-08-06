@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { COLORS } from '../../lib/colors'
-import { priorityTierLabel, fetchFlaggedClockingCount, isTicketStuck, KpiTiles, fetchComplianceAgingCounts, fetchVoidAgingCounts, fetchGardenReviewAging, computeAvgResponseMs, formatDuration, fetchPriorityThresholds } from './shared'
+import { priorityTierLabel, fetchFlaggedClockingCount, isTicketStuck, KpiTiles, fetchComplianceAgingCounts, fetchVoidAgingCounts, fetchGardenReviewAging, computeAvgResponseMs, formatDuration, fetchPriorityThresholds, fetchAssignableBuilders, fetchAssignableStaffForDivision, ukDateKey, formatUKDateTime, minutesLate } from './shared'
 import { NavIcon } from '../../lib/icons'
 
 const DEFAULT_NEW_PROPERTY_WINDOW_HOURS = 48
@@ -77,6 +77,13 @@ function DashboardSection({ id, title, background, alertCount = 0, defaultCollap
 // data-dashboard-section on DashboardSection above) rather than duplicating
 // its toggle state here. Built entirely from the same numbers those
 // sections already compute.
+// Fixed height shared with TeamWhereabouts below, via the grid these two
+// sit in together -- CSS Grid's stretch alignment only pads the SHORTER
+// column up to match the taller one, it never caps the taller one, so a
+// long team log needs an explicit height on both cards (not just grid
+// stretch) to actually scroll internally instead of growing the row.
+const DASHBOARD_TOP_CARD_HEIGHT = '420px'
+
 function DailyBriefing({ lines }) {
   function handleLineClick(target) {
     const header = document.querySelector(`[data-dashboard-section="${target}"]`)
@@ -88,32 +95,218 @@ function DailyBriefing({ lines }) {
 
   return (
     <div style={{
-      borderRadius: '14px', padding: '18px 20px', marginBottom: '16px',
-      background: `linear-gradient(135deg, ${COLORS.indigo100} 0%, ${COLORS.violet100} 100%)`,
-      border: `1px solid ${COLORS.indigo100}`,
+      borderRadius: '16px', padding: '18px 20px', background: COLORS.white,
+      border: `1px solid ${COLORS.slate200}`, boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+      height: DASHBOARD_TOP_CARD_HEIGHT, display: 'flex', flexDirection: 'column',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
         <span style={{ color: COLORS.indigo700, display: 'flex' }}><NavIcon name="sunrise" size={16} /></span>
         <span style={{ fontSize: '12px', fontWeight: 800, color: COLORS.indigo700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Daily Briefing</span>
       </div>
-      <p style={{ margin: '0 0 10px', fontSize: '11px', color: COLORS.indigo700, opacity: 0.75 }}>
+      <p style={{ margin: '0 0 10px', fontSize: '11px', color: COLORS.slate500 }}>
         What's worth a look across the dashboard this morning.
       </p>
-      {lines.map((line, i) => (
-        <div
-          key={i}
-          onClick={() => handleLineClick(line.target)}
-          style={{
-            display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 0', cursor: 'pointer',
-            borderTop: i === 0 ? 'none' : `1px solid rgba(67,56,202,0.1)`,
-            opacity: line.tone === 'quiet' ? 0.6 : 1,
-          }}
-        >
-          <span style={{ width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0, background: toneColour[line.tone] }} />
-          <span style={{ flex: 1, fontSize: '13px', color: '#1e1b4b', fontWeight: line.tone === 'quiet' ? 400 : 500 }}>{line.text}</span>
-          <span style={{ fontSize: '12px', color: line.tone === 'quiet' ? COLORS.slate400 : COLORS.violet600, flexShrink: 0 }}>→</span>
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+        {lines.map((line, i) => (
+          <div
+            key={i}
+            onClick={() => handleLineClick(line.target)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 0', cursor: 'pointer',
+              borderTop: i === 0 ? 'none' : `1px solid ${COLORS.slate100}`,
+              opacity: line.tone === 'quiet' ? 0.6 : 1,
+            }}
+          >
+            <span style={{ width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0, background: toneColour[line.tone] }} />
+            <span style={{ flex: 1, fontSize: '13px', color: COLORS.slate900, fontWeight: line.tone === 'quiet' ? 400 : 500 }}>{line.text}</span>
+            <span style={{ fontSize: '12px', color: line.tone === 'quiet' ? COLORS.slate400 : COLORS.violet600, flexShrink: 0 }}>→</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// Portfolio-wide "where is everyone right now, and what have they done
+// today" -- sits alongside Daily Briefing rather than replacing anything
+// on the Clocking page (AdminClocking.jsx's Today's Attendance table is
+// the detailed/manager-override view; this is the at-a-glance dashboard
+// version). Reads pmms.daily_attendance (day-level shift), pmms.work_sessions
+// (per-job, for "On Job #N"), and pmms.activity_log (Leaving Site/I'm Back,
+// each now carrying the ticket_id that was In Progress when the builder
+// stepped away, so "left site"/"returned" can show which job it was).
+function TeamWhereabouts({ profile, onNavigate }) {
+  const [loading, setLoading] = useState(true)
+  const [builders, setBuilders] = useState([])
+  const [statusByStaffId, setStatusByStaffId] = useState({})
+  const [logEntries, setLogEntries] = useState([])
+  const [filterStaffId, setFilterStaffId] = useState('All')
+
+  useEffect(() => { fetchData() }, [])
+
+  async function fetchData() {
+    setLoading(true)
+    const assignableBuilders = await (profile.division ? fetchAssignableStaffForDivision(profile.division) : fetchAssignableBuilders())
+    setBuilders(assignableBuilders)
+
+    const todayKey = ukDateKey()
+
+    const { data: deadlineRow } = await supabase
+      .schema('pmms')
+      .from('settings')
+      .select('setting_value')
+      .eq('setting_key', 'daily_clock_in_deadline')
+      .maybeSingle()
+    const deadline = deadlineRow?.setting_value || '09:00'
+
+    const [{ data: attendanceData }, { data: activityData }, { data: openSessions }] = await Promise.all([
+      supabase.schema('pmms').from('daily_attendance').select('id, staff_id, clock_in_at, late_flag, clock_out_at').or(`work_date.eq.${todayKey},clock_out_at.is.null`),
+      supabase.schema('pmms').from('activity_log').select('id, staff_id, activity_type, note, started_at, ended_at, ticket_id').or(`started_at.gte.${todayKey}T00:00:00,ended_at.is.null`),
+      supabase.schema('pmms').from('work_sessions').select('id, ticket_id, builder_id').is('ended_at', null),
+    ])
+
+    const ticketIds = [...new Set([
+      ...(activityData || []).map(a => a.ticket_id).filter(Boolean),
+      ...(openSessions || []).map(s => s.ticket_id),
+    ])]
+    let ticketsById = {}
+    if (ticketIds.length > 0) {
+      const { data: ticketRows } = await supabase.schema('pmms').from('tickets').select('id, ticket_number').in('id', ticketIds)
+      ticketsById = Object.fromEntries((ticketRows || []).map(t => [t.id, t]))
+    }
+
+    const statuses = {}
+    assignableBuilders.forEach(b => {
+      const shift = (attendanceData || [])
+        .filter(a => a.staff_id === b.id)
+        .sort((x, y) => new Date(y.clock_in_at) - new Date(x.clock_in_at))[0]
+      const openSession = (openSessions || []).find(s => s.builder_id === b.id)
+      const openActivity = (activityData || []).find(a => a.staff_id === b.id && !a.ended_at)
+
+      let status = 'Off shift'
+      let tone = 'off'
+      if (shift && !shift.clock_out_at) {
+        if (openActivity) {
+          status = `${openActivity.activity_type === 'Travel' ? 'Travelling' : 'On break'}${openActivity.note ? `: ${openActivity.note}` : ''}`
+          tone = 'away'
+        } else if (openSession) {
+          status = `On Job #${ticketsById[openSession.ticket_id]?.ticket_number ?? '?'}`
+          tone = 'job'
+        } else {
+          status = 'Available'
+          tone = 'available'
+        }
+      }
+      statuses[b.id] = { status, tone }
+    })
+    setStatusByStaffId(statuses)
+
+    const entries = []
+    ;(attendanceData || []).forEach(a => {
+      const b = assignableBuilders.find(x => x.id === a.staff_id)
+      if (!b) return
+      entries.push({
+        id: `${a.id}-in`, time: a.clock_in_at, staffId: a.staff_id, staffName: b.name, tone: 'in',
+        text: a.late_flag ? `clocked in (${minutesLate(a.clock_in_at, deadline)}m late)` : 'clocked in',
+      })
+      if (a.clock_out_at) entries.push({ id: `${a.id}-out`, time: a.clock_out_at, staffId: a.staff_id, staffName: b.name, tone: 'out', text: 'clocked out' })
+    })
+    ;(activityData || []).forEach(a => {
+      const b = assignableBuilders.find(x => x.id === a.staff_id)
+      if (!b) return
+      const ticket = a.ticket_id ? ticketsById[a.ticket_id] : null
+      entries.push({
+        id: `${a.id}-start`, time: a.started_at, staffId: a.staff_id, staffName: b.name, tone: 'away',
+        text: `${a.activity_type === 'Travel' ? 'left site' : 'started break'}${a.note ? `: ${a.note}` : ''}`,
+        ticketNumber: ticket?.ticket_number,
+      })
+      if (a.ended_at) {
+        entries.push({
+          id: `${a.id}-end`, time: a.ended_at, staffId: a.staff_id, staffName: b.name, tone: 'back',
+          text: a.activity_type === 'Travel' ? 'returned to site' : 'back from break',
+          ticketNumber: ticket?.ticket_number,
+        })
+      }
+    })
+    entries.sort((x, y) => new Date(y.time) - new Date(x.time))
+    setLogEntries(entries.slice(0, 40))
+
+    setLoading(false)
+  }
+
+  const toneDot = { in: COLORS.green600, out: COLORS.slate900, away: COLORS.violet600, back: COLORS.slate900 }
+  const chipStyle = { off: { bg: COLORS.slate100, fg: COLORS.slate400 }, available: { bg: COLORS.blue50, fg: COLORS.blue700 }, job: { bg: COLORS.teal50, fg: COLORS.teal700 }, away: { bg: COLORS.violet100, fg: COLORS.violet600 } }
+
+  const visibleBuilders = filterStaffId === 'All' ? builders : builders.filter(b => b.id === filterStaffId)
+  const visibleEntries = filterStaffId === 'All' ? logEntries : logEntries.filter(e => e.staffId === filterStaffId)
+
+  return (
+    <div style={{
+      borderRadius: '16px', padding: '18px 20px', background: COLORS.white,
+      border: `1px solid ${COLORS.slate200}`, boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+      height: DASHBOARD_TOP_CARD_HEIGHT, display: 'flex', flexDirection: 'column',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ color: COLORS.teal700 }}>📍</span>
+          <span style={{ fontSize: '12px', fontWeight: 800, color: COLORS.teal700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Where's the Team</span>
         </div>
-      ))}
+        <select
+          value={filterStaffId}
+          onChange={(e) => setFilterStaffId(e.target.value)}
+          style={{ fontSize: '12px', fontWeight: 700, color: COLORS.slate900, background: COLORS.slate50, border: `1px solid ${COLORS.slate200}`, borderRadius: '8px', padding: '6px 10px', cursor: 'pointer' }}
+        >
+          <option value="All">All builders</option>
+          {builders.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+        </select>
+      </div>
+      <p style={{ margin: '4px 0 12px 0', fontSize: '11px', color: COLORS.slate500 }}>Live status and every trip logged today.</p>
+
+      {loading ? (
+        <p style={{ color: COLORS.slate400, fontWeight: 600, fontSize: '13px' }}>Loading...</p>
+      ) : (
+        <>
+          <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px', marginBottom: '10px' }}>
+            {visibleBuilders.map(b => {
+              const s = statusByStaffId[b.id] || { status: 'Off shift', tone: 'off' }
+              const c = chipStyle[s.tone]
+              return (
+                <div key={b.id} style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: '7px', padding: '7px 12px', borderRadius: '999px', background: c.bg, fontSize: '12px', fontWeight: 700 }}>
+                  <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: c.fg }} />
+                  <span style={{ color: COLORS.slate900 }}>{b.name.split(' ')[0]}</span>
+                  <span style={{ color: c.fg }}>{s.status}</span>
+                </div>
+              )
+            })}
+          </div>
+
+          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+            {visibleEntries.length === 0 && (
+              <p style={{ fontSize: '12.5px', color: COLORS.slate400, fontStyle: 'italic', textAlign: 'center', marginTop: '20px' }}>Nothing logged yet today.</p>
+            )}
+            {visibleEntries.map(e => (
+              <div key={e.id} style={{ display: 'flex', gap: '10px', padding: '9px 0', borderTop: `1px solid ${COLORS.slate100}`, alignItems: 'flex-start' }}>
+                <span style={{ fontFamily: 'monospace', fontSize: '11px', color: COLORS.slate400, flexShrink: 0, width: '38px', paddingTop: '1px' }}>
+                  {formatUKDateTime(e.time).split(' ').slice(-1)[0]}
+                </span>
+                <span style={{ width: '7px', height: '7px', borderRadius: '50%', marginTop: '5px', flexShrink: 0, background: toneDot[e.tone] }} />
+                <div style={{ flex: 1 }}>
+                  <span style={{ fontSize: '12.5px', fontWeight: 700, color: COLORS.slate900 }}>{e.staffName}</span>
+                  <span style={{ fontSize: '12.5px', color: COLORS.slate600 }}> — {e.text}</span>
+                  {e.ticketNumber != null && (
+                    <span
+                      onClick={() => onNavigate?.('pipeline', { ticketNumber: e.ticketNumber })}
+                      style={{ fontSize: '12.5px', fontWeight: 700, color: COLORS.blue700, cursor: onNavigate ? 'pointer' : 'default' }}
+                    >
+                      {' '}(Job #{e.ticketNumber})
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   )
 }
@@ -391,7 +584,10 @@ export default function AdminDashboard({ profile, onNavigate }) {
 
   return (
     <div>
-      <DailyBriefing lines={briefingLines} />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', gap: '16px', alignItems: 'stretch', marginBottom: '16px' }}>
+        <DailyBriefing lines={briefingLines} />
+        <TeamWhereabouts profile={profile} onNavigate={onNavigate} />
+      </div>
 
       <DashboardSection id="pipeline" title="Ticket Pipeline" background={COLORS.white} alertCount={kpis.find(k => k.label === 'Stuck')?.value || 0}>
         <div style={{ width: '100%' }}>

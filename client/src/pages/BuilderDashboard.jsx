@@ -651,6 +651,11 @@ export default function BuilderDashboard({ profile }) {
     // moment shouldn't stop someone from logging that they're leaving.
     const position = await getCurrentPositionSafe()
 
+    // Captured automatically, not builder-entered -- whichever job they
+    // were mid-way through (if any) when they stepped away, so managers
+    // can see "left site" and "returned" against a job number later.
+    const inProgressTicket = tickets.find(t => t.status === 'In Progress')
+
     const { data, error } = await supabase
       .schema('pmms')
       .from('activity_log')
@@ -661,6 +666,7 @@ export default function BuilderDashboard({ profile }) {
         started_at: new Date().toISOString(),
         started_lat: position?.latitude ?? null,
         started_lng: position?.longitude ?? null,
+        ticket_id: inProgressTicket?.id ?? null,
       })
       .select('id, activity_type, note, started_at')
       .single()
