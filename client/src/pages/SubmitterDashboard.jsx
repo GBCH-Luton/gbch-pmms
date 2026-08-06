@@ -20,14 +20,14 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { COLORS } from '../lib/colors'
 import { logLoginEvent } from '../lib/loginEvents'
-import { compressImage } from '../lib/imageCompression'
-import { getSignedUrl } from '../lib/storage'
+import { uploadTicketAttachments } from '../lib/ticketAttachments'
 import { fetchMaintenanceCategories, sortedCategoryEntries, isUnlistedTag, unlistedTagFor, unlistedLabelFor, calculatePriorityScore } from '../lib/maintenanceCategories'
 import { attachBuilderSafeProperties } from '../lib/properties'
 import { statusColour, statusLabel, postSystemComment, postAuditEvent, KpiTiles } from './admin/shared'
 import PropertySearchSelect from '../components/PropertySearchSelect'
 import VoiceInputButton from '../components/VoiceInputButton'
 import AttachmentMedia from '../components/AttachmentMedia'
+import TicketMediaPicker from '../components/TicketMediaPicker'
 import gbchLogo from '../assets/gbch-logo.svg'
 
 const ROOM_OPTIONS = ['Kitchen', 'Bathroom', 'Communal Area', 'Bedroom', 'Hallways / Stairs', 'Garden', 'Other Area...']
@@ -117,8 +117,7 @@ function NewReportForm({ profile, onSubmitted }) {
   const [issueTag, setIssueTag] = useState(null)
   const [issueOther, setIssueOther] = useState('')
   const [notes, setNotes] = useState('')
-  const [photoFile, setPhotoFile] = useState(null)
-  const [photoPreview, setPhotoPreview] = useState(null)
+  const [mediaFiles, setMediaFiles] = useState([])
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -129,15 +128,6 @@ function NewReportForm({ profile, onSubmitted }) {
     })
     fetchMaintenanceCategories().then(setMaintenanceCategories)
   }, [])
-
-  function handlePhoto(e) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setPhotoFile(file)
-    const reader = new FileReader()
-    reader.onload = () => setPhotoPreview(reader.result)
-    reader.readAsDataURL(file)
-  }
 
   function roomString() {
     if (room === 'Other Area...') return otherArea
@@ -152,19 +142,6 @@ function NewReportForm({ profile, onSubmitted }) {
     const description = notes.trim() ? `${finalIssueTag} — ${notes.trim()}` : finalIssueTag
     const priorityScore = calculatePriorityScore(maintenanceCategories, category, issueTag)
 
-    let photoUrl = null
-    if (photoFile) {
-      const compressed = await compressImage(photoFile)
-      const path = `${profile.id}/${Date.now()}-${compressed.name}`
-      const { error: uploadError } = await supabase.storage.from('ticket-photos').upload(path, compressed)
-      if (uploadError) {
-        setSubmitting(false)
-        setError(`Photo upload failed: ${uploadError.message}`)
-        return
-      }
-      photoUrl = await getSignedUrl('ticket-photos', path)
-    }
-
     const { data, error: insertError } = await supabase
       .schema('pmms')
       .from('tickets')
@@ -178,22 +155,32 @@ function NewReportForm({ profile, onSubmitted }) {
         status: 'Pending',
         raised_by: profile.id,
         raised_by_name: profile.name,
-        photo_url: photoUrl,
         created_at: new Date().toISOString(),
         status_changed_at: new Date().toISOString(),
       })
       .select('id, ticket_number')
 
-    setSubmitting(false)
-
     if (insertError) {
+      setSubmitting(false)
       setError(insertError.message)
       return
     }
 
+    if (mediaFiles.length > 0) {
+      try {
+        const [firstUrl] = await uploadTicketAttachments(mediaFiles, data[0].id, profile.id)
+        await supabase.schema('pmms').from('tickets').update({ photo_url: firstUrl }).eq('id', data[0].id)
+      } catch (uploadErr) {
+        setSubmitting(false)
+        setError(uploadErr.message)
+        return
+      }
+    }
+
+    setSubmitting(false)
     setSuccess(`Thanks — your report has been logged as Job #${data[0].ticket_number}. Our team will review and assign it.`)
     setPropertyId(''); setRoom(null); setOtherArea(''); setCategory(null); setIssueTag(null); setIssueOther('')
-    setNotes(''); setPhotoFile(null); setPhotoPreview(null)
+    setNotes(''); setMediaFiles([])
   }
 
   const step2Complete = !!room && (room !== 'Other Area...' || otherArea.trim())
@@ -272,9 +259,8 @@ function NewReportForm({ profile, onSubmitted }) {
             <VoiceInputButton onResult={(text) => setNotes(prev => prev ? `${prev} ${text}` : text)} />
           </div>
 
-          <p style={{ ...fieldLabelStyle, marginTop: '16px' }}>Photo (optional)</p>
-          {photoPreview && <img src={photoPreview} alt="" style={{ width: '100%', maxHeight: '200px', objectFit: 'cover', borderRadius: '10px', marginBottom: '8px' }} />}
-          <input type="file" accept="image/*" capture="environment" onChange={handlePhoto} style={{ fontSize: '13px' }} />
+          <p style={{ ...fieldLabelStyle, marginTop: '16px' }}>Photos / videos (optional)</p>
+          <TicketMediaPicker files={mediaFiles} onChange={setMediaFiles} inputId="submitter-ticket-media-input" />
         </div>
       )}
 

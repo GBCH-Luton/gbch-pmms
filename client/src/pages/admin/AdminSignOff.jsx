@@ -4,6 +4,7 @@ import { COLORS } from '../../lib/colors'
 import { attachProperties } from '../../lib/properties'
 import PropertySearchSelect from '../../components/PropertySearchSelect'
 import AttachmentMedia from '../../components/AttachmentMedia'
+import TicketAttachmentGallery from '../../components/TicketAttachmentGallery'
 import {
   formatDuration, postSystemComment, postAuditEvent, filterSelectStyle,
   modalOverlayStyle, modalCardStyle, modalTitleStyle, modalSubtitleStyle, modalLabelStyle,
@@ -230,7 +231,9 @@ export default function AdminSignOff({ profile, onTicketsChanged }) {
                 <div style={{ background: COLORS.white, border: `1px solid ${COLORS.purple200}`, borderRadius: '10px', padding: '10px' }}>
                   <p style={{ margin: '0 0 6px 0', fontSize: '10px', fontWeight: 800, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Before — reported issue</p>
                   {t.photo_url ? (
-                    <AttachmentMedia url={t.photo_url} alt="Reported issue" style={{ width: '100%', height: '140px', objectFit: 'cover', borderRadius: '8px', marginBottom: '6px' }} />
+                    <div style={{ marginBottom: '6px' }}>
+                      <TicketAttachmentGallery ticketId={t.id} fallbackUrl={t.photo_url} mediaHeight="140px" />
+                    </div>
                   ) : (
                     <div style={{ width: '100%', height: '140px', borderRadius: '8px', background: COLORS.slate50, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '6px' }}>
                       <span style={{ fontSize: '12px', color: COLORS.slate400, fontStyle: 'italic' }}>No photo</span>

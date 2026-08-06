@@ -8,6 +8,7 @@ import { fetchAllMaintenanceCategoryNames } from '../../lib/maintenanceCategorie
 import { fetchDivisions } from '../../lib/divisions'
 import PrintableTicketReport from '../../components/PrintableTicketReport'
 import AttachmentMedia from '../../components/AttachmentMedia'
+import TicketAttachmentGallery from '../../components/TicketAttachmentGallery'
 import {
   priorityTierLabel, priorityBadgeStyle, statusColour, statusLabel, formatUKDate, formatUKDateTime, formatDurationDays, formatDuration,
   filterSelectStyle, thStyle, tdStyle, actionBtnStyle,
@@ -1048,9 +1049,9 @@ export default function AdminPipeline({
                               {(t.photo_url || t.completion_photo_url) ? (
                                 <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                                   {t.photo_url && (
-                                    <div>
-                                      <p style={expandLabelStyle}>Reported Photo</p>
-                                      <AttachmentMedia url={t.photo_url} alt="Reported fault" style={{ width: '140px', height: '140px', objectFit: 'cover', borderRadius: '10px', border: `1px solid ${COLORS.slate200}` }} />
+                                    <div style={{ minWidth: '140px' }}>
+                                      <p style={expandLabelStyle}>Reported Photos / Videos</p>
+                                      <TicketAttachmentGallery ticketId={t.id} fallbackUrl={t.photo_url} mediaHeight="140px" />
                                     </div>
                                   )}
                                   {t.completion_photo_url && (

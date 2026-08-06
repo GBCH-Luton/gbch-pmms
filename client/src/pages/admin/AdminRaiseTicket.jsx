@@ -7,8 +7,10 @@ import { fetchMaintenanceCategories, sortedCategoryEntries, UNLISTED_MARKER_PREF
 import { fetchDivisions } from '../../lib/divisions'
 import { compressImage } from '../../lib/imageCompression'
 import { getSignedUrl } from '../../lib/storage'
+import { uploadTicketAttachments } from '../../lib/ticketAttachments'
 import PropertySearchSelect from '../../components/PropertySearchSelect'
 import VoiceInputButton from '../../components/VoiceInputButton'
+import TicketMediaPicker from '../../components/TicketMediaPicker'
 
 const ROOM_OPTIONS = ['Kitchen', 'Bathroom', 'Communal Area', 'Bedroom', 'Hallways / Stairs', 'Garden', 'Other Area...']
 
@@ -66,8 +68,7 @@ export default function AdminRaiseTicket({ profile }) {
   const [ticketCategory, setTicketCategory] = useState(null)
   const [ticketIssueTag, setTicketIssueTag] = useState(null)
   const [ticketIssueOther, setTicketIssueOther] = useState('')
-  const [ticketPhotoFile, setTicketPhotoFile] = useState(null)
-  const [ticketPhotoPreview, setTicketPhotoPreview] = useState(null)
+  const [ticketMediaFiles, setTicketMediaFiles] = useState([])
   const [ticketDuplicateWarning, setTicketDuplicateWarning] = useState(null)
   const [ticketSubmitting, setTicketSubmitting] = useState(false)
   const [ticketError, setTicketError] = useState('')
@@ -161,8 +162,7 @@ export default function AdminRaiseTicket({ profile }) {
     setTicketCategory(null)
     setTicketIssueTag(null)
     setTicketIssueOther('')
-    setTicketPhotoFile(null)
-    setTicketPhotoPreview(null)
+    setTicketMediaFiles([])
     setTicketDuplicateWarning(null)
     setTicketSubmitting(false)
     setTicketError('')
@@ -181,16 +181,6 @@ export default function AdminRaiseTicket({ profile }) {
   }
 
   const selectedTicketProperty = ticketProperties.find(p => String(p.id) === String(ticketPropertyId))
-
-  function handleTicketPhoto(e) {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    setTicketPhotoFile(file)
-    const reader = new FileReader()
-    reader.onload = () => setTicketPhotoPreview(reader.result)
-    reader.readAsDataURL(file)
-  }
 
   function ticketRoomString() {
     if (ticketRoom === 'Other Area...') return ticketOtherArea
@@ -234,23 +224,6 @@ export default function AdminRaiseTicket({ profile }) {
     setTicketDuplicateWarning(null)
     setTicketSubmitting(true)
 
-    let photoUrl = null
-    if (ticketPhotoFile) {
-      const compressedTicketPhoto = await compressImage(ticketPhotoFile)
-      const path = `${profile.id}/${Date.now()}-${compressedTicketPhoto.name}`
-      const { error: uploadError } = await supabase.storage
-        .from('ticket-photos')
-        .upload(path, compressedTicketPhoto)
-
-      if (uploadError) {
-        setTicketSubmitting(false)
-        setTicketError(`Photo upload failed: ${uploadError.message}`)
-        return
-      }
-
-      photoUrl = await getSignedUrl('ticket-photos', path)
-    }
-
     const { data, error } = await supabase
       .schema('pmms')
       .from('tickets')
@@ -270,18 +243,29 @@ export default function AdminRaiseTicket({ profile }) {
         first_assigned_at: assignedBuilderId ? new Date().toISOString() : null,
         raised_by: profile.id,
         raised_by_name: profile.name,
-        photo_url: photoUrl,
         created_at: new Date().toISOString(),
         status_changed_at: new Date().toISOString(),
       })
       .select('id, ticket_number')
 
-    setTicketSubmitting(false)
-
     if (error) {
+      setTicketSubmitting(false)
       setTicketError(error.message)
       return
     }
+
+    if (ticketMediaFiles.length > 0) {
+      try {
+        const [firstUrl] = await uploadTicketAttachments(ticketMediaFiles, data[0].id, profile.id)
+        await supabase.schema('pmms').from('tickets').update({ photo_url: firstUrl }).eq('id', data[0].id)
+      } catch (uploadErr) {
+        setTicketSubmitting(false)
+        setTicketError(uploadErr.message)
+        return
+      }
+    }
+
+    setTicketSubmitting(false)
 
     if (assignedBuilderId) {
       await createNotification(assignedBuilderId, data[0].id, `You've been assigned Job #${data[0].ticket_number} at ${selectedTicketProperty?.address || 'a property'}.`)
@@ -758,23 +742,7 @@ export default function AdminRaiseTicket({ profile }) {
             <div style={{ background: SECTION_BG[1], padding: '20px' }}>
               <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: COLORS.slate900 }}>6. Photo &amp; Submit</p>
 
-              <input
-                type="file"
-                accept="image/*"
-                id="admin-ticket-photo-input"
-                onChange={handleTicketPhoto}
-                style={{ display: 'none' }}
-              />
-              <button
-                onClick={() => document.getElementById('admin-ticket-photo-input').click()}
-                style={{ width: '100%', height: '44px', borderRadius: '10px', border: `2px dashed ${COLORS.slate300}`, background: COLORS.white, color: COLORS.slate500, fontSize: '13px', fontWeight: 600, cursor: 'pointer', boxSizing: 'border-box' }}
-              >
-                Add a photo
-              </button>
-
-              {ticketPhotoPreview && (
-                <img src={ticketPhotoPreview} alt="Ticket attachment preview" style={{ width: '100%', maxWidth: '320px', marginTop: '10px', borderRadius: '10px', display: 'block' }} />
-              )}
+              <TicketMediaPicker files={ticketMediaFiles} onChange={setTicketMediaFiles} inputId="admin-ticket-photo-input" />
 
               <div style={{ marginTop: '16px' }}>
                 <p style={fieldLabelStyle}>Raised by</p>

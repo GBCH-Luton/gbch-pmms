@@ -14,11 +14,14 @@ import { fetchDmContacts, fetchConversations, fetchThreadMessages, subscribeToDm
 import { NavIcon } from '../lib/icons'
 import { compressImage } from '../lib/imageCompression'
 import { getSignedUrl } from '../lib/storage'
+import { uploadTicketAttachments } from '../lib/ticketAttachments'
 import PropertySearchSelect from '../components/PropertySearchSelect'
 import ChatComposer from '../components/ChatComposer'
 import PhotoLightbox from '../components/PhotoLightbox'
 import AttachmentMedia from '../components/AttachmentMedia'
+import TicketAttachmentGallery from '../components/TicketAttachmentGallery'
 import VoiceInputButton from '../components/VoiceInputButton'
+import TicketMediaPicker from '../components/TicketMediaPicker'
 import gbchLogo from '../assets/gbch-logo.svg'
 
 // Hidden for now, not removed -- flip back to true to bring the builder's
@@ -153,8 +156,7 @@ export default function BuilderDashboard({ profile }) {
   const [ticketCategory, setTicketCategory] = useState(null)
   const [ticketIssueTag, setTicketIssueTag] = useState(null)
   const [ticketIssueOther, setTicketIssueOther] = useState('')
-  const [ticketPhotoFile, setTicketPhotoFile] = useState(null)
-  const [ticketPhotoPreview, setTicketPhotoPreview] = useState(null)
+  const [ticketMediaFiles, setTicketMediaFiles] = useState([])
   const [ticketDuplicateWarning, setTicketDuplicateWarning] = useState(null)
   const [ticketSubmitting, setTicketSubmitting] = useState(false)
   const [ticketError, setTicketError] = useState('')
@@ -1110,8 +1112,7 @@ export default function BuilderDashboard({ profile }) {
     setTicketCategory(null)
     setTicketIssueTag(null)
     setTicketIssueOther('')
-    setTicketPhotoFile(null)
-    setTicketPhotoPreview(null)
+    setTicketMediaFiles([])
     setTicketDuplicateWarning(null)
     setTicketSubmitting(false)
     setTicketError('')
@@ -1145,16 +1146,6 @@ export default function BuilderDashboard({ profile }) {
       .order('created_at', { ascending: false })
 
     if (!error) setReportedTickets(await attachBuilderSafeProperties(data))
-  }
-
-  function handleTicketPhoto(e) {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    setTicketPhotoFile(file)
-    const reader = new FileReader()
-    reader.onload = () => setTicketPhotoPreview(reader.result)
-    reader.readAsDataURL(file)
   }
 
   function handleCompletePhoto(e) {
@@ -1214,23 +1205,6 @@ export default function BuilderDashboard({ profile }) {
     setTicketDuplicateWarning(null)
     setTicketSubmitting(true)
 
-    let photoUrl = null
-    if (ticketPhotoFile) {
-      const compressedTicketPhoto = await compressImage(ticketPhotoFile)
-      const path = `${profile.id}/${Date.now()}-${compressedTicketPhoto.name}`
-      const { error: uploadError } = await supabase.storage
-        .from('ticket-photos')
-        .upload(path, compressedTicketPhoto)
-
-      if (uploadError) {
-        setTicketSubmitting(false)
-        setTicketError(`Photo upload failed: ${uploadError.message}`)
-        return
-      }
-
-      photoUrl = await getSignedUrl('ticket-photos', path)
-    }
-
     const { data, error } = await supabase
       .schema('pmms')
       .from('tickets')
@@ -1244,18 +1218,29 @@ export default function BuilderDashboard({ profile }) {
         status: 'Pending',
         raised_by: profile.id,
         raised_by_name: profile.name,
-        photo_url: photoUrl,
         created_at: new Date().toISOString(),
         status_changed_at: new Date().toISOString(),
       })
       .select('id, ticket_number')
 
-    setTicketSubmitting(false)
-
     if (error) {
+      setTicketSubmitting(false)
       setTicketError(error.message)
       return
     }
+
+    if (ticketMediaFiles.length > 0) {
+      try {
+        const [firstUrl] = await uploadTicketAttachments(ticketMediaFiles, data[0].id, profile.id)
+        await supabase.schema('pmms').from('tickets').update({ photo_url: firstUrl }).eq('id', data[0].id)
+      } catch (uploadErr) {
+        setTicketSubmitting(false)
+        setTicketError(uploadErr.message)
+        return
+      }
+    }
+
+    setTicketSubmitting(false)
 
     if (priorityTierLabel(priorityScore, p1Threshold, p2Threshold) === 'P1 Critical') {
       const division = maintenanceCategories[ticketCategory]?.division || 'Maintenance'
@@ -1968,7 +1953,7 @@ export default function BuilderDashboard({ profile }) {
       {selectedTicket.photo_url && (
         <div style={{ background: COLORS.white, borderRadius: '16px', padding: '20px', marginBottom: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
           <p style={{ margin: '0 0 14px 0', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Photo</p>
-          <AttachmentMedia url={selectedTicket.photo_url} alt="Ticket attachment" style={{ width: '100%', borderRadius: '10px', display: 'block' }} />
+          <TicketAttachmentGallery ticketId={selectedTicket.id} fallbackUrl={selectedTicket.photo_url} />
         </div>
       )}
 
@@ -3321,24 +3306,7 @@ export default function BuilderDashboard({ profile }) {
                   <div style={{ background: SECTION_BG[0], padding: '20px' }}>
                     <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: COLORS.slate900 }}>5. Photo &amp; Submit</p>
 
-                    <input
-                      type="file"
-                      accept="image/*"
-                      capture="environment"
-                      id="ticket-photo-input"
-                      onChange={handleTicketPhoto}
-                      style={{ display: 'none' }}
-                    />
-                    <button
-                      onClick={() => document.getElementById('ticket-photo-input').click()}
-                      style={{ width: '100%', height: '44px', borderRadius: '10px', border: `2px dashed ${COLORS.slate300}`, background: COLORS.white, color: COLORS.slate500, fontSize: '13px', fontWeight: 600, cursor: 'pointer', boxSizing: 'border-box' }}
-                    >
-                      Add a photo
-                    </button>
-
-                    {ticketPhotoPreview && (
-                      <img src={ticketPhotoPreview} alt="Ticket attachment preview" style={{ width: '100%', marginTop: '10px', borderRadius: '10px', display: 'block' }} />
-                    )}
+                    <TicketMediaPicker files={ticketMediaFiles} onChange={setTicketMediaFiles} inputId="ticket-photo-input" />
 
                     <div style={{ marginTop: '16px' }}>
                       <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 600, color: COLORS.slate500, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Reported by</p>
