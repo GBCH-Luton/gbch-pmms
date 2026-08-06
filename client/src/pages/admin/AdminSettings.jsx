@@ -34,7 +34,7 @@ const expandToggleBtnStyle = { width: '32px', height: '32px', borderRadius: '8px
 const orderInputStyle = { width: '40px', height: '32px', padding: 0, borderRadius: '8px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', fontWeight: 700, color: COLORS.slate600, textAlign: 'center', boxSizing: 'border-box', flexShrink: 0 }
 const removeBtnStyle = { padding: '8px 14px', background: COLORS.white, color: COLORS.red600, border: `1px solid ${COLORS.red200}`, borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', flexShrink: 0, marginLeft: 'auto' }
 
-const SECTION_IDS = ['priority-thresholds', 'issue-scores', 'compliance-types', 'clocking-rules', 'stuck-ticket-alerts', 'compliance-alerts', 'on-call-roster', 'dashboard-metrics']
+const SECTION_IDS = ['priority-thresholds', 'issue-scores', 'compliance-types', 'clocking-rules', 'stuck-ticket-alerts', 'compliance-alerts', 'dashboard-metrics']
 
 function SettingsSection({ title, subtitle, headerExtra, open, onToggle, children }) {
   return (
@@ -156,9 +156,6 @@ export default function AdminSettings() {
   const [townError, setTownError] = useState('')
   const [townSaving, setTownSaving] = useState(false)
 
-  const [roster, setRoster] = useState([])
-  const [rosterSaving, setRosterSaving] = useState(false)
-  const [rosterSaved, setRosterSaved] = useState(false)
 
   const [newPropertyWindowHours, setNewPropertyWindowHours] = useState(48)
   const [totalTicketsPeriod, setTotalTicketsPeriod] = useState('all_time')
@@ -231,7 +228,6 @@ export default function AdminSettings() {
       if (map.clock_overrun_hours != null) setClockOverrunHours(map.clock_overrun_hours)
       if (map.done_window_hours != null) setDoneWindowHours(map.done_window_hours)
       if (map.clock_distance_threshold_meters != null) setClockDistanceThresholdM(map.clock_distance_threshold_meters)
-      if (map.on_call_roster) setRoster(map.on_call_roster)
       if (map.new_property_window_hours != null) setNewPropertyWindowHours(map.new_property_window_hours)
       if (map.dashboard_total_tickets_period != null) setTotalTicketsPeriod(map.dashboard_total_tickets_period)
       if (Array.isArray(map.divisions) && map.divisions.length > 0) setDivisions(map.divisions)
@@ -660,31 +656,6 @@ export default function AdminSettings() {
     const next = towns.filter(t => t !== name)
     await saveSetting('towns', next)
     setTowns(next)
-  }
-
-  async function addRosterContact() {
-    const updated = [...roster, { id: Date.now(), name: '', role: '', phone: '' }]
-    setRoster(updated)
-    await saveSetting('on_call_roster', updated)
-  }
-
-  async function removeRosterContact(id) {
-    const updated = roster.filter(c => c.id !== id)
-    setRoster(updated)
-    await saveSetting('on_call_roster', updated)
-  }
-
-  function updateRosterField(id, field, value) {
-    setRoster(prev => prev.map(c => c.id === id ? { ...c, [field]: value } : c))
-  }
-
-  async function saveRoster() {
-    setRosterSaving(true)
-    setRosterSaved(false)
-    await saveSetting('on_call_roster', roster)
-    setRosterSaving(false)
-    setRosterSaved(true)
-    setTimeout(() => setRosterSaved(false), 2000)
   }
 
   async function saveDashboardMetrics() {
@@ -1475,65 +1446,6 @@ export default function AdminSettings() {
           </button>
         </div>
         {townError && <p style={modalErrorStyle}>{townError}</p>}
-      </SettingsSection>
-
-      {/* Section 5: On-Call Roster */}
-      <SettingsSection
-        title="On-Call Roster"
-        subtitle="Contacts notified when a P1 Critical ticket is raised."
-        open={!!openSections['on-call-roster']}
-        onToggle={() => toggleSection('on-call-roster')}
-      >
-        {roster.length === 0 && (
-          <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>No on-call contacts added yet.</p>
-        )}
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
-          {roster.map(contact => (
-            <div key={contact.id} style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-              <input
-                type="text"
-                value={contact.name}
-                onChange={(e) => updateRosterField(contact.id, 'name', e.target.value)}
-                placeholder="Name"
-                style={{ ...inputStyle, flex: '2 1 140px' }}
-              />
-              <input
-                type="text"
-                value={contact.role}
-                onChange={(e) => updateRosterField(contact.id, 'role', e.target.value)}
-                placeholder="Role"
-                style={{ ...inputStyle, flex: '2 1 140px' }}
-              />
-              <input
-                type="text"
-                value={contact.phone}
-                onChange={(e) => updateRosterField(contact.id, 'phone', e.target.value)}
-                placeholder="Phone"
-                style={{ ...inputStyle, flex: '2 1 140px' }}
-              />
-              <button
-                onClick={() => removeRosterContact(contact.id)}
-                style={{ padding: '10px 14px', background: COLORS.white, color: COLORS.red600, border: `1px solid ${COLORS.red200}`, borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
-              >
-                Delete
-              </button>
-            </div>
-          ))}
-        </div>
-
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-          <button
-            onClick={addRosterContact}
-            style={{ padding: '10px 20px', background: COLORS.white, color: COLORS.blue700, border: `1px solid ${COLORS.blue200}`, borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}
-          >
-            + Add new contact
-          </button>
-          <button onClick={saveRoster} disabled={rosterSaving} style={{ ...saveBtnStyle, opacity: rosterSaving ? 0.6 : 1, cursor: rosterSaving ? 'not-allowed' : 'pointer' }}>
-            {rosterSaving ? 'Saving...' : 'Save Roster'}
-          </button>
-          {rosterSaved && <span style={savedTagStyle}>✓ Saved</span>}
-        </div>
       </SettingsSection>
 
       {/* Section 6: Dashboard Metrics */}
