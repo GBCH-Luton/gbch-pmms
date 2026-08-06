@@ -7,7 +7,7 @@ import { fetchMaintenanceCategories, fetchAllMaintenanceCategoryNames, sortedCat
 import { attachBuilderSafeProperties } from '../lib/properties'
 import { logLoginEvent } from '../lib/loginEvents'
 import { pushNotificationsSupported, hasActivePushSubscription, enablePushNotifications } from '../lib/pushNotifications'
-import { pushEmergencyAlert, priorityTierLabel, fetchPriorityThresholds, Avatar } from './admin/shared'
+import { pushEmergencyAlert, priorityTierLabel, fetchPriorityThresholds, Avatar, formatUKDate, formatUKDateTime } from './admin/shared'
 import { fetchAvailableMaterials, logMaterialUsage } from '../lib/simsMaterialsBridge'
 import { fetchChannelMessages, subscribeToChannel, postMessage, markChannelRead, markChannelReadRemote, fetchChannelReads, countUnreadMentions, colorForSender } from '../lib/chat'
 import { fetchDmContacts, fetchConversations, fetchThreadMessages, subscribeToDm, postDm, markThreadRead, countUnreadDms } from '../lib/dm'
@@ -1217,23 +1217,6 @@ export default function BuilderDashboard({ profile }) {
     if (h > 0) return `${h}h ${m}m ${s}s`
     if (m > 0) return `${m}m ${s}s`
     return `${s}s`
-  }
-
-  const formatUKDate = (isoString) => {
-    if (!isoString) return ''
-    const d = new Date(isoString)
-    const dd = String(d.getDate()).padStart(2, '0')
-    const mm = String(d.getMonth() + 1).padStart(2, '0')
-    const yyyy = d.getFullYear()
-    return `${dd}/${mm}/${yyyy}`
-  }
-
-  const formatUKDateTime = (isoString) => {
-    if (!isoString) return ''
-    const d = new Date(isoString)
-    const hh = String(d.getHours()).padStart(2, '0')
-    const min = String(d.getMinutes()).padStart(2, '0')
-    return `${formatUKDate(isoString)} ${hh}:${min}`
   }
 
   const isSameDay = (a, b) =>

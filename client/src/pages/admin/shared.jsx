@@ -441,24 +441,67 @@ export async function fetchGardenReviewAging() {
   return counts
 }
 
+// Intl.DateTimeFormat pinned to Europe/London, NOT Date.prototype's
+// getDate()/getHours() etc, which this used to use -- those read the
+// VIEWING DEVICE's local clock/timezone, not genuine UK time, despite the
+// function's name. Everyone in this company is UK-based, but whoever's
+// looking at the page isn't guaranteed to be on a device set to UK time
+// (found live: a Clocking page timestamp that didn't match its own
+// database row at all). Intl also gets BST/GMT right automatically across
+// the year, which a hardcoded "+1 hour" patch wouldn't.
+const UK_DATE_FORMATTER = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/London', day: '2-digit', month: '2-digit', year: 'numeric' })
+const UK_TIME_FORMATTER = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit', hour12: false })
+
 export const formatUKDate = (isoString) => {
   if (!isoString) return ''
-  const d = new Date(isoString)
-  const dd = String(d.getDate()).padStart(2, '0')
-  const mm = String(d.getMonth() + 1).padStart(2, '0')
-  const yyyy = d.getFullYear()
-  return `${dd}/${mm}/${yyyy}`
+  return UK_DATE_FORMATTER.format(new Date(isoString))
 }
 
 export const formatUKDateTime = (isoString) => {
   if (!isoString) return ''
   const d = new Date(isoString)
-  const dd = String(d.getDate()).padStart(2, '0')
-  const mm = String(d.getMonth() + 1).padStart(2, '0')
-  const yyyy = d.getFullYear()
-  const hh = String(d.getHours()).padStart(2, '0')
-  const min = String(d.getMinutes()).padStart(2, '0')
-  return `${dd}/${mm}/${yyyy} ${hh}:${min}`
+  return `${UK_DATE_FORMATTER.format(d)} ${UK_TIME_FORMATTER.format(d)}`
+}
+
+const UK_DATETIME_PARTS_FORMATTER = new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'Europe/London', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false,
+})
+
+function ukPartsOf(ms) {
+  const parts = {}
+  UK_DATETIME_PARTS_FORMATTER.formatToParts(new Date(ms)).forEach(p => { parts[p.type] = p.value })
+  return parts
+}
+
+// Populates a `<input type="datetime-local">` (AdminClocking.jsx's
+// "Correct Clock Times" modal) with genuine UK wall-clock time, paired
+// with ukDateTimeInputValueToMs below for the reverse direction --
+// together these replace a plain toLocalInputValue()/`new Date(str)`
+// round-trip, which used the browser's own timezone on both ends. That
+// was internally consistent (so editing without changing anything was
+// harmless) right up until formatUKDateTime became genuinely UK-pinned --
+// after that, the modal would pre-fill a DIFFERENT number than the
+// read-only table shows for the exact same timestamp, and an admin
+// "correcting" a time based on that mismatch would silently save the
+// wrong UTC instant.
+export function toUkDateTimeInputValue(ms) {
+  const p = ukPartsOf(ms)
+  return `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}`
+}
+
+// Reverse of the above -- interprets a "YYYY-MM-DDTHH:mm" string as UK
+// wall-clock time (BST or GMT, whichever applies on that date) and
+// returns the matching UTC instant in milliseconds. Standard
+// guess-and-correct technique for timezone conversion without a date
+// library: treat the typed numbers as if they were already UTC (a
+// guess), see what UK wall-clock time that guess actually displays as,
+// then shift the guess by the difference.
+export function ukDateTimeInputValueToMs(value) {
+  const guessMs = Date.parse(`${value}:00Z`)
+  if (isNaN(guessMs)) return NaN
+  const shown = ukPartsOf(guessMs)
+  const shownAsUtcMs = Date.UTC(Number(shown.year), Number(shown.month) - 1, Number(shown.day), Number(shown.hour), Number(shown.minute))
+  return guessMs - (shownAsUtcMs - guessMs)
 }
 
 export const filterSelectStyle = { padding: '8px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', fontWeight: 600, color: COLORS.slate900, background: COLORS.slate50, cursor: 'pointer' }

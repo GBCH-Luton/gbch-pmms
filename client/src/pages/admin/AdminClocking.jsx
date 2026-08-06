@@ -4,7 +4,7 @@ import { COLORS } from '../../lib/colors'
 import { distanceMetres, googleMapsEmbedLink, googleMapsRouteEmbedLink, metresToMiles, formatDistanceMetres, ensurePropertyCoords } from '../../lib/geo'
 import { attachProperties } from '../../lib/properties'
 import {
-  thStyle, tdStyle, actionBtnStyle, filterSelectStyle, formatUKDateTime,
+  thStyle, tdStyle, actionBtnStyle, filterSelectStyle, formatUKDateTime, toUkDateTimeInputValue, ukDateTimeInputValueToMs,
   modalOverlayStyle, modalCardStyle, modalTitleStyle, modalLabelStyle,
   modalErrorStyle, modalCancelBtnStyle, modalConfirmBtnStyle, fetchAssignableBuilders, fetchAssignableStaffForDivision,
 } from './shared'
@@ -48,12 +48,6 @@ function formatDuration(ms) {
   return `${h}h ${m}m`
 }
 
-function toLocalInputValue(ms) {
-  const d = new Date(ms)
-  const p = (n) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`
-}
-
 export default function AdminClocking({ profile, onNavigate }) {
   const [loading, setLoading] = useState(true)
   const [liveSessions, setLiveSessions] = useState([])
@@ -91,8 +85,8 @@ export default function AdminClocking({ profile, onNavigate }) {
 
   useEffect(() => {
     if (editRow) {
-      setEditClockIn(toLocalInputValue(new Date(editRow.firstIn).getTime()))
-      setEditClockOut(toLocalInputValue(new Date(editRow.lastOut).getTime()))
+      setEditClockIn(toUkDateTimeInputValue(new Date(editRow.firstIn).getTime()))
+      setEditClockOut(toUkDateTimeInputValue(new Date(editRow.lastOut).getTime()))
       setEditError('')
     }
   }, [editRow])
@@ -228,8 +222,8 @@ export default function AdminClocking({ profile, onNavigate }) {
   async function submitEdit() {
     if (!editClockIn || !editClockOut) { setEditError('Please fill in both times.'); return }
 
-    const newIn = new Date(editClockIn).getTime()
-    const newOut = new Date(editClockOut).getTime()
+    const newIn = ukDateTimeInputValueToMs(editClockIn)
+    const newOut = ukDateTimeInputValueToMs(editClockOut)
     if (isNaN(newIn) || isNaN(newOut)) { setEditError("Couldn't read those times."); return }
     if (newOut <= newIn) { setEditError('Clock-out must be after clock-in.'); return }
 
