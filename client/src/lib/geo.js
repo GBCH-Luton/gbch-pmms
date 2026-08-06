@@ -123,3 +123,34 @@ export async function ensurePropertyCoords(properties) {
 
   return coordsByPropertyId
 }
+
+// Same caching pattern as ensurePropertyCoords, but for a builder's home
+// postcode (public.staff.home_postcode/home_latitude/home_longitude) --
+// used by AdminClocking.jsx to estimate expected mileage for someone's
+// first job of the day. Staff without a home_postcode set are silently
+// skipped, not an error -- it's an optional field.
+export async function ensureStaffHomeCoords(staffList) {
+  const coordsByStaffId = {}
+  const toGeocode = []
+
+  staffList.forEach(s => {
+    if (!s || !s.home_postcode) return
+    if (s.home_latitude != null && s.home_longitude != null) {
+      coordsByStaffId[s.id] = { latitude: s.home_latitude, longitude: s.home_longitude }
+    } else {
+      toGeocode.push(s)
+    }
+  })
+
+  for (const s of toGeocode) {
+    const coords = await geocodePostcode(s.home_postcode)
+    if (!coords) continue
+    coordsByStaffId[s.id] = coords
+    await supabase
+      .from('staff')
+      .update({ home_latitude: coords.latitude, home_longitude: coords.longitude })
+      .eq('id', s.id)
+  }
+
+  return coordsByStaffId
+}

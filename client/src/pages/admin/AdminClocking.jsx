@@ -1,16 +1,24 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { COLORS } from '../../lib/colors'
-import { distanceMetres, googleMapsEmbedLink, googleMapsRouteEmbedLink, metresToMiles, formatDistanceMetres, ensurePropertyCoords } from '../../lib/geo'
+import { distanceMetres, googleMapsEmbedLink, googleMapsRouteEmbedLink, metresToMiles, formatDistanceMetres, ensurePropertyCoords, ensureStaffHomeCoords } from '../../lib/geo'
 import { attachProperties } from '../../lib/properties'
 import {
-  thStyle, tdStyle, actionBtnStyle, filterSelectStyle, formatUKDateTime, toUkDateTimeInputValue, ukDateTimeInputValueToMs,
+  thStyle, tdStyle, actionBtnStyle, filterSelectStyle, formatUKDate, formatUKDateTime, toUkDateTimeInputValue, ukDateTimeInputValueToMs,
   modalOverlayStyle, modalCardStyle, modalTitleStyle, modalLabelStyle,
   modalErrorStyle, modalCancelBtnStyle, modalConfirmBtnStyle, fetchAssignableBuilders, fetchAssignableStaffForDivision,
 } from './shared'
 
 const EIGHT_HOURS_MS = 8 * 60 * 60 * 1000
 const DEFAULT_CLOCK_DISTANCE_THRESHOLD_M = 250
+
+// Straight-line (haversine) distance always undercounts real road miles --
+// actual roads bend, one-way systems detour, etc. This is a rough UK rule-
+// of-thumb multiplier to approximate driving distance without needing a
+// paid routing API (Google Distance Matrix/Directions). It's an
+// approximation, labelled as such in the UI, not a claim to match Google's
+// actual route mileage exactly.
+const ROAD_DISTANCE_MULTIPLIER = 1.3
 
 // Compact map-pin button + optional "too far" flag shown under a clock-in
 // or clock-out time in the timesheet, when that event has a recorded
@@ -110,7 +118,7 @@ export default function AdminClocking({ profile, onNavigate }) {
     // filter dropdown, so it matches what Pipeline/Reassign actually offer.
     const { data: builderData } = await supabase
       .from('staff')
-      .select('id, name')
+      .select('id, name, home_postcode, home_latitude, home_longitude')
     setBuilders(await (profile.division ? fetchAssignableStaffForDivision(profile.division) : fetchAssignableBuilders()))
 
     // --- Section 1: currently clocked in (open work_sessions) ---
@@ -206,11 +214,43 @@ export default function AdminClocking({ profile, onNavigate }) {
             lastSession,
             clockInDistance,
             clockOutDistance,
+            propertyCoords,
           }
         })
         .filter(Boolean)
         .sort((a, b) => new Date(b.lastOut) - new Date(a.lastOut))
     }
+
+    // Estimated mileage: straight-line distance (times a road-distance
+    // multiplier, see ROAD_DISTANCE_MULTIPLIER above) from wherever the
+    // builder plausibly started their trip -- home for their first job of
+    // a given UK calendar day, otherwise their own previous job that same
+    // day -- to this job's property. Nothing in the system records an
+    // actual trip origin, so this is deliberately an approximation to
+    // compare the builder's self-reported figure against, not a claim to
+    // reproduce Google's real route mileage.
+    const homeCoordsByStaffId = await ensureStaffHomeCoords((builderData || []).filter(b => b.home_postcode))
+    const rowsByBuilder = {}
+    rows.forEach(r => {
+      const id = r.ticket.assigned_builder_id
+      if (!id) return
+      ;(rowsByBuilder[id] ||= []).push(r)
+    })
+    Object.values(rowsByBuilder).forEach(builderRows => {
+      builderRows.sort((a, b) => new Date(a.firstIn) - new Date(b.firstIn))
+      let prevRow = null
+      let prevDateStr = null
+      builderRows.forEach(r => {
+        const dateStr = formatUKDate(r.firstIn)
+        const origin = (prevRow && prevDateStr === dateStr) ? prevRow.propertyCoords : homeCoordsByStaffId[r.ticket.assigned_builder_id]
+        r.estimatedMiles = (origin && r.propertyCoords)
+          ? metresToMiles(distanceMetres(origin.latitude, origin.longitude, r.propertyCoords.latitude, r.propertyCoords.longitude)) * ROAD_DISTANCE_MULTIPLIER
+          : null
+        prevRow = r
+        prevDateStr = dateStr
+      })
+    })
+
     setCompletedRows(rows)
 
     setLoading(false)
@@ -380,7 +420,7 @@ export default function AdminClocking({ profile, onNavigate }) {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px', marginBottom: '14px' }}>
           <div>
             <h2 style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: 800, color: COLORS.slate900 }}>Completed Job Timesheet</h2>
-            <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate500 }}>Clock-in, clock-out, total worked time and mileage per finished job.</p>
+            <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate500 }}>Clock-in, clock-out, total worked time and mileage per finished job. "Est." mileage is an approximate straight-line estimate (home, or the builder's previous job that day, to the property) -- not an exact route match.</p>
           </div>
           <select value={builderFilter} onChange={(e) => setBuilderFilter(e.target.value)} style={filterSelectStyle}>
             <option value="All">All builders</option>
@@ -459,7 +499,23 @@ export default function AdminClocking({ profile, onNavigate }) {
                       )
                     })()}
                   </td>
-                  <td style={tdStyle}>{(row.ticket.mileage_logged || 0).toFixed(1)}</td>
+                  <td style={tdStyle}>
+                    {(row.ticket.mileage_logged || 0).toFixed(1)}
+                    {row.estimatedMiles != null && (() => {
+                      const actual = row.ticket.mileage_logged || 0
+                      // Same "clearly not just normal variation" framing as
+                      // the estimated-time flag above -- a builder logging
+                      // 0 against a non-trivial estimated trip is the exact
+                      // "forgot to fill it in" signature (see ticket #12).
+                      const mismatch = actual === 0 ? row.estimatedMiles > 0.3 : Math.abs(actual - row.estimatedMiles) > Math.max(1, row.estimatedMiles * 0.5)
+                      return (
+                        <span style={{ display: 'block', marginTop: '2px', fontSize: '10px', fontWeight: 700, color: mismatch ? COLORS.red600 : COLORS.slate400 }}>
+                          Est. {row.estimatedMiles.toFixed(1)}mi
+                          {mismatch && ' — check against logged mileage'}
+                        </span>
+                      )
+                    })()}
+                  </td>
                   <td style={tdStyle}>
                     {row.firstSession.clock_in_lat != null && row.firstSession.clock_in_lng != null && row.lastSession.clock_out_lat != null && row.lastSession.clock_out_lng != null ? (
                       <button

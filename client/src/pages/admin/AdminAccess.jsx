@@ -84,7 +84,7 @@ function roleStyle(role) {
 
 const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', fontFamily: 'inherit', boxSizing: 'border-box' }
 
-const emptyForm = { name: '', email: '', role: 'Builder', job_title: '', phone: '', skills: [] }
+const emptyForm = { name: '', email: '', role: 'Builder', job_title: '', phone: '', skills: [], home_postcode: '' }
 
 // Shown once, right after a temp password is generated -- by a brand new
 // account (StaffFormModal) or a reset on an existing one (ResetPasswordModal).
@@ -195,6 +195,7 @@ function StaffFormModal({ staff, roleOptions, staffDirectory, onClose, onSaved }
         job_title: staff.job_title || '',
         phone: staff.phone || '',
         skills: staff.skills || [],
+        home_postcode: staff.home_postcode || '',
       })
     } else {
       setForm({ ...emptyForm, role: roleOptions[0] || '' })
@@ -268,6 +269,9 @@ function StaffFormModal({ staff, roleOptions, staffDirectory, onClose, onSaved }
     const targetId = staff?.id || matchedExisting?.id
 
     if (targetId) {
+      const newHomePostcode = form.home_postcode.trim() || null
+      const homePostcodeChanged = newHomePostcode !== (staff?.home_postcode || null)
+
       const { data, error: updateError } = await supabase
         .from('staff')
         .update({
@@ -276,6 +280,12 @@ function StaffFormModal({ staff, roleOptions, staffDirectory, onClose, onSaved }
           job_title: form.job_title.trim() || null,
           phone: form.phone.trim() || null,
           skills: form.skills,
+          home_postcode: newHomePostcode,
+          // Cleared whenever the postcode itself changes so the mileage
+          // estimate (AdminClocking.jsx, via ensureStaffHomeCoords) never
+          // reads a stale lat/lng cached under the old address -- it's
+          // cheap to re-geocode lazily next time it's needed.
+          ...(homePostcodeChanged ? { home_latitude: null, home_longitude: null } : {}),
         })
         .eq('id', targetId)
         .select()
@@ -386,6 +396,9 @@ function StaffFormModal({ staff, roleOptions, staffDirectory, onClose, onSaved }
 
         <p style={modalLabelStyle}>Phone</p>
         <input type="text" value={form.phone} onChange={(e) => set('phone', e.target.value)} style={inputStyle} />
+
+        <p style={modalLabelStyle}>Home Postcode <span style={{ fontWeight: 500, color: COLORS.slate400 }}>(optional -- used by Clocking to estimate expected mileage on someone's first job of the day)</span></p>
+        <input type="text" value={form.home_postcode} onChange={(e) => set('home_postcode', e.target.value)} placeholder="e.g. LU1 2AB" style={inputStyle} />
 
         <p style={modalLabelStyle}>Skills</p>
         <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: COLORS.slate400 }}>
