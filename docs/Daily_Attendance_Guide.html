@@ -280,33 +280,53 @@
     <!-- Step 3 -->
     <div class="step">
       <div class="step-mock">
-        <div class="phone"><div class="notch"></div>
-          <div class="screen">
-            <div class="mock-header">
-              <div class="mock-logo"><div class="sq"></div>PMMS</div>
-              <div class="mock-icons">🔔 ☰</div>
-            </div>
-            <div style="padding:10px 14px 0;">
-              <div class="mock-banner ok">
-                <span>🟢 Clocked in since 08:03</span>
-                <div style="display:flex; gap:6px;">
-                  <button class="mock-btn ghost" style="padding:6px 10px;font-size:10.5px;">Leaving Site</button>
-                  <button class="mock-btn dark" style="padding:6px 10px;font-size:10.5px;">Clock Out for the Day</button>
+        <div style="display:flex; flex-direction:column; gap:10px; align-items:center;">
+          <div class="phone"><div class="notch"></div>
+            <div class="screen">
+              <div class="mock-header">
+                <div class="mock-logo"><div class="sq"></div>PMMS</div>
+                <div class="mock-icons">🔔 ☰</div>
+              </div>
+              <div style="padding:10px 14px 0;">
+                <div class="mock-banner ok">
+                  <span>🟢 Clocked in since 08:03</span>
+                  <div style="display:flex; gap:6px;">
+                    <button class="mock-btn ghost" style="padding:6px 10px;font-size:10.5px;">Leaving Site</button>
+                    <button class="mock-btn dark" style="padding:6px 10px;font-size:10.5px;">Clock Out for the Day</button>
+                  </div>
+                </div>
+              </div>
+              <div style="padding:12px 14px;">
+                <div class="mock-kpi-row">
+                  <div class="mock-kpi" style="background:#0d9488;"><span class="n">2</span><span class="l">Working Now</span></div>
+                  <div class="mock-kpi" style="background:#3b82f6;"><span class="n">3</span><span class="l">To Do</span></div>
+                </div>
+                <div class="mock-ticket">
+                  <div class="addr">10 Red Rails, Luton</div>
+                  <div class="meta">Kitchen &middot; Leaking tap</div>
+                </div>
+                <div class="mock-ticket">
+                  <div class="addr">4 Alpine Way, Luton</div>
+                  <div class="meta">Garden &middot; Grass cutting</div>
                 </div>
               </div>
             </div>
-            <div style="padding:12px 14px;">
-              <div class="mock-kpi-row">
-                <div class="mock-kpi" style="background:#0d9488;"><span class="n">2</span><span class="l">Working Now</span></div>
-                <div class="mock-kpi" style="background:#3b82f6;"><span class="n">3</span><span class="l">To Do</span></div>
+          </div>
+          <p style="font-size:11px; font-weight:700; color:var(--guide-text-faint); margin:2px 0 0 0;">&darr; if you clock in late, the bar looks like this instead &darr;</p>
+          <div class="phone" style="max-width:300px;"><div class="notch"></div>
+            <div class="screen" style="min-height:auto;">
+              <div class="mock-header">
+                <div class="mock-logo"><div class="sq"></div>PMMS</div>
+                <div class="mock-icons">🔔 ☰</div>
               </div>
-              <div class="mock-ticket">
-                <div class="addr">10 Red Rails, Luton</div>
-                <div class="meta">Kitchen &middot; Leaking tap</div>
-              </div>
-              <div class="mock-ticket">
-                <div class="addr">4 Alpine Way, Luton</div>
-                <div class="meta">Garden &middot; Grass cutting</div>
+              <div style="padding:10px 14px 14px;">
+                <div class="mock-banner late">
+                  <span>⚠ Clocked in since 09:03 (3m late)</span>
+                  <div style="display:flex; gap:6px;">
+                    <button class="mock-btn ghost" style="padding:6px 10px;font-size:10.5px;">Leaving Site</button>
+                    <button class="mock-btn dark" style="padding:6px 10px;font-size:10.5px;">Clock Out for the Day</button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -316,13 +336,9 @@
         <p class="step-title"><span class="step-num">3</span> You're in for the day</p>
         <p>Now you can see your jobs as normal. Notice the bar at the top &mdash; that's your reminder that you're clocked in, and it stays there all day.</p>
         <ul>
-          <li>If you clocked in after <b>9:00am</b>, this bar turns orange and shows exactly how many minutes late it was &mdash; that's just for your manager to see, nothing you need to do.</li>
+          <li>If you clocked in after <b>9:00am</b>, this bar turns orange and shows exactly how many minutes late it was (see the second screen alongside) &mdash; that's just for your manager to see, nothing you need to do.</li>
           <li>Tap into a job and clock in/out of it exactly like you always have &mdash; that part hasn't changed.</li>
         </ul>
-        <p style="font-size:12px; font-weight:700; color:var(--guide-text-faint); margin-top:14px;">If you clock in late, the bar looks like this instead:</p>
-        <div class="mock-banner late" style="max-width:320px;">
-          <span>⚠ Clocked in since 09:03 (3m late)</span>
-        </div>
       </div>
     </div>
 
