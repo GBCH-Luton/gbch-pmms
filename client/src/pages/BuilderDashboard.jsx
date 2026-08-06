@@ -1380,13 +1380,17 @@ export default function BuilderDashboard({ profile }) {
   const onHoldTickets = tickets.filter(t => t.status === 'On Hold')
   const doneTickets = tickets.filter(t => t.status === 'Completed')
 
+  // 'ALL' is the main dashboard's default view -- a completed job has
+  // nothing left to action, so it's excluded here to keep this list to what
+  // the builder still needs to do. Still reachable via the "Done" filter/
+  // tile above, or from their own profile page.
   const filteredTickets =
     statusFilter === 'WORKING' ? inProgressTickets :
     statusFilter === 'URGENT' ? urgentTickets :
     statusFilter === 'TODO'   ? toDoTickets :
     statusFilter === 'HOLD'   ? onHoldTickets :
     statusFilter === 'DONE'   ? doneTickets :
-    tickets
+    tickets.filter(t => t.status !== 'Completed')
 
   const mileageTickets = tickets
     .filter(t => t.mileage_logged > 0)
