@@ -55,7 +55,7 @@ const SECTION_BG = [COLORS.white, COLORS.slate50]
 const fieldSelectStyle = { width: '100%', height: '44px', padding: '0 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', fontWeight: 500, boxSizing: 'border-box', background: COLORS.white }
 const fieldLabelStyle = { margin: '0 0 8px 0', fontSize: '11px', fontWeight: 600, color: COLORS.slate500, textTransform: 'uppercase', letterSpacing: '0.06em' }
 
-export default function AdminRaiseTicket({ profile }) {
+export default function AdminRaiseTicket({ profile, onNavigate }) {
   const [loggingMode, setLoggingMode] = useState('maintenance') // 'maintenance' | 'compliance'
 
   const [ticketProperties, setTicketProperties] = useState([])
@@ -426,8 +426,18 @@ export default function AdminRaiseTicket({ profile }) {
   return (
     <div style={{ maxWidth: '720px' }}>
 
-      <h1 style={{ margin: '0 0 4px 0', fontSize: '18px', fontWeight: 700, color: COLORS.slate900 }}>Raise Ticket</h1>
-      <p style={{ margin: '0 0 16px 0', fontSize: '13px', fontWeight: 400, color: COLORS.slate500 }}>Calculates priority instantly based on the property and issue you select.</p>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
+        <div>
+          <h1 style={{ margin: '0 0 4px 0', fontSize: '18px', fontWeight: 700, color: COLORS.slate900 }}>Raise Ticket</h1>
+          <p style={{ margin: '0 0 16px 0', fontSize: '13px', fontWeight: 400, color: COLORS.slate500 }}>Calculates priority instantly based on the property and issue you select.</p>
+        </div>
+        <button
+          onClick={() => { resetTicketForm(); onNavigate?.('dashboard') }}
+          style={{ flexShrink: 0, height: '36px', padding: '0 16px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, background: COLORS.white, color: COLORS.slate500, fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}
+        >
+          Cancel
+        </button>
+      </div>
 
       {/* Mode toggle */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
