@@ -111,6 +111,13 @@ export default function AdminPipeline({
   const [editEstimateError, setEditEstimateError] = useState('')
   const [editEstimateSaving, setEditEstimateSaving] = useState(false)
 
+  // Same reasoning as editEstimateModalTicket above -- correcting mileage
+  // a builder forgot (or mis-typed) shouldn't require a full reassign.
+  const [editMileageModalTicket, setEditMileageModalTicket] = useState(null)
+  const [editMileageValue, setEditMileageValue] = useState('')
+  const [editMileageError, setEditMileageError] = useState('')
+  const [editMileageSaving, setEditMileageSaving] = useState(false)
+
   const [historyModalTicket, setHistoryModalTicket] = useState(null)
   const [historyEvents, setHistoryEvents] = useState([])
 
@@ -219,6 +226,13 @@ export default function AdminPipeline({
       setEditEstimateError('')
     }
   }, [editEstimateModalTicket])
+
+  useEffect(() => {
+    if (editMileageModalTicket) {
+      setEditMileageValue(editMileageModalTicket.mileage_logged != null ? String(editMileageModalTicket.mileage_logged) : '')
+      setEditMileageError('')
+    }
+  }, [editMileageModalTicket])
 
   useEffect(() => {
     if (priorityModalTicket) {
@@ -486,6 +500,30 @@ export default function AdminPipeline({
     await postAuditEvent(t.id, profile, 'Estimate Updated', `Estimated time changed from ${t.estimated_minutes != null ? `${t.estimated_minutes}m` : 'not set'} to ${newMinutes}m.`)
     await fetchTickets()
     closeEditEstimateModal()
+  }
+
+  function openEditMileageModal(ticket) { setEditMileageModalTicket(ticket) }
+  function closeEditMileageModal() { setEditMileageModalTicket(null) }
+
+  async function submitEditMileage() {
+    if (editMileageValue === '') { setEditMileageError('Please enter a mileage figure.'); return }
+
+    const t = editMileageModalTicket
+    const newMileage = Number(editMileageValue)
+
+    setEditMileageSaving(true)
+    const { error } = await supabase
+      .schema('pmms')
+      .from('tickets')
+      .update({ mileage_logged: newMileage })
+      .eq('id', t.id)
+    setEditMileageSaving(false)
+
+    if (error) { setEditMileageError(error.message); return }
+
+    await postAuditEvent(t.id, profile, 'Mileage Updated', `Mileage changed from ${t.mileage_logged ?? 0} to ${newMileage}.`)
+    await fetchTickets()
+    closeEditMileageModal()
   }
 
   function openPriorityModal(ticket) { setPriorityModalTicket(ticket) }
@@ -1126,6 +1164,9 @@ export default function AdminPipeline({
                               {t.assigned_builder_id && t.status !== 'Archived' && (
                                 <button onClick={() => openEditEstimateModal(t)} style={actionBtnStyle}>{t.estimated_minutes != null ? 'Edit Estimate' : 'Add Estimate'}</button>
                               )}
+                              {t.assigned_builder_id && t.status !== 'Archived' && (
+                                <button onClick={() => openEditMileageModal(t)} style={actionBtnStyle}>Edit Mileage</button>
+                              )}
                               <button onClick={() => openReassignModal(t)} style={{ ...actionBtnStyle, background: COLORS.blue700, color: COLORS.white, borderColor: COLORS.blue700 }}>Reassign</button>
                             </div>
                           </div>
@@ -1401,6 +1442,35 @@ export default function AdminPipeline({
               <button onClick={closeEditEstimateModal} style={modalCancelBtnStyle}>Cancel</button>
               <button onClick={submitEditEstimate} disabled={editEstimateSaving} style={{ ...modalConfirmBtnStyle, opacity: editEstimateSaving ? 0.6 : 1, cursor: editEstimateSaving ? 'not-allowed' : 'pointer' }}>
                 {editEstimateSaving ? 'Saving...' : 'Save'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editMileageModalTicket && (
+        <div style={modalOverlayStyle}>
+          <div style={modalCardStyle}>
+            <p style={modalTitleStyle}>Mileage — Ticket #{editMileageModalTicket.ticket_number}</p>
+            <p style={modalSubtitleStyle}>{editMileageModalTicket.property?.address}</p>
+
+            <label style={modalLabelStyle}>Miles driven to get here</label>
+            <input
+              type="number"
+              min="0"
+              step="0.1"
+              value={editMileageValue}
+              onChange={(e) => setEditMileageValue(e.target.value)}
+              placeholder="e.g. 4.5"
+              style={{ width: '100%', height: '40px', padding: '0 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', boxSizing: 'border-box' }}
+            />
+
+            {editMileageError && <p style={modalErrorStyle}>{editMileageError}</p>}
+
+            <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
+              <button onClick={closeEditMileageModal} style={modalCancelBtnStyle}>Cancel</button>
+              <button onClick={submitEditMileage} disabled={editMileageSaving} style={{ ...modalConfirmBtnStyle, opacity: editMileageSaving ? 0.6 : 1, cursor: editMileageSaving ? 'not-allowed' : 'pointer' }}>
+                {editMileageSaving ? 'Saving...' : 'Save'}
               </button>
             </div>
           </div>
