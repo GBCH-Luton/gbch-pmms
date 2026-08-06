@@ -94,6 +94,18 @@ export default function BuilderDashboard({ profile }) {
   const [clockInForDayError, setClockInForDayError] = useState('')
   const [clockingOutForDay, setClockingOutForDay] = useState(false)
   const [clockOutForDayError, setClockOutForDayError] = useState('')
+
+  // Mid-day presence, independent of both the shift above and any job's
+  // own work_session -- a materials run or a break doesn't pause or
+  // affect job time, it's purely a supplementary "where are they right
+  // now" record for managers (see pmms.activity_log).
+  const [openActivity, setOpenActivity] = useState(null)
+  const [activityPickerOpen, setActivityPickerOpen] = useState(false)
+  const [activityType, setActivityType] = useState('Travel')
+  const [activityNote, setActivityNote] = useState('')
+  const [startingActivity, setStartingActivity] = useState(false)
+  const [endingActivity, setEndingActivity] = useState(false)
+  const [activityError, setActivityError] = useState('')
   const [comments, setComments] = useState([])
   const [commentText, setCommentText] = useState('')
   const [commentError, setCommentError] = useState('')
@@ -171,6 +183,7 @@ export default function BuilderDashboard({ profile }) {
     fetchNotifications()
     fetchAvailableJobs()
     fetchTodayShift()
+    fetchOpenActivity()
     fetchPriorityThresholds().then(({ p1, p2 }) => { setP1Threshold(p1); setP2Threshold(p2) })
     fetchRoutineVisitChecklistTemplate()
     supabase.schema('pmms').from('settings').select('setting_value').eq('setting_key', 'daily_clock_in_deadline').maybeSingle()
@@ -585,6 +598,10 @@ export default function BuilderDashboard({ profile }) {
       setClockOutForDayError(`Job #${stillWorking.ticket_number} is still in progress -- pause or complete it before clocking out for the day.`)
       return
     }
+    if (openActivity) {
+      setClockOutForDayError("You're still logged as away -- tap \"I'm Back\" before clocking out for the day.")
+      return
+    }
 
     setClockingOutForDay(true)
     // Unlike clocking IN for the day, a missing GPS fix here doesn't block
@@ -601,6 +618,72 @@ export default function BuilderDashboard({ profile }) {
     setClockingOutForDay(false)
     if (error) { setClockOutForDayError(error.message); return }
     setTodayShift(null)
+  }
+
+  async function fetchOpenActivity() {
+    const { data } = await supabase
+      .schema('pmms')
+      .from('activity_log')
+      .select('id, activity_type, note, started_at')
+      .eq('staff_id', profile.id)
+      .is('ended_at', null)
+      .order('started_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    setOpenActivity(data || null)
+  }
+
+  function openActivityPicker() {
+    setActivityType('Travel')
+    setActivityNote('')
+    setActivityError('')
+    setActivityPickerOpen(true)
+  }
+
+  async function handleStartActivity() {
+    if (activityType === 'Travel' && !activityNote.trim()) {
+      setActivityError('Please say where you\'re going (e.g. shop name).')
+      return
+    }
+    setActivityError('')
+    setStartingActivity(true)
+    // Non-blocking, unlike the daily clock-in GPS fix -- a bad signal
+    // moment shouldn't stop someone from logging that they're leaving.
+    const position = await getCurrentPositionSafe()
+
+    const { data, error } = await supabase
+      .schema('pmms')
+      .from('activity_log')
+      .insert({
+        staff_id: profile.id,
+        activity_type: activityType,
+        note: activityType === 'Break' ? (activityNote.trim() || 'Lunch') : activityNote.trim(),
+        started_at: new Date().toISOString(),
+        started_lat: position?.latitude ?? null,
+        started_lng: position?.longitude ?? null,
+      })
+      .select('id, activity_type, note, started_at')
+      .single()
+
+    setStartingActivity(false)
+    if (error) { setActivityError(error.message); return }
+    setOpenActivity(data)
+    setActivityPickerOpen(false)
+  }
+
+  async function handleEndActivity() {
+    setEndingActivity(true)
+    const position = await getCurrentPositionSafe()
+
+    const { error } = await supabase
+      .schema('pmms')
+      .from('activity_log')
+      .update({ ended_at: new Date().toISOString(), ended_lat: position?.latitude ?? null, ended_lng: position?.longitude ?? null })
+      .eq('id', openActivity.id)
+
+    setEndingActivity(false)
+    if (error) { setActivityError(error.message); return }
+    setOpenActivity(null)
   }
 
   async function handleClockIn(transitStart, milesLogged) {
@@ -1530,20 +1613,88 @@ export default function BuilderDashboard({ profile }) {
       {/* Day shift banner -- only ever reachable once past the daily
           clock-in gate above, so todayShift is always set here. */}
       <div style={{ maxWidth: '600px', margin: '10px auto 0 auto', padding: '0 16px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap', background: todayShift.late_flag ? COLORS.amber50 : COLORS.slate50, border: `1px solid ${todayShift.late_flag ? COLORS.amber300 : COLORS.slate200}`, borderRadius: '12px', padding: '10px 14px' }}>
-          <span style={{ fontSize: '13px', fontWeight: 600, color: todayShift.late_flag ? COLORS.amber900 : COLORS.slate600 }}>
-            {todayShift.late_flag ? '⚠ ' : '🟢 '}Clocked in since {formatUKDateTime(todayShift.clock_in_at).split(' ').slice(-1)[0]}
-            {todayShift.late_flag && ' (late)'}
-          </span>
-          <button
-            onClick={handleClockOutForDay}
-            disabled={clockingOutForDay}
-            style={{ padding: '8px 14px', background: COLORS.slate900, color: COLORS.white, border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: clockingOutForDay ? 'not-allowed' : 'pointer', opacity: clockingOutForDay ? 0.7 : 1 }}
-          >
-            {clockingOutForDay ? 'Clocking out…' : 'Clock Out for the Day'}
-          </button>
-        </div>
+        {openActivity ? (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap', background: COLORS.violet100, border: `1px solid ${COLORS.violet500}`, borderRadius: '12px', padding: '10px 14px' }}>
+            <span style={{ fontSize: '13px', fontWeight: 600, color: COLORS.violet600 }}>
+              🚶 Away — {openActivity.activity_type === 'Travel' ? 'Travelling' : 'On break'}{openActivity.note ? `: ${openActivity.note}` : ''} since {formatUKDateTime(openActivity.started_at).split(' ').slice(-1)[0]}
+            </span>
+            <button
+              onClick={handleEndActivity}
+              disabled={endingActivity}
+              style={{ padding: '8px 14px', background: COLORS.teal600, color: COLORS.white, border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: endingActivity ? 'not-allowed' : 'pointer', opacity: endingActivity ? 0.7 : 1 }}
+            >
+              {endingActivity ? 'Saving…' : "✓ I'm Back"}
+            </button>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap', background: todayShift.late_flag ? COLORS.amber50 : COLORS.slate50, border: `1px solid ${todayShift.late_flag ? COLORS.amber300 : COLORS.slate200}`, borderRadius: '12px', padding: '10px 14px' }}>
+            <span style={{ fontSize: '13px', fontWeight: 600, color: todayShift.late_flag ? COLORS.amber900 : COLORS.slate600 }}>
+              {todayShift.late_flag ? '⚠ ' : '🟢 '}Clocked in since {formatUKDateTime(todayShift.clock_in_at).split(' ').slice(-1)[0]}
+              {todayShift.late_flag && ' (late)'}
+            </span>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                onClick={openActivityPicker}
+                style={{ padding: '8px 14px', background: COLORS.white, color: COLORS.slate600, border: `1px solid ${COLORS.slate200}`, borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
+              >
+                Leaving Site
+              </button>
+              <button
+                onClick={handleClockOutForDay}
+                disabled={clockingOutForDay}
+                style={{ padding: '8px 14px', background: COLORS.slate900, color: COLORS.white, border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: clockingOutForDay ? 'not-allowed' : 'pointer', opacity: clockingOutForDay ? 0.7 : 1 }}
+              >
+                {clockingOutForDay ? 'Clocking out…' : 'Clock Out for the Day'}
+              </button>
+            </div>
+          </div>
+        )}
         {clockOutForDayError && <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: COLORS.red500, fontWeight: 600 }}>{clockOutForDayError}</p>}
+
+        {activityPickerOpen && (
+          <div style={{ marginTop: '8px', background: COLORS.white, border: `1px solid ${COLORS.slate200}`, borderRadius: '12px', padding: '14px' }}>
+            <p style={{ margin: '0 0 10px 0', fontSize: '12px', fontWeight: 700, color: COLORS.slate500, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Where are you going?</p>
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '10px', flexWrap: 'wrap' }}>
+              {[
+                { key: 'Travel', label: '🛒 Buying Materials' },
+                { key: 'Break', label: '🍽️ Lunch Break' },
+              ].map(opt => (
+                <button
+                  key={opt.key}
+                  onClick={() => setActivityType(opt.key)}
+                  style={{
+                    padding: '8px 14px', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer',
+                    border: activityType === opt.key ? `2px solid ${COLORS.teal600}` : `1px solid ${COLORS.slate200}`,
+                    background: activityType === opt.key ? `${COLORS.teal600}14` : COLORS.slate50,
+                    color: COLORS.slate900,
+                  }}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            <input
+              type="text"
+              value={activityNote}
+              onChange={(e) => setActivityNote(e.target.value)}
+              placeholder={activityType === 'Travel' ? 'Shop/destination name...' : 'Note (optional)'}
+              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '14px', boxSizing: 'border-box', marginBottom: '10px' }}
+            />
+            {activityError && <p style={{ margin: '0 0 10px 0', fontSize: '12px', color: COLORS.red500, fontWeight: 600 }}>{activityError}</p>}
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button onClick={() => setActivityPickerOpen(false)} style={{ flex: 1, padding: '10px', background: COLORS.slate100, color: COLORS.slate600, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
+                Cancel
+              </button>
+              <button
+                onClick={handleStartActivity}
+                disabled={startingActivity}
+                style={{ flex: 2, padding: '10px', background: COLORS.teal600, color: COLORS.white, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: startingActivity ? 'not-allowed' : 'pointer', opacity: startingActivity ? 0.7 : 1 }}
+              >
+                {startingActivity ? 'Starting…' : 'Start'}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Metric tiles */}

@@ -80,6 +80,11 @@ export default function AdminClocking({ profile, onNavigate }) {
   const [overrideNote, setOverrideNote] = useState('')
   const [overrideError, setOverrideError] = useState('')
   const [overrideSaving, setOverrideSaving] = useState(false)
+  const [historyModalRow, setHistoryModalRow] = useState(null)
+
+  const [monthlyMonth, setMonthlyMonth] = useState(ukDateKey().slice(0, 7))
+  const [monthlyRows, setMonthlyRows] = useState([])
+  const [monthlyLoading, setMonthlyLoading] = useState(true)
 
   function openPinMap(lat, lng) {
     setMapModal({ mode: 'pin', embedUrl: googleMapsEmbedLink(lat, lng) })
@@ -98,6 +103,45 @@ export default function AdminClocking({ profile, onNavigate }) {
     const interval = setInterval(() => setTick(t => t + 1), 1000)
     return () => clearInterval(interval)
   }, [])
+
+  // Waits on `builders` (populated by fetchAll) so the rollup always has
+  // the same assignable-builder list Today's Attendance uses, rather than
+  // re-deriving it -- refires whenever that list loads in, and again
+  // whenever the month picker changes.
+  useEffect(() => {
+    if (builders.length > 0) fetchMonthlyHours()
+  }, [monthlyMonth, builders])
+
+  async function fetchMonthlyHours() {
+    setMonthlyLoading(true)
+    const [year, month] = monthlyMonth.split('-').map(Number)
+    const firstDay = `${monthlyMonth}-01`
+    const lastDayDate = new Date(year, month, 0)
+    const lastDay = `${lastDayDate.getFullYear()}-${String(lastDayDate.getMonth() + 1).padStart(2, '0')}-${String(lastDayDate.getDate()).padStart(2, '0')}`
+
+    const { data } = await supabase
+      .schema('pmms')
+      .from('daily_attendance')
+      .select('staff_id, work_date, clock_in_at, clock_out_at')
+      .gte('work_date', firstDay)
+      .lte('work_date', lastDay)
+
+    setMonthlyRows(builders.map(b => {
+      const shifts = (data || []).filter(s => s.staff_id === b.id)
+      // Still-open shifts (forgotten clock-out, or today if viewing the
+      // current month) are excluded from the total and flagged instead,
+      // rather than silently counted as zero or guessed at.
+      const totalMs = shifts.reduce((sum, s) => s.clock_out_at ? sum + (new Date(s.clock_out_at) - new Date(s.clock_in_at)) : sum, 0)
+      return {
+        staffId: b.id,
+        staffName: b.name,
+        daysWorked: new Set(shifts.map(s => s.work_date)).size,
+        totalMs,
+        hasIncomplete: shifts.some(s => !s.clock_out_at),
+      }
+    }))
+    setMonthlyLoading(false)
+  }
 
   useEffect(() => {
     if (editRow) {
@@ -143,7 +187,10 @@ export default function AdminClocking({ profile, onNavigate }) {
     // whether or not they've clocked in yet, so a manager can override
     // either direction. `.or(...)` pulls in today's rows by work_date PLUS
     // any still-open row regardless of date, so a forgotten clock-out from
-    // a previous day doesn't just silently vanish from view.
+    // a previous day doesn't just silently vanish from view. Merged with
+    // activity_log and the live work_sessions fetched just below into the
+    // full attendanceRows (current status, hours today) further down,
+    // once all three are available.
     const todayKey = ukDateKey()
     const { data: attendanceData } = await supabase
       .schema('pmms')
@@ -152,11 +199,12 @@ export default function AdminClocking({ profile, onNavigate }) {
       .or(`work_date.eq.${todayKey},clock_out_at.is.null`)
       .order('clock_in_at', { ascending: false })
 
-    setAttendanceRows(assignableBuilders.map(b => ({
-      staffId: b.id,
-      staffName: b.name,
-      shift: (attendanceData || []).find(a => a.staff_id === b.id) || null,
-    })))
+    const { data: activityData } = await supabase
+      .schema('pmms')
+      .from('activity_log')
+      .select('id, staff_id, activity_type, note, started_at, ended_at')
+      .or(`started_at.gte.${todayKey}T00:00:00,ended_at.is.null`)
+      .order('started_at', { ascending: true })
 
     // --- Section 1: currently clocked in (open work_sessions) ---
     const { data: openSessions } = await supabase
@@ -210,6 +258,38 @@ export default function AdminClocking({ profile, onNavigate }) {
         .filter(Boolean)
     }
     setLiveSessions(live)
+
+    // Merge daily_attendance + activity_log + the live work_sessions just
+    // fetched above into one row per builder: their shift, a derived
+    // "where are they right now" status, and today's total hours (summed
+    // across however many separate shifts they had today, in case of an
+    // early clock-out corrected by clocking back in).
+    setAttendanceRows(assignableBuilders.map(b => {
+      const shift = (attendanceData || []).find(a => a.staff_id === b.id) || null
+      const openSession = (openSessions || []).find(s => s.builder_id === b.id)
+      const openSessionTicket = openSession ? liveTicketData.find(t => t.id === openSession.ticket_id) : null
+      const openActivityForBuilder = (activityData || []).find(a => a.staff_id === b.id && !a.ended_at)
+      const todaysActivity = (activityData || []).filter(a => a.staff_id === b.id)
+
+      let currentStatus = 'Off shift'
+      if (shift && !shift.clock_out_at) {
+        if (openActivityForBuilder) {
+          currentStatus = `${openActivityForBuilder.activity_type === 'Travel' ? 'Travelling' : 'On break'}${openActivityForBuilder.note ? `: ${openActivityForBuilder.note}` : ''}`
+        } else if (openSessionTicket) {
+          currentStatus = `On Job #${openSessionTicket.ticket_number}`
+        } else {
+          currentStatus = 'Available'
+        }
+      }
+
+      const todaysShifts = (attendanceData || []).filter(a => a.staff_id === b.id && a.work_date === todayKey)
+      const hoursTodayMs = todaysShifts.reduce((sum, s) => {
+        const end = s.clock_out_at ? new Date(s.clock_out_at).getTime() : Date.now()
+        return sum + (end - new Date(s.clock_in_at).getTime())
+      }, 0)
+
+      return { staffId: b.id, staffName: b.name, shift, currentStatus, hoursTodayMs, todaysActivity }
+    }))
 
     let rows = []
     if (completedTickets.length > 0) {
@@ -435,7 +515,9 @@ export default function AdminClocking({ profile, onNavigate }) {
                 <th style={thStyle}>Builder</th>
                 <th style={thStyle}>Clocked In</th>
                 <th style={thStyle}>Clocked Out</th>
-                <th style={{ ...thStyle, textAlign: 'right' }}>Override</th>
+                <th style={thStyle}>Right Now</th>
+                <th style={thStyle}>Hours Today</th>
+                <th style={{ ...thStyle, textAlign: 'right' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -460,12 +542,25 @@ export default function AdminClocking({ profile, onNavigate }) {
                         ? <span style={{ color: COLORS.teal600, fontWeight: 700, fontFamily: 'system-ui' }}>Still clocked in</span>
                         : <span style={{ color: COLORS.slate300 }}>—</span>}
                   </td>
+                  <td style={tdStyle}>
+                    <span style={{
+                      fontSize: '11px', fontWeight: 700, padding: '3px 10px', borderRadius: '999px',
+                      color: row.currentStatus === 'Off shift' ? COLORS.slate400 : row.currentStatus.startsWith('On Job') ? COLORS.teal700 : row.currentStatus === 'Available' ? COLORS.blue700 : COLORS.violet600,
+                      background: row.currentStatus === 'Off shift' ? COLORS.slate100 : row.currentStatus.startsWith('On Job') ? COLORS.teal50 : row.currentStatus === 'Available' ? COLORS.blue50 : COLORS.violet100,
+                    }}>
+                      {row.currentStatus}
+                    </span>
+                  </td>
+                  <td style={{ ...tdStyle, fontWeight: 700, fontFamily: 'monospace' }}>{formatDuration(row.hoursTodayMs)}</td>
                   <td style={{ ...tdStyle, textAlign: 'right' }}>
-                    {row.shift && !row.shift.clock_out_at ? (
-                      <button onClick={() => openOverrideModal('out', row)} style={actionBtnStyle}>Clock Out For Them</button>
-                    ) : (
-                      <button onClick={() => openOverrideModal('in', row)} style={actionBtnStyle}>Clock In For Them</button>
-                    )}
+                    <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                      <button onClick={() => setHistoryModalRow(row)} style={actionBtnStyle}>History</button>
+                      {row.shift && !row.shift.clock_out_at ? (
+                        <button onClick={() => openOverrideModal('out', row)} style={actionBtnStyle}>Clock Out For Them</button>
+                      ) : (
+                        <button onClick={() => openOverrideModal('in', row)} style={actionBtnStyle}>Clock In For Them</button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -678,6 +773,56 @@ export default function AdminClocking({ profile, onNavigate }) {
         </div>
       </div>
 
+      {/* Section 4: Monthly Hours -- payroll-style rollup, summed from
+          daily_attendance across the whole selected month. */}
+      <div style={{ background: COLORS.white, borderRadius: '16px', padding: '20px', marginTop: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px', marginBottom: '14px' }}>
+          <div>
+            <h2 style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: 800, color: COLORS.slate900 }}>Monthly Hours</h2>
+            <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate500 }}>Total daily-attendance hours per builder for the selected month.</p>
+          </div>
+          <input
+            type="month"
+            value={monthlyMonth}
+            onChange={(e) => setMonthlyMonth(e.target.value)}
+            style={{ ...filterSelectStyle, cursor: 'pointer' }}
+          />
+        </div>
+
+        {monthlyLoading ? (
+          <p style={{ color: COLORS.slate400, fontWeight: 600, fontSize: '13px' }}>Loading...</p>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ background: COLORS.slate50, borderBottom: `1px solid ${COLORS.slate200}` }}>
+                  <th style={thStyle}>Builder</th>
+                  <th style={thStyle}>Days Worked</th>
+                  <th style={thStyle}>Total Hours</th>
+                </tr>
+              </thead>
+              <tbody>
+                {monthlyRows.length === 0 && (
+                  <tr>
+                    <td colSpan={3} style={{ padding: '32px', textAlign: 'center', color: COLORS.slate400, fontWeight: 600 }}>No attendance recorded this month.</td>
+                  </tr>
+                )}
+                {monthlyRows.map(r => (
+                  <tr key={r.staffId} style={{ borderBottom: `1px solid ${COLORS.slate100}` }}>
+                    <td style={tdStyle}>{r.staffName}</td>
+                    <td style={tdStyle}>{r.daysWorked}</td>
+                    <td style={{ ...tdStyle, fontWeight: 700, fontFamily: 'monospace' }}>
+                      {formatDuration(r.totalMs)}
+                      {r.hasIncomplete && <span style={{ display: 'block', fontSize: '10px', fontWeight: 700, color: COLORS.amber700 }}>⚠ Has a shift with no clock-out -- excluded from total</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
       {/* Edit clock times modal */}
       {editRow && (
         <div style={modalOverlayStyle}>
@@ -744,6 +889,44 @@ export default function AdminClocking({ profile, onNavigate }) {
                 {overrideSaving ? 'Saving...' : `Confirm ${overrideModal.mode === 'in' ? 'Clock In' : 'Clock Out'}`}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {historyModalRow && (
+        <div style={modalOverlayStyle}>
+          <div style={modalCardStyle}>
+            <p style={modalTitleStyle}>Today's Log — {historyModalRow.staffName}</p>
+            {(() => {
+              const events = []
+              if (historyModalRow.shift) {
+                events.push({ time: historyModalRow.shift.clock_in_at, label: 'Clocked in for the day', tone: 'in' })
+                if (historyModalRow.shift.clock_out_at) events.push({ time: historyModalRow.shift.clock_out_at, label: 'Clocked out for the day', tone: 'out' })
+              }
+              ;(historyModalRow.todaysActivity || []).forEach(a => {
+                const verb = a.activity_type === 'Travel' ? 'Left site' : 'Started break'
+                const backVerb = a.activity_type === 'Travel' ? 'Returned to site' : 'Back from break'
+                events.push({ time: a.started_at, label: `${verb}${a.note ? `: ${a.note}` : ''}`, tone: 'away' })
+                if (a.ended_at) events.push({ time: a.ended_at, label: backVerb, tone: 'back' })
+              })
+              events.sort((a, b) => new Date(a.time) - new Date(b.time))
+
+              if (events.length === 0) return <p style={{ margin: '12px 0', fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>Nothing logged yet today.</p>
+
+              return (
+                <div style={{ margin: '14px 0', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {events.map((e, i) => (
+                    <div key={i} style={{ display: 'flex', gap: '10px', alignItems: 'baseline' }}>
+                      <span style={{ fontFamily: 'monospace', fontSize: '12px', color: COLORS.slate400, flexShrink: 0, width: '52px' }}>
+                        {formatUKDateTime(e.time).split(' ').slice(-1)[0]}
+                      </span>
+                      <span style={{ fontSize: '13px', fontWeight: 600, color: e.tone === 'away' ? COLORS.violet600 : COLORS.slate900 }}>{e.label}</span>
+                    </div>
+                  ))}
+                </div>
+              )
+            })()}
+            <button onClick={() => setHistoryModalRow(null)} style={{ ...modalConfirmBtnStyle, width: '100%' }}>Close</button>
           </div>
         </div>
       )}
