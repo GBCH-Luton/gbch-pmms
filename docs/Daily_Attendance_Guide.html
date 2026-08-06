@@ -51,6 +51,12 @@
   }
   .disclaimer b { color: var(--guide-text); }
 
+  .print-hint {
+    display: flex; gap: 10px; align-items: center;
+    background: var(--guide-accent-bg); border: 1px solid var(--guide-accent); border-radius: 12px;
+    padding: 12px 16px; margin: 12px 0 0 0; font-size: 13px; color: var(--guide-accent-dark); font-weight: 600;
+  }
+
   /* Tabs */
   .tabs {
     position: sticky; top: 0; z-index: 20;
@@ -189,6 +195,9 @@
   .mock-ticket .addr { font-weight: 700; font-size: 12px; color: #0f172a; }
   .mock-ticket .meta { font-size: 10.5px; color: #64748b; margin-top: 2px; }
 
+  .mock-chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 999px; font-size: 10.5px; font-weight: 700; }
+  .mock-chip .d { width: 6px; height: 6px; border-radius: 50%; }
+
   .browser-page-title { padding: 14px 16px 0 16px; }
   .browser-page-title h3 { margin: 0 0 2px 0; font-size: 14px; font-weight: 800; color: #0f172a; }
   .browser-page-title p { margin: 0; font-size: 11px; color: #64748b; }
@@ -196,6 +205,29 @@
   footer.end {
     margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--guide-border);
     font-size: 12.5px; color: var(--guide-text-faint); text-align: center;
+  }
+
+  /* ===================== PRINT / PDF ===================== */
+  @media print {
+    @page { size: A4; margin: 14mm 12mm; }
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    body { background: #fff; }
+    .wrap { max-width: none; padding: 0; }
+    .tabs, .disclaimer, .print-hint { display: none !important; }
+    header.hero { border-bottom: none; margin-bottom: 8px; padding-bottom: 0; }
+    /* Both tracks print in full, one after another, regardless of which
+       tab is on screen -- a single Print/Save-as-PDF then covers the
+       whole guide instead of only whichever track happened to be open. */
+    .track { display: block !important; }
+    #track-manager { break-before: page; }
+    .track-intro { break-after: avoid; }
+    /* One step per printed page: break-before on every step except the
+       very first in each track avoids a blank trailing page at the end. */
+    .step { break-inside: avoid; padding: 0; border-top: none; grid-template-columns: 1fr !important; }
+    .step + .step { break-before: page; }
+    .step.reverse .step-mock { order: 0 !important; }
+    .step-mock { margin-bottom: 14px; }
+    .phone, .browser { box-shadow: none; border: 1px solid #cbd5e1; }
   }
 </style>
 </head>
@@ -205,10 +237,13 @@
   <header class="hero">
     <p class="eyebrow">GBCH PMMS &middot; Feature guide</p>
     <h1>Daily Attendance &amp; Activity Log</h1>
-    <p class="sub">How the new clock-in/out and "where are they" system works, step by step, for builders and for managers.</p>
+    <p class="sub">How the clock-in/out and "where are they" system works, step by step, for builders and for managers.</p>
     <div class="disclaimer">
       <span style="font-size:18px;">&#9432;</span>
       <span><b>These are recreated mockups, not live screenshots</b> &mdash; built from the same colours, wording and layout as the real, already-deployed code, since screenshots of a running app weren't available when this was written. Every screen, label and button shown here matches what's actually live in production as of 2026-08-06.</span>
+    </div>
+    <div class="print-hint">
+      🖨️ <span>To save as PDF: <b>Print this page</b> (Ctrl/Cmd+P) &rarr; destination "Save as PDF" &rarr; make sure <b>"Background graphics"</b> is turned on so the phone/browser mockups render. Both tracks print in full, one step per page.</span>
     </div>
   </header>
 
@@ -375,6 +410,7 @@
           <li>Choose <b>Buying Materials</b> or <b>Lunch Break</b>.</li>
           <li>If it's a materials run, type the <b>shop name</b> in the box &mdash; e.g. "B&amp;Q Luton".</li>
           <li>Tap <b>Start</b>.</li>
+          <li>If you're mid-way through a job when you leave, the app quietly notes which job it was &mdash; your manager can see that later, you don't need to type it yourself.</li>
         </ul>
         <span class="callout tap">👉 Pick a reason, add a note, tap Start</span>
       </div>
@@ -449,6 +485,40 @@
     <div class="step">
       <div class="step-mock">
         <div class="phone"><div class="notch"></div>
+          <div class="screen" style="position:relative;">
+            <div class="mock-header">
+              <div class="mock-logo"><div class="sq"></div>PMMS</div>
+              <div class="mock-icons">🔔 ☰</div>
+            </div>
+            <div style="padding:12px 14px;">
+              <div class="mock-card" style="border:1px solid #fcd34d;">
+                <p style="font-size:13px;font-weight:800;color:#92400e;margin:0 0 4px 0;">⚠ You're finishing before 17:00</p>
+                <p style="font-size:11px;color:#64748b;margin:0 0 10px 0;">Just so your manager knows why &mdash; e.g. "all jobs done", "doctor's appointment".</p>
+                <input class="mock-input" placeholder="Reason for finishing early..." value="All jobs done for today" readonly>
+                <div style="display:flex; gap:8px;">
+                  <div class="mock-btn ghost" style="flex:1;">Cancel</div>
+                  <div class="mock-btn dark" style="flex:2;">Confirm Clock Out</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="step-body">
+        <p class="step-title"><span class="step-num">7</span> Clocking out early? Give a reason</p>
+        <p>If you tap "Clock Out for the Day" before <b>5:00pm</b>, the app asks why first &mdash; same idea as the late flag in the morning, just the other end of the day.</p>
+        <ul>
+          <li>Type a short reason &mdash; a sentence is plenty.</li>
+          <li>This only appears if you're finishing early. Clocking out at or after 5:00pm doesn't ask for anything.</li>
+        </ul>
+        <span class="callout warn">⚠ A reason is required before an early clock-out goes through</span>
+      </div>
+    </div>
+
+    <!-- Step 8 -->
+    <div class="step">
+      <div class="step-mock">
+        <div class="phone"><div class="notch"></div>
           <div class="screen" style="align-items:center; justify-content:center; padding:20px; text-align:center;">
             <div style="background:#fff; border-radius:20px; padding:28px 20px; box-shadow:0 4px 20px rgba(0,0,0,0.08); width:100%;">
               <div style="width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,#0D1B3E,#0D2F5E);margin:0 auto 14px;"></div>
@@ -460,7 +530,7 @@
         </div>
       </div>
       <div class="step-body">
-        <p class="step-title"><span class="step-num">7</span> You're done for the day</p>
+        <p class="step-title"><span class="step-num">8</span> You're done for the day</p>
         <p>You're back at this same screen &mdash; that's normal, it just means you're successfully clocked out. You won't see your jobs again until you clock in tomorrow.</p>
         <p>If you needed to come back on for any reason (forgot something, asked to help with an urgent job), just tap "Clock In for the Day" again &mdash; it works the same way, any time of day.</p>
       </div>
@@ -469,7 +539,7 @@
 
   <!-- ============================= MANAGER TRACK ============================= -->
   <section class="track" id="track-manager">
-    <p class="track-intro">Everything below lives on the existing <b>Clocking</b> page in the admin/manager side of PMMS &mdash; nothing new to install or find, just new sections on a page you already use.</p>
+    <p class="track-intro">Everything below lives on the existing <b>Clocking</b> page and the <b>Dashboard</b> home page in the admin/manager side of PMMS &mdash; nothing new to install or find, just new sections on pages you already use.</p>
 
     <!-- Step 1 -->
     <div class="step">
@@ -483,25 +553,25 @@
             </div>
             <div style="padding:12px 16px;">
               <table class="mock-table">
-                <thead><tr><th>Builder</th><th>Clocked In</th><th>Right Now</th><th>Hours</th></tr></thead>
+                <thead><tr><th>Builder</th><th>Clocked In</th><th>Clocked Out</th><th>Right Now</th></tr></thead>
                 <tbody>
                   <tr>
                     <td>Dave Miller</td>
                     <td>08:03</td>
-                    <td><span class="mock-pill" style="background:#eff6ff;color:#1d4ed8;">Available</span></td>
-                    <td style="font-weight:700;">4h 12m</td>
+                    <td>16:40<br><span style="font-size:9px;color:#b45309;font-weight:800;">⚠ Left early: All jobs done</span></td>
+                    <td><span class="mock-pill" style="background:#f1f5f9;color:#94a3b8;">Off shift</span></td>
                   </tr>
                   <tr>
                     <td>Paulo Da Silva</td>
                     <td>09:22 <span style="color:#b45309;font-weight:800;">⚠ 22m late</span></td>
+                    <td>&mdash;</td>
                     <td><span class="mock-pill" style="background:#ede9fe;color:#7c3aed;">Travelling: B&amp;Q</span></td>
-                    <td style="font-weight:700;">3h 05m</td>
                   </tr>
                   <tr>
                     <td>Aisha Khan</td>
                     <td style="color:#cbd5e1;">Not clocked in</td>
+                    <td>&mdash;</td>
                     <td><span class="mock-pill" style="background:#f1f5f9;color:#94a3b8;">Off shift</span></td>
-                    <td style="font-weight:700;">0h 00m</td>
                   </tr>
                 </tbody>
               </table>
@@ -518,12 +588,50 @@
           <li><b>Travelling: [note]</b> or <b>On break</b> &mdash; purple, currently away</li>
           <li><b>Off shift</b> &mdash; hasn't clocked in for the day</li>
         </ul>
-        <p>The <b>Hours</b> column is their running total for today &mdash; updates live.</p>
+        <p>Late clock-ins and early clock-outs are both flagged in amber, each with the reason given (a required reason for early leaves, an automatic minute count for lateness).</p>
       </div>
     </div>
 
     <!-- Step 2 -->
     <div class="step reverse">
+      <div class="step-mock">
+        <div class="browser">
+          <div class="bar"><span class="dot" style="background:#ef4444"></span><span class="dot" style="background:#f59e0b"></span><span class="dot" style="background:#22c55e"></span><span class="url">pmms.greenbridgehousing.com/dashboard</span></div>
+          <div class="screen">
+            <div class="browser-page-title">
+              <h3>📍 Where's the Team</h3>
+              <p>Live status and every trip logged today &mdash; on the Dashboard home page, next to the Daily Briefing.</p>
+            </div>
+            <div style="padding:12px 16px;">
+              <div style="display:flex; gap:6px; margin-bottom:10px;">
+                <span class="mock-chip" style="background:#eff6ff;"><span class="d" style="background:#1d4ed8;"></span>Dave <span style="color:#1d4ed8;">Available</span></span>
+                <span class="mock-chip" style="background:#ede9fe;"><span class="d" style="background:#7c3aed;"></span>Paulo <span style="color:#7c3aed;">On break</span></span>
+              </div>
+              <div style="border-top:1px solid #f1f5f9; padding:8px 0; font-size:11px;">
+                <span style="font-family:monospace; color:#94a3b8;">13:15</span>
+                <b style="color:#0f172a;"> Paulo Da Silva</b> <span style="color:#7c3aed; font-weight:700;">— left site: Lunch break</span>
+              </div>
+              <div style="border-top:1px solid #f1f5f9; padding:8px 0; font-size:11px;">
+                <span style="font-family:monospace; color:#94a3b8;">11:47</span>
+                <b style="color:#0f172a;"> Dave Miller</b> — returned to site <span style="color:#1d4ed8; font-weight:700;">(Job #14)</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="step-body">
+        <p class="step-title"><span class="step-num">2</span> "Where's the Team" on the Dashboard</p>
+        <p>The Dashboard home page now has this panel sitting next to the Daily Briefing &mdash; a quicker, at-a-glance version of Today's Attendance, for the whole portfolio in one place.</p>
+        <ul>
+          <li>Filter to one builder with the dropdown, top right.</li>
+          <li>If a "left site"/"returned" entry happened mid-job, the job number shows next to it and is clickable straight through to that ticket in Pipeline.</li>
+          <li>The list scrolls on its own once it fills up &mdash; it won't push the rest of the dashboard down.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Step 3 -->
+    <div class="step">
       <div class="step-mock">
         <div class="browser">
           <div class="bar"><span class="dot" style="background:#ef4444"></span><span class="dot" style="background:#f59e0b"></span><span class="dot" style="background:#22c55e"></span><span class="url">pmms.greenbridgehousing.com/clocking</span></div>
@@ -545,7 +653,7 @@
         </div>
       </div>
       <div class="step-body">
-        <p class="step-title"><span class="step-num">2</span> Someone can't clock in themselves? Override it</p>
+        <p class="step-title"><span class="step-num">3</span> Someone can't clock in themselves? Override it</p>
         <p>Dead phone, no signal, whatever the reason &mdash; every row has a <b>"Clock In For Them"</b> / <b>"Clock Out For Them"</b> button on the right.</p>
         <ul>
           <li>You must type a short reason &mdash; it's kept on record against that shift.</li>
@@ -554,12 +662,12 @@
       </div>
     </div>
 
-    <!-- Step 3 -->
-    <div class="step">
+    <!-- Step 4 -->
+    <div class="step reverse">
       <div class="step-mock">
         <div class="browser">
           <div class="bar"><span class="dot" style="background:#ef4444"></span><span class="dot" style="background:#f59e0b"></span><span class="dot" style="background:#22c55e"></span><span class="url">pmms.greenbridgehousing.com/clocking</span></div>
-          <div class="screen" style="position:relative; min-height:280px;">
+          <div class="screen" style="position:relative; min-height:300px;">
             <div class="browser-page-title"><h3>Today's Attendance</h3></div>
             <div class="mock-modal-overlay">
               <div class="mock-modal">
@@ -568,6 +676,7 @@
                   <div style="display:flex; gap:8px;"><span style="font-family:monospace;color:#94a3b8;">09:22</span><span style="font-weight:600;color:#0f172a;">Clocked in for the day</span></div>
                   <div style="display:flex; gap:8px;"><span style="font-family:monospace;color:#94a3b8;">11:20</span><span style="font-weight:600;color:#7c3aed;">Left site: B&amp;Q Luton</span></div>
                   <div style="display:flex; gap:8px;"><span style="font-family:monospace;color:#94a3b8;">11:47</span><span style="font-weight:600;color:#0f172a;">Returned to site</span></div>
+                  <div style="display:flex; gap:8px;"><span style="font-family:monospace;color:#94a3b8;">16:40</span><span style="font-weight:600;color:#b45309;">Clocked out &mdash; left early: All jobs done</span></div>
                 </div>
                 <div class="mock-btn primary block">Close</div>
               </div>
@@ -576,13 +685,13 @@
         </div>
       </div>
       <div class="step-body">
-        <p class="step-title"><span class="step-num">3</span> See exactly what someone did all day</p>
-        <p>Tap <b>"History"</b> on any row for a full, timestamped timeline &mdash; clock-in, every trip away and back, clock-out. This is the "all the logs" view.</p>
+        <p class="step-title"><span class="step-num">4</span> See exactly what someone did all day</p>
+        <p>Tap <b>"History"</b> on any row for a full, timestamped timeline &mdash; clock-in, every trip away and back, clock-out (with the early-leave reason if there is one). This is the "all the logs" view.</p>
       </div>
     </div>
 
-    <!-- Step 4 -->
-    <div class="step reverse">
+    <!-- Step 5 -->
+    <div class="step">
       <div class="step-mock">
         <div class="browser">
           <div class="bar"><span class="dot" style="background:#ef4444"></span><span class="dot" style="background:#f59e0b"></span><span class="dot" style="background:#22c55e"></span><span class="url">pmms.greenbridgehousing.com/clocking</span></div>
@@ -607,7 +716,7 @@
         </div>
       </div>
       <div class="step-body">
-        <p class="step-title"><span class="step-num">4</span> Month-end totals for payroll</p>
+        <p class="step-title"><span class="step-num">5</span> Month-end totals for payroll</p>
         <p>Further down the same page, <b>Monthly Hours</b> adds up every clocked day for whichever month you pick.</p>
         <ul>
           <li>Change the month with the picker in the top right.</li>
@@ -616,8 +725,8 @@
       </div>
     </div>
 
-    <!-- Step 5 -->
-    <div class="step">
+    <!-- Step 6 -->
+    <div class="step reverse">
       <div class="step-mock">
         <div class="browser">
           <div class="bar"><span class="dot" style="background:#ef4444"></span><span class="dot" style="background:#f59e0b"></span><span class="dot" style="background:#22c55e"></span><span class="url">pmms.greenbridgehousing.com/settings</span></div>
@@ -643,17 +752,17 @@
         </div>
       </div>
       <div class="step-body">
-        <p class="step-title"><span class="step-num">5</span> Adjusting the rules</p>
+        <p class="step-title"><span class="step-num">6</span> Adjusting the rules</p>
         <p>Under <b>Settings &rarr; Daily Attendance</b>, you control both times used everywhere above:</p>
         <ul>
           <li><b>Clock-in deadline</b> &mdash; clocking in after this time gets flagged late.</li>
-          <li><b>Clock-out reminder</b> &mdash; anyone still clocked in past this time gets a one-off push notification reminding them.</li>
+          <li><b>Clock-out reminder</b> &mdash; the same time works both ways: anyone still clocked in past it gets a push reminder, and anyone clocking out <i>before</i> it has to give a reason.</li>
         </ul>
       </div>
     </div>
 
-    <!-- Step 6 -->
-    <div class="step reverse">
+    <!-- Step 7 -->
+    <div class="step">
       <div class="step-mock">
         <div class="browser">
           <div class="bar"><span class="dot" style="background:#ef4444"></span><span class="dot" style="background:#f59e0b"></span><span class="dot" style="background:#22c55e"></span><span class="url">pmms.greenbridgehousing.com/clocking</span></div>
@@ -674,14 +783,14 @@
         </div>
       </div>
       <div class="step-body">
-        <p class="step-title"><span class="step-num">6</span> Per-job clocking still works the same</p>
+        <p class="step-title"><span class="step-num">7</span> Per-job clocking still works the same</p>
         <p>Nothing about clocking in/out of an individual job &mdash; or the Completed Job Timesheet, mileage, estimates &mdash; has changed. Daily Attendance sits <i>above</i> that as a separate, whole-day layer, not a replacement for it.</p>
       </div>
     </div>
 
   </section>
 
-  <footer class="end">GBCH PMMS &middot; Daily Attendance &amp; Activity Log feature guide &middot; written 2026-08-06</footer>
+  <footer class="end">GBCH PMMS &middot; Daily Attendance &amp; Activity Log feature guide &middot; last updated 2026-08-06</footer>
 </div>
 
 <script>
