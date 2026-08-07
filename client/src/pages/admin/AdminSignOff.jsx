@@ -439,17 +439,37 @@ function SignOffOversight({ onNavigate }) {
 
   const awaitingTickets = tickets.filter(t => t.status === 'Completed')
   const archivedTickets = tickets.filter(t => t.status === 'Archived')
-  const avgSignOffMs = archivedTickets.length > 0
-    ? archivedTickets.reduce((sum, t) => sum + (signOffWaitMs(t) || 0), 0) / archivedTickets.length
+
+  // Only the average reacts to the submitter/property/ticket# filters (not
+  // the status dropdown, which just toggles which rows the table shows) --
+  // the whole point is picking a submitter and comparing their figure
+  // against another's, or against everyone's.
+  const archivedForAvg = archivedTickets.filter(t => {
+    if (submitterFilter !== 'All' && t.raised_by_name !== submitterFilter) return false
+    if (propertyFilter && String(t.property_id) !== String(propertyFilter)) return false
+    if (ticketNumberFilter.trim() && !String(t.ticket_number).includes(ticketNumberFilter.trim())) return false
+    return true
+  })
+  const avgSignOffMs = archivedForAvg.length > 0
+    ? archivedForAvg.reduce((sum, t) => sum + (signOffWaitMs(t) || 0), 0) / archivedForAvg.length
     : null
 
   const kpis = [
     { label: 'Awaiting Sign-Off', value: awaitingTickets.length, colour: statusColour('Completed'), statusFilter: 'Completed' },
     { label: 'Signed Off', value: archivedTickets.length, colour: statusColour('Archived'), statusFilter: 'Archived' },
-    { label: 'Avg. Sign-Off Time', value: avgSignOffMs != null ? formatDurationDays(avgSignOffMs) : '—', colour: COLORS.slate500, statusFilter: 'All' },
+    {
+      label: submitterFilter !== 'All' ? `Avg. Sign-Off Time — ${submitterFilter}` : 'Avg. Sign-Off Time',
+      value: avgSignOffMs != null ? formatDurationDays(avgSignOffMs) : '—',
+      colour: COLORS.slate500,
+      keepFilters: true,
+    },
   ]
 
+  // The Avg tile is a live readout of whatever submitter/property/ticket#
+  // is already selected, not a shortcut to a status view -- clicking it
+  // shouldn't wipe out the very comparison it's showing.
   function applyKpiFilter(kpi) {
+    if (kpi.keepFilters) return
     setSubmitterFilter('All'); setPropertyFilter(''); setTicketNumberFilter('')
     setStatusFilter(kpi.statusFilter || 'All')
   }
