@@ -14,6 +14,7 @@ import {
   formatDuration, filterSelectStyle, thStyle, tdStyle,
   fetchAssignableBuilders, fetchAssignableStaffForDivision, resolveCategoryDivision, computeAvgTurnaroundMs, computeAvgResponseMs, buildWeeklyTrend,
   isoDateNDaysAgo, todayIso, extractFunctionError, formatUKDateTime, computeComplianceAging, COMPLIANCE_TYPES, ukDateKey, fetchComplianceAgingCounts,
+  modalOverlayStyle, modalCardStyle, modalTitleStyle, modalSubtitleStyle, modalCancelBtnStyle,
 } from './shared'
 import SimpleBarChart from '../../components/SimpleBarChart'
 import PrintableOperationsSnapshot from '../../components/PrintableOperationsSnapshot'
@@ -160,6 +161,7 @@ export default function AdminReports({ profile, onNavigate }) {
   const [aiAnswer, setAiAnswer] = useState(null)
   const [aiError, setAiError] = useState('')
   const [aiUsageLog, setAiUsageLog] = useState([])
+  const [viewingLogRow, setViewingLogRow] = useState(null)
 
   useEffect(() => {
     load()
@@ -200,7 +202,7 @@ export default function AdminReports({ profile, onNavigate }) {
     const { data } = await supabase
       .schema('pmms')
       .from('ai_usage_log')
-      .select('id, question, input_tokens, output_tokens, cost_usd, created_at')
+      .select('id, question, answer, input_tokens, output_tokens, cost_usd, created_at')
       .order('created_at', { ascending: false })
       .limit(50)
     setAiUsageLog(data || [])
@@ -518,7 +520,12 @@ export default function AdminReports({ profile, onNavigate }) {
                           {aiUsageLog.map(r => (
                             <tr key={r.id}>
                               <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>{formatUKDateTime(r.created_at)}</td>
-                              <td style={tdStyle}>{r.question}</td>
+                              <td
+                                style={{ ...tdStyle, cursor: 'pointer', color: COLORS.blue700, fontWeight: 600 }}
+                                onClick={() => setViewingLogRow(r)}
+                              >
+                                {r.question}
+                              </td>
                               <td style={tdStyle}>{r.input_tokens ?? '—'} / {r.output_tokens ?? '—'}</td>
                               <td style={tdStyle}>{r.cost_usd != null ? `$${r.cost_usd.toFixed(4)}` : '—'}</td>
                             </tr>
@@ -687,6 +694,22 @@ export default function AdminReports({ profile, onNavigate }) {
 
       {showSnapshot && (
         <PrintableOperationsSnapshot summary={snapshotSummary} onClose={() => setShowSnapshot(false)} />
+      )}
+
+      {viewingLogRow && (
+        <div style={modalOverlayStyle} onClick={() => setViewingLogRow(null)}>
+          <div style={{ ...modalCardStyle, maxWidth: '560px' }} onClick={(e) => e.stopPropagation()}>
+            <p style={modalTitleStyle}>{viewingLogRow.question}</p>
+            <p style={modalSubtitleStyle}>
+              {formatUKDateTime(viewingLogRow.created_at)} · {viewingLogRow.input_tokens ?? '—'} / {viewingLogRow.output_tokens ?? '—'} tokens
+              {viewingLogRow.cost_usd != null ? ` · $${viewingLogRow.cost_usd.toFixed(4)}` : ''}
+            </p>
+            <p style={{ margin: '16px 0 0 0', fontSize: '13.5px', color: COLORS.slate600, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+              {viewingLogRow.answer}
+            </p>
+            <button onClick={() => setViewingLogRow(null)} style={{ ...modalCancelBtnStyle, width: '100%', marginTop: '20px' }}>Close</button>
+          </div>
+        </div>
       )}
     </div>
   )
