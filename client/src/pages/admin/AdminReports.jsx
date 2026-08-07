@@ -13,7 +13,8 @@ import { fetchAllMaintenanceCategoryNames } from '../../lib/maintenanceCategorie
 import {
   formatDuration, filterSelectStyle, thStyle, tdStyle,
   fetchAssignableBuilders, fetchAssignableStaffForDivision, resolveCategoryDivision, computeAvgTurnaroundMs, computeAvgResponseMs, buildWeeklyTrend,
-  isoDateNDaysAgo, todayIso, extractFunctionError, formatUKDateTime, computeComplianceAging, COMPLIANCE_TYPES, ukDateKey, fetchComplianceAgingCounts,
+  isoDateNDaysAgo, todayIso, extractFunctionError, formatUKDateTime, formatUKDate, computeComplianceAging, COMPLIANCE_TYPES,
+  ukDateKey, mondayOfWeek, firstOfMonth, fetchComplianceAgingCounts, statusColour, statusLabel,
   modalOverlayStyle, modalCardStyle, modalTitleStyle, modalSubtitleStyle, modalCancelBtnStyle,
 } from './shared'
 import SimpleBarChart from '../../components/SimpleBarChart'
@@ -25,6 +26,20 @@ const tileValueStyle = { margin: 0, fontSize: '26px', fontWeight: 800, color: CO
 const cardStyle = { background: COLORS.white, borderRadius: '16px', padding: '18px 20px', marginBottom: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }
 const cardLabelStyle = { margin: '0 0 12px 0', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }
 const filterLabelStyle = { display: 'block', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, marginBottom: '4px' }
+
+// Operations Snapshot period tabs -- calendar-based like Attendance &
+// Hours's own period tabs, not rolling windows, so "This Week" means the
+// week-to-date rather than a floating 7-day lookback.
+const SNAPSHOT_PERIODS = [
+  { key: 'today', label: 'Today' },
+  { key: 'week', label: 'This Week' },
+  { key: 'month', label: 'This Month' },
+]
+const SNAPSHOT_RANGE_FOR = {
+  today: (today) => ({ from: today, to: today }),
+  week: (today) => ({ from: mondayOfWeek(today), to: today }),
+  month: (today) => ({ from: firstOfMonth(today), to: today }),
+}
 
 function avgMsLabel(ms) {
   if (ms == null) return 'N/A'
@@ -147,6 +162,7 @@ export default function AdminReports({ profile, onNavigate }) {
   const [complianceCounts, setComplianceCounts] = useState(null)
   const [staffNames, setStaffNames] = useState({})
   const [showSnapshot, setShowSnapshot] = useState(false)
+  const [snapshotPeriod, setSnapshotPeriod] = useState('today')
 
   const [fromDate, setFromDate] = useState(isoDateNDaysAgo(30))
   const [toDate, setToDate] = useState(todayIso())
@@ -347,22 +363,32 @@ export default function AdminReports({ profile, onNavigate }) {
   // return text. Computed here (not inside the printable component) so
   // it's built once from data this page has already loaded, rather than
   // the report component re-deriving it on every open.
-  const todayKey = ukDateKey()
-  const raisedToday = tickets.filter(t => ukDateKey(new Date(t.created_at).getTime()) === todayKey).length
-  const completedToday = tickets.filter(t => t.completed_at && ukDateKey(new Date(t.completed_at).getTime()) === todayKey).length
+  const { from: snapshotFrom, to: snapshotTo } = SNAPSHOT_RANGE_FOR[snapshotPeriod](ukDateKey())
+  const snapshotFromMs = new Date(snapshotFrom).getTime()
+  const snapshotToMs = new Date(snapshotTo).getTime() + 86400000 - 1
+  const inSnapshotPeriod = (iso) => {
+    const ms = new Date(iso).getTime()
+    return ms >= snapshotFromMs && ms <= snapshotToMs
+  }
+
+  const raisedInPeriod = tickets.filter(t => inSnapshotPeriod(t.created_at))
+  const completedInPeriod = tickets.filter(t => t.completed_at && inSnapshotPeriod(t.completed_at))
+
+  // Pipeline stays a live "right now" read (a status is a current state,
+  // not something that happened "this week") -- everything else on the
+  // snapshot follows the period tabs.
   const openStatuses = ['Pending', 'Assigned', 'In Progress', 'On Hold']
   const currentlyOpenCount = tickets.filter(t => openStatuses.includes(t.status)).length
 
   const statusCounts = {}
   tickets.forEach(t => { statusCounts[t.status] = (statusCounts[t.status] || 0) + 1 })
   const STATUS_ORDER = ['Pending', 'Assigned', 'In Progress', 'On Hold', 'Completed', 'Archived', 'Cancelled']
-  const STATUS_LABELS = { Pending: 'Unassigned', Assigned: 'Assigned', 'In Progress': 'In Progress', 'On Hold': 'On Hold', Completed: 'Completed', Archived: 'Archived', Cancelled: 'Cancelled' }
-  const pipelineChartData = STATUS_ORDER
+  const pipelineBars = STATUS_ORDER
     .filter(s => statusCounts[s] > 0)
-    .map(s => ({ label: STATUS_LABELS[s], values: [statusCounts[s]] }))
+    .map(s => ({ label: statusLabel(s), count: statusCounts[s], colour: statusColour(s) }))
 
   const categoryCounts = {}
-  tickets.forEach(t => { if (t.category) categoryCounts[t.category] = (categoryCounts[t.category] || 0) + 1 })
+  raisedInPeriod.forEach(t => { if (t.category) categoryCounts[t.category] = (categoryCounts[t.category] || 0) + 1 })
   const categoryChartData = Object.entries(categoryCounts)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 8)
@@ -370,15 +396,15 @@ export default function AdminReports({ profile, onNavigate }) {
 
   // Same fetchComplianceAgingCounts() the dashboard/Compliance page KPI
   // tiles already use -- single source of truth, not a re-derived copy.
+  // Also a live read, not period-scoped -- an expiry date doesn't have a
+  // "this week" version of itself.
   const complianceValid = complianceCounts?.valid || 0
   const complianceDueSoon = complianceCounts?.dueSoon || 0
   const complianceExpired = (complianceCounts?.expired || 0) + (complianceCounts?.noRecord || 0)
 
   const teamActivityCounts = {}
-  tickets.forEach(t => {
-    if ((t.status === 'Completed' || t.status === 'Archived') && t.assigned_builder_id) {
-      teamActivityCounts[t.assigned_builder_id] = (teamActivityCounts[t.assigned_builder_id] || 0) + 1
-    }
+  completedInPeriod.forEach(t => {
+    if (t.assigned_builder_id) teamActivityCounts[t.assigned_builder_id] = (teamActivityCounts[t.assigned_builder_id] || 0) + 1
   })
   const teamActivity = Object.entries(teamActivityCounts)
     .map(([id, count]) => ({ id, name: staffNames[id] || 'Unknown', count }))
@@ -386,8 +412,11 @@ export default function AdminReports({ profile, onNavigate }) {
     .slice(0, 10)
 
   const snapshotSummary = {
-    raisedToday, completedToday, currentlyOpenCount, totalProperties: properties.length,
-    pipelineChartData, categoryChartData,
+    periodLabel: SNAPSHOT_PERIODS.find(p => p.key === snapshotPeriod)?.label,
+    rangeLabel: snapshotFrom === snapshotTo ? formatUKDate(snapshotFrom) : `${formatUKDate(snapshotFrom)} – ${formatUKDate(snapshotTo)}`,
+    raisedCount: raisedInPeriod.length, completedCount: completedInPeriod.length,
+    currentlyOpenCount, totalProperties: properties.length,
+    pipelineBars, categoryChartData,
     complianceValid, complianceDueSoon, complianceExpired,
     teamActivity,
   }
@@ -396,10 +425,26 @@ export default function AdminReports({ profile, onNavigate }) {
     <div>
       <h2 style={{ margin: '0 0 16px 0', fontSize: '18px', fontWeight: 800, color: COLORS.slate900 }}>Reports</h2>
 
-      <div style={{ ...cardStyle, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+      <div style={{ ...cardStyle, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '14px' }}>
         <div>
           <p style={{ margin: '0 0 2px 0', fontSize: '14px', fontWeight: 800, color: COLORS.slate900 }}>Operations Snapshot</p>
-          <p style={{ margin: 0, fontSize: '12.5px', color: COLORS.slate500 }}>A board-ready page — today's activity, the ticket pipeline, top issue categories, compliance health and team activity — built live from real data, no AI involved.</p>
+          <p style={{ margin: '0 0 10px 0', fontSize: '12.5px', color: COLORS.slate500 }}>A board-ready page — raised/completed, the ticket pipeline, top issue categories, compliance health and team activity — built live from real data, no AI involved.</p>
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+            {SNAPSHOT_PERIODS.map(p => (
+              <button
+                key={p.key}
+                onClick={() => setSnapshotPeriod(p.key)}
+                style={{
+                  padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer',
+                  border: snapshotPeriod === p.key ? `1px solid ${COLORS.brandNavy}` : `1px solid ${COLORS.slate200}`,
+                  background: snapshotPeriod === p.key ? COLORS.brandNavy : COLORS.white,
+                  color: snapshotPeriod === p.key ? COLORS.white : COLORS.slate600,
+                }}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
         </div>
         <button
           onClick={() => setShowSnapshot(true)}
