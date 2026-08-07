@@ -304,12 +304,58 @@
         <p>Now they can see their jobs as normal. Notice the bar at the top &mdash; that's their reminder that they're clocked in, and it stays there all day.</p>
         <ul>
           <li>If they clocked in after <b>9:00am</b>, this bar turns orange and shows exactly how many minutes late it was (see the second screen alongside) &mdash; that's just for a manager to see, nothing the builder needs to do.</li>
-          <li>They tap into a job and clock in/out of it exactly like they always have &mdash; that part hasn't changed.</li>
+          <li>Tapping into a job and starting work on it is a separate step of its own &mdash; see next.</li>
         </ul>
       </div>
     </div>
 
     <!-- Step 4 -->
+    <div class="step reverse">
+      <div class="step-mock">
+        <div style="display:flex; flex-direction:column; gap:10px; align-items:center;">
+          <div class="phone"><div class="notch"></div>
+            <div class="screen">
+              <div class="mock-header">
+                <div class="mock-logo"><div class="sq"></div>PMMS</div>
+                <div class="mock-icons">🔔 ☰</div>
+              </div>
+              <div style="padding:12px 14px;">
+                <div class="mock-card">
+                  <p style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;margin:0 0 8px 0;">Coming from</p>
+                  <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:10px;">
+                    <div class="mock-btn ghost" style="font-size:11px; text-align:left;">🏠 Home</div>
+                    <div class="mock-btn" style="background:rgba(13,148,136,0.08); border:2px solid #0d9488; color:#0f172a; font-size:11px; text-align:left;">📍 Already on site</div>
+                  </div>
+                  <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:10px 12px; margin-bottom:10px; font-size:11.5px; font-weight:600; color:#475569;">📍 0 miles &mdash; already at this property.</div>
+                  <div class="mock-btn primary block">✓ I've arrived &mdash; start work</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <p style="font-size:11px; font-weight:700; color:var(--guide-text-faint); margin:2px 0 0 0;">&darr; once started, the job screen looks like this &darr;</p>
+          <div class="phone" style="max-width:300px;"><div class="notch"></div>
+            <div class="screen" style="min-height:auto;">
+              <div style="background:#0d9488; padding:16px 18px; display:flex; align-items:center; justify-content:space-between;">
+                <span style="font-size:10px; font-weight:700; color:#fff; text-transform:uppercase; letter-spacing:0.05em;">⏱ Clock running</span>
+                <span style="font-size:19px; font-weight:800; color:#fff; font-family:monospace;">00:14:32</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="step-body">
+        <p class="step-title"><span class="step-num">4</span> Starting a job</p>
+        <p>From the job list, they tap a job, then say <b>where they're travelling from</b> (or "Already on site" for a second job at the same property) and log the miles driven, if any.</p>
+        <ul>
+          <li>Tap <b>"I've arrived — start work"</b> to begin.</li>
+          <li>The job screen then shows a live running timer &mdash; that's the system logging exactly when work started on this specific job, separate from the day-level clock-in.</li>
+          <li>Only one job can run at a time &mdash; they finish or pause the current one before starting another.</li>
+        </ul>
+        <span class="callout tap">👉 Pick where you're coming from, log miles, tap "I've arrived"</span>
+      </div>
+    </div>
+
+    <!-- Step 5 -->
     <div class="step reverse">
       <div class="step-mock">
         <div class="phone"><div class="notch"></div>
@@ -336,7 +382,7 @@
         </div>
       </div>
       <div class="step-body">
-        <p class="step-title"><span class="step-num">4</span> Popping out? Tell the app first</p>
+        <p class="step-title"><span class="step-num">5</span> Popping out? Tell the app first</p>
         <p>Going to buy materials, or taking a lunch break? They tap <b>"Leaving Site"</b> on the banner before going.</p>
         <ul>
           <li>Choose <b>Buying Materials</b> or <b>Lunch Break</b>.</li>
@@ -348,7 +394,7 @@
       </div>
     </div>
 
-    <!-- Step 5 -->
+    <!-- Step 6 -->
     <div class="step">
       <div class="step-mock">
         <div class="phone"><div class="notch"></div>
@@ -373,13 +419,13 @@
         </div>
       </div>
       <div class="step-body">
-        <p class="step-title"><span class="step-num">5</span> The banner shows they're away</p>
+        <p class="step-title"><span class="step-num">6</span> The banner shows they're away</p>
         <p>While they're out, the bar turns purple so it's obvious they're marked as away. Their job keeps running as normal underneath &mdash; this doesn't pause or affect anything on the job itself.</p>
         <span class="callout tap">👉 When they're back, they tap "I'm Back"</span>
       </div>
     </div>
 
-    <!-- Step 6 -->
+    <!-- Step 7 -->
     <div class="step reverse">
       <div class="step-mock">
         <div class="phone"><div class="notch"></div>
@@ -403,7 +449,7 @@
         </div>
       </div>
       <div class="step-body">
-        <p class="step-title"><span class="step-num">6</span> End of day &mdash; clock out</p>
+        <p class="step-title"><span class="step-num">7</span> End of day &mdash; clock out</p>
         <p>Once they've finished all their jobs, they tap <b>"Clock Out for the Day"</b> on the banner.</p>
         <ul>
           <li>If they still have a job showing "In Progress", it stops them and tells them to pause or complete that job first.</li>
@@ -413,7 +459,7 @@
       </div>
     </div>
 
-    <!-- Step 7 -->
+    <!-- Step 8 -->
     <div class="step">
       <div class="step-mock">
         <div class="phone"><div class="notch"></div>
@@ -437,7 +483,7 @@
         </div>
       </div>
       <div class="step-body">
-        <p class="step-title"><span class="step-num">7</span> Clocking out early? Give a reason</p>
+        <p class="step-title"><span class="step-num">8</span> Clocking out early? Give a reason</p>
         <p>If they tap "Clock Out for the Day" before <b>5:00pm</b>, the app asks why first &mdash; same idea as the late flag in the morning, just the other end of the day.</p>
         <ul>
           <li>They type a short reason &mdash; a sentence is plenty.</li>
@@ -447,7 +493,7 @@
       </div>
     </div>
 
-    <!-- Step 8 -->
+    <!-- Step 9 -->
     <div class="step">
       <div class="step-mock">
         <div class="phone"><div class="notch"></div>
@@ -462,7 +508,7 @@
         </div>
       </div>
       <div class="step-body">
-        <p class="step-title"><span class="step-num">8</span> Done for the day</p>
+        <p class="step-title"><span class="step-num">9</span> Done for the day</p>
         <p>They're back at this same screen &mdash; that's normal, it just means they're successfully clocked out. They won't see their jobs again until they clock in tomorrow.</p>
         <p>If they need to come back on for any reason (forgot something, asked to help with an urgent job), tapping "Clock In for the Day" again works the same way, any time of day.</p>
       </div>
