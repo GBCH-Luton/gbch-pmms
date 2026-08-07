@@ -364,7 +364,12 @@ export default function BuilderDashboard({ profile }) {
   }
 
   useEffect(() => {
-    setFromLocation(null)
+    // Already told the system exactly which job he was heading to when he
+    // left the last one (see "Going to Another Job") -- re-asking "coming
+    // from?" here would just be asking him to repeat himself. Miles are
+    // still needed (that part genuinely can't be known automatically).
+    const isMatchedArrival = openActivity?.activity_type === 'Travel' && openActivity.destination_ticket_id === selectedTicket?.id
+    setFromLocation(isMatchedArrival ? 'From the last job' : null)
     setCustomLocation('')
     setMiles(0)
     setClockingIn(false)
@@ -715,7 +720,7 @@ export default function BuilderDashboard({ profile }) {
     const { data } = await supabase
       .schema('pmms')
       .from('activity_log')
-      .select('id, activity_type, note, started_at')
+      .select('id, activity_type, note, started_at, destination_ticket_id')
       .eq('staff_id', profile.id)
       .is('ended_at', null)
       .order('started_at', { ascending: false })
@@ -777,7 +782,7 @@ export default function BuilderDashboard({ profile }) {
         ticket_id: inProgressTicket?.id ?? null,
         destination_ticket_id: destinationTicket?.id ?? null,
       })
-      .select('id, activity_type, note, started_at')
+      .select('id, activity_type, note, started_at, destination_ticket_id')
       .single()
 
     setStartingActivity(false)
@@ -837,6 +842,20 @@ export default function BuilderDashboard({ profile }) {
 
     if (sessionError) {
       console.error('Failed to start work session:', sessionError)
+    }
+
+    // Closes the loop on "Going to Another Job" -- if this arrival is the
+    // exact destination that travel entry named, end it automatically
+    // instead of leaving the "Away" banner stuck showing after he's
+    // already started working (and without making him tap "I'm Back"
+    // separately first).
+    if (openActivity?.activity_type === 'Travel' && openActivity.destination_ticket_id === selectedTicket.id) {
+      await supabase
+        .schema('pmms')
+        .from('activity_log')
+        .update({ ended_at: now, ended_lat: position?.latitude ?? null, ended_lng: position?.longitude ?? null })
+        .eq('id', openActivity.id)
+      setOpenActivity(null)
     }
 
     await postAuditEvent(selectedTicket.id, 'Status Changed', `${previousStatus} → In Progress (clocked in)`)
@@ -1449,6 +1468,11 @@ export default function BuilderDashboard({ profile }) {
 
   const inProgressTickets = tickets.filter(t => t.status === 'In Progress')
   const activeTicket = inProgressTickets[0] || null
+  // True when the job he's about to start is exactly the destination he
+  // named when he left the last one -- see "Going to Another Job" on the
+  // Leaving Site picker. Skips the "Coming from" question for that one
+  // arrival (see the reset useEffect and the Actions section below).
+  const isMatchedArrival = openActivity?.activity_type === 'Travel' && openActivity.destination_ticket_id === selectedTicket?.id
   const isRoutineVisit = selectedTicket?.category === 'Cleaning Rota' && selectedTicket?.issue_tag === 'Routine 2-Week Visit'
   const checklistIncomplete = isRoutineVisit && routineVisitChecklistTemplate.some(item => !checklistChecked[item])
   const urgentTickets = tickets.filter(t => t.status === 'Assigned' && t.priority_score >= p1Threshold)
@@ -1738,20 +1762,33 @@ export default function BuilderDashboard({ profile }) {
       {/* Day shift banner -- only ever reachable once past the daily
           clock-in gate above, so todayShift is always set here. */}
       <div style={{ maxWidth: '600px', margin: '10px auto 0 auto', padding: '0 16px' }}>
-        {openActivity ? (
+        {openActivity ? (() => {
+          const destinationTicket = openActivity.destination_ticket_id ? tickets.find(t => t.id === openActivity.destination_ticket_id) : null
+          return (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap', background: COLORS.violet100, border: `1px solid ${COLORS.violet500}`, borderRadius: '12px', padding: '10px 14px' }}>
             <span style={{ fontSize: '13px', fontWeight: 600, color: COLORS.violet600 }}>
               🚶 Away — {openActivity.activity_type === 'Travel' ? 'Travelling' : 'On break'}{openActivity.note ? `: ${openActivity.note}` : ''} since {formatUKDateTime(openActivity.started_at).split(' ').slice(-1)[0]}
             </span>
-            <button
-              onClick={handleEndActivity}
-              disabled={endingActivity}
-              style={{ padding: '8px 14px', background: COLORS.teal600, color: COLORS.white, border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: endingActivity ? 'not-allowed' : 'pointer', opacity: endingActivity ? 0.7 : 1 }}
-            >
-              {endingActivity ? 'Saving…' : "✓ I'm Back"}
-            </button>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              {destinationTicket && (
+                <button
+                  onClick={() => setSelectedTicket(destinationTicket)}
+                  style={{ padding: '8px 14px', background: COLORS.teal600, color: COLORS.white, border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
+                >
+                  ✓ Arrived — Start Job #{destinationTicket.ticket_number}
+                </button>
+              )}
+              <button
+                onClick={handleEndActivity}
+                disabled={endingActivity}
+                style={{ padding: '8px 14px', background: destinationTicket ? COLORS.white : COLORS.teal600, color: destinationTicket ? COLORS.slate600 : COLORS.white, border: destinationTicket ? `1px solid ${COLORS.slate200}` : 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: endingActivity ? 'not-allowed' : 'pointer', opacity: endingActivity ? 0.7 : 1 }}
+              >
+                {endingActivity ? 'Saving…' : "✓ I'm Back"}
+              </button>
+            </div>
           </div>
-        ) : (
+          )
+        })() : (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap', background: todayShift.late_flag ? COLORS.amber50 : COLORS.slate50, border: `1px solid ${todayShift.late_flag ? COLORS.amber300 : COLORS.slate200}`, borderRadius: '12px', padding: '10px 14px' }}>
             <span style={{ fontSize: '13px', fontWeight: 600, color: todayShift.late_flag ? COLORS.amber900 : COLORS.slate600 }}>
               {todayShift.late_flag ? '⚠ ' : '🟢 '}Clocked in since {formatUKDateTime(todayShift.clock_in_at).split(' ').slice(-1)[0]}
@@ -2116,6 +2153,11 @@ export default function BuilderDashboard({ profile }) {
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {isMatchedArrival ? (
+              <div style={{ padding: '12px 14px', borderRadius: '10px', background: COLORS.teal600 + '14', border: `1px solid ${COLORS.teal600}` }}>
+                <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate900, fontWeight: 600 }}>🚗 Coming from your last job — already logged when you left.</p>
+              </div>
+            ) : (
             <div>
               <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: COLORS.slate500, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Coming from</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -2158,6 +2200,7 @@ export default function BuilderDashboard({ profile }) {
                 />
               )}
             </div>
+            )}
 
             {fromLocation === 'Already on site' ? (
               <div style={{ padding: '12px 14px', borderRadius: '10px', background: COLORS.slate50, border: `1px solid ${COLORS.slate200}` }}>

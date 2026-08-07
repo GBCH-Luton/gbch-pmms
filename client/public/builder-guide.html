@@ -350,6 +350,7 @@
           <li>Tap <b>"I've arrived — start work"</b> to begin.</li>
           <li>The job screen then shows a live running timer &mdash; that's the system logging exactly when work started on this specific job, separate from the day-level clock-in.</li>
           <li>Only one job can run at a time &mdash; they finish or pause the current one before starting another.</li>
+          <li>Exception: if they got here by tapping <b>"✓ Arrived — Start Job #N"</b> straight off the Away banner (see the next step), this whole "Coming from" question is skipped &mdash; the app already knows they were heading here, so it jumps straight to just the miles.</li>
         </ul>
         <span class="callout tap">👉 Pick where you're coming from, log miles, tap "I've arrived"</span>
       </div>
@@ -358,39 +359,50 @@
     <!-- Step 5 -->
     <div class="step reverse">
       <div class="step-mock">
-        <div class="phone"><div class="notch"></div>
-          <div class="screen">
-            <div class="mock-header">
-              <div class="mock-logo"><div class="sq"></div>PMMS</div>
-              <div class="mock-icons">🔔 ☰</div>
-            </div>
-            <div style="padding:12px 14px;">
-              <div class="mock-card">
-                <p style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;margin:0 0 8px 0;">Where are you going?</p>
-                <div style="display:flex; gap:6px; margin-bottom:10px;">
-                  <div class="mock-btn" style="background:rgba(13,148,136,0.08); border:2px solid #0d9488; color:#0f172a; font-size:11px; flex:1;">🛒 Buying Materials</div>
-                  <div class="mock-btn ghost" style="font-size:11px; flex:1;">🍽️ Lunch Break</div>
-                </div>
-                <input class="mock-input" placeholder="Shop/destination name..." value="B&amp;Q Luton" readonly>
-                <div style="display:flex; gap:8px;">
-                  <div class="mock-btn ghost" style="flex:1;">Cancel</div>
-                  <div class="mock-btn primary" style="flex:2;">Start</div>
+        <div style="display:flex; flex-direction:column; gap:10px; align-items:center;">
+          <div class="phone"><div class="notch"></div>
+            <div class="screen">
+              <div class="mock-header">
+                <div class="mock-logo"><div class="sq"></div>PMMS</div>
+                <div class="mock-icons">🔔 ☰</div>
+              </div>
+              <div style="padding:12px 14px;">
+                <div class="mock-card">
+                  <p style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;margin:0 0 8px 0;">Where are you going?</p>
+                  <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:10px;">
+                    <div class="mock-btn ghost" style="font-size:11px; text-align:left;">🛒 Buying Materials</div>
+                    <div class="mock-btn" style="background:rgba(13,148,136,0.08); border:2px solid #0d9488; color:#0f172a; font-size:11px; text-align:left;">🚗 Going to Another Job</div>
+                    <div class="mock-btn ghost" style="font-size:11px; text-align:left;">🍽️ Lunch Break</div>
+                  </div>
+                  <select class="mock-input" style="margin-bottom:10px;" disabled>
+                    <option>#38 — 12 Stanley Road</option>
+                  </select>
+                  <div style="display:flex; gap:8px;">
+                    <div class="mock-btn ghost" style="flex:1;">Cancel</div>
+                    <div class="mock-btn primary" style="flex:2;">Start</div>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
+          <p style="font-size:11px; font-weight:700; color:var(--guide-text-faint); margin:2px 0 0 0;">&darr; on arrival, one tap takes them straight in &darr;</p>
+          <div class="mock-card" style="max-width:300px; width:100%; display:flex; align-items:center; justify-content:space-between; gap:8px; background:#ede9fe; border:1px solid #8b5cf6;">
+            <span style="font-size:10.5px; font-weight:600; color:#7c3aed;">🚶 Away — Travelling: Job #38 &mdash; 12 Stanley Road</span>
+          </div>
+          <div class="mock-btn primary block" style="max-width:300px;">✓ Arrived — Start Job #38</div>
         </div>
       </div>
       <div class="step-body">
         <p class="step-title"><span class="step-num">5</span> Popping out? Tell the app first</p>
-        <p>Going to buy materials, or taking a lunch break? They tap <b>"Leaving Site"</b> on the banner before going.</p>
+        <p>Buying materials, taking a lunch break, or driving to another one of their own jobs? They tap <b>"Leaving Site"</b> on the banner before going.</p>
         <ul>
-          <li>Choose <b>Buying Materials</b> or <b>Lunch Break</b>.</li>
-          <li>If it's a materials run, they type the <b>shop name</b> in the box &mdash; e.g. "B&amp;Q Luton".</li>
-          <li>Then tap <b>Start</b>.</li>
-          <li>If they're mid-way through a job when they leave, the app quietly notes which job it was &mdash; a manager can see that later, the builder doesn't need to type it themselves.</li>
+          <li>Choose <b>Buying Materials</b>, <b>Going to Another Job</b>, or <b>Lunch Break</b>.</li>
+          <li>Materials run: type the <b>shop name</b> &mdash; e.g. "B&amp;Q Luton".</li>
+          <li>Going to another job: pick it from a <b>dropdown</b> of their own assigned jobs &mdash; no typing.</li>
+          <li>Then tap <b>Start</b>. If they're mid-way through a job when they leave, the app quietly notes which job it was too &mdash; nothing to type.</li>
+          <li>When they arrive, the "Away" banner itself has a <b>"✓ Arrived — Start Job #N"</b> button &mdash; one tap takes them straight into that exact job, no need to go find it again in their list, and it automatically clears the "Away" status for them.</li>
         </ul>
-        <span class="callout tap">👉 Pick a reason, add a note, tap Start</span>
+        <span class="callout tap">👉 Pick a reason (or a job), tap Start &mdash; then tap "Arrived" on the banner when you get there</span>
       </div>
     </div>
 
