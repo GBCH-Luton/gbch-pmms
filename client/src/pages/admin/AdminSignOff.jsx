@@ -6,12 +6,26 @@ import PropertySearchSelect from '../../components/PropertySearchSelect'
 import AttachmentMedia from '../../components/AttachmentMedia'
 import TicketAttachmentGallery from '../../components/TicketAttachmentGallery'
 import {
-  formatDuration, postSystemComment, postAuditEvent, filterSelectStyle,
+  formatDuration, formatDurationDays, formatUKDateTime, postSystemComment, postAuditEvent, filterSelectStyle,
+  thStyle, tdStyle, statusColour, KpiTiles,
   modalOverlayStyle, modalCardStyle, modalTitleStyle, modalSubtitleStyle, modalLabelStyle,
   modalTextareaStyle, modalErrorStyle, modalCancelBtnStyle, modalConfirmBtnStyle,
 } from './shared'
 
-export default function AdminSignOff({ profile, onTicketsChanged }) {
+// Admins never raise tickets, so "your pending sign-offs" is always empty
+// for them -- expected, not a bug (see MySignOffs below). What they need
+// instead is an oversight view across every submitter's tickets, to see how
+// long staff are taking to sign off their own completed work once a KPI
+// threshold gets defined later. Managers can raise tickets themselves, so
+// they keep the raiser-only actionable list.
+export default function AdminSignOff({ profile, onTicketsChanged, onNavigate }) {
+  if (profile.role === 'admin') {
+    return <SignOffOversight onNavigate={onNavigate} />
+  }
+  return <MySignOffs profile={profile} onTicketsChanged={onTicketsChanged} />
+}
+
+function MySignOffs({ profile, onTicketsChanged }) {
   const [tickets, setTickets] = useState([])
   const [properties, setProperties] = useState([])
   const [loading, setLoading] = useState(true)
@@ -335,6 +349,235 @@ export default function AdminSignOff({ profile, onTicketsChanged }) {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// How long a ticket sat "Completed" before someone signed it off -- for a
+// currently-Archived ticket that's completed_at -> status_changed_at (the
+// last status transition, which is necessarily the archive itself while the
+// ticket sits in that status). For a ticket still waiting, it's
+// completed_at -> now, so the figure keeps climbing until it's actioned.
+function signOffWaitMs(t) {
+  if (!t.completed_at) return null
+  if (t.status === 'Archived') return Math.max(0, new Date(t.status_changed_at) - new Date(t.completed_at))
+  if (t.status === 'Completed') return Math.max(0, Date.now() - new Date(t.completed_at))
+  return null
+}
+
+function signOffWaitTone(ms) {
+  if (ms == null) return null
+  if (ms >= 72 * 3600000) return { bg: COLORS.red100, color: COLORS.red600 }
+  if (ms >= 24 * 3600000) return { bg: COLORS.amber100, color: COLORS.amber700 }
+  return { bg: COLORS.teal50, color: COLORS.teal700 }
+}
+
+const OVERSIGHT_STATUS_LABELS = {
+  Pending: 'Waiting to be Assigned',
+  Assigned: 'Assigned',
+  'In Progress': 'In Progress',
+  'On Hold': 'On Hold',
+  Completed: 'Awaiting Sign-Off',
+  Archived: 'Signed Off',
+  Cancelled: 'Cancelled',
+}
+
+// Admin-only oversight of the whole ticket lifecycle, not just "tickets I
+// raised" -- the point is watching how long each submitter takes to sign
+// off their own completed work once it's done, since a slow sign-off is a
+// proxy for how much a builder's completed job is actually being checked
+// on. No hard KPI threshold yet (directors haven't set one) -- this just
+// surfaces the wait times plainly, colour-graded, so one can be added later
+// without changing how the data is gathered.
+function SignOffOversight({ onNavigate }) {
+  const [tickets, setTickets] = useState([])
+  const [properties, setProperties] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  const [statusFilter, setStatusFilter] = useState('All')
+  const [submitterFilter, setSubmitterFilter] = useState('All')
+  const [propertyFilter, setPropertyFilter] = useState('')
+  const [ticketNumberFilter, setTicketNumberFilter] = useState('')
+
+  useEffect(() => {
+    fetchAll()
+    fetchProperties()
+  }, [])
+
+  async function fetchProperties() {
+    const { data, error } = await supabase
+      .schema('pmms')
+      .from('properties')
+      .select('id, address')
+      .order('address')
+
+    if (!error) setProperties(data)
+  }
+
+  async function fetchAll() {
+    const { data, error } = await supabase
+      .schema('pmms')
+      .from('tickets')
+      .select(`
+        id, ticket_number, category, issue_tag, room, property_id,
+        raised_by_name, status, created_at, first_assigned_at, completed_at, status_changed_at
+      `)
+      .neq('status', 'Cancelled')
+      .order('created_at', { ascending: false })
+
+    if (!error) {
+      const withProperties = await attachProperties(data, 'address')
+      setTickets(withProperties)
+    }
+    setLoading(false)
+  }
+
+  if (loading) return (
+    <div style={{ minHeight: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <p style={{ color: COLORS.slate400, fontWeight: 600, fontFamily: 'system-ui' }}>Loading sign-off oversight...</p>
+    </div>
+  )
+
+  const submitterOptions = [...new Set(tickets.map(t => t.raised_by_name).filter(Boolean))].sort()
+
+  const counts = {
+    Pending: tickets.filter(t => t.status === 'Pending').length,
+    Assigned: tickets.filter(t => t.status === 'Assigned').length,
+    'In Progress': tickets.filter(t => t.status === 'In Progress').length,
+    'On Hold': tickets.filter(t => t.status === 'On Hold').length,
+    Completed: tickets.filter(t => t.status === 'Completed').length,
+    Archived: tickets.filter(t => t.status === 'Archived').length,
+  }
+
+  const kpis = [
+    { label: 'Waiting to be Assigned', value: counts.Pending, colour: statusColour('Pending'), statusFilter: 'Pending' },
+    { label: 'Assigned', value: counts.Assigned, colour: statusColour('Assigned'), statusFilter: 'Assigned' },
+    { label: 'In Progress', value: counts['In Progress'], colour: statusColour('In Progress'), statusFilter: 'In Progress' },
+    { label: 'On Hold', value: counts['On Hold'], colour: statusColour('On Hold'), statusFilter: 'On Hold' },
+    { label: 'Awaiting Sign-Off', value: counts.Completed, colour: statusColour('Completed'), statusFilter: 'Completed' },
+    { label: 'Signed Off', value: counts.Archived, colour: statusColour('Archived'), statusFilter: 'Archived' },
+  ]
+
+  function applyKpiFilter(kpi) {
+    setSubmitterFilter('All'); setPropertyFilter(''); setTicketNumberFilter('')
+    setStatusFilter(kpi.statusFilter || 'All')
+  }
+
+  let filteredTickets = tickets.filter(t => {
+    if (statusFilter !== 'All' && t.status !== statusFilter) return false
+    if (submitterFilter !== 'All' && t.raised_by_name !== submitterFilter) return false
+    if (propertyFilter && String(t.property_id) !== String(propertyFilter)) return false
+    if (ticketNumberFilter.trim() && !String(t.ticket_number).includes(ticketNumberFilter.trim())) return false
+    return true
+  })
+
+  // Awaiting/already-signed-off views are specifically about latency, so
+  // the whole reason to look at them is finding the worst offenders --
+  // sort those by longest wait rather than the default "newest first".
+  if (statusFilter === 'Completed' || statusFilter === 'Archived') {
+    filteredTickets = [...filteredTickets].sort((a, b) => (signOffWaitMs(b) ?? -1) - (signOffWaitMs(a) ?? -1))
+  }
+
+  const hasFilters = statusFilter !== 'All' || submitterFilter !== 'All' || propertyFilter || ticketNumberFilter
+  function clearFilters() { setStatusFilter('All'); setSubmitterFilter('All'); setPropertyFilter(''); setTicketNumberFilter('') }
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+        <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '32px', height: '32px', borderRadius: '50%', background: COLORS.purple100, color: COLORS.purple600, fontSize: '16px' }}>✓</span>
+        <div>
+          <h1 style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: COLORS.slate900 }}>Sign-Off Oversight</h1>
+          <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate500 }}>Every job's stage, and how long each submitter takes to sign off their own completed work.</p>
+        </div>
+      </div>
+
+      <KpiTiles kpis={kpis} onTileClick={applyKpiFilter} />
+
+      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '16px' }}>
+        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={filterSelectStyle}>
+          <option value="All">All Statuses</option>
+          {Object.entries(OVERSIGHT_STATUS_LABELS).map(([value, label]) => (
+            <option key={value} value={value}>{label}</option>
+          ))}
+        </select>
+        <select value={submitterFilter} onChange={(e) => setSubmitterFilter(e.target.value)} style={filterSelectStyle}>
+          <option value="All">All Submitters</option>
+          {submitterOptions.map(name => <option key={name} value={name}>{name}</option>)}
+        </select>
+        <div style={{ width: '220px' }}>
+          <PropertySearchSelect properties={properties} value={propertyFilter} onChange={setPropertyFilter} placeholder="All Properties" />
+        </div>
+        <input
+          type="text"
+          value={ticketNumberFilter}
+          onChange={(e) => setTicketNumberFilter(e.target.value)}
+          placeholder="Search ticket #..."
+          style={{ ...filterSelectStyle, cursor: 'text', width: '160px' }}
+        />
+        {hasFilters && (
+          <button onClick={clearFilters} style={{ ...filterSelectStyle, background: COLORS.white }}>Clear filters</button>
+        )}
+      </div>
+
+      <div style={{ background: COLORS.white, borderRadius: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '900px' }}>
+            <thead>
+              <tr style={{ borderBottom: `1px solid ${COLORS.slate200}` }}>
+                <th style={thStyle}>Job</th>
+                <th style={thStyle}>Submitter</th>
+                <th style={thStyle}>Status</th>
+                <th style={thStyle}>Assigned</th>
+                <th style={thStyle}>Completed</th>
+                <th style={thStyle}>Signed Off</th>
+                <th style={thStyle}>Sign-Off Wait</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredTickets.map(t => {
+                const wait = signOffWaitMs(t)
+                const waitTone = signOffWaitTone(wait)
+                return (
+                  <tr key={t.id} style={{ borderBottom: `1px solid ${COLORS.slate100}` }}>
+                    <td
+                      style={{ ...tdStyle, cursor: onNavigate ? 'pointer' : 'default' }}
+                      onClick={onNavigate ? () => onNavigate('pipeline', { ticketNumber: t.ticket_number }) : undefined}
+                    >
+                      <span style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: COLORS.slate400 }}>#{t.ticket_number}</span>
+                      <span style={{ display: 'block', fontWeight: 700, color: onNavigate ? COLORS.blue700 : COLORS.slate900 }}>{t.property?.address || '—'}</span>
+                      <span style={{ display: 'block', fontSize: '12px', color: COLORS.slate500 }}>{t.room ? `${t.room} — ` : ''}{t.issue_tag || t.category}</span>
+                    </td>
+                    <td style={tdStyle}>{t.raised_by_name || '—'}</td>
+                    <td style={tdStyle}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: 700, color: statusColour(t.status) }}>
+                        <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: statusColour(t.status) }} />
+                        {OVERSIGHT_STATUS_LABELS[t.status] || t.status}
+                      </span>
+                    </td>
+                    <td style={tdStyle}>{t.first_assigned_at ? formatUKDateTime(t.first_assigned_at) : '—'}</td>
+                    <td style={tdStyle}>{t.completed_at ? formatUKDateTime(t.completed_at) : '—'}</td>
+                    <td style={tdStyle}>{t.status === 'Archived' ? formatUKDateTime(t.status_changed_at) : '—'}</td>
+                    <td style={tdStyle}>
+                      {wait != null ? (
+                        <span style={{ display: 'inline-block', padding: '3px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, background: waitTone.bg, color: waitTone.color }}>
+                          {formatDurationDays(wait)}{t.status === 'Completed' ? ' so far' : ''}
+                        </span>
+                      ) : '—'}
+                    </td>
+                  </tr>
+                )
+              })}
+              {filteredTickets.length === 0 && (
+                <tr>
+                  <td colSpan={7} style={{ padding: '32px 14px', textAlign: 'center', fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>
+                    No jobs match these filters.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   )
 }
