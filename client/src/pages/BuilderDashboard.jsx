@@ -1821,6 +1821,15 @@ export default function BuilderDashboard({ profile }) {
 
       {/* Metric tiles */}
       <div style={{ padding: '16px 16px 0 16px', maxWidth: '600px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        {/* Only when genuinely idle -- if they're on a logged break/materials
+            run/travelling to the next job (openActivity), that's already
+            accounted for and shouldn't also get flagged as "not working". */}
+        {inProgressTickets.length === 0 && !openActivity && (
+          <div style={{ background: COLORS.amber50, border: `1px solid ${COLORS.amber300}`, borderRadius: '12px', padding: '14px' }}>
+            <p style={{ margin: '0 0 2px 0', fontSize: '13px', fontWeight: 800, color: COLORS.amber800 }}>⚠ You're not working on a job right now</p>
+            <p style={{ margin: 0, fontSize: '12px', color: COLORS.amber900 }}>Pick up a job below, or contact your manager if you're not sure what to do next.</p>
+          </div>
+        )}
         <button
           onClick={() => setStatusFilter('WORKING')}
           style={{ width: '100%', padding: '14px', background: COLORS.teal600, color: COLORS.white, border: 'none', borderRadius: '12px', cursor: 'pointer', textAlign: 'center' }}
