@@ -12,24 +12,36 @@ import {
   Avatar, KpiTiles, roleBadgeStyle, STAFF_AVAILABILITY_STYLES,
   formatUKDateTime, formatUKDate, formatDurationDays, formatDuration,
   computeDutyStatus, computeAvgTurnaroundMs, buildWeeklyTrend,
-  ukDateKey, shiftDateKey, fetchAttendanceSummary,
+  ukDateKey, shiftDateKey, mondayOfWeek, firstOfMonth, fetchAttendanceSummary,
 } from './shared'
+import PrintableAttendanceReport from '../../components/PrintableAttendanceReport'
 
 const cardStyle = { background: COLORS.white, borderRadius: '16px', padding: '20px', marginBottom: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }
 const cardLabelStyle = { margin: '0 0 12px 0', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }
 const ACTIVITY_PREVIEW_COUNT = 10
 const TREND_WEEKS = 8
 
-// "Day"/"week"/"month"/"3 months" from the feature ask, as rolling windows
-// ending today rather than calendar boundaries -- simpler to reason about
-// than a calendar-month picker, and matches how the rest of this section
-// (Total Hours, flag counts) already reads as "the last N days," not
-// "this named month."
+// Calendar-based, not rolling windows -- "Yesterday" means yesterday and
+// "This Month" means the calendar month so far, so "how many hours did he
+// work yesterday/this month" is a single click rather than scanning the
+// day list for the right row. Previewed as an artifact and approved before
+// building (see conversation this came out of).
 const ATTENDANCE_PERIODS = [
-  { label: '7 Days', days: 7 },
-  { label: '30 Days', days: 30 },
-  { label: '90 Days', days: 90 },
+  { key: 'today', label: 'Today' },
+  { key: 'yesterday', label: 'Yesterday' },
+  { key: 'week', label: 'This Week' },
+  { key: 'month', label: 'This Month' },
+  { key: 'quarter', label: 'Last 3 Months' },
 ]
+
+function attendanceRangeFor(periodKey) {
+  const today = ukDateKey()
+  if (periodKey === 'yesterday') { const y = shiftDateKey(today, -1); return { from: y, to: y } }
+  if (periodKey === 'week') return { from: mondayOfWeek(today), to: today }
+  if (periodKey === 'month') return { from: firstOfMonth(today), to: today }
+  if (periodKey === 'quarter') return { from: shiftDateKey(today, -89), to: today }
+  return { from: today, to: today } // 'today'
+}
 
 function AttendanceStat({ label, value, colour }) {
   return (
@@ -110,10 +122,11 @@ export default function BuilderProfilePage({ staffId, onBack }) {
   // per-job work_sessions the KPI tiles above already use. Fetched
   // independently of the main load() effect since it re-fetches on its
   // own whenever the period changes, not just when staffId changes.
-  const [attendancePeriodDays, setAttendancePeriodDays] = useState(7)
+  const [attendancePeriod, setAttendancePeriod] = useState('today')
   const [attendanceSummary, setAttendanceSummary] = useState(null)
   const [attendanceLoading, setAttendanceLoading] = useState(true)
   const [showAllAttendance, setShowAllAttendance] = useState(false)
+  const [showAttendanceReport, setShowAttendanceReport] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -190,13 +203,12 @@ export default function BuilderProfilePage({ staffId, onBack }) {
     let cancelled = false
     setAttendanceLoading(true)
     setShowAllAttendance(false)
-    const toKey = ukDateKey()
-    const fromKey = shiftDateKey(toKey, -(attendancePeriodDays - 1))
-    fetchAttendanceSummary(staffId, fromKey, toKey).then(summary => {
+    const { from, to } = attendanceRangeFor(attendancePeriod)
+    fetchAttendanceSummary(staffId, from, to).then(summary => {
       if (!cancelled) { setAttendanceSummary(summary); setAttendanceLoading(false) }
     })
     return () => { cancelled = true }
-  }, [staffId, attendancePeriodDays])
+  }, [staffId, attendancePeriod])
 
   if (loadError) {
     return (
@@ -301,22 +313,35 @@ export default function BuilderProfilePage({ staffId, onBack }) {
       <div style={cardStyle}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px', marginBottom: '14px' }}>
           <p style={{ ...cardLabelStyle, margin: 0 }}>Attendance &amp; Hours</p>
-          <div style={{ display: 'flex', gap: '6px' }}>
-            {ATTENDANCE_PERIODS.map(p => (
-              <button
-                key={p.days}
-                onClick={() => setAttendancePeriodDays(p.days)}
-                style={{
-                  padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer',
-                  border: attendancePeriodDays === p.days ? `1px solid ${COLORS.teal700}` : `1px solid ${COLORS.slate200}`,
-                  background: attendancePeriodDays === p.days ? COLORS.teal700 : COLORS.white,
-                  color: attendancePeriodDays === p.days ? COLORS.white : COLORS.slate600,
-                }}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
+          <button
+            onClick={() => setShowAttendanceReport(true)}
+            disabled={attendanceLoading || !attendanceSummary}
+            style={{
+              padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: 700,
+              border: `1px solid ${COLORS.slate200}`, background: COLORS.white, color: COLORS.slate600,
+              cursor: (attendanceLoading || !attendanceSummary) ? 'not-allowed' : 'pointer',
+              opacity: (attendanceLoading || !attendanceSummary) ? 0.5 : 1,
+            }}
+          >
+            Export as PDF
+          </button>
+        </div>
+
+        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '16px' }}>
+          {ATTENDANCE_PERIODS.map(p => (
+            <button
+              key={p.key}
+              onClick={() => setAttendancePeriod(p.key)}
+              style={{
+                padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer',
+                border: attendancePeriod === p.key ? `1px solid ${COLORS.teal700}` : `1px solid ${COLORS.slate200}`,
+                background: attendancePeriod === p.key ? COLORS.teal700 : COLORS.white,
+                color: attendancePeriod === p.key ? COLORS.white : COLORS.slate600,
+              }}
+            >
+              {p.label}
+            </button>
+          ))}
         </div>
 
         {attendanceLoading ? (
@@ -443,6 +468,21 @@ export default function BuilderProfilePage({ staffId, onBack }) {
           </>
         )}
       </div>
+
+      {showAttendanceReport && attendanceSummary && (() => {
+        const { from, to } = attendanceRangeFor(attendancePeriod)
+        const periodLabel = ATTENDANCE_PERIODS.find(p => p.key === attendancePeriod)?.label
+        const rangeLabel = from === to ? formatUKDate(from) : `${formatUKDate(from)} – ${formatUKDate(to)}`
+        return (
+          <PrintableAttendanceReport
+            staffName={staff.name}
+            periodLabel={periodLabel}
+            rangeLabel={rangeLabel}
+            summary={attendanceSummary}
+            onClose={() => setShowAttendanceReport(false)}
+          />
+        )
+      })()}
     </div>
   )
 }

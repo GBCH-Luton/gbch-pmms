@@ -553,6 +553,20 @@ export function shiftDateKey(dateKey, days) {
   return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10)
 }
 
+// Monday (week start) of the week containing a given date-key -- getUTCDay()
+// returns 0 for Sunday, so it needs its own case rather than a plain mod 7
+// to land on the Monday before it, not the Monday after.
+export function mondayOfWeek(dateKey) {
+  const [y, m, d] = dateKey.split('-').map(Number)
+  const day = new Date(Date.UTC(y, m - 1, d)).getUTCDay()
+  return shiftDateKey(dateKey, day === 0 ? -6 : 1 - day)
+}
+
+// First of the calendar month containing a given date-key.
+export function firstOfMonth(dateKey) {
+  return `${dateKey.slice(0, 7)}-01`
+}
+
 // Aggregates pmms.daily_attendance for one staff member over an inclusive
 // UK-calendar-date range into per-day rows plus summary counts -- shared
 // by BuilderProfilePage.jsx (a manager looking at someone else's record)
