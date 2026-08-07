@@ -16,13 +16,25 @@ import {
 // for them -- expected, not a bug (see MySignOffs below). What they need
 // instead is an oversight view across every submitter's tickets, to see how
 // long staff are taking to sign off their own completed work once a KPI
-// threshold gets defined later. Managers can raise tickets themselves, so
-// they keep the raiser-only actionable list.
+// threshold gets defined later.
+//
+// Managers can raise tickets themselves, so they keep the raiser-only
+// actionable list -- but they also get the oversight table above it, since
+// they're just as much "the person who wants to know if their team is
+// slow to sign off" as an admin is. RLS (manager_division_scoped_access)
+// already narrows SignOffOversight's query to the manager's own division
+// with no extra filtering needed here -- an unscoped manager (division
+// null) sees everything, same as Pipeline/Reports/etc already behave.
 export default function AdminSignOff({ profile, onTicketsChanged, onNavigate }) {
   if (profile.role === 'admin') {
     return <SignOffOversight onNavigate={onNavigate} />
   }
-  return <MySignOffs profile={profile} onTicketsChanged={onTicketsChanged} />
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+      <SignOffOversight onNavigate={onNavigate} />
+      <MySignOffs profile={profile} onTicketsChanged={onTicketsChanged} />
+    </div>
+  )
 }
 
 function MySignOffs({ profile, onTicketsChanged }) {
