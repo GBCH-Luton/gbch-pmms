@@ -373,22 +373,19 @@ function signOffWaitTone(ms) {
 }
 
 const OVERSIGHT_STATUS_LABELS = {
-  Pending: 'Waiting to be Assigned',
-  Assigned: 'Assigned',
-  'In Progress': 'In Progress',
-  'On Hold': 'On Hold',
   Completed: 'Awaiting Sign-Off',
   Archived: 'Signed Off',
-  Cancelled: 'Cancelled',
 }
 
-// Admin-only oversight of the whole ticket lifecycle, not just "tickets I
-// raised" -- the point is watching how long each submitter takes to sign
-// off their own completed work once it's done, since a slow sign-off is a
-// proxy for how much a builder's completed job is actually being checked
-// on. No hard KPI threshold yet (directors haven't set one) -- this just
-// surfaces the wait times plainly, colour-graded, so one can be added later
-// without changing how the data is gathered.
+// Admin-only oversight of the sign-off stage specifically -- not the whole
+// pipeline (that's what the Pipeline page is for). Only tickets that have
+// actually reached Completed or Archived belong here: the point is watching
+// how long each submitter takes to sign off their own completed work once
+// it's done, since a slow sign-off is a proxy for how much a builder's
+// completed job is actually being checked on. No hard KPI threshold yet
+// (directors haven't set one) -- this just surfaces the wait times plainly,
+// colour-graded, so one can be added later without changing how the data
+// is gathered.
 function SignOffOversight({ onNavigate }) {
   const [tickets, setTickets] = useState([])
   const [properties, setProperties] = useState([])
@@ -422,7 +419,7 @@ function SignOffOversight({ onNavigate }) {
         id, ticket_number, category, issue_tag, room, property_id,
         raised_by_name, status, created_at, first_assigned_at, completed_at, status_changed_at
       `)
-      .neq('status', 'Cancelled')
+      .in('status', ['Completed', 'Archived'])
       .order('created_at', { ascending: false })
 
     if (!error) {
@@ -440,22 +437,16 @@ function SignOffOversight({ onNavigate }) {
 
   const submitterOptions = [...new Set(tickets.map(t => t.raised_by_name).filter(Boolean))].sort()
 
-  const counts = {
-    Pending: tickets.filter(t => t.status === 'Pending').length,
-    Assigned: tickets.filter(t => t.status === 'Assigned').length,
-    'In Progress': tickets.filter(t => t.status === 'In Progress').length,
-    'On Hold': tickets.filter(t => t.status === 'On Hold').length,
-    Completed: tickets.filter(t => t.status === 'Completed').length,
-    Archived: tickets.filter(t => t.status === 'Archived').length,
-  }
+  const awaitingTickets = tickets.filter(t => t.status === 'Completed')
+  const archivedTickets = tickets.filter(t => t.status === 'Archived')
+  const avgSignOffMs = archivedTickets.length > 0
+    ? archivedTickets.reduce((sum, t) => sum + (signOffWaitMs(t) || 0), 0) / archivedTickets.length
+    : null
 
   const kpis = [
-    { label: 'Waiting to be Assigned', value: counts.Pending, colour: statusColour('Pending'), statusFilter: 'Pending' },
-    { label: 'Assigned', value: counts.Assigned, colour: statusColour('Assigned'), statusFilter: 'Assigned' },
-    { label: 'In Progress', value: counts['In Progress'], colour: statusColour('In Progress'), statusFilter: 'In Progress' },
-    { label: 'On Hold', value: counts['On Hold'], colour: statusColour('On Hold'), statusFilter: 'On Hold' },
-    { label: 'Awaiting Sign-Off', value: counts.Completed, colour: statusColour('Completed'), statusFilter: 'Completed' },
-    { label: 'Signed Off', value: counts.Archived, colour: statusColour('Archived'), statusFilter: 'Archived' },
+    { label: 'Awaiting Sign-Off', value: awaitingTickets.length, colour: statusColour('Completed'), statusFilter: 'Completed' },
+    { label: 'Signed Off', value: archivedTickets.length, colour: statusColour('Archived'), statusFilter: 'Archived' },
+    { label: 'Avg. Sign-Off Time', value: avgSignOffMs != null ? formatDurationDays(avgSignOffMs) : '—', colour: COLORS.slate500, statusFilter: 'All' },
   ]
 
   function applyKpiFilter(kpi) {
@@ -487,7 +478,7 @@ function SignOffOversight({ onNavigate }) {
         <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '32px', height: '32px', borderRadius: '50%', background: COLORS.purple100, color: COLORS.purple600, fontSize: '16px' }}>✓</span>
         <div>
           <h1 style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: COLORS.slate900 }}>Sign-Off Oversight</h1>
-          <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate500 }}>Every job's stage, and how long each submitter takes to sign off their own completed work.</p>
+          <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate500 }}>Completed jobs awaiting sign-off, and how long each submitter took once they've signed off.</p>
         </div>
       </div>
 

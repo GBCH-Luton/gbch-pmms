@@ -198,14 +198,20 @@ export default function AdminDashboard({ profile }) {
   }
 
   const fetchPendingSignOffCount = useCallback(async () => {
+    // Matches AdminSignOff.jsx's own raiser-only rule -- only tickets THIS
+    // person raised are theirs to sign off, so the badge should only ever
+    // count what they'd actually see on that page. Admins never raise
+    // tickets, so this is always 0 for them (they get the read-only
+    // oversight table instead, which isn't an action queue).
     const { count } = await supabase
       .schema('pmms')
       .from('tickets')
       .select('id', { count: 'exact', head: true })
       .eq('status', 'Completed')
+      .eq('raised_by', profile.id)
 
     setPendingSignOffCount(count || 0)
-  }, [])
+  }, [profile.id])
 
   const fetchTotalTicketsCount = useCallback(async () => {
     const { count } = await supabase
