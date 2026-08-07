@@ -86,11 +86,16 @@ export default function BuilderDashboard({ profile }) {
   // Day-level shift, separate from per-job clocking above -- gates the
   // whole dashboard (see the early return right after the loading check)
   // until a builder clocks in for the day. "Currently on shift" == the
-  // most recent pmms.daily_attendance row with clock_out_at still null,
-  // same open/closed convention as pmms.work_sessions.ended_at, rather
-  // than a work_date match -- so a shift that runs past midnight UK time
-  // doesn't spuriously ask for a second clock-in.
+  // most recent pmms.daily_attendance row with clock_out_at still null --
+  // but only counts as TODAY's shift if it's genuinely still within the
+  // stale-shift threshold; see fetchTodayShift and staleShift below for
+  // what happens once it isn't.
   const [todayShift, setTodayShift] = useState(null)
+  // A forgotten clock-out that's rolled past the configurable threshold
+  // (stale_shift_hours) into a new calendar day -- blocks the whole
+  // dashboard (own early return, before the normal clock-in gate) until a
+  // manager closes it out via AdminClocking.jsx's "Clock Out For Them".
+  const [staleShift, setStaleShift] = useState(null)
   const [shiftLoading, setShiftLoading] = useState(true)
   const [dailyClockInDeadline, setDailyClockInDeadline] = useState('09:00')
   const [dailyClockOutDeadline, setDailyClockOutDeadline] = useState('17:00')
@@ -594,6 +599,32 @@ export default function BuilderDashboard({ profile }) {
       .order('clock_in_at', { ascending: false })
       .limit(1)
       .maybeSingle()
+
+    // This used to just trust "the most recent open shift" as today's,
+    // even when it was actually still open from a PREVIOUS day -- a
+    // forgotten clock-out silently rolled straight into the next day as
+    // one long shift instead of two. Now: a shift that's both from a
+    // different calendar day AND open past the configurable threshold is
+    // "stale" and blocks the app entirely -- a manager has to close it out
+    // (see AdminClocking.jsx's "Clock Out For Them") before a fresh
+    // clock-in is even possible. Director-approved design: no auto
+    // clock-out (a guess at hours could short-change or overpay someone),
+    // and no quietly letting the builder start fresh while the old shift
+    // sits unresolved.
+    if (data) {
+      const { data: thresholdRow } = await supabase
+        .schema('pmms').from('settings').select('setting_value')
+        .eq('setting_key', 'stale_shift_hours').maybeSingle()
+      const thresholdHours = thresholdRow?.setting_value != null ? Number(thresholdRow.setting_value) : 16
+      const hoursOpen = (Date.now() - new Date(data.clock_in_at).getTime()) / 3600000
+      if (data.work_date !== ukDateKey() && hoursOpen >= thresholdHours) {
+        setStaleShift(data)
+        setTodayShift(null)
+        setShiftLoading(false)
+        return
+      }
+    }
+    setStaleShift(null)
     setTodayShift(data || null)
     setShiftLoading(false)
   }
@@ -1509,6 +1540,29 @@ export default function BuilderDashboard({ profile }) {
   if (loading || shiftLoading) return (
     <div style={{ minHeight: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: COLORS.slate100 }}>
       <p style={{ color: COLORS.slate400, fontWeight: 600, fontFamily: 'system-ui' }}>Loading your jobs...</p>
+    </div>
+  )
+
+  // Takes priority over the normal clock-in gate below -- a stale shift
+  // means there's nothing a fresh clock-in would fix; a manager has to
+  // close the old one first (see fetchTodayShift for the staleness rule).
+  // Director-approved: no self-service way past this, and deliberately no
+  // automatic clock-out on the old shift either.
+  if (staleShift) return (
+    <div style={{ minHeight: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: COLORS.slate100, fontFamily: 'system-ui, sans-serif', padding: '20px' }}>
+      <div style={{ width: '100%', maxWidth: '360px', background: COLORS.white, borderRadius: '20px', padding: '28px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', textAlign: 'center' }}>
+        <img src={gbchLogo} alt="GBCH" style={{ height: '44px', marginBottom: '16px' }} />
+        <p style={{ margin: '0 0 6px 0', fontSize: '18px', fontWeight: 800, color: COLORS.amber800 }}>⚠ Waiting on your manager</p>
+        <p style={{ margin: '0 0 20px 0', fontSize: '13px', color: COLORS.slate600, lineHeight: 1.5 }}>
+          Your shift from {formatUKDate(staleShift.work_date)} (clocked in {formatUKDateTime(staleShift.clock_in_at)}) was never closed out. A manager's been notified and needs to close it before you can clock in today.
+        </p>
+        <button onClick={fetchTodayShift} style={{ width: '100%', padding: '14px', background: COLORS.teal600, color: COLORS.white, border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: 700, cursor: 'pointer' }}>
+          Check again
+        </button>
+        <button onClick={handleSignOut} style={{ marginTop: '18px', background: 'none', border: 'none', fontSize: '12px', color: COLORS.slate400, cursor: 'pointer', textDecoration: 'underline' }}>
+          Sign out
+        </button>
+      </div>
     </div>
   )
 

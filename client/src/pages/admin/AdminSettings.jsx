@@ -119,6 +119,7 @@ export default function AdminSettings() {
   const [dailyClockInDeadline, setDailyClockInDeadline] = useState('09:00')
   const [dailyClockOutReminderTime, setDailyClockOutReminderTime] = useState('17:00')
   const [overtimeThresholdHours, setOvertimeThresholdHours] = useState(8)
+  const [staleShiftHours, setStaleShiftHours] = useState(16)
   const [dailyAttendanceSaving, setDailyAttendanceSaving] = useState(false)
   const [dailyAttendanceSaved, setDailyAttendanceSaved] = useState(false)
 
@@ -242,6 +243,7 @@ export default function AdminSettings() {
       if (map.daily_clock_in_deadline != null) setDailyClockInDeadline(map.daily_clock_in_deadline)
       if (map.daily_clock_out_reminder_time != null) setDailyClockOutReminderTime(map.daily_clock_out_reminder_time)
       if (map.daily_overtime_threshold_hours != null) setOvertimeThresholdHours(Number(map.daily_overtime_threshold_hours))
+      if (map.stale_shift_hours != null) setStaleShiftHours(Number(map.stale_shift_hours))
       if (map.new_property_window_hours != null) setNewPropertyWindowHours(map.new_property_window_hours)
       if (map.dashboard_total_tickets_period != null) setTotalTicketsPeriod(map.dashboard_total_tickets_period)
       if (Array.isArray(map.divisions) && map.divisions.length > 0) setDivisions(map.divisions)
@@ -579,6 +581,7 @@ export default function AdminSettings() {
     await saveSetting('daily_clock_in_deadline', dailyClockInDeadline)
     await saveSetting('daily_clock_out_reminder_time', dailyClockOutReminderTime)
     await saveSetting('daily_overtime_threshold_hours', Number(overtimeThresholdHours))
+    await saveSetting('stale_shift_hours', Number(staleShiftHours))
     setDailyAttendanceSaving(false)
     setDailyAttendanceSaved(true)
     setTimeout(() => setDailyAttendanceSaved(false), 2000)
@@ -1234,6 +1237,18 @@ export default function AdminSettings() {
               style={inputStyle}
             />
             <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: COLORS.slate400 }}>A day totalling more than this many clocked hours is flagged as overtime, on the builder's profile and their own Metrics page.</p>
+          </div>
+          <div style={{ flex: '1 1 200px' }}>
+            <label style={fieldLabelStyle}>Stale shift threshold (hours)</label>
+            <input
+              type="number"
+              min="1"
+              step="0.5"
+              value={staleShiftHours}
+              onChange={(e) => setStaleShiftHours(e.target.value)}
+              style={inputStyle}
+            />
+            <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: COLORS.slate400 }}>A shift still open past this many hours, into a new day, locks the builder out and pushes every admin/manager to close it out for them -- no auto clock-out.</p>
           </div>
         </div>
 

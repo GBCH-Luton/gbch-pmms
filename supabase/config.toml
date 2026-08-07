@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.check-clock-out-reminders]
 verify_jwt = false
+
+[functions.check-stale-shifts]
+verify_jwt = false
