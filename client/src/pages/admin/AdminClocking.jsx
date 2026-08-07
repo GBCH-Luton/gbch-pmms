@@ -88,6 +88,7 @@ export default function AdminClocking({ profile, onNavigate }) {
   const [historyDate, setHistoryDate] = useState(ukDateKey())
   const [historyShifts, setHistoryShifts] = useState([])
   const [historyActivity, setHistoryActivity] = useState([])
+  const [historyJobEvents, setHistoryJobEvents] = useState([])
   const [historyLoading, setHistoryLoading] = useState(false)
 
   const [monthlyMonth, setMonthlyMonth] = useState(ukDateKey().slice(0, 7))
@@ -417,21 +418,50 @@ export default function AdminClocking({ profile, onNavigate }) {
       .order('clock_in_at', { ascending: true })
 
     let activity = []
+    let jobEvents = []
     if (shifts && shifts.length > 0) {
       const lastShift = shifts[shifts.length - 1]
-      const { data } = await supabase
-        .schema('pmms')
-        .from('activity_log')
-        .select('id, activity_type, note, started_at, ended_at')
-        .eq('staff_id', staffId)
-        .gte('started_at', shifts[0].clock_in_at)
-        .lte('started_at', lastShift.clock_out_at || new Date().toISOString())
-        .order('started_at', { ascending: true })
+      const lowerBound = shifts[0].clock_in_at
+      const upperBound = lastShift.clock_out_at || new Date().toISOString()
+
+      const [{ data }, { data: auditData }] = await Promise.all([
+        supabase
+          .schema('pmms')
+          .from('activity_log')
+          .select('id, activity_type, note, started_at, ended_at')
+          .eq('staff_id', staffId)
+          .gte('started_at', lowerBound)
+          .lte('started_at', upperBound)
+          .order('started_at', { ascending: true }),
+        // Job start/resume/complete/pause/no-access -- previously invisible
+        // in this modal entirely, even though every one of them already
+        // gets a human-readable audit_events row from BuilderDashboard.jsx's
+        // own postAuditEvent() calls. Filtered to 'Status Changed' so a
+        // ticket comment doesn't show up as an attendance event.
+        supabase
+          .schema('pmms')
+          .from('audit_events')
+          .select('id, ticket_id, summary, created_at')
+          .eq('actor_id', staffId)
+          .eq('action', 'Status Changed')
+          .gte('created_at', lowerBound)
+          .lte('created_at', upperBound)
+          .order('created_at', { ascending: true }),
+      ])
       activity = data || []
+
+      const ticketIds = [...new Set((auditData || []).map(a => a.ticket_id).filter(Boolean))]
+      let ticketsById = {}
+      if (ticketIds.length > 0) {
+        const { data: ticketRows } = await supabase.schema('pmms').from('tickets').select('id, ticket_number').in('id', ticketIds)
+        ticketsById = Object.fromEntries((ticketRows || []).map(t => [t.id, t]))
+      }
+      jobEvents = (auditData || []).map(a => ({ ...a, ticketNumber: a.ticket_id ? ticketsById[a.ticket_id]?.ticket_number : null }))
     }
 
     setHistoryShifts(shifts || [])
     setHistoryActivity(activity)
+    setHistoryJobEvents(jobEvents)
     setHistoryLoading(false)
   }
 
@@ -1028,9 +1058,18 @@ export default function AdminClocking({ profile, onNavigate }) {
                 events.push({ time: a.started_at, label: `${verb}${a.note ? `: ${a.note}` : ''}`, tone: 'away' })
                 if (a.ended_at) events.push({ time: a.ended_at, label: backVerb, tone: 'back' })
               })
+              historyJobEvents.forEach(a => {
+                const tone = a.summary.includes('Completed') ? 'done'
+                  : a.summary.includes('On Hold') ? 'hold'
+                  : a.summary.includes("couldn't get access") ? 'noAccess'
+                  : 'job'
+                events.push({ time: a.created_at, label: a.summary, tone, ticketNumber: a.ticketNumber })
+              })
               events.sort((a, b) => new Date(a.time) - new Date(b.time))
 
               if (events.length === 0) return <p style={{ margin: '14px 0', fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>Nothing logged that day.</p>
+
+              const toneColor = { away: COLORS.violet600, early: COLORS.amber700, late: COLORS.amber700, hold: COLORS.amber700, noAccess: COLORS.red600, done: COLORS.green600, job: COLORS.teal700 }
 
               return (
                 <div style={{ margin: '14px 0', display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -1039,7 +1078,17 @@ export default function AdminClocking({ profile, onNavigate }) {
                       <span style={{ fontFamily: 'monospace', fontSize: '12px', color: COLORS.slate400, flexShrink: 0, width: '52px' }}>
                         {formatUKDateTime(e.time).split(' ').slice(-1)[0]}
                       </span>
-                      <span style={{ fontSize: '13px', fontWeight: 600, color: e.tone === 'away' ? COLORS.violet600 : (e.tone === 'early' || e.tone === 'late') ? COLORS.amber700 : COLORS.slate900 }}>{e.label}</span>
+                      <span style={{ fontSize: '13px', fontWeight: 600, color: toneColor[e.tone] || COLORS.slate900 }}>
+                        {e.label}
+                        {e.ticketNumber != null && (
+                          <span
+                            onClick={onNavigate ? () => onNavigate('pipeline', { ticketNumber: e.ticketNumber }) : undefined}
+                            style={{ color: COLORS.blue700, cursor: onNavigate ? 'pointer' : 'default' }}
+                          >
+                            {' '}(Job #{e.ticketNumber})
+                          </span>
+                        )}
+                      </span>
                     </div>
                   ))}
                 </div>

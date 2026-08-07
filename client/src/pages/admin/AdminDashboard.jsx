@@ -157,15 +157,27 @@ function TeamWhereabouts({ profile, onNavigate }) {
       .maybeSingle()
     const deadline = deadlineRow?.setting_value || '09:00'
 
-    const [{ data: attendanceData }, { data: activityData }, { data: openSessions }] = await Promise.all([
+    const [{ data: attendanceData }, { data: activityData }, { data: openSessions }, { data: auditData }] = await Promise.all([
       supabase.schema('pmms').from('daily_attendance').select('id, staff_id, clock_in_at, late_flag, clock_out_at, early_leave_reason').or(`work_date.eq.${todayKey},clock_out_at.is.null`),
       supabase.schema('pmms').from('activity_log').select('id, staff_id, activity_type, note, started_at, ended_at, ticket_id').or(`started_at.gte.${todayKey}T00:00:00,ended_at.is.null`),
       supabase.schema('pmms').from('work_sessions').select('id, ticket_id, builder_id').is('ended_at', null),
+      // Job start/resume/complete/pause/no-access events -- these were
+      // previously invisible here entirely (this panel only ever read
+      // daily_attendance + activity_log), even though every one of them
+      // already gets a human-readable audit_events row from
+      // BuilderDashboard.jsx's own postAuditEvent() calls. Filtered to
+      // 'Status Changed' so a ticket comment doesn't show up as a
+      // whereabouts event.
+      supabase.schema('pmms').from('audit_events').select('id, actor_id, ticket_id, summary, created_at')
+        .eq('action', 'Status Changed')
+        .gte('created_at', `${todayKey}T00:00:00`)
+        .in('actor_id', assignableBuilders.map(b => b.id)),
     ])
 
     const ticketIds = [...new Set([
       ...(activityData || []).map(a => a.ticket_id).filter(Boolean),
       ...(openSessions || []).map(s => s.ticket_id),
+      ...(auditData || []).map(a => a.ticket_id).filter(Boolean),
     ])]
     let ticketsById = {}
     if (ticketIds.length > 0) {
@@ -232,13 +244,29 @@ function TeamWhereabouts({ profile, onNavigate }) {
         })
       }
     })
+    ;(auditData || []).forEach(a => {
+      const b = assignableBuilders.find(x => x.id === a.actor_id)
+      if (!b) return
+      const ticket = a.ticket_id ? ticketsById[a.ticket_id] : null
+      const tone = a.summary.includes('Completed') ? 'done'
+        : a.summary.includes('On Hold') ? 'hold'
+        : a.summary.includes("couldn't get access") ? 'noAccess'
+        : 'job'
+      entries.push({
+        id: `${a.id}-audit`, time: a.created_at, staffId: a.actor_id, staffName: b.name, tone,
+        text: a.summary, ticketNumber: ticket?.ticket_number,
+      })
+    })
     entries.sort((x, y) => new Date(y.time) - new Date(x.time))
     setLogEntries(entries.slice(0, 40))
 
     setLoading(false)
   }
 
-  const toneDot = { in: COLORS.green600, out: COLORS.slate900, away: COLORS.violet600, back: COLORS.slate900, early: COLORS.amber700 }
+  const toneDot = {
+    in: COLORS.green600, out: COLORS.slate900, away: COLORS.violet600, back: COLORS.slate900, early: COLORS.amber700,
+    job: COLORS.teal600, done: COLORS.green600, hold: COLORS.amber700, noAccess: COLORS.red600,
+  }
   const chipStyle = { off: { bg: COLORS.slate100, fg: COLORS.slate400 }, available: { bg: COLORS.blue50, fg: COLORS.blue700 }, job: { bg: COLORS.teal50, fg: COLORS.teal700 }, away: { bg: COLORS.violet100, fg: COLORS.violet600 } }
 
   const visibleBuilders = filterStaffId === 'All' ? builders : builders.filter(b => b.id === filterStaffId)
@@ -296,7 +324,11 @@ function TeamWhereabouts({ profile, onNavigate }) {
                 <span style={{ width: '7px', height: '7px', borderRadius: '50%', marginTop: '5px', flexShrink: 0, background: toneDot[e.tone] }} />
                 <div style={{ flex: 1 }}>
                   <span style={{ fontSize: '12.5px', fontWeight: 700, color: COLORS.slate900 }}>{e.staffName}</span>
-                  <span style={{ fontSize: '12.5px', color: e.tone === 'early' ? COLORS.amber700 : COLORS.slate600, fontWeight: e.tone === 'early' ? 700 : 400 }}> — {e.text}</span>
+                  <span style={{
+                    fontSize: '12.5px',
+                    color: (e.tone === 'early' || e.tone === 'hold') ? COLORS.amber700 : e.tone === 'noAccess' ? COLORS.red600 : COLORS.slate600,
+                    fontWeight: (e.tone === 'early' || e.tone === 'hold' || e.tone === 'noAccess') ? 700 : 400,
+                  }}> — {e.text}</span>
                   {e.ticketNumber != null && (
                     <span
                       onClick={() => onNavigate?.('pipeline', { ticketNumber: e.ticketNumber })}
