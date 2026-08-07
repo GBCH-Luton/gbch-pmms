@@ -117,6 +117,7 @@ export default function BuilderProfilePage({ staffId, onBack }) {
   const [workSessions, setWorkSessions] = useState([])
   const [activity, setActivity] = useState([])
   const [showAllActivity, setShowAllActivity] = useState(false)
+  const [assignmentOpen, setAssignmentOpen] = useState(false)
 
   // Attendance & Hours -- day-level daily_attendance, separate from the
   // per-job work_sessions the KPI tiles above already use. Fetched
@@ -309,25 +310,45 @@ export default function BuilderProfilePage({ staffId, onBack }) {
       </div>
 
       <div style={cardStyle}>
-        <p style={cardLabelStyle}>Current Assignment</p>
-        {inProgressJob ? (
-          <div style={{ background: COLORS.green50, border: `1px solid ${COLORS.green200}`, borderRadius: '10px', padding: '12px' }}>
-            <span style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: COLORS.green600 }}>#{inProgressJob.ticket_number}</span>
-            <span style={{ display: 'block', fontSize: '14px', fontWeight: 700, color: COLORS.slate900 }}>{inProgressJob.property?.address}</span>
-            <span style={{ display: 'block', fontSize: '13px', color: COLORS.slate600 }}>{inProgressJob.room || '—'} → {inProgressJob.description}</span>
+        <button
+          onClick={() => setAssignmentOpen(v => !v)}
+          style={{ display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between', gap: '12px', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left' }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <p style={{ ...cardLabelStyle, margin: 0 }}>Current Assignment</p>
+            {!assignmentOpen && (
+              <span style={{ fontSize: '12px', fontWeight: 700, color: inProgressJob || activeJobs.length > 0 ? COLORS.green600 : COLORS.slate400 }}>
+                {inProgressJob ? `#${inProgressJob.ticket_number} in progress` : activeJobs.length > 0 ? `${activeJobs.length} active` : 'None'}
+              </span>
+            )}
           </div>
-        ) : activeJobs.length > 0 ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            {activeJobs.map(j => (
-              <div key={j.id} style={{ background: COLORS.slate50, border: `1px solid ${COLORS.slate200}`, borderRadius: '10px', padding: '10px 12px' }}>
-                <span style={{ fontSize: '11px', fontWeight: 700, color: COLORS.slate400 }}>#{j.ticket_number}</span>{' '}
-                <span style={{ fontSize: '13px', fontWeight: 700, color: COLORS.slate900 }}>{j.property?.address}</span>{' '}
-                <span style={{ fontSize: '12px', color: COLORS.slate500 }}>— {j.status}</span>
+          <span style={{ fontSize: '13px', color: COLORS.slate400, fontWeight: 700, flexShrink: 0 }}>
+            {assignmentOpen ? '▲ Collapse' : '▼ Expand'}
+          </span>
+        </button>
+
+        {assignmentOpen && (
+          <div style={{ marginTop: '12px' }}>
+            {inProgressJob ? (
+              <div style={{ background: COLORS.green50, border: `1px solid ${COLORS.green200}`, borderRadius: '10px', padding: '12px' }}>
+                <span style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: COLORS.green600 }}>#{inProgressJob.ticket_number}</span>
+                <span style={{ display: 'block', fontSize: '14px', fontWeight: 700, color: COLORS.slate900 }}>{inProgressJob.property?.address}</span>
+                <span style={{ display: 'block', fontSize: '13px', color: COLORS.slate600 }}>{inProgressJob.room || '—'} → {inProgressJob.description}</span>
               </div>
-            ))}
+            ) : activeJobs.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {activeJobs.map(j => (
+                  <div key={j.id} style={{ background: COLORS.slate50, border: `1px solid ${COLORS.slate200}`, borderRadius: '10px', padding: '10px 12px' }}>
+                    <span style={{ fontSize: '11px', fontWeight: 700, color: COLORS.slate400 }}>#{j.ticket_number}</span>{' '}
+                    <span style={{ fontSize: '13px', fontWeight: 700, color: COLORS.slate900 }}>{j.property?.address}</span>{' '}
+                    <span style={{ fontSize: '12px', color: COLORS.slate500 }}>— {j.status}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>No active assignment.</p>
+            )}
           </div>
-        ) : (
-          <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>No active assignment.</p>
         )}
       </div>
 
