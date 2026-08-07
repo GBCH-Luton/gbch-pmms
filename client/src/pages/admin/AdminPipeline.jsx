@@ -804,6 +804,18 @@ export default function AdminPipeline({
           <option value="Auto">Auto-assigned only</option>
           <option value="Manual">Manually assigned only</option>
         </select>
+        {/* Same fromDate/toDate the "Generate a report" section below also
+            uses for the export -- it's a real filter on the list too (see
+            dateField in the filter above), not just a report parameter, so
+            it belongs up here where it's actually reached for day to day. */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span style={{ fontSize: '12px', fontWeight: 700, color: COLORS.slate400 }}>
+            {(statusFilter === 'Completed' || statusFilter === 'Archived' || statusFilter === 'CompletedAll') ? 'Completed' : 'Raised'}
+          </span>
+          <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} style={filterSelectStyle} />
+          <span style={{ fontSize: '12px', fontWeight: 700, color: COLORS.slate400 }}>to</span>
+          <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} style={filterSelectStyle} />
+        </div>
         <label style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 12px', borderRadius: '10px', border: `1px solid ${COLORS.amber200}`, background: COLORS.amber50, color: COLORS.amber800, fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
           <input type="checkbox" checked={stuckOnlyFilter} onChange={(e) => setStuckOnlyFilter(e.target.checked)} />
           ⚠ Stuck only
@@ -842,14 +854,7 @@ export default function AdminPipeline({
                 ))}
               </select>
             </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, marginBottom: '4px' }}>Raised from</label>
-              <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} style={filterSelectStyle} />
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, marginBottom: '4px' }}>Raised to</label>
-              <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} style={filterSelectStyle} />
-            </div>
+            <p style={{ margin: 0, fontSize: '12px', color: COLORS.slate400 }}>Uses the date range and other filters set above.</p>
             <button onClick={() => setReportOpen(true)} style={{ padding: '9px 16px', borderRadius: '10px', border: 'none', background: COLORS.slate900, color: COLORS.white, fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
               🖨️ Print / Export
             </button>
