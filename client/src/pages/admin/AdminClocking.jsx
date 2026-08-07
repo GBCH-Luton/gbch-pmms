@@ -57,6 +57,15 @@ function formatDuration(ms) {
   return `${h}h ${m}m`
 }
 
+// Plain calendar-date arithmetic on the "YYYY-MM-DD" string itself (via
+// Date.UTC), not a local Date object -- a work_date string is already a UK
+// calendar date, so shifting it a day either way should never risk
+// drifting onto the wrong day depending on the browser's own timezone.
+function shiftDateKey(dateKey, days) {
+  const [y, m, d] = dateKey.split('-').map(Number)
+  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10)
+}
+
 export default function AdminClocking({ profile, onNavigate }) {
   const [loading, setLoading] = useState(true)
   const [liveSessions, setLiveSessions] = useState([])
@@ -80,7 +89,15 @@ export default function AdminClocking({ profile, onNavigate }) {
   const [overrideNote, setOverrideNote] = useState('')
   const [overrideError, setOverrideError] = useState('')
   const [overrideSaving, setOverrideSaving] = useState(false)
-  const [historyModalRow, setHistoryModalRow] = useState(null)
+  // History modal: identity only (staffId/staffName) -- the actual events
+  // shown are fetched fresh for whichever date is selected, not derived
+  // from the Today's Attendance row, so a manager can page back to any
+  // past day, not just today.
+  const [historyModal, setHistoryModal] = useState(null) // { staffId, staffName }
+  const [historyDate, setHistoryDate] = useState(ukDateKey())
+  const [historyShifts, setHistoryShifts] = useState([])
+  const [historyActivity, setHistoryActivity] = useState([])
+  const [historyLoading, setHistoryLoading] = useState(false)
 
   const [monthlyMonth, setMonthlyMonth] = useState(ukDateKey().slice(0, 7))
   const [monthlyRows, setMonthlyRows] = useState([])
@@ -269,7 +286,6 @@ export default function AdminClocking({ profile, onNavigate }) {
       const openSession = (openSessions || []).find(s => s.builder_id === b.id)
       const openSessionTicket = openSession ? liveTicketData.find(t => t.id === openSession.ticket_id) : null
       const openActivityForBuilder = (activityData || []).find(a => a.staff_id === b.id && !a.ended_at)
-      const todaysActivity = (activityData || []).filter(a => a.staff_id === b.id)
 
       let currentStatus = 'Off shift'
       if (shift && !shift.clock_out_at) {
@@ -288,7 +304,7 @@ export default function AdminClocking({ profile, onNavigate }) {
         return sum + (end - new Date(s.clock_in_at).getTime())
       }, 0)
 
-      return { staffId: b.id, staffName: b.name, shift, currentStatus, hoursTodayMs, todaysActivity }
+      return { staffId: b.id, staffName: b.name, shift, currentStatus, hoursTodayMs }
     }))
 
     let rows = []
@@ -382,6 +398,51 @@ export default function AdminClocking({ profile, onNavigate }) {
     setOverrideError('')
   }
   function closeOverrideModal() { setOverrideModal(null) }
+
+  function openHistoryModal(staffId, staffName) {
+    setHistoryModal({ staffId, staffName })
+    setHistoryDate(ukDateKey())
+  }
+  function closeHistoryModal() { setHistoryModal(null) }
+
+  useEffect(() => {
+    if (!historyModal) return
+    fetchHistoryForDate(historyModal.staffId, historyDate)
+  }, [historyModal, historyDate])
+
+  // A day can have more than one shift (e.g. an early clock-out corrected
+  // by clocking back in), so activity_log is bounded by the FIRST shift's
+  // clock-in through the LAST shift's clock-out (or now, if still open) --
+  // not a plain date match, since activity_log has no work_date column of
+  // its own and only ever happens while clocked in.
+  async function fetchHistoryForDate(staffId, dateKey) {
+    setHistoryLoading(true)
+    const { data: shifts } = await supabase
+      .schema('pmms')
+      .from('daily_attendance')
+      .select('id, clock_in_at, clock_out_at, late_flag, early_leave_reason, manual_override')
+      .eq('staff_id', staffId)
+      .eq('work_date', dateKey)
+      .order('clock_in_at', { ascending: true })
+
+    let activity = []
+    if (shifts && shifts.length > 0) {
+      const lastShift = shifts[shifts.length - 1]
+      const { data } = await supabase
+        .schema('pmms')
+        .from('activity_log')
+        .select('id, activity_type, note, started_at, ended_at')
+        .eq('staff_id', staffId)
+        .gte('started_at', shifts[0].clock_in_at)
+        .lte('started_at', lastShift.clock_out_at || new Date().toISOString())
+        .order('started_at', { ascending: true })
+      activity = data || []
+    }
+
+    setHistoryShifts(shifts || [])
+    setHistoryActivity(activity)
+    setHistoryLoading(false)
+  }
 
   // Escape hatch for when a builder genuinely can't clock themselves in or
   // out (dead phone, no signal, etc.) and the dashboard gate would
@@ -653,7 +714,7 @@ export default function AdminClocking({ profile, onNavigate }) {
                   <td style={{ ...tdStyle, fontWeight: 700, fontFamily: 'monospace' }}>{formatDuration(row.hoursTodayMs)}</td>
                   <td style={{ ...tdStyle, textAlign: 'right' }}>
                     <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                      <button onClick={() => setHistoryModalRow(row)} style={actionBtnStyle}>History</button>
+                      <button onClick={() => openHistoryModal(row.staffId, row.staffName)} style={actionBtnStyle}>History</button>
                       {row.shift && !row.shift.clock_out_at ? (
                         <button onClick={() => openOverrideModal('out', row)} style={actionBtnStyle}>Clock Out For Them</button>
                       ) : (
@@ -911,23 +972,54 @@ export default function AdminClocking({ profile, onNavigate }) {
         </div>
       )}
 
-      {historyModalRow && (
+      {historyModal && (
         <div style={modalOverlayStyle}>
           <div style={modalCardStyle}>
-            <p style={modalTitleStyle}>Today's Log — {historyModalRow.staffName}</p>
-            {(() => {
+            <p style={modalTitleStyle}>Attendance Log — {historyModal.staffName}</p>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '10px 0 4px 0' }}>
+              <button
+                onClick={() => setHistoryDate(prev => shiftDateKey(prev, -1))}
+                style={{ ...actionBtnStyle, padding: '6px 10px' }}
+              >
+                ← Prev day
+              </button>
+              <input
+                type="date"
+                value={historyDate}
+                max={ukDateKey()}
+                onChange={(e) => setHistoryDate(e.target.value)}
+                style={{ flex: 1, height: '36px', padding: '0 10px', borderRadius: '8px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', boxSizing: 'border-box' }}
+              />
+              <button
+                onClick={() => setHistoryDate(prev => shiftDateKey(prev, 1))}
+                disabled={historyDate >= ukDateKey()}
+                style={{ ...actionBtnStyle, padding: '6px 10px', opacity: historyDate >= ukDateKey() ? 0.4 : 1, cursor: historyDate >= ukDateKey() ? 'not-allowed' : 'pointer' }}
+              >
+                Next day →
+              </button>
+            </div>
+
+            {historyLoading ? (
+              <p style={{ margin: '14px 0', fontSize: '13px', color: COLORS.slate400, fontWeight: 600 }}>Loading...</p>
+            ) : (() => {
               const events = []
-              if (historyModalRow.shift) {
-                events.push({ time: historyModalRow.shift.clock_in_at, label: 'Clocked in for the day', tone: 'in' })
-                if (historyModalRow.shift.clock_out_at) {
+              historyShifts.forEach(shift => {
+                events.push({
+                  time: shift.clock_in_at,
+                  label: shift.manual_override ? 'Clocked in for the day (manager override)' : 'Clocked in for the day',
+                  tone: shift.late_flag ? 'late' : 'in',
+                })
+                if (shift.late_flag) events[events.length - 1].label += ` — ${minutesLate(shift.clock_in_at, dailyClockInDeadline)}m late`
+                if (shift.clock_out_at) {
                   events.push({
-                    time: historyModalRow.shift.clock_out_at,
-                    label: historyModalRow.shift.early_leave_reason ? `Clocked out for the day — left early: ${historyModalRow.shift.early_leave_reason}` : 'Clocked out for the day',
-                    tone: historyModalRow.shift.early_leave_reason ? 'early' : 'out',
+                    time: shift.clock_out_at,
+                    label: shift.early_leave_reason ? `Clocked out for the day — left early: ${shift.early_leave_reason}` : 'Clocked out for the day',
+                    tone: shift.early_leave_reason ? 'early' : 'out',
                   })
                 }
-              }
-              ;(historyModalRow.todaysActivity || []).forEach(a => {
+              })
+              historyActivity.forEach(a => {
                 const verb = a.activity_type === 'Travel' ? 'Left site' : 'Started break'
                 const backVerb = a.activity_type === 'Travel' ? 'Returned to site' : 'Back from break'
                 events.push({ time: a.started_at, label: `${verb}${a.note ? `: ${a.note}` : ''}`, tone: 'away' })
@@ -935,7 +1027,7 @@ export default function AdminClocking({ profile, onNavigate }) {
               })
               events.sort((a, b) => new Date(a.time) - new Date(b.time))
 
-              if (events.length === 0) return <p style={{ margin: '12px 0', fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>Nothing logged yet today.</p>
+              if (events.length === 0) return <p style={{ margin: '14px 0', fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>Nothing logged that day.</p>
 
               return (
                 <div style={{ margin: '14px 0', display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -944,13 +1036,13 @@ export default function AdminClocking({ profile, onNavigate }) {
                       <span style={{ fontFamily: 'monospace', fontSize: '12px', color: COLORS.slate400, flexShrink: 0, width: '52px' }}>
                         {formatUKDateTime(e.time).split(' ').slice(-1)[0]}
                       </span>
-                      <span style={{ fontSize: '13px', fontWeight: 600, color: e.tone === 'away' ? COLORS.violet600 : e.tone === 'early' ? COLORS.amber700 : COLORS.slate900 }}>{e.label}</span>
+                      <span style={{ fontSize: '13px', fontWeight: 600, color: e.tone === 'away' ? COLORS.violet600 : (e.tone === 'early' || e.tone === 'late') ? COLORS.amber700 : COLORS.slate900 }}>{e.label}</span>
                     </div>
                   ))}
                 </div>
               )
             })()}
-            <button onClick={() => setHistoryModalRow(null)} style={{ ...modalConfirmBtnStyle, width: '100%' }}>Close</button>
+            <button onClick={closeHistoryModal} style={{ ...modalConfirmBtnStyle, width: '100%' }}>Close</button>
           </div>
         </div>
       )}
