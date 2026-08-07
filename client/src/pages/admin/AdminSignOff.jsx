@@ -365,10 +365,13 @@ function signOffWaitMs(t) {
   return null
 }
 
-function signOffWaitTone(ms) {
+// thresholdMs comes from the admin-configurable "Sign-Off Threshold"
+// setting (AdminSettings.jsx) -- red once a job's actually over it, amber
+// from 75% of it as an early warning, teal while comfortably on track.
+function signOffWaitTone(ms, thresholdMs) {
   if (ms == null) return null
-  if (ms >= 72 * 3600000) return { bg: COLORS.red100, color: COLORS.red600 }
-  if (ms >= 24 * 3600000) return { bg: COLORS.amber100, color: COLORS.amber700 }
+  if (thresholdMs != null && ms >= thresholdMs) return { bg: COLORS.red100, color: COLORS.red600 }
+  if (thresholdMs != null && ms >= thresholdMs * 0.75) return { bg: COLORS.amber100, color: COLORS.amber700 }
   return { bg: COLORS.teal50, color: COLORS.teal700 }
 }
 
@@ -390,6 +393,7 @@ function SignOffOversight({ onNavigate }) {
   const [tickets, setTickets] = useState([])
   const [properties, setProperties] = useState([])
   const [loading, setLoading] = useState(true)
+  const [thresholdHours, setThresholdHours] = useState(48)
 
   const [statusFilter, setStatusFilter] = useState('All')
   const [submitterFilter, setSubmitterFilter] = useState('All')
@@ -399,6 +403,7 @@ function SignOffOversight({ onNavigate }) {
   useEffect(() => {
     fetchAll()
     fetchProperties()
+    fetchThreshold()
   }, [])
 
   async function fetchProperties() {
@@ -409,6 +414,17 @@ function SignOffOversight({ onNavigate }) {
       .order('address')
 
     if (!error) setProperties(data)
+  }
+
+  async function fetchThreshold() {
+    const { data } = await supabase
+      .schema('pmms')
+      .from('settings')
+      .select('setting_value')
+      .eq('setting_key', 'sign_off_wait_threshold_hours')
+      .maybeSingle()
+
+    if (data?.setting_value != null) setThresholdHours(Number(data.setting_value))
   }
 
   async function fetchAll() {
@@ -498,7 +514,10 @@ function SignOffOversight({ onNavigate }) {
         <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '32px', height: '32px', borderRadius: '50%', background: COLORS.purple100, color: COLORS.purple600, fontSize: '16px' }}>✓</span>
         <div>
           <h1 style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: COLORS.slate900 }}>Sign-Off Oversight</h1>
-          <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate500 }}>Completed jobs awaiting sign-off, and how long each submitter took once they've signed off.</p>
+          <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate500 }}>
+            Completed jobs awaiting sign-off, and how long each submitter took once they've signed off.
+            {' '}Sign-off wait is flagged red past {formatDurationDays(thresholdHours * 3600000)} (Settings → Sign-Off Threshold).
+          </p>
         </div>
       </div>
 
@@ -547,7 +566,7 @@ function SignOffOversight({ onNavigate }) {
             <tbody>
               {filteredTickets.map(t => {
                 const wait = signOffWaitMs(t)
-                const waitTone = signOffWaitTone(wait)
+                const waitTone = signOffWaitTone(wait, thresholdHours * 3600000)
                 return (
                   <tr key={t.id} style={{ borderBottom: `1px solid ${COLORS.slate100}` }}>
                     <td

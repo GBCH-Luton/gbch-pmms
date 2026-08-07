@@ -137,6 +137,10 @@ export default function AdminSettings() {
   const [voidAlertsSaving, setVoidAlertsSaving] = useState(false)
   const [voidAlertsSaved, setVoidAlertsSaved] = useState(false)
 
+  const [signOffThresholdHours, setSignOffThresholdHours] = useState(48)
+  const [signOffThresholdSaving, setSignOffThresholdSaving] = useState(false)
+  const [signOffThresholdSaved, setSignOffThresholdSaved] = useState(false)
+
   const [routineVisitFlagDays, setRoutineVisitFlagDays] = useState(12)
   const [routineVisitAlertsEnabled, setRoutineVisitAlertsEnabled] = useState(true)
   // These jobs are created by check-routine-visits-due (pg_cron, no
@@ -221,6 +225,7 @@ export default function AdminSettings() {
       if (map.compliance_alerts_enabled != null) setComplianceAlertsEnabled(map.compliance_alerts_enabled)
       if (map.void_aging_threshold_days != null) setVoidAgingThresholdDays(map.void_aging_threshold_days)
       if (map.void_alerts_enabled != null) setVoidAlertsEnabled(map.void_alerts_enabled)
+      if (map.sign_off_wait_threshold_hours != null) setSignOffThresholdHours(Number(map.sign_off_wait_threshold_hours))
       if (map.ai_cost_per_million_input_tokens != null) setAiInputCostPerMillion(map.ai_cost_per_million_input_tokens)
       if (map.ai_cost_per_million_output_tokens != null) setAiOutputCostPerMillion(map.ai_cost_per_million_output_tokens)
       if (map.routine_visit_flag_days != null) setRoutineVisitFlagDays(map.routine_visit_flag_days)
@@ -614,6 +619,15 @@ export default function AdminSettings() {
     setVoidAlertsSaving(false)
     setVoidAlertsSaved(true)
     setTimeout(() => setVoidAlertsSaved(false), 2000)
+  }
+
+  async function saveSignOffThreshold() {
+    setSignOffThresholdSaving(true)
+    setSignOffThresholdSaved(false)
+    await saveSetting('sign_off_wait_threshold_hours', Number(signOffThresholdHours))
+    setSignOffThresholdSaving(false)
+    setSignOffThresholdSaved(true)
+    setTimeout(() => setSignOffThresholdSaved(false), 2000)
   }
 
   async function saveRoutineVisitAlerts() {
@@ -1344,6 +1358,36 @@ export default function AdminSettings() {
           {voidAlertsSaving ? 'Saving...' : 'Save Void Aging Alerts'}
         </button>
         {voidAlertsSaved && <span style={savedTagStyle}>✓ Saved</span>}
+      </SettingsSection>
+
+      {/* Section 4d-2: Sign-Off Threshold */}
+      <SettingsSection
+        title="Sign-Off Threshold"
+        subtitle="How long a completed job can sit waiting for the submitter to sign it off before the Sign-Off Oversight page flags it in red."
+        open={!!openSections['sign-off-threshold']}
+        onToggle={() => toggleSection('sign-off-threshold')}
+      >
+        <div style={{ marginBottom: '16px', maxWidth: '260px' }}>
+          <label style={fieldLabelStyle}>Flag as overdue after</label>
+          <select
+            value={signOffThresholdHours}
+            onChange={(e) => setSignOffThresholdHours(e.target.value)}
+            style={inputStyle}
+          >
+            <option value={24}>24 hours</option>
+            <option value={48}>48 hours</option>
+            <option value={72}>72 hours</option>
+            <option value={168}>1 week</option>
+            <option value={336}>2 weeks</option>
+            <option value={720}>1 month</option>
+          </select>
+          <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: COLORS.slate400 }}>Measured from when the job was completed. Doesn't affect anything until a sign-off KPI is actually built on top of it.</p>
+        </div>
+
+        <button onClick={saveSignOffThreshold} disabled={signOffThresholdSaving} style={{ ...saveBtnStyle, opacity: signOffThresholdSaving ? 0.6 : 1, cursor: signOffThresholdSaving ? 'not-allowed' : 'pointer' }}>
+          {signOffThresholdSaving ? 'Saving...' : 'Save Sign-Off Threshold'}
+        </button>
+        {signOffThresholdSaved && <span style={savedTagStyle}>✓ Saved</span>}
       </SettingsSection>
 
       {/* Section 4e: Routine Cleaning Visits (Cleaners Rota) */}
