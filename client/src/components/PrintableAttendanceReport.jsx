@@ -64,7 +64,8 @@ export default function PrintableAttendanceReport({ staffName, periodLabel, rang
               if (day.early_leave_reason) notes.push(`Left early: ${day.early_leave_reason}`)
               if (day.overtime) notes.push('Overtime')
               if (day.clock_in_override || day.clock_out_override) notes.push('Manager override')
-              if (!day.clock_out_at) notes.push('No clock-out')
+              if (day.incomplete) notes.push('No clock-out')
+              else if (!day.clock_out_at) notes.push('Still clocked in')
               return (
                 <tr key={day.id} style={{ borderBottom: `1px solid ${COLORS.slate200}` }}>
                   <td style={{ padding: '6px 8px' }}>{formatUKDate(day.work_date)}</td>

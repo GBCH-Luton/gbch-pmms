@@ -600,17 +600,23 @@ export async function fetchAttendanceSummary(staffId, fromDateKey, toDateKey) {
   let overtimeCount = 0
   let incompleteCount = 0
   const daySet = new Set()
+  const todayKey = ukDateKey()
 
   const days = (rows || []).map(r => {
     const durationMs = r.clock_out_at ? (new Date(r.clock_out_at) - new Date(r.clock_in_at)) : null
     const overtime = durationMs != null && durationMs > overtimeThresholdMs
+    // A still-open row for TODAY just means they haven't clocked out yet --
+    // normal, not an anomaly. Only a still-open row from a PAST day is a
+    // genuinely forgotten clock-out worth flagging (see the Paulo Da Silva
+    // case this distinction came from).
+    const incomplete = durationMs == null && r.work_date !== todayKey
     if (durationMs != null) totalMs += durationMs
-    else incompleteCount += 1
+    if (incomplete) incompleteCount += 1
     if (r.late_flag) lateCount += 1
     if (r.early_leave_reason) earlyLeaveCount += 1
     if (overtime) overtimeCount += 1
     daySet.add(r.work_date)
-    return { ...r, durationMs, overtime }
+    return { ...r, durationMs, overtime, incomplete }
   })
 
   return { days, totalMs, daysWorked: daySet.size, lateCount, earlyLeaveCount, overtimeCount, incompleteCount }

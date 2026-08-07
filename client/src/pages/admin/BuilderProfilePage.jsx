@@ -382,7 +382,7 @@ export default function BuilderProfilePage({ staffId, onBack }) {
                         {day.early_leave_reason && <AttendanceFlag label="Left early" colour={COLORS.amber700} bg={COLORS.amber100} />}
                         {day.overtime && <AttendanceFlag label="Overtime" colour={COLORS.purple700} bg={COLORS.purple100} />}
                         {(day.clock_in_override || day.clock_out_override) && <AttendanceFlag label="Manager override" colour={COLORS.slate600} bg={COLORS.slate100} />}
-                        {!day.clock_out_at && <AttendanceFlag label="No clock-out" colour={COLORS.red600} bg={COLORS.red100} />}
+                        {day.incomplete && <AttendanceFlag label="No clock-out" colour={COLORS.red600} bg={COLORS.red100} />}
                       </div>
                     </div>
                   ))}
