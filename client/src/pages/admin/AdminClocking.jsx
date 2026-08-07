@@ -5,7 +5,7 @@ import { distanceMetres, googleMapsEmbedLink, googleMapsRouteEmbedLink, metresTo
 import { attachProperties } from '../../lib/properties'
 import {
   thStyle, tdStyle, actionBtnStyle, filterSelectStyle, formatUKDate, formatUKDateTime, toUkDateTimeInputValue, ukDateTimeInputValueToMs,
-  ukDateKey, ukTimeHHMM, minutesLate,
+  ukDateKey, ukTimeHHMM, minutesLate, shiftDateKey,
   modalOverlayStyle, modalCardStyle, modalTitleStyle, modalLabelStyle,
   modalErrorStyle, modalCancelBtnStyle, modalConfirmBtnStyle, fetchAssignableBuilders, fetchAssignableStaffForDivision,
 } from './shared'
@@ -55,15 +55,6 @@ function formatDuration(ms) {
   const h = Math.floor(totalMinutes / 60)
   const m = totalMinutes % 60
   return `${h}h ${m}m`
-}
-
-// Plain calendar-date arithmetic on the "YYYY-MM-DD" string itself (via
-// Date.UTC), not a local Date object -- a work_date string is already a UK
-// calendar date, so shifting it a day either way should never risk
-// drifting onto the wrong day depending on the browser's own timezone.
-function shiftDateKey(dateKey, days) {
-  const [y, m, d] = dateKey.split('-').map(Number)
-  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10)
 }
 
 export default function AdminClocking({ profile, onNavigate }) {

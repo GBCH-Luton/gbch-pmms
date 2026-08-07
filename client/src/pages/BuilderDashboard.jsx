@@ -7,7 +7,7 @@ import { fetchMaintenanceCategories, fetchAllMaintenanceCategoryNames, sortedCat
 import { attachBuilderSafeProperties } from '../lib/properties'
 import { logLoginEvent } from '../lib/loginEvents'
 import { pushNotificationsSupported, hasActivePushSubscription, enablePushNotifications } from '../lib/pushNotifications'
-import { pushEmergencyAlert, priorityTierLabel, fetchPriorityThresholds, Avatar, formatUKDate, formatUKDateTime, ukDateKey, ukTimeHHMM, minutesLate } from './admin/shared'
+import { pushEmergencyAlert, priorityTierLabel, fetchPriorityThresholds, Avatar, formatUKDate, formatUKDateTime, ukDateKey, ukTimeHHMM, minutesLate, shiftDateKey, fetchAttendanceSummary, formatDuration, formatDurationDays } from './admin/shared'
 import { fetchAvailableMaterials, logMaterialUsage } from '../lib/simsMaterialsBridge'
 import { fetchChannelMessages, subscribeToChannel, postMessage, markChannelRead, markChannelReadRemote, fetchChannelReads, countUnreadMentions, colorForSender } from '../lib/chat'
 import { fetchDmContacts, fetchConversations, fetchThreadMessages, subscribeToDm, postDm, markThreadRead, countUnreadDms } from '../lib/dm'
@@ -103,6 +103,14 @@ export default function BuilderDashboard({ profile }) {
   // clock-out actually goes through.
   const [earlyLeavePromptOpen, setEarlyLeavePromptOpen] = useState(false)
   const [earlyLeaveReason, setEarlyLeaveReason] = useState('')
+
+  // My Metrics' own Attendance section -- fetched only while that page is
+  // open (unlike everything else on this dashboard, nothing else needs a
+  // daily_attendance date-range query up front), same aggregation
+  // BuilderProfilePage.jsx uses for the admin-side view of this builder.
+  const [attendancePeriodDays, setAttendancePeriodDays] = useState(7)
+  const [attendanceSummary, setAttendanceSummary] = useState(null)
+  const [attendanceLoading, setAttendanceLoading] = useState(true)
 
   // Mid-day presence, independent of both the shift above and any job's
   // own work_session -- a materials run or a break doesn't pause or
@@ -259,6 +267,18 @@ export default function BuilderDashboard({ profile }) {
       return unsubscribe
     }
   }, [page])
+
+  useEffect(() => {
+    if (page !== 'metrics') return
+    let cancelled = false
+    setAttendanceLoading(true)
+    const toKey = ukDateKey()
+    const fromKey = shiftDateKey(toKey, -(attendancePeriodDays - 1))
+    fetchAttendanceSummary(profile.id, fromKey, toKey).then(summary => {
+      if (!cancelled) { setAttendanceSummary(summary); setAttendanceLoading(false) }
+    })
+    return () => { cancelled = true }
+  }, [page, attendancePeriodDays])
 
   // Direct Messages: loaded whenever the team-chat page is open regardless
   // of which tab is active, so switching from Channel to Direct Messages
@@ -2670,6 +2690,70 @@ export default function BuilderDashboard({ profile }) {
               <h1 style={{ margin: '0 0 4px 0', fontSize: '20px', fontWeight: 800, color: COLORS.slate900 }}>My Metrics</h1>
               <p style={{ margin: 0, fontSize: '14px', color: COLORS.slate500 }}>{profile.name}</p>
             </div>
+
+            {/* Attendance -- day-level hours, separate from the jobs stats
+                below. Read-only: same numbers a manager sees on this
+                builder's profile, no edit controls here. */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+              <p style={{ margin: 0, fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Attendance</p>
+              <div style={{ display: 'flex', gap: '4px' }}>
+                {[{ label: '7d', days: 7 }, { label: '30d', days: 30 }, { label: '90d', days: 90 }].map(p => (
+                  <button
+                    key={p.days}
+                    onClick={() => setAttendancePeriodDays(p.days)}
+                    style={{
+                      padding: '5px 10px', borderRadius: '8px', fontSize: '11px', fontWeight: 700, cursor: 'pointer',
+                      border: attendancePeriodDays === p.days ? `1px solid ${COLORS.teal700}` : `1px solid ${COLORS.slate200}`,
+                      background: attendancePeriodDays === p.days ? COLORS.teal700 : COLORS.white,
+                      color: attendancePeriodDays === p.days ? COLORS.white : COLORS.slate600,
+                    }}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {attendanceLoading || !attendanceSummary ? (
+              <p style={{ margin: '0 0 20px 0', fontSize: '13px', color: COLORS.slate400, fontWeight: 600, textAlign: 'left' }}>Loading...</p>
+            ) : (
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', marginBottom: '12px' }}>
+                  <div style={{ background: COLORS.white, borderRadius: '16px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', boxSizing: 'border-box' }}>
+                    <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Total Hours</p>
+                    <p style={{ margin: 0, fontSize: '22px', fontWeight: 800, color: COLORS.teal600 }}>{formatDurationDays(attendanceSummary.totalMs)}</p>
+                  </div>
+                  <div style={{ background: COLORS.white, borderRadius: '16px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', boxSizing: 'border-box' }}>
+                    <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Days Worked</p>
+                    <p style={{ margin: 0, fontSize: '22px', fontWeight: 800, color: COLORS.blue600 }}>{attendanceSummary.daysWorked}</p>
+                  </div>
+                  <div style={{ background: COLORS.white, borderRadius: '16px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', boxSizing: 'border-box' }}>
+                    <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Late</p>
+                    <p style={{ margin: 0, fontSize: '22px', fontWeight: 800, color: attendanceSummary.lateCount > 0 ? COLORS.amber600 : COLORS.slate400 }}>{attendanceSummary.lateCount}</p>
+                  </div>
+                  <div style={{ background: COLORS.white, borderRadius: '16px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', boxSizing: 'border-box' }}>
+                    <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Overtime</p>
+                    <p style={{ margin: 0, fontSize: '22px', fontWeight: 800, color: attendanceSummary.overtimeCount > 0 ? COLORS.purple600 : COLORS.slate400 }}>{attendanceSummary.overtimeCount}</p>
+                  </div>
+                </div>
+
+                {attendanceSummary.days.length > 0 && (
+                  <div style={{ width: '100%', background: COLORS.white, borderRadius: '16px', padding: '14px 16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', boxSizing: 'border-box', marginBottom: '20px', textAlign: 'left' }}>
+                    {attendanceSummary.days.slice(0, 7).map(day => (
+                      <div key={day.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', padding: '8px 0', borderBottom: `1px solid ${COLORS.slate100}`, flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '12px', fontWeight: 700, color: COLORS.slate900, minWidth: '80px' }}>{formatUKDate(day.work_date)}</span>
+                        <span style={{ fontSize: '12px', fontWeight: 700, color: COLORS.slate600, fontFamily: 'monospace' }}>{day.durationMs != null ? formatDuration(day.durationMs) : 'still clocked in'}</span>
+                        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                          {day.late_flag && <span style={{ fontSize: '10px', fontWeight: 700, color: COLORS.amber700, background: COLORS.amber100, padding: '2px 8px', borderRadius: '999px' }}>Late</span>}
+                          {day.early_leave_reason && <span style={{ fontSize: '10px', fontWeight: 700, color: COLORS.amber700, background: COLORS.amber100, padding: '2px 8px', borderRadius: '999px' }}>Left early</span>}
+                          {day.overtime && <span style={{ fontSize: '10px', fontWeight: 700, color: COLORS.purple700, background: COLORS.purple100, padding: '2px 8px', borderRadius: '999px' }}>Overtime</span>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
 
             {/* Jobs completed */}
             <p style={{ margin: '0 0 8px 0', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Jobs completed</p>

@@ -544,6 +544,64 @@ export function minutesLate(isoString, deadlineHHMM) {
   return clockInMinutes - (dh * 60 + dm)
 }
 
+// Plain calendar-date arithmetic on the "YYYY-MM-DD" string itself (via
+// Date.UTC), not a local Date object -- a ukDateKey() string is already a
+// UK calendar date, so shifting it a day either way should never risk
+// drifting onto the wrong day depending on the browser's own timezone.
+export function shiftDateKey(dateKey, days) {
+  const [y, m, d] = dateKey.split('-').map(Number)
+  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10)
+}
+
+// Aggregates pmms.daily_attendance for one staff member over an inclusive
+// UK-calendar-date range into per-day rows plus summary counts -- shared
+// by BuilderProfilePage.jsx (a manager looking at someone else's record)
+// and BuilderDashboard.jsx's My Metrics page (a builder looking at their
+// own, read-only), so both are guaranteed to ever agree on the same
+// numbers rather than each computing it slightly differently.
+// "Overtime" is a single per-day hours threshold (daily_overtime_threshold_hours,
+// default 8) rather than a weekly total or "past the clock-out deadline" --
+// see the design discussion this came out of.
+export async function fetchAttendanceSummary(staffId, fromDateKey, toDateKey) {
+  const { data: rows } = await supabase
+    .schema('pmms')
+    .from('daily_attendance')
+    .select('id, work_date, clock_in_at, clock_out_at, late_flag, early_leave_reason, clock_in_override, clock_out_override')
+    .eq('staff_id', staffId)
+    .gte('work_date', fromDateKey)
+    .lte('work_date', toDateKey)
+    .order('work_date', { ascending: false })
+
+  const { data: thresholdRow } = await supabase
+    .schema('pmms')
+    .from('settings')
+    .select('setting_value')
+    .eq('setting_key', 'daily_overtime_threshold_hours')
+    .maybeSingle()
+  const overtimeThresholdMs = (thresholdRow?.setting_value != null ? Number(thresholdRow.setting_value) : 8) * 3600000
+
+  let totalMs = 0
+  let lateCount = 0
+  let earlyLeaveCount = 0
+  let overtimeCount = 0
+  let incompleteCount = 0
+  const daySet = new Set()
+
+  const days = (rows || []).map(r => {
+    const durationMs = r.clock_out_at ? (new Date(r.clock_out_at) - new Date(r.clock_in_at)) : null
+    const overtime = durationMs != null && durationMs > overtimeThresholdMs
+    if (durationMs != null) totalMs += durationMs
+    else incompleteCount += 1
+    if (r.late_flag) lateCount += 1
+    if (r.early_leave_reason) earlyLeaveCount += 1
+    if (overtime) overtimeCount += 1
+    daySet.add(r.work_date)
+    return { ...r, durationMs, overtime }
+  })
+
+  return { days, totalMs, daysWorked: daySet.size, lateCount, earlyLeaveCount, overtimeCount, incompleteCount }
+}
+
 export const filterSelectStyle = { padding: '8px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', fontWeight: 600, color: COLORS.slate900, background: COLORS.slate50, cursor: 'pointer' }
 export const thStyle = { padding: '10px 14px', textAlign: 'left', fontSize: '10px', fontWeight: 800, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }
 export const tdStyle = { padding: '12px 14px', verticalAlign: 'top', fontSize: '13px' }

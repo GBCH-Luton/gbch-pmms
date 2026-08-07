@@ -10,14 +10,41 @@ import { attachProperties } from '../../lib/properties'
 import SimpleBarChart from '../../components/SimpleBarChart'
 import {
   Avatar, KpiTiles, roleBadgeStyle, STAFF_AVAILABILITY_STYLES,
-  formatUKDateTime, formatDurationDays,
+  formatUKDateTime, formatUKDate, formatDurationDays, formatDuration,
   computeDutyStatus, computeAvgTurnaroundMs, buildWeeklyTrend,
+  ukDateKey, shiftDateKey, fetchAttendanceSummary,
 } from './shared'
 
 const cardStyle = { background: COLORS.white, borderRadius: '16px', padding: '20px', marginBottom: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }
 const cardLabelStyle = { margin: '0 0 12px 0', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }
 const ACTIVITY_PREVIEW_COUNT = 10
 const TREND_WEEKS = 8
+
+// "Day"/"week"/"month"/"3 months" from the feature ask, as rolling windows
+// ending today rather than calendar boundaries -- simpler to reason about
+// than a calendar-month picker, and matches how the rest of this section
+// (Total Hours, flag counts) already reads as "the last N days," not
+// "this named month."
+const ATTENDANCE_PERIODS = [
+  { label: '7 Days', days: 7 },
+  { label: '30 Days', days: 30 },
+  { label: '90 Days', days: 90 },
+]
+
+function AttendanceStat({ label, value, colour }) {
+  return (
+    <div style={{ background: COLORS.slate50, border: `1px solid ${COLORS.slate200}`, borderRadius: '10px', padding: '10px', textAlign: 'center' }}>
+      <p style={{ margin: '0 0 4px 0', fontSize: '10px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</p>
+      <p style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: colour }}>{value}</p>
+    </div>
+  )
+}
+
+function AttendanceFlag({ label, colour, bg }) {
+  return (
+    <span style={{ fontSize: '10px', fontWeight: 700, color: colour, background: bg, padding: '2px 8px', borderRadius: '999px', whiteSpace: 'nowrap' }}>{label}</span>
+  )
+}
 
 // Powers automated matching against a property's staff_gender_restriction
 // (see PropertyCoreTab.jsx's CleanerAssignmentSection) -- general-purpose,
@@ -78,6 +105,15 @@ export default function BuilderProfilePage({ staffId, onBack }) {
   const [workSessions, setWorkSessions] = useState([])
   const [activity, setActivity] = useState([])
   const [showAllActivity, setShowAllActivity] = useState(false)
+
+  // Attendance & Hours -- day-level daily_attendance, separate from the
+  // per-job work_sessions the KPI tiles above already use. Fetched
+  // independently of the main load() effect since it re-fetches on its
+  // own whenever the period changes, not just when staffId changes.
+  const [attendancePeriodDays, setAttendancePeriodDays] = useState(7)
+  const [attendanceSummary, setAttendanceSummary] = useState(null)
+  const [attendanceLoading, setAttendanceLoading] = useState(true)
+  const [showAllAttendance, setShowAllAttendance] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -149,6 +185,18 @@ export default function BuilderProfilePage({ staffId, onBack }) {
     load()
     return () => { cancelled = true }
   }, [staffId])
+
+  useEffect(() => {
+    let cancelled = false
+    setAttendanceLoading(true)
+    setShowAllAttendance(false)
+    const toKey = ukDateKey()
+    const fromKey = shiftDateKey(toKey, -(attendancePeriodDays - 1))
+    fetchAttendanceSummary(staffId, fromKey, toKey).then(summary => {
+      if (!cancelled) { setAttendanceSummary(summary); setAttendanceLoading(false) }
+    })
+    return () => { cancelled = true }
+  }, [staffId, attendancePeriodDays])
 
   if (loadError) {
     return (
@@ -249,6 +297,84 @@ export default function BuilderProfilePage({ staffId, onBack }) {
       </div>
 
       <KpiTiles kpis={kpis} />
+
+      <div style={cardStyle}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px', marginBottom: '14px' }}>
+          <p style={{ ...cardLabelStyle, margin: 0 }}>Attendance &amp; Hours</p>
+          <div style={{ display: 'flex', gap: '6px' }}>
+            {ATTENDANCE_PERIODS.map(p => (
+              <button
+                key={p.days}
+                onClick={() => setAttendancePeriodDays(p.days)}
+                style={{
+                  padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer',
+                  border: attendancePeriodDays === p.days ? `1px solid ${COLORS.teal700}` : `1px solid ${COLORS.slate200}`,
+                  background: attendancePeriodDays === p.days ? COLORS.teal700 : COLORS.white,
+                  color: attendancePeriodDays === p.days ? COLORS.white : COLORS.slate600,
+                }}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {attendanceLoading ? (
+          <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate400, fontWeight: 600 }}>Loading...</p>
+        ) : (
+          <>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '10px', marginBottom: '16px' }}>
+              <AttendanceStat label="Total Hours" value={formatDurationDays(attendanceSummary.totalMs)} colour={COLORS.teal600} />
+              <AttendanceStat label="Days Worked" value={attendanceSummary.daysWorked} colour={COLORS.blue600} />
+              <AttendanceStat label="Late" value={attendanceSummary.lateCount} colour={attendanceSummary.lateCount > 0 ? COLORS.amber600 : COLORS.slate400} />
+              <AttendanceStat label="Left Early" value={attendanceSummary.earlyLeaveCount} colour={attendanceSummary.earlyLeaveCount > 0 ? COLORS.amber600 : COLORS.slate400} />
+              <AttendanceStat label="Overtime" value={attendanceSummary.overtimeCount} colour={attendanceSummary.overtimeCount > 0 ? COLORS.purple600 : COLORS.slate400} />
+              {attendanceSummary.incompleteCount > 0 && (
+                <AttendanceStat label="Missing Clock-Out" value={attendanceSummary.incompleteCount} colour={COLORS.red600} />
+              )}
+            </div>
+
+            {attendanceSummary.days.length === 0 ? (
+              <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>No attendance recorded in this period.</p>
+            ) : (
+              <>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  {(showAllAttendance ? attendanceSummary.days : attendanceSummary.days.slice(0, ACTIVITY_PREVIEW_COUNT)).map(day => (
+                    <div key={day.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', padding: '10px 0', borderBottom: `1px solid ${COLORS.slate100}`, flexWrap: 'wrap' }}>
+                      <div style={{ minWidth: '110px' }}>
+                        <span style={{ fontSize: '13px', fontWeight: 700, color: COLORS.slate900 }}>{formatUKDate(day.work_date)}</span>
+                      </div>
+                      <div style={{ flex: 1, minWidth: '220px', fontSize: '12px', color: COLORS.slate500, fontFamily: 'monospace' }}>
+                        {formatUKDateTime(day.clock_in_at).split(' ').slice(-1)[0]}
+                        {' → '}
+                        {day.clock_out_at ? formatUKDateTime(day.clock_out_at).split(' ').slice(-1)[0] : 'still clocked in'}
+                      </div>
+                      <div style={{ fontSize: '13px', fontWeight: 700, color: COLORS.slate900, fontFamily: 'monospace', minWidth: '70px', textAlign: 'right' }}>
+                        {day.durationMs != null ? formatDuration(day.durationMs) : '—'}
+                      </div>
+                      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                        {day.late_flag && <AttendanceFlag label="Late" colour={COLORS.amber700} bg={COLORS.amber100} />}
+                        {day.early_leave_reason && <AttendanceFlag label="Left early" colour={COLORS.amber700} bg={COLORS.amber100} />}
+                        {day.overtime && <AttendanceFlag label="Overtime" colour={COLORS.purple700} bg={COLORS.purple100} />}
+                        {(day.clock_in_override || day.clock_out_override) && <AttendanceFlag label="Manager override" colour={COLORS.slate600} bg={COLORS.slate100} />}
+                        {!day.clock_out_at && <AttendanceFlag label="No clock-out" colour={COLORS.red600} bg={COLORS.red100} />}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {attendanceSummary.days.length > ACTIVITY_PREVIEW_COUNT && (
+                  <button
+                    onClick={() => setShowAllAttendance(v => !v)}
+                    style={{ marginTop: '12px', padding: '8px 14px', background: COLORS.slate100, border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, color: COLORS.slate600, cursor: 'pointer' }}
+                  >
+                    {showAllAttendance ? 'Show fewer' : `Show all ${attendanceSummary.days.length} days`}
+                  </button>
+                )}
+              </>
+            )}
+          </>
+        )}
+      </div>
 
       <div style={cardStyle}>
         <p style={cardLabelStyle}>Jobs Assigned vs. Completed (last {TREND_WEEKS} weeks)</p>
