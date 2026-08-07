@@ -308,6 +308,29 @@ export default function BuilderProfilePage({ staffId, onBack }) {
         </div>
       </div>
 
+      <div style={cardStyle}>
+        <p style={cardLabelStyle}>Current Assignment</p>
+        {inProgressJob ? (
+          <div style={{ background: COLORS.green50, border: `1px solid ${COLORS.green200}`, borderRadius: '10px', padding: '12px' }}>
+            <span style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: COLORS.green600 }}>#{inProgressJob.ticket_number}</span>
+            <span style={{ display: 'block', fontSize: '14px', fontWeight: 700, color: COLORS.slate900 }}>{inProgressJob.property?.address}</span>
+            <span style={{ display: 'block', fontSize: '13px', color: COLORS.slate600 }}>{inProgressJob.room || '—'} → {inProgressJob.description}</span>
+          </div>
+        ) : activeJobs.length > 0 ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            {activeJobs.map(j => (
+              <div key={j.id} style={{ background: COLORS.slate50, border: `1px solid ${COLORS.slate200}`, borderRadius: '10px', padding: '10px 12px' }}>
+                <span style={{ fontSize: '11px', fontWeight: 700, color: COLORS.slate400 }}>#{j.ticket_number}</span>{' '}
+                <span style={{ fontSize: '13px', fontWeight: 700, color: COLORS.slate900 }}>{j.property?.address}</span>{' '}
+                <span style={{ fontSize: '12px', color: COLORS.slate500 }}>— {j.status}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>No active assignment.</p>
+        )}
+      </div>
+
       <KpiTiles kpis={kpis} />
 
       <div style={cardStyle}>
@@ -427,29 +450,6 @@ export default function BuilderProfilePage({ staffId, onBack }) {
       <div style={cardStyle}>
         <p style={cardLabelStyle}>Jobs by Category (all-time)</p>
         <SimpleBarChart data={categoryChartData} series={[{ name: 'Category', color: COLORS.teal600 }]} />
-      </div>
-
-      <div style={cardStyle}>
-        <p style={cardLabelStyle}>Current Assignment</p>
-        {inProgressJob ? (
-          <div style={{ background: COLORS.green50, border: `1px solid ${COLORS.green200}`, borderRadius: '10px', padding: '12px' }}>
-            <span style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: COLORS.green600 }}>#{inProgressJob.ticket_number}</span>
-            <span style={{ display: 'block', fontSize: '14px', fontWeight: 700, color: COLORS.slate900 }}>{inProgressJob.property?.address}</span>
-            <span style={{ display: 'block', fontSize: '13px', color: COLORS.slate600 }}>{inProgressJob.room || '—'} → {inProgressJob.description}</span>
-          </div>
-        ) : activeJobs.length > 0 ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            {activeJobs.map(j => (
-              <div key={j.id} style={{ background: COLORS.slate50, border: `1px solid ${COLORS.slate200}`, borderRadius: '10px', padding: '10px 12px' }}>
-                <span style={{ fontSize: '11px', fontWeight: 700, color: COLORS.slate400 }}>#{j.ticket_number}</span>{' '}
-                <span style={{ fontSize: '13px', fontWeight: 700, color: COLORS.slate900 }}>{j.property?.address}</span>{' '}
-                <span style={{ fontSize: '12px', color: COLORS.slate500 }}>— {j.status}</span>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>No active assignment.</p>
-        )}
       </div>
 
       <div style={cardStyle}>
