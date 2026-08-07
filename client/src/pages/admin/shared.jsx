@@ -638,6 +638,40 @@ export async function fetchAttendanceSummary(staffId, fromDateKey, toDateKey) {
   return { days, totalMs, daysWorked: daySet.size, lateCount, earlyLeaveCount, overtimeCount, incompleteCount, missedClockOutCount }
 }
 
+// Trip-level mileage for one staff member over an inclusive UK-calendar-date
+// range -- mirrors fetchAttendanceSummary's shape/purpose, but keyed off
+// tickets.mileage_logged_at (set at clock-in, see
+// scripts/add_ticket_mileage_logged_at.sql) rather than daily_attendance.
+// Bounds are converted through ukDateTimeInputValueToMs so "the whole of
+// August" means UK midnight-to-midnight, not the viewer's own timezone.
+export async function fetchMileageSummary(staffId, fromDateKey, toDateKey) {
+  const fromMs = ukDateTimeInputValueToMs(`${fromDateKey}T00:00`)
+  const toExclusiveMs = ukDateTimeInputValueToMs(`${shiftDateKey(toDateKey, 1)}T00:00`)
+
+  const { data: rows } = await supabase
+    .schema('pmms')
+    .from('tickets')
+    .select('id, ticket_number, property_id, mileage_logged, mileage_logged_at, transit_start')
+    .eq('assigned_builder_id', staffId)
+    .gt('mileage_logged', 0)
+    .gte('mileage_logged_at', new Date(fromMs).toISOString())
+    .lt('mileage_logged_at', new Date(toExclusiveMs).toISOString())
+    .order('mileage_logged_at', { ascending: false })
+
+  const withProperties = await attachProperties(rows || [], 'address')
+
+  let totalMiles = 0
+  const dateSet = new Set()
+  const trips = withProperties.map(t => {
+    const dateKey = ukDateKey(new Date(t.mileage_logged_at).getTime())
+    totalMiles += Number(t.mileage_logged) || 0
+    dateSet.add(dateKey)
+    return { ...t, dateKey }
+  })
+
+  return { trips, totalMiles, tripCount: trips.length, daysWithTravel: dateSet.size, avgMilesPerTrip: trips.length ? totalMiles / trips.length : 0 }
+}
+
 export const filterSelectStyle = { padding: '8px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', fontWeight: 600, color: COLORS.slate900, background: COLORS.slate50, cursor: 'pointer' }
 export const thStyle = { padding: '10px 14px', textAlign: 'left', fontSize: '10px', fontWeight: 800, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }
 export const tdStyle = { padding: '12px 14px', verticalAlign: 'top', fontSize: '13px' }

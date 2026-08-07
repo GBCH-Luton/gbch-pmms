@@ -762,7 +762,7 @@ export default function BuilderDashboard({ profile }) {
     const { error: ticketError } = await supabase
       .schema('pmms')
       .from('tickets')
-      .update({ status: 'In Progress', status_changed_at: now, stuck_alert_sent_at: null, mileage_logged: milesLogged, transit_start: transitStart })
+      .update({ status: 'In Progress', status_changed_at: now, stuck_alert_sent_at: null, mileage_logged: milesLogged, transit_start: transitStart, mileage_logged_at: now })
       .eq('id', selectedTicket.id)
 
     if (ticketError) {

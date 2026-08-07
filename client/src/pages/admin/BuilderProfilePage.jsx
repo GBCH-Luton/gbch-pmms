@@ -12,14 +12,37 @@ import {
   Avatar, KpiTiles, roleBadgeStyle, STAFF_AVAILABILITY_STYLES,
   formatUKDateTime, formatUKDate, formatDurationDays, formatDuration,
   computeDutyStatus, computeAvgTurnaroundMs, buildWeeklyTrend,
-  ukDateKey, shiftDateKey, mondayOfWeek, firstOfMonth, fetchAttendanceSummary,
+  ukDateKey, shiftDateKey, mondayOfWeek, firstOfMonth, fetchAttendanceSummary, fetchMileageSummary,
 } from './shared'
 import PrintableAttendanceReport from '../../components/PrintableAttendanceReport'
+import PrintableMileageReport from '../../components/PrintableMileageReport'
 
 const cardStyle = { background: COLORS.white, borderRadius: '16px', padding: '20px', marginBottom: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }
 const cardLabelStyle = { margin: '0 0 12px 0', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }
 const ACTIVITY_PREVIEW_COUNT = 10
 const TREND_WEEKS = 8
+
+// Every card on this page was the same white background + grey label,
+// which made it easy to lose track of which section you were in while
+// scanning. A thin top border plus a matching label colour gives each one
+// its own identity without breaking the app's white-card convention used
+// everywhere else -- picked from colours already meaningful within each
+// card (green for "in progress", teal for hours, blue for miles) so the
+// accent reinforces what's already there rather than adding a new meaning.
+const SECTION_ACCENTS = {
+  assignment: COLORS.green600,
+  attendance: COLORS.teal700,
+  mileage: COLORS.blue600,
+  trend: COLORS.indigo700,
+  category: COLORS.violet600,
+  activity: COLORS.slate600,
+}
+function sectionCardStyle(accent) {
+  return { ...cardStyle, borderTop: `3px solid ${accent}` }
+}
+function sectionLabelStyle(accent, extra) {
+  return { ...cardLabelStyle, color: accent, ...extra }
+}
 
 // Calendar-based, not rolling windows -- "Yesterday" means yesterday and
 // "This Month" means the calendar month so far, so "how many hours did he
@@ -42,6 +65,13 @@ function attendanceRangeFor(periodKey) {
   if (periodKey === 'quarter') return { from: shiftDateKey(today, -89), to: today }
   return { from: today, to: today } // 'today'
 }
+
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+function shiftMonth({ year, month }, delta) {
+  const d = new Date(Date.UTC(year, month + delta, 1))
+  return { year: d.getUTCFullYear(), month: d.getUTCMonth() }
+}
+function sameMonth(a, b) { return a.year === b.year && a.month === b.month }
 
 function AttendanceStat({ label, value, colour }) {
   return (
@@ -128,6 +158,31 @@ export default function BuilderProfilePage({ staffId, onBack }) {
   const [attendanceLoading, setAttendanceLoading] = useState(true)
   const [showAllAttendance, setShowAllAttendance] = useState(false)
   const [showAttendanceReport, setShowAttendanceReport] = useState(false)
+
+  // Mileage -- month-level breakdown of tickets.mileage_logged. A month
+  // picker rather than the day/week/quarter tabs Attendance & Hours uses,
+  // since "which month" is how a builder actually thinks about mileage
+  // (matches the artifact this was previewed as before building).
+  const todayUkParts = ukDateKey().split('-').map(Number)
+  const [mileageOpen, setMileageOpen] = useState(false)
+  const [mileageMonth, setMileageMonth] = useState({ year: todayUkParts[0], month: todayUkParts[1] - 1 })
+  const [mileageSummary, setMileageSummary] = useState(null)
+  const [mileageLoading, setMileageLoading] = useState(true)
+  const [showMileageReport, setShowMileageReport] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    setMileageLoading(true)
+    const { year, month } = mileageMonth
+    const mm = String(month + 1).padStart(2, '0')
+    const fromDateKey = `${year}-${mm}-01`
+    const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate()
+    const toDateKey = `${year}-${mm}-${String(lastDay).padStart(2, '0')}`
+    fetchMileageSummary(staffId, fromDateKey, toDateKey).then(summary => {
+      if (!cancelled) { setMileageSummary(summary); setMileageLoading(false) }
+    })
+    return () => { cancelled = true }
+  }, [staffId, mileageMonth])
 
   useEffect(() => {
     let cancelled = false
@@ -309,13 +364,13 @@ export default function BuilderProfilePage({ staffId, onBack }) {
         </div>
       </div>
 
-      <div style={cardStyle}>
+      <div style={sectionCardStyle(SECTION_ACCENTS.assignment)}>
         <button
           onClick={() => setAssignmentOpen(v => !v)}
           style={{ display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between', gap: '12px', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left' }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <p style={{ ...cardLabelStyle, margin: 0 }}>Current Assignment</p>
+            <p style={sectionLabelStyle(SECTION_ACCENTS.assignment, { margin: 0 })}>Current Assignment</p>
             {!assignmentOpen && (
               <span style={{ fontSize: '12px', fontWeight: 700, color: inProgressJob || activeJobs.length > 0 ? COLORS.green600 : COLORS.slate400 }}>
                 {inProgressJob ? `#${inProgressJob.ticket_number} in progress` : activeJobs.length > 0 ? `${activeJobs.length} active` : 'None'}
@@ -354,9 +409,9 @@ export default function BuilderProfilePage({ staffId, onBack }) {
 
       <KpiTiles kpis={kpis} />
 
-      <div style={cardStyle}>
+      <div style={sectionCardStyle(SECTION_ACCENTS.attendance)}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px', marginBottom: '14px' }}>
-          <p style={{ ...cardLabelStyle, margin: 0 }}>Attendance &amp; Hours</p>
+          <p style={sectionLabelStyle(SECTION_ACCENTS.attendance, { margin: 0 })}>Attendance &amp; Hours</p>
           <button
             onClick={() => setShowAttendanceReport(true)}
             disabled={attendanceLoading || !attendanceSummary}
@@ -457,8 +512,133 @@ export default function BuilderProfilePage({ staffId, onBack }) {
         )}
       </div>
 
-      <div style={cardStyle}>
-        <p style={cardLabelStyle}>Jobs Assigned vs. Completed (last {TREND_WEEKS} weeks)</p>
+      <div style={sectionCardStyle(SECTION_ACCENTS.mileage)}>
+        <button
+          onClick={() => setMileageOpen(v => !v)}
+          style={{ display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between', gap: '12px', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left' }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <p style={sectionLabelStyle(SECTION_ACCENTS.mileage, { margin: 0 })}>Mileage</p>
+            {!mileageOpen && mileageSummary && (
+              <span style={{ fontSize: '12px', fontWeight: 700, color: mileageSummary.totalMiles > 0 ? COLORS.blue600 : COLORS.slate400 }}>
+                {mileageSummary.totalMiles.toFixed(1)} mi · {MONTH_NAMES[mileageMonth.month]}
+              </span>
+            )}
+          </div>
+          <span style={{ fontSize: '13px', color: COLORS.slate400, fontWeight: 700, flexShrink: 0 }}>
+            {mileageOpen ? '▲ Collapse' : '▼ Expand'}
+          </span>
+        </button>
+
+        {mileageOpen && (
+          <div style={{ marginTop: '14px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px', marginBottom: '14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <button
+                  onClick={() => setMileageMonth(m => shiftMonth(m, -1))}
+                  aria-label="Previous month"
+                  style={{ width: '28px', height: '28px', borderRadius: '8px', border: `1px solid ${COLORS.slate200}`, background: COLORS.white, color: COLORS.slate600, fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}
+                >‹</button>
+                <span style={{ fontSize: '14px', fontWeight: 800, color: COLORS.slate900, minWidth: '120px', textAlign: 'center' }}>
+                  {MONTH_NAMES[mileageMonth.month]} {mileageMonth.year}
+                </span>
+                <button
+                  onClick={() => setMileageMonth(m => shiftMonth(m, 1))}
+                  disabled={sameMonth(mileageMonth, { year: todayUkParts[0], month: todayUkParts[1] - 1 })}
+                  aria-label="Next month"
+                  style={{ width: '28px', height: '28px', borderRadius: '8px', border: `1px solid ${COLORS.slate200}`, background: COLORS.white, color: COLORS.slate600, fontSize: '13px', fontWeight: 700, cursor: 'pointer', opacity: sameMonth(mileageMonth, { year: todayUkParts[0], month: todayUkParts[1] - 1 }) ? 0.4 : 1 }}
+                >›</button>
+              </div>
+              <button
+                onClick={() => setShowMileageReport(true)}
+                disabled={mileageLoading || !mileageSummary}
+                style={{
+                  padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: 700,
+                  border: `1px solid ${COLORS.slate200}`, background: COLORS.white, color: COLORS.slate600,
+                  cursor: (mileageLoading || !mileageSummary) ? 'not-allowed' : 'pointer',
+                  opacity: (mileageLoading || !mileageSummary) ? 0.5 : 1,
+                }}
+              >
+                Export as PDF
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '16px' }}>
+              {['This Month', 'Last Month'].map(label => {
+                const target = label === 'This Month'
+                  ? { year: todayUkParts[0], month: todayUkParts[1] - 1 }
+                  : shiftMonth({ year: todayUkParts[0], month: todayUkParts[1] - 1 }, -1)
+                const active = sameMonth(mileageMonth, target)
+                return (
+                  <button
+                    key={label}
+                    onClick={() => setMileageMonth(target)}
+                    style={{
+                      padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer',
+                      border: active ? `1px solid ${COLORS.blue600}` : `1px solid ${COLORS.slate200}`,
+                      background: active ? COLORS.blue600 : COLORS.white,
+                      color: active ? COLORS.white : COLORS.slate600,
+                    }}
+                  >
+                    {label}
+                  </button>
+                )
+              })}
+            </div>
+
+            {mileageLoading ? (
+              <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate400, fontWeight: 600 }}>Loading...</p>
+            ) : (
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '10px', marginBottom: '16px' }}>
+                  <AttendanceStat label="Total Miles" value={mileageSummary.totalMiles.toFixed(1)} colour={COLORS.blue600} />
+                  <AttendanceStat label="Trips Logged" value={mileageSummary.tripCount} colour={COLORS.blue600} />
+                  <AttendanceStat label="Avg Miles / Trip" value={mileageSummary.tripCount ? mileageSummary.avgMilesPerTrip.toFixed(1) : '—'} colour={COLORS.slate500} />
+                  <AttendanceStat label="Days With Travel" value={mileageSummary.daysWithTravel} colour={COLORS.slate500} />
+                </div>
+
+                {mileageSummary.trips.length === 0 ? (
+                  <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>No mileage logged in {MONTH_NAMES[mileageMonth.month]}.</p>
+                ) : (
+                  (() => {
+                    const byDate = new Map()
+                    mileageSummary.trips.forEach(t => {
+                      if (!byDate.has(t.dateKey)) byDate.set(t.dateKey, [])
+                      byDate.get(t.dateKey).push(t)
+                    })
+                    return [...byDate.entries()].map(([dateKey, dayTrips]) => {
+                      const dayTotal = dayTrips.reduce((sum, t) => sum + Number(t.mileage_logged), 0)
+                      return (
+                        <div key={dateKey} style={{ marginBottom: '4px' }}>
+                          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', padding: '10px 0 6px', borderBottom: `1px solid ${COLORS.slate200}` }}>
+                            <span style={{ fontSize: '12.5px', fontWeight: 800, color: COLORS.slate900 }}>{formatUKDate(dateKey)}</span>
+                            <span style={{ fontSize: '12px', fontWeight: 700, color: COLORS.slate500 }}>{dayTotal.toFixed(1)} mi</span>
+                          </div>
+                          {dayTrips.map(t => (
+                            <div key={t.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', padding: '9px 0', borderBottom: `1px solid ${COLORS.slate100}` }}>
+                              <div style={{ minWidth: 0 }}>
+                                <span style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: COLORS.slate900, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.property?.address || '—'}</span>
+                                <span style={{ fontSize: '11.5px', color: COLORS.slate500 }}>
+                                  <span style={{ display: 'inline-block', fontSize: '10.5px', fontWeight: 700, padding: '1px 8px', borderRadius: '999px', background: COLORS.blue50, color: COLORS.blue700, marginRight: '6px' }}>{t.transit_start || '—'}</span>
+                                  Job #{t.ticket_number}
+                                </span>
+                              </div>
+                              <span style={{ fontSize: '14px', fontWeight: 800, color: COLORS.blue600, flexShrink: 0 }}>{Number(t.mileage_logged).toFixed(1)} mi</span>
+                            </div>
+                          ))}
+                        </div>
+                      )
+                    })
+                  })()
+                )}
+              </>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div style={sectionCardStyle(SECTION_ACCENTS.trend)}>
+        <p style={sectionLabelStyle(SECTION_ACCENTS.trend)}>Jobs Assigned vs. Completed (last {TREND_WEEKS} weeks)</p>
         <SimpleBarChart
           data={trendData}
           series={[
@@ -468,13 +648,13 @@ export default function BuilderProfilePage({ staffId, onBack }) {
         />
       </div>
 
-      <div style={cardStyle}>
-        <p style={cardLabelStyle}>Jobs by Category (all-time)</p>
+      <div style={sectionCardStyle(SECTION_ACCENTS.category)}>
+        <p style={sectionLabelStyle(SECTION_ACCENTS.category)}>Jobs by Category (all-time)</p>
         <SimpleBarChart data={categoryChartData} series={[{ name: 'Category', color: COLORS.teal600 }]} />
       </div>
 
-      <div style={cardStyle}>
-        <p style={cardLabelStyle}>Activity</p>
+      <div style={sectionCardStyle(SECTION_ACCENTS.activity)}>
+        <p style={sectionLabelStyle(SECTION_ACCENTS.activity)}>Activity</p>
         {activity.length === 0 ? (
           <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>No recorded activity for this person yet.</p>
         ) : (
@@ -516,6 +696,15 @@ export default function BuilderProfilePage({ staffId, onBack }) {
           />
         )
       })()}
+
+      {showMileageReport && mileageSummary && (
+        <PrintableMileageReport
+          staffName={staff.name}
+          periodLabel={`${MONTH_NAMES[mileageMonth.month]} ${mileageMonth.year}`}
+          summary={mileageSummary}
+          onClose={() => setShowMileageReport(false)}
+        />
+      )}
     </div>
   )
 }
