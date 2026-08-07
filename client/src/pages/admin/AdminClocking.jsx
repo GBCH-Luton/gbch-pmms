@@ -212,7 +212,7 @@ export default function AdminClocking({ profile, onNavigate }) {
     const { data: attendanceData } = await supabase
       .schema('pmms')
       .from('daily_attendance')
-      .select('id, staff_id, work_date, clock_in_at, late_flag, clock_out_at, manual_override, early_leave_reason')
+      .select('id, staff_id, work_date, clock_in_at, late_flag, clock_out_at, clock_in_override, clock_out_override, early_leave_reason')
       .or(`work_date.eq.${todayKey},clock_out_at.is.null`)
       .order('clock_in_at', { ascending: false })
 
@@ -420,7 +420,7 @@ export default function AdminClocking({ profile, onNavigate }) {
     const { data: shifts } = await supabase
       .schema('pmms')
       .from('daily_attendance')
-      .select('id, clock_in_at, clock_out_at, late_flag, early_leave_reason, manual_override')
+      .select('id, clock_in_at, clock_out_at, late_flag, early_leave_reason, clock_in_override, clock_out_override')
       .eq('staff_id', staffId)
       .eq('work_date', dateKey)
       .order('clock_in_at', { ascending: true })
@@ -463,7 +463,7 @@ export default function AdminClocking({ profile, onNavigate }) {
           work_date: ukDateKey(now.getTime()),
           clock_in_at: now.toISOString(),
           late_flag: ukTimeHHMM(now.getTime()) > dailyClockInDeadline,
-          manual_override: true,
+          clock_in_override: true,
           override_note: overrideNote.trim(),
           override_by: profile.id,
         })
@@ -475,7 +475,7 @@ export default function AdminClocking({ profile, onNavigate }) {
         .from('daily_attendance')
         .update({
           clock_out_at: new Date().toISOString(),
-          manual_override: true,
+          clock_out_override: true,
           override_note: overrideNote.trim(),
           override_by: profile.id,
         })
@@ -680,7 +680,7 @@ export default function AdminClocking({ profile, onNavigate }) {
                       <>
                         {formatUKDateTime(row.shift.clock_in_at)}
                         {row.shift.late_flag && <span style={{ display: 'block', fontSize: '10px', fontWeight: 800, color: COLORS.amber700 }}>⚠ {minutesLate(row.shift.clock_in_at, dailyClockInDeadline)}m late</span>}
-                        {row.shift.manual_override && <span style={{ display: 'block', fontSize: '10px', fontWeight: 700, color: COLORS.slate400 }}>Manager override</span>}
+                        {row.shift.clock_in_override && <span style={{ display: 'block', fontSize: '10px', fontWeight: 700, color: COLORS.slate400 }}>Manager override</span>}
                       </>
                     ) : (
                       <span style={{ color: COLORS.slate300 }}>Not clocked in</span>
@@ -696,6 +696,7 @@ export default function AdminClocking({ profile, onNavigate }) {
                               ⚠ Left early: {row.shift.early_leave_reason}
                             </span>
                           )}
+                          {row.shift.clock_out_override && <span style={{ display: 'block', fontSize: '10px', fontWeight: 700, color: COLORS.slate400 }}>Manager override</span>}
                         </>
                       )
                       : row.shift
@@ -1007,14 +1008,16 @@ export default function AdminClocking({ profile, onNavigate }) {
               historyShifts.forEach(shift => {
                 events.push({
                   time: shift.clock_in_at,
-                  label: shift.manual_override ? 'Clocked in for the day (manager override)' : 'Clocked in for the day',
+                  label: shift.clock_in_override ? 'Clocked in for the day (manager override)' : 'Clocked in for the day',
                   tone: shift.late_flag ? 'late' : 'in',
                 })
                 if (shift.late_flag) events[events.length - 1].label += ` — ${minutesLate(shift.clock_in_at, dailyClockInDeadline)}m late`
                 if (shift.clock_out_at) {
                   events.push({
                     time: shift.clock_out_at,
-                    label: shift.early_leave_reason ? `Clocked out for the day — left early: ${shift.early_leave_reason}` : 'Clocked out for the day',
+                    label: shift.early_leave_reason
+                      ? `Clocked out for the day — left early: ${shift.early_leave_reason}`
+                      : shift.clock_out_override ? 'Clocked out for the day (manager override)' : 'Clocked out for the day',
                     tone: shift.early_leave_reason ? 'early' : 'out',
                   })
                 }
