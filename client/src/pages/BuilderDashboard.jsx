@@ -119,6 +119,13 @@ export default function BuilderDashboard({ profile }) {
   const [openActivity, setOpenActivity] = useState(null)
   const [activityPickerOpen, setActivityPickerOpen] = useState(false)
   const [activityType, setActivityType] = useState('Travel')
+  // 'shop' is the original free-text "Buying Materials" flow; 'job' picks
+  // one of this builder's own Assigned tickets from a dropdown instead of
+  // typing a note, and records it in destination_ticket_id -- both still
+  // write activity_type: 'Travel', so every existing "Travelling"
+  // display elsewhere in the app keeps working unchanged.
+  const [travelMode, setTravelMode] = useState('shop')
+  const [destinationTicketId, setDestinationTicketId] = useState('')
   const [activityNote, setActivityNote] = useState('')
   const [startingActivity, setStartingActivity] = useState(false)
   const [endingActivity, setEndingActivity] = useState(false)
@@ -688,14 +695,20 @@ export default function BuilderDashboard({ profile }) {
 
   function openActivityPicker() {
     setActivityType('Travel')
+    setTravelMode('shop')
+    setDestinationTicketId('')
     setActivityNote('')
     setActivityError('')
     setActivityPickerOpen(true)
   }
 
   async function handleStartActivity() {
-    if (activityType === 'Travel' && !activityNote.trim()) {
+    if (activityType === 'Travel' && travelMode === 'shop' && !activityNote.trim()) {
       setActivityError('Please say where you\'re going (e.g. shop name).')
+      return
+    }
+    if (activityType === 'Travel' && travelMode === 'job' && !destinationTicketId) {
+      setActivityError('Please pick which job you\'re heading to.')
       return
     }
     setActivityError('')
@@ -708,6 +721,17 @@ export default function BuilderDashboard({ profile }) {
     // were mid-way through (if any) when they stepped away, so managers
     // can see "left site" and "returned" against a job number later.
     const inProgressTicket = tickets.find(t => t.status === 'In Progress')
+    const destinationTicket = travelMode === 'job' ? tickets.find(t => t.id === destinationTicketId) : null
+    // The note stays a plain readable string ("Job #38 -- 12 Stanley
+    // Road") so every existing display that just shows `.note` (Team
+    // Whereabouts, the History modal, the day banner) already reads
+    // correctly with no changes -- destination_ticket_id is there
+    // separately for making it clickable.
+    const note = activityType === 'Break'
+      ? (activityNote.trim() || 'Lunch')
+      : travelMode === 'job'
+        ? `Job #${destinationTicket.ticket_number} — ${destinationTicket.property?.address || 'address unknown'}`
+        : activityNote.trim()
 
     const { data, error } = await supabase
       .schema('pmms')
@@ -715,11 +739,12 @@ export default function BuilderDashboard({ profile }) {
       .insert({
         staff_id: profile.id,
         activity_type: activityType,
-        note: activityType === 'Break' ? (activityNote.trim() || 'Lunch') : activityNote.trim(),
+        note,
         started_at: new Date().toISOString(),
         started_lat: position?.latitude ?? null,
         started_lng: position?.longitude ?? null,
         ticket_id: inProgressTicket?.id ?? null,
+        destination_ticket_id: destinationTicket?.id ?? null,
       })
       .select('id, activity_type, note, started_at')
       .single()
@@ -1697,35 +1722,58 @@ export default function BuilderDashboard({ profile }) {
         )}
         {clockOutForDayError && <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: COLORS.red500, fontWeight: 600 }}>{clockOutForDayError}</p>}
 
-        {activityPickerOpen && (
+        {activityPickerOpen && (() => {
+          const assignedJobs = tickets.filter(t => t.status === 'Assigned')
+          return (
           <div style={{ marginTop: '8px', background: COLORS.white, border: `1px solid ${COLORS.slate200}`, borderRadius: '12px', padding: '14px' }}>
             <p style={{ margin: '0 0 10px 0', fontSize: '12px', fontWeight: 700, color: COLORS.slate500, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Where are you going?</p>
             <div style={{ display: 'flex', gap: '8px', marginBottom: '10px', flexWrap: 'wrap' }}>
               {[
-                { key: 'Travel', label: '🛒 Buying Materials' },
-                { key: 'Break', label: '🍽️ Lunch Break' },
-              ].map(opt => (
-                <button
-                  key={opt.key}
-                  onClick={() => setActivityType(opt.key)}
-                  style={{
-                    padding: '8px 14px', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer',
-                    border: activityType === opt.key ? `2px solid ${COLORS.teal600}` : `1px solid ${COLORS.slate200}`,
-                    background: activityType === opt.key ? `${COLORS.teal600}14` : COLORS.slate50,
-                    color: COLORS.slate900,
-                  }}
-                >
-                  {opt.label}
-                </button>
-              ))}
+                { type: 'Travel', mode: 'shop', label: '🛒 Buying Materials' },
+                { type: 'Travel', mode: 'job', label: '🚗 Going to Another Job' },
+                { type: 'Break', mode: 'shop', label: '🍽️ Lunch Break' },
+              ].map(opt => {
+                const active = activityType === opt.type && (opt.type !== 'Travel' || travelMode === opt.mode)
+                return (
+                  <button
+                    key={opt.mode + opt.type}
+                    onClick={() => { setActivityType(opt.type); setTravelMode(opt.mode); setActivityNote(''); setDestinationTicketId('') }}
+                    style={{
+                      padding: '8px 14px', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer',
+                      border: active ? `2px solid ${COLORS.teal600}` : `1px solid ${COLORS.slate200}`,
+                      background: active ? `${COLORS.teal600}14` : COLORS.slate50,
+                      color: COLORS.slate900,
+                    }}
+                  >
+                    {opt.label}
+                  </button>
+                )
+              })}
             </div>
-            <input
-              type="text"
-              value={activityNote}
-              onChange={(e) => setActivityNote(e.target.value)}
-              placeholder={activityType === 'Travel' ? 'Shop/destination name...' : 'Note (optional)'}
-              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '14px', boxSizing: 'border-box', marginBottom: '10px' }}
-            />
+            {activityType === 'Travel' && travelMode === 'job' ? (
+              assignedJobs.length === 0 ? (
+                <p style={{ margin: '0 0 10px 0', fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>No other assigned jobs to head to right now.</p>
+              ) : (
+                <select
+                  value={destinationTicketId}
+                  onChange={(e) => setDestinationTicketId(e.target.value)}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '14px', boxSizing: 'border-box', marginBottom: '10px' }}
+                >
+                  <option value="">Select a job...</option>
+                  {assignedJobs.map(t => (
+                    <option key={t.id} value={t.id}>#{t.ticket_number} — {t.property?.address || 'Unknown address'}</option>
+                  ))}
+                </select>
+              )
+            ) : (
+              <input
+                type="text"
+                value={activityNote}
+                onChange={(e) => setActivityNote(e.target.value)}
+                placeholder={activityType === 'Travel' ? 'Shop/destination name...' : 'Note (optional)'}
+                style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '14px', boxSizing: 'border-box', marginBottom: '10px' }}
+              />
+            )}
             {activityError && <p style={{ margin: '0 0 10px 0', fontSize: '12px', color: COLORS.red500, fontWeight: 600 }}>{activityError}</p>}
             <div style={{ display: 'flex', gap: '8px' }}>
               <button onClick={() => setActivityPickerOpen(false)} style={{ flex: 1, padding: '10px', background: COLORS.slate100, color: COLORS.slate600, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
@@ -1740,7 +1788,8 @@ export default function BuilderDashboard({ profile }) {
               </button>
             </div>
           </div>
-        )}
+          )
+        })()}
 
         {earlyLeavePromptOpen && (
           <div style={{ marginTop: '8px', background: COLORS.white, border: `1px solid ${COLORS.amber300}`, borderRadius: '12px', padding: '14px' }}>

@@ -428,7 +428,7 @@ export default function AdminClocking({ profile, onNavigate }) {
         supabase
           .schema('pmms')
           .from('activity_log')
-          .select('id, activity_type, note, started_at, ended_at')
+          .select('id, activity_type, note, started_at, ended_at, destination_ticket_id')
           .eq('staff_id', staffId)
           .gte('started_at', lowerBound)
           .lte('started_at', upperBound)
@@ -448,14 +448,17 @@ export default function AdminClocking({ profile, onNavigate }) {
           .lte('created_at', upperBound)
           .order('created_at', { ascending: true }),
       ])
-      activity = data || []
 
-      const ticketIds = [...new Set((auditData || []).map(a => a.ticket_id).filter(Boolean))]
+      const ticketIds = [...new Set([
+        ...(auditData || []).map(a => a.ticket_id).filter(Boolean),
+        ...(data || []).map(a => a.destination_ticket_id).filter(Boolean),
+      ])]
       let ticketsById = {}
       if (ticketIds.length > 0) {
         const { data: ticketRows } = await supabase.schema('pmms').from('tickets').select('id, ticket_number').in('id', ticketIds)
         ticketsById = Object.fromEntries((ticketRows || []).map(t => [t.id, t]))
       }
+      activity = (data || []).map(a => ({ ...a, destinationTicketNumber: a.destination_ticket_id ? ticketsById[a.destination_ticket_id]?.ticket_number : null }))
       jobEvents = (auditData || []).map(a => ({ ...a, ticketNumber: a.ticket_id ? ticketsById[a.ticket_id]?.ticket_number : null }))
     }
 
@@ -1082,7 +1085,7 @@ export default function AdminClocking({ profile, onNavigate }) {
               historyActivity.forEach(a => {
                 const verb = a.activity_type === 'Travel' ? 'Left site' : 'Started break'
                 const backVerb = a.activity_type === 'Travel' ? 'Returned to site' : 'Back from break'
-                events.push({ time: a.started_at, label: `${verb}${a.note ? `: ${a.note}` : ''}`, tone: 'away' })
+                events.push({ time: a.started_at, label: `${verb}${a.note ? `: ${a.note}` : ''}`, tone: 'away', ticketNumber: a.destinationTicketNumber })
                 if (a.ended_at) events.push({ time: a.ended_at, label: backVerb, tone: 'back' })
               })
               historyJobEvents.forEach(a => {

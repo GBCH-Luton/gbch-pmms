@@ -159,7 +159,7 @@ function TeamWhereabouts({ profile, onNavigate }) {
 
     const [{ data: attendanceData }, { data: activityData }, { data: openSessions }, { data: auditData }] = await Promise.all([
       supabase.schema('pmms').from('daily_attendance').select('id, staff_id, clock_in_at, late_flag, clock_out_at, early_leave_reason').or(`work_date.eq.${todayKey},clock_out_at.is.null`),
-      supabase.schema('pmms').from('activity_log').select('id, staff_id, activity_type, note, started_at, ended_at, ticket_id').or(`started_at.gte.${todayKey}T00:00:00,ended_at.is.null`),
+      supabase.schema('pmms').from('activity_log').select('id, staff_id, activity_type, note, started_at, ended_at, ticket_id, destination_ticket_id').or(`started_at.gte.${todayKey}T00:00:00,ended_at.is.null`),
       supabase.schema('pmms').from('work_sessions').select('id, ticket_id, builder_id').is('ended_at', null),
       // Job start/resume/complete/pause/no-access events -- these were
       // previously invisible here entirely (this panel only ever read
@@ -176,6 +176,7 @@ function TeamWhereabouts({ profile, onNavigate }) {
 
     const ticketIds = [...new Set([
       ...(activityData || []).map(a => a.ticket_id).filter(Boolean),
+      ...(activityData || []).map(a => a.destination_ticket_id).filter(Boolean),
       ...(openSessions || []).map(s => s.ticket_id),
       ...(auditData || []).map(a => a.ticket_id).filter(Boolean),
     ])]
@@ -231,10 +232,13 @@ function TeamWhereabouts({ profile, onNavigate }) {
       const b = assignableBuilders.find(x => x.id === a.staff_id)
       if (!b) return
       const ticket = a.ticket_id ? ticketsById[a.ticket_id] : null
+      // The destination they're heading to is the more useful jump target
+      // on the "left site" line than the job they just stepped away from.
+      const destinationTicket = a.destination_ticket_id ? ticketsById[a.destination_ticket_id] : null
       entries.push({
         id: `${a.id}-start`, time: a.started_at, staffId: a.staff_id, staffName: b.name, tone: 'away',
         text: `${a.activity_type === 'Travel' ? 'left site' : 'started break'}${a.note ? `: ${a.note}` : ''}`,
-        ticketNumber: ticket?.ticket_number,
+        ticketNumber: (destinationTicket ?? ticket)?.ticket_number,
       })
       if (a.ended_at) {
         entries.push({
