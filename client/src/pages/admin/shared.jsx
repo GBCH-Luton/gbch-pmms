@@ -580,7 +580,7 @@ export async function fetchAttendanceSummary(staffId, fromDateKey, toDateKey) {
   const { data: rows } = await supabase
     .schema('pmms')
     .from('daily_attendance')
-    .select('id, work_date, clock_in_at, clock_out_at, late_flag, early_leave_reason, clock_in_override, clock_out_override')
+    .select('id, work_date, clock_in_at, clock_out_at, late_flag, early_leave_reason, clock_in_override, clock_out_override, missed_clock_out')
     .eq('staff_id', staffId)
     .gte('work_date', fromDateKey)
     .lte('work_date', toDateKey)
@@ -599,6 +599,7 @@ export async function fetchAttendanceSummary(staffId, fromDateKey, toDateKey) {
   let earlyLeaveCount = 0
   let overtimeCount = 0
   let incompleteCount = 0
+  let missedClockOutCount = 0
   const daySet = new Set()
   const todayKey = ukDateKey()
 
@@ -610,16 +611,23 @@ export async function fetchAttendanceSummary(staffId, fromDateKey, toDateKey) {
     // genuinely forgotten clock-out worth flagging (see the Paulo Da Silva
     // case this distinction came from).
     const incomplete = durationMs == null && r.work_date !== todayKey
+    // Permanent record that a clock-out was missed, independent of
+    // "incomplete" above -- stays true even after a manager's correction
+    // closes it out, since fixing the record isn't the same as it never
+    // having happened. Still-open past days count here too, even before
+    // anyone's corrected them yet.
+    const wasMissed = r.missed_clock_out || incomplete
     if (durationMs != null) totalMs += durationMs
     if (incomplete) incompleteCount += 1
+    if (wasMissed) missedClockOutCount += 1
     if (r.late_flag) lateCount += 1
     if (r.early_leave_reason) earlyLeaveCount += 1
     if (overtime) overtimeCount += 1
     daySet.add(r.work_date)
-    return { ...r, durationMs, overtime, incomplete }
+    return { ...r, durationMs, overtime, incomplete, wasMissed }
   })
 
-  return { days, totalMs, daysWorked: daySet.size, lateCount, earlyLeaveCount, overtimeCount, incompleteCount }
+  return { days, totalMs, daysWorked: daySet.size, lateCount, earlyLeaveCount, overtimeCount, incompleteCount, missedClockOutCount }
 }
 
 export const filterSelectStyle = { padding: '8px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', fontWeight: 600, color: COLORS.slate900, background: COLORS.slate50, cursor: 'pointer' }

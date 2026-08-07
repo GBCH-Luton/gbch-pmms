@@ -354,8 +354,13 @@ export default function BuilderProfilePage({ staffId, onBack }) {
               <AttendanceStat label="Late" value={attendanceSummary.lateCount} colour={attendanceSummary.lateCount > 0 ? COLORS.amber600 : COLORS.slate400} />
               <AttendanceStat label="Left Early" value={attendanceSummary.earlyLeaveCount} colour={attendanceSummary.earlyLeaveCount > 0 ? COLORS.amber600 : COLORS.slate400} />
               <AttendanceStat label="Overtime" value={attendanceSummary.overtimeCount} colour={attendanceSummary.overtimeCount > 0 ? COLORS.purple600 : COLORS.slate400} />
+              {/* Missed Clock-Outs is a permanent record -- stays counted
+                  even after a manager corrects it, since fixing the row
+                  isn't the same as it never having happened. Still Open is
+                  just what needs action right now, and clears once fixed. */}
+              <AttendanceStat label="Missed Clock-Outs" value={attendanceSummary.missedClockOutCount} colour={attendanceSummary.missedClockOutCount > 0 ? COLORS.red600 : COLORS.slate400} />
               {attendanceSummary.incompleteCount > 0 && (
-                <AttendanceStat label="Missing Clock-Out" value={attendanceSummary.incompleteCount} colour={COLORS.red600} />
+                <AttendanceStat label="Still Open" value={attendanceSummary.incompleteCount} colour={COLORS.red600} />
               )}
             </div>
 
@@ -382,7 +387,13 @@ export default function BuilderProfilePage({ staffId, onBack }) {
                         {day.early_leave_reason && <AttendanceFlag label="Left early" colour={COLORS.amber700} bg={COLORS.amber100} />}
                         {day.overtime && <AttendanceFlag label="Overtime" colour={COLORS.purple700} bg={COLORS.purple100} />}
                         {(day.clock_in_override || day.clock_out_override) && <AttendanceFlag label="Manager override" colour={COLORS.slate600} bg={COLORS.slate100} />}
-                        {day.incomplete && <AttendanceFlag label="No clock-out" colour={COLORS.red600} bg={COLORS.red100} />}
+                        {day.wasMissed && (
+                          <AttendanceFlag
+                            label={day.incomplete ? 'No clock-out' : 'Missed clock-out (corrected)'}
+                            colour={COLORS.red600}
+                            bg={COLORS.red100}
+                          />
+                        )}
                       </div>
                     </div>
                   ))}

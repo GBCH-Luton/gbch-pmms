@@ -385,7 +385,7 @@ export default function AdminClocking({ profile, onNavigate }) {
   function closeEditModal() { setEditRow(null) }
 
   function openOverrideModal(mode, attendanceRow) {
-    setOverrideModal({ mode, staffId: attendanceRow.staffId, staffName: attendanceRow.staffName, rowId: attendanceRow.shift?.id })
+    setOverrideModal({ mode, staffId: attendanceRow.staffId, staffName: attendanceRow.staffName, rowId: attendanceRow.shift?.id, workDate: attendanceRow.shift?.work_date })
     setOverrideNote('')
     setOverrideError('')
   }
@@ -491,12 +491,19 @@ export default function AdminClocking({ profile, onNavigate }) {
       setOverrideSaving(false)
       if (error) { setOverrideError(error.message); return }
     } else {
+      // A correction applied to a PAST day's shift (not today's) means it
+      // sat open, unclosed, into a later day before anyone caught it --
+      // that's a genuinely missed clock-out, not a live same-day assist,
+      // and stays on record even once this fixes it. See
+      // add_daily_attendance_missed_clock_out.sql for the full reasoning.
+      const missedClockOut = overrideModal.workDate != null && overrideModal.workDate !== ukDateKey()
       const { error } = await supabase
         .schema('pmms')
         .from('daily_attendance')
         .update({
           clock_out_at: new Date().toISOString(),
           clock_out_override: true,
+          missed_clock_out: missedClockOut,
           override_note: overrideNote.trim(),
           override_by: profile.id,
         })

@@ -14,7 +14,8 @@ export default function PrintableAttendanceReport({ staffName, periodLabel, rang
     ['Late', summary.lateCount],
     ['Left Early', summary.earlyLeaveCount],
     ['Overtime', summary.overtimeCount],
-    ['Missing Clock-Out', summary.incompleteCount],
+    ['Missed Clock-Outs', summary.missedClockOutCount],
+    ['Still Open', summary.incompleteCount],
   ]
 
   return (
@@ -65,6 +66,7 @@ export default function PrintableAttendanceReport({ staffName, periodLabel, rang
               if (day.overtime) notes.push('Overtime')
               if (day.clock_in_override || day.clock_out_override) notes.push('Manager override')
               if (day.incomplete) notes.push('No clock-out')
+              else if (day.wasMissed) notes.push('Missed clock-out (corrected)')
               else if (!day.clock_out_at) notes.push('Still clocked in')
               return (
                 <tr key={day.id} style={{ borderBottom: `1px solid ${COLORS.slate200}` }}>

@@ -2735,6 +2735,10 @@ export default function BuilderDashboard({ profile }) {
                     <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Overtime</p>
                     <p style={{ margin: 0, fontSize: '22px', fontWeight: 800, color: attendanceSummary.overtimeCount > 0 ? COLORS.purple600 : COLORS.slate400 }}>{attendanceSummary.overtimeCount}</p>
                   </div>
+                  <div style={{ background: COLORS.white, borderRadius: '16px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', boxSizing: 'border-box' }}>
+                    <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Missed Clock-Outs</p>
+                    <p style={{ margin: 0, fontSize: '22px', fontWeight: 800, color: attendanceSummary.missedClockOutCount > 0 ? COLORS.red600 : COLORS.slate400 }}>{attendanceSummary.missedClockOutCount}</p>
+                  </div>
                 </div>
 
                 {attendanceSummary.days.length > 0 && (
@@ -2747,6 +2751,11 @@ export default function BuilderDashboard({ profile }) {
                           {day.late_flag && <span style={{ fontSize: '10px', fontWeight: 700, color: COLORS.amber700, background: COLORS.amber100, padding: '2px 8px', borderRadius: '999px' }}>Late</span>}
                           {day.early_leave_reason && <span style={{ fontSize: '10px', fontWeight: 700, color: COLORS.amber700, background: COLORS.amber100, padding: '2px 8px', borderRadius: '999px' }}>Left early</span>}
                           {day.overtime && <span style={{ fontSize: '10px', fontWeight: 700, color: COLORS.purple700, background: COLORS.purple100, padding: '2px 8px', borderRadius: '999px' }}>Overtime</span>}
+                          {day.wasMissed && (
+                            <span style={{ fontSize: '10px', fontWeight: 700, color: COLORS.red600, background: COLORS.red100, padding: '2px 8px', borderRadius: '999px' }}>
+                              {day.incomplete ? 'No clock-out' : 'Missed clock-out'}
+                            </span>
+                          )}
                         </div>
                       </div>
                     ))}
