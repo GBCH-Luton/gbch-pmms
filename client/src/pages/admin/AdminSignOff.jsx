@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import { COLORS } from '../../lib/colors'
 import { attachProperties } from '../../lib/properties'
@@ -26,13 +26,21 @@ import {
 // with no extra filtering needed here -- an unscoped manager (division
 // null) sees everything, same as Pipeline/Reports/etc already behave.
 export default function AdminSignOff({ profile, onTicketsChanged, onNavigate }) {
+  const mySignOffsRef = useRef(null)
+
   if (profile.role === 'admin') {
     return <SignOffOversight onNavigate={onNavigate} />
   }
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
-      <SignOffOversight onNavigate={onNavigate} />
-      <MySignOffs profile={profile} onTicketsChanged={onTicketsChanged} />
+      <SignOffOversight
+        onNavigate={onNavigate}
+        profile={profile}
+        onJumpToMine={() => mySignOffsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+      />
+      <div ref={mySignOffsRef}>
+        <MySignOffs profile={profile} onTicketsChanged={onTicketsChanged} />
+      </div>
     </div>
   )
 }
@@ -392,16 +400,20 @@ const OVERSIGHT_STATUS_LABELS = {
   Archived: 'Signed Off',
 }
 
-// Admin-only oversight of the sign-off stage specifically -- not the whole
-// pipeline (that's what the Pipeline page is for). Only tickets that have
-// actually reached Completed or Archived belong here: the point is watching
-// how long each submitter takes to sign off their own completed work once
-// it's done, since a slow sign-off is a proxy for how much a builder's
+// Oversight of the sign-off stage specifically -- not the whole pipeline
+// (that's what the Pipeline page is for). Only tickets that have actually
+// reached Completed or Archived belong here: the point is watching how
+// long each submitter takes to sign off their own completed work once it's
+// done, since a slow sign-off is a proxy for how much a builder's
 // completed job is actually being checked on. No hard KPI threshold yet
 // (directors haven't set one) -- this just surfaces the wait times plainly,
 // colour-graded, so one can be added later without changing how the data
 // is gathered.
-function SignOffOversight({ onNavigate }) {
+//
+// `profile`/`onJumpToMine` are only passed for managers (admins render
+// this standalone, and never have anything of "their own" to sign off) --
+// their presence is what turns on the extra "you need to sign off" tile.
+function SignOffOversight({ onNavigate, profile, onJumpToMine }) {
   const [tickets, setTickets] = useState([])
   const [properties, setProperties] = useState([])
   const [loading, setLoading] = useState(true)
@@ -445,7 +457,7 @@ function SignOffOversight({ onNavigate }) {
       .from('tickets')
       .select(`
         id, ticket_number, category, issue_tag, room, property_id,
-        raised_by_name, status, created_at, first_assigned_at, completed_at, status_changed_at
+        raised_by, raised_by_name, status, created_at, first_assigned_at, completed_at, status_changed_at
       `)
       .in('status', ['Completed', 'Archived'])
       .order('created_at', { ascending: false })
@@ -482,7 +494,10 @@ function SignOffOversight({ onNavigate }) {
     ? archivedForAvg.reduce((sum, t) => sum + (signOffWaitMs(t) || 0), 0) / archivedForAvg.length
     : null
 
+  const mineCount = profile ? awaitingTickets.filter(t => t.raised_by === profile.id).length : 0
+
   const kpis = [
+    ...(profile ? [{ label: 'You Need to Sign Off', value: mineCount, colour: COLORS.purple600, jumpToMine: true }] : []),
     { label: 'Awaiting Sign-Off', value: awaitingTickets.length, colour: statusColour('Completed'), statusFilter: 'Completed' },
     { label: 'Signed Off', value: archivedTickets.length, colour: statusColour('Archived'), statusFilter: 'Archived' },
     {
@@ -495,8 +510,11 @@ function SignOffOversight({ onNavigate }) {
 
   // The Avg tile is a live readout of whatever submitter/property/ticket#
   // is already selected, not a shortcut to a status view -- clicking it
-  // shouldn't wipe out the very comparison it's showing.
+  // shouldn't wipe out the very comparison it's showing. "You Need to Sign
+  // Off" isn't a filter at all -- it jumps down to the actionable list
+  // below, since this table itself has no archive/reopen actions on it.
   function applyKpiFilter(kpi) {
+    if (kpi.jumpToMine) { onJumpToMine?.(); return }
     if (kpi.keepFilters) return
     setSubmitterFilter('All'); setPropertyFilter(''); setTicketNumberFilter('')
     setStatusFilter(kpi.statusFilter || 'All')
