@@ -381,6 +381,7 @@ export default function BuilderProfilePage({ staffId, onBack }) {
                       </div>
                       <div style={{ fontSize: '13px', fontWeight: 700, color: COLORS.slate900, fontFamily: 'monospace', minWidth: '70px', textAlign: 'right' }}>
                         {day.durationMs != null ? formatDuration(day.durationMs) : '—'}
+                        {day.isLive && <span style={{ fontWeight: 600, color: COLORS.teal600 }}> so far</span>}
                       </div>
                       <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                         {day.late_flag && <AttendanceFlag label="Late" colour={COLORS.amber700} bg={COLORS.amber100} />}

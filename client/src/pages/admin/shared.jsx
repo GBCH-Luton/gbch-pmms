@@ -604,13 +604,21 @@ export async function fetchAttendanceSummary(staffId, fromDateKey, toDateKey) {
   const todayKey = ukDateKey()
 
   const days = (rows || []).map(r => {
-    const durationMs = r.clock_out_at ? (new Date(r.clock_out_at) - new Date(r.clock_in_at)) : null
+    // Still clocked in today isn't "0 hours worked" -- it's hours worked
+    // so far, ticking up until they clock out. A still-open row from a
+    // PAST day is different (see `incomplete` below): that's not live,
+    // it's a gap, so it stays uncounted rather than crediting hours nobody
+    // confirmed were actually worked.
+    const isLive = !r.clock_out_at && r.work_date === todayKey
+    const durationMs = r.clock_out_at ? (new Date(r.clock_out_at) - new Date(r.clock_in_at))
+      : isLive ? (Date.now() - new Date(r.clock_in_at))
+      : null
     const overtime = durationMs != null && durationMs > overtimeThresholdMs
     // A still-open row for TODAY just means they haven't clocked out yet --
     // normal, not an anomaly. Only a still-open row from a PAST day is a
     // genuinely forgotten clock-out worth flagging (see the Paulo Da Silva
     // case this distinction came from).
-    const incomplete = durationMs == null && r.work_date !== todayKey
+    const incomplete = !r.clock_out_at && r.work_date !== todayKey
     // Permanent record that a clock-out was missed, independent of
     // "incomplete" above -- stays true even after a manager's correction
     // closes it out, since fixing the record isn't the same as it never
@@ -624,7 +632,7 @@ export async function fetchAttendanceSummary(staffId, fromDateKey, toDateKey) {
     if (r.early_leave_reason) earlyLeaveCount += 1
     if (overtime) overtimeCount += 1
     daySet.add(r.work_date)
-    return { ...r, durationMs, overtime, incomplete, wasMissed }
+    return { ...r, durationMs, overtime, incomplete, wasMissed, isLive }
   })
 
   return { days, totalMs, daysWorked: daySet.size, lateCount, earlyLeaveCount, overtimeCount, incompleteCount, missedClockOutCount }

@@ -73,7 +73,7 @@ export default function PrintableAttendanceReport({ staffName, periodLabel, rang
                   <td style={{ padding: '6px 8px' }}>{formatUKDate(day.work_date)}</td>
                   <td style={{ padding: '6px 8px' }}>{formatUKDateTime(day.clock_in_at).split(' ').slice(-1)[0]}</td>
                   <td style={{ padding: '6px 8px' }}>{day.clock_out_at ? formatUKDateTime(day.clock_out_at).split(' ').slice(-1)[0] : '—'}</td>
-                  <td style={{ padding: '6px 8px' }}>{day.durationMs != null ? formatDuration(day.durationMs) : '—'}</td>
+                  <td style={{ padding: '6px 8px' }}>{day.durationMs != null ? formatDuration(day.durationMs) : '—'}{day.isLive ? ' (so far)' : ''}</td>
                   <td style={{ padding: '6px 8px' }}>{notes.join(', ') || '—'}</td>
                 </tr>
               )

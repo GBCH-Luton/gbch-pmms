@@ -2746,7 +2746,9 @@ export default function BuilderDashboard({ profile }) {
                     {attendanceSummary.days.slice(0, 7).map(day => (
                       <div key={day.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', padding: '8px 0', borderBottom: `1px solid ${COLORS.slate100}`, flexWrap: 'wrap' }}>
                         <span style={{ fontSize: '12px', fontWeight: 700, color: COLORS.slate900, minWidth: '80px' }}>{formatUKDate(day.work_date)}</span>
-                        <span style={{ fontSize: '12px', fontWeight: 700, color: COLORS.slate600, fontFamily: 'monospace' }}>{day.durationMs != null ? formatDuration(day.durationMs) : 'still clocked in'}</span>
+                        <span style={{ fontSize: '12px', fontWeight: 700, color: day.isLive ? COLORS.teal600 : COLORS.slate600, fontFamily: 'monospace' }}>
+                          {day.durationMs != null ? formatDuration(day.durationMs) : 'still clocked in'}{day.isLive ? ' so far' : ''}
+                        </span>
                         <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
                           {day.late_flag && <span style={{ fontSize: '10px', fontWeight: 700, color: COLORS.amber700, background: COLORS.amber100, padding: '2px 8px', borderRadius: '999px' }}>Late</span>}
                           {day.early_leave_reason && <span style={{ fontSize: '10px', fontWeight: 700, color: COLORS.amber700, background: COLORS.amber100, padding: '2px 8px', borderRadius: '999px' }}>Left early</span>}
