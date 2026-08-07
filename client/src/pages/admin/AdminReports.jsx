@@ -13,9 +13,10 @@ import { fetchAllMaintenanceCategoryNames } from '../../lib/maintenanceCategorie
 import {
   formatDuration, filterSelectStyle, thStyle, tdStyle,
   fetchAssignableBuilders, fetchAssignableStaffForDivision, resolveCategoryDivision, computeAvgTurnaroundMs, computeAvgResponseMs, buildWeeklyTrend,
-  isoDateNDaysAgo, todayIso, extractFunctionError, formatUKDateTime, computeComplianceAging, COMPLIANCE_TYPES,
+  isoDateNDaysAgo, todayIso, extractFunctionError, formatUKDateTime, computeComplianceAging, COMPLIANCE_TYPES, ukDateKey, fetchComplianceAgingCounts,
 } from './shared'
 import SimpleBarChart from '../../components/SimpleBarChart'
+import PrintableOperationsSnapshot from '../../components/PrintableOperationsSnapshot'
 
 const tileStyle = (colour) => ({ flex: '1 1 160px', background: colour, borderRadius: '16px', padding: '16px', textAlign: 'center' })
 const tileLabelStyle = { margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase', letterSpacing: '0.06em' }
@@ -141,6 +142,11 @@ export default function AdminReports({ profile, onNavigate }) {
   const [categoriesSettingsRow, setCategoriesSettingsRow] = useState(null)
   const [categoryOptions, setCategoryOptions] = useState([])
 
+  const [properties, setProperties] = useState([])
+  const [complianceCounts, setComplianceCounts] = useState(null)
+  const [staffNames, setStaffNames] = useState({})
+  const [showSnapshot, setShowSnapshot] = useState(false)
+
   const [fromDate, setFromDate] = useState(isoDateNDaysAgo(30))
   const [toDate, setToDate] = useState(todayIso())
   const [categoryFilter, setCategoryFilter] = useState('All')
@@ -220,6 +226,16 @@ export default function AdminReports({ profile, onNavigate }) {
       .maybeSingle()
     setCategoriesSettingsRow(categoriesRow)
     setCategoryOptions(await fetchAllMaintenanceCategoryNames(profile.division))
+
+    // Only what the Operations Snapshot needs.
+    const { data: propertiesData } = await supabase.schema('pmms').from('properties').select('id')
+    setProperties(propertiesData || [])
+    setComplianceCounts(await fetchComplianceAgingCounts())
+
+    const { data: staffRows } = await supabase.from('staff').select('id, name')
+    const nameById = {}
+    ;(staffRows || []).forEach(s => { nameById[s.id] = s.name })
+    setStaffNames(nameById)
   }
 
   if (tickets === null) {
@@ -323,9 +339,73 @@ export default function AdminReports({ profile, onNavigate }) {
 
   const clickableTileStyle = (colour) => ({ ...tileStyle(colour), cursor: onNavigate ? 'pointer' : 'default' })
 
+  // Operations Snapshot -- a real, permanent, printable report (no AI
+  // involved, deterministic from live data) built after a director asked
+  // for "something visual" and the Claude Q&A box turned out to only
+  // return text. Computed here (not inside the printable component) so
+  // it's built once from data this page has already loaded, rather than
+  // the report component re-deriving it on every open.
+  const todayKey = ukDateKey()
+  const raisedToday = tickets.filter(t => ukDateKey(new Date(t.created_at).getTime()) === todayKey).length
+  const completedToday = tickets.filter(t => t.completed_at && ukDateKey(new Date(t.completed_at).getTime()) === todayKey).length
+  const openStatuses = ['Pending', 'Assigned', 'In Progress', 'On Hold']
+  const currentlyOpenCount = tickets.filter(t => openStatuses.includes(t.status)).length
+
+  const statusCounts = {}
+  tickets.forEach(t => { statusCounts[t.status] = (statusCounts[t.status] || 0) + 1 })
+  const STATUS_ORDER = ['Pending', 'Assigned', 'In Progress', 'On Hold', 'Completed', 'Archived', 'Cancelled']
+  const STATUS_LABELS = { Pending: 'Unassigned', Assigned: 'Assigned', 'In Progress': 'In Progress', 'On Hold': 'On Hold', Completed: 'Completed', Archived: 'Archived', Cancelled: 'Cancelled' }
+  const pipelineChartData = STATUS_ORDER
+    .filter(s => statusCounts[s] > 0)
+    .map(s => ({ label: STATUS_LABELS[s], values: [statusCounts[s]] }))
+
+  const categoryCounts = {}
+  tickets.forEach(t => { if (t.category) categoryCounts[t.category] = (categoryCounts[t.category] || 0) + 1 })
+  const categoryChartData = Object.entries(categoryCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 8)
+    .map(([label, count]) => ({ label, values: [count] }))
+
+  // Same fetchComplianceAgingCounts() the dashboard/Compliance page KPI
+  // tiles already use -- single source of truth, not a re-derived copy.
+  const complianceValid = complianceCounts?.valid || 0
+  const complianceDueSoon = complianceCounts?.dueSoon || 0
+  const complianceExpired = (complianceCounts?.expired || 0) + (complianceCounts?.noRecord || 0)
+
+  const teamActivityCounts = {}
+  tickets.forEach(t => {
+    if ((t.status === 'Completed' || t.status === 'Archived') && t.assigned_builder_id) {
+      teamActivityCounts[t.assigned_builder_id] = (teamActivityCounts[t.assigned_builder_id] || 0) + 1
+    }
+  })
+  const teamActivity = Object.entries(teamActivityCounts)
+    .map(([id, count]) => ({ id, name: staffNames[id] || 'Unknown', count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 10)
+
+  const snapshotSummary = {
+    raisedToday, completedToday, currentlyOpenCount, totalProperties: properties.length,
+    pipelineChartData, categoryChartData,
+    complianceValid, complianceDueSoon, complianceExpired,
+    teamActivity,
+  }
+
   return (
     <div>
       <h2 style={{ margin: '0 0 16px 0', fontSize: '18px', fontWeight: 800, color: COLORS.slate900 }}>Reports</h2>
+
+      <div style={{ ...cardStyle, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+        <div>
+          <p style={{ margin: '0 0 2px 0', fontSize: '14px', fontWeight: 800, color: COLORS.slate900 }}>Operations Snapshot</p>
+          <p style={{ margin: 0, fontSize: '12.5px', color: COLORS.slate500 }}>A board-ready page — today's activity, the ticket pipeline, top issue categories, compliance health and team activity — built live from real data, no AI involved.</p>
+        </div>
+        <button
+          onClick={() => setShowSnapshot(true)}
+          style={{ padding: '10px 18px', borderRadius: '10px', border: 'none', background: COLORS.brandNavy, color: COLORS.white, fontWeight: 700, fontSize: '13px', cursor: 'pointer', flexShrink: 0 }}
+        >
+          📊 Generate Snapshot
+        </button>
+      </div>
 
       {isAdmin && (
         <>
@@ -604,6 +684,10 @@ export default function AdminReports({ profile, onNavigate }) {
           </div>
         )}
       </div>
+
+      {showSnapshot && (
+        <PrintableOperationsSnapshot summary={snapshotSummary} onClose={() => setShowSnapshot(false)} />
+      )}
     </div>
   )
 }
