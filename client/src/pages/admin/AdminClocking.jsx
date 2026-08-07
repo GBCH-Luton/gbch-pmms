@@ -204,7 +204,7 @@ export default function AdminClocking({ profile, onNavigate }) {
     const { data: attendanceData } = await supabase
       .schema('pmms')
       .from('daily_attendance')
-      .select('id, staff_id, work_date, clock_in_at, late_flag, clock_out_at, clock_in_override, clock_out_override, early_leave_reason')
+      .select('id, staff_id, work_date, clock_in_at, clock_in_lat, clock_in_lng, late_flag, clock_out_at, clock_out_lat, clock_out_lng, clock_in_override, clock_out_override, early_leave_reason')
       .or(`work_date.eq.${todayKey},clock_out_at.is.null`)
       .order('clock_in_at', { ascending: false })
 
@@ -412,7 +412,7 @@ export default function AdminClocking({ profile, onNavigate }) {
     const { data: shifts } = await supabase
       .schema('pmms')
       .from('daily_attendance')
-      .select('id, clock_in_at, clock_out_at, late_flag, early_leave_reason, clock_in_override, clock_out_override')
+      .select('id, clock_in_at, clock_in_lat, clock_in_lng, clock_out_at, clock_out_lat, clock_out_lng, late_flag, early_leave_reason, clock_in_override, clock_out_override')
       .eq('staff_id', staffId)
       .eq('work_date', dateKey)
       .order('clock_in_at', { ascending: true })
@@ -718,6 +718,14 @@ export default function AdminClocking({ profile, onNavigate }) {
                         {formatUKDateTime(row.shift.clock_in_at)}
                         {row.shift.late_flag && <span style={{ display: 'block', fontSize: '10px', fontWeight: 800, color: COLORS.amber700 }}>⚠ {minutesLate(row.shift.clock_in_at, dailyClockInDeadline)}m late</span>}
                         {row.shift.clock_in_override && <span style={{ display: 'block', fontSize: '10px', fontWeight: 700, color: COLORS.slate400 }}>Manager override</span>}
+                        {row.shift.clock_in_lat != null && row.shift.clock_in_lng != null && (
+                          <button
+                            onClick={() => openPinMap(row.shift.clock_in_lat, row.shift.clock_in_lng)}
+                            style={{ display: 'block', marginTop: '2px', background: 'none', border: 'none', padding: 0, fontSize: '10px', fontWeight: 700, color: COLORS.blue700, cursor: 'pointer', fontFamily: 'system-ui' }}
+                          >
+                            📍 View location
+                          </button>
+                        )}
                       </>
                     ) : (
                       <span style={{ color: COLORS.slate300 }}>Not clocked in</span>
@@ -734,6 +742,14 @@ export default function AdminClocking({ profile, onNavigate }) {
                             </span>
                           )}
                           {row.shift.clock_out_override && <span style={{ display: 'block', fontSize: '10px', fontWeight: 700, color: COLORS.slate400 }}>Manager override</span>}
+                          {row.shift.clock_out_lat != null && row.shift.clock_out_lng != null && (
+                            <button
+                              onClick={() => openPinMap(row.shift.clock_out_lat, row.shift.clock_out_lng)}
+                              style={{ display: 'block', marginTop: '2px', background: 'none', border: 'none', padding: 0, fontSize: '10px', fontWeight: 700, color: COLORS.blue700, cursor: 'pointer', fontFamily: 'system-ui' }}
+                            >
+                              📍 View location
+                            </button>
+                          )}
                         </>
                       )
                       : row.shift
@@ -1047,6 +1063,8 @@ export default function AdminClocking({ profile, onNavigate }) {
                   time: shift.clock_in_at,
                   label: shift.clock_in_override ? 'Clocked in for the day (manager override)' : 'Clocked in for the day',
                   tone: shift.late_flag ? 'late' : 'in',
+                  lat: shift.clock_in_lat,
+                  lng: shift.clock_in_lng,
                 })
                 if (shift.late_flag) events[events.length - 1].label += ` — ${minutesLate(shift.clock_in_at, dailyClockInDeadline)}m late`
                 if (shift.clock_out_at) {
@@ -1056,6 +1074,8 @@ export default function AdminClocking({ profile, onNavigate }) {
                       ? `Clocked out for the day — left early: ${shift.early_leave_reason}`
                       : shift.clock_out_override ? 'Clocked out for the day (manager override)' : 'Clocked out for the day',
                     tone: shift.early_leave_reason ? 'early' : 'out',
+                    lat: shift.clock_out_lat,
+                    lng: shift.clock_out_lng,
                   })
                 }
               })
@@ -1094,6 +1114,14 @@ export default function AdminClocking({ profile, onNavigate }) {
                           >
                             {' '}(Job #{e.ticketNumber})
                           </span>
+                        )}
+                        {e.lat != null && e.lng != null && (
+                          <button
+                            onClick={() => openPinMap(e.lat, e.lng)}
+                            style={{ display: 'block', marginTop: '2px', background: 'none', border: 'none', padding: 0, fontSize: '11px', fontWeight: 700, color: COLORS.blue700, cursor: 'pointer' }}
+                          >
+                            📍 View location
+                          </button>
                         )}
                       </span>
                     </div>
