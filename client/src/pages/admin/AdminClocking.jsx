@@ -674,7 +674,16 @@ export default function AdminClocking({ profile, onNavigate }) {
             <tbody>
               {attendanceRows.map(row => (
                 <tr key={row.staffId} style={{ borderBottom: `1px solid ${COLORS.slate100}` }}>
-                  <td style={tdStyle}>{row.staffName}</td>
+                  <td style={tdStyle}>
+                    {onNavigate ? (
+                      <span
+                        onClick={() => onNavigate('builders', { staffId: row.staffId })}
+                        style={{ color: COLORS.blue700, fontWeight: 600, cursor: 'pointer' }}
+                      >
+                        {row.staffName}
+                      </span>
+                    ) : row.staffName}
+                  </td>
                   <td style={{ ...tdStyle, fontFamily: 'monospace', fontSize: '12px' }}>
                     {row.shift ? (
                       <>
