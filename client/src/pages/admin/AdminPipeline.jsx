@@ -633,6 +633,11 @@ export default function AdminPipeline({
     // Cancelled specifically (the option is still right there in the
     // dropdown), never actually removed from the data.
     if (statusFilter === 'All' && t.status === 'Cancelled') return false
+    // Same treatment for Archived (signed-off, locked, done) -- same reason:
+    // it's finished work, not something a manager scanning the default list
+    // needs to see every day. Still reachable via Status > Archived, or via
+    // CompletedAll (which deliberately includes it -- see below).
+    if (statusFilter === 'All' && t.status === 'Archived') return false
     // Not a real ticket status -- a dropdown/KPI-tile value meaning
     // "Completed, whether or not it's since been signed off (Archived)",
     // so the Dashboard/Pipeline "Completed" tiles can count and link to
