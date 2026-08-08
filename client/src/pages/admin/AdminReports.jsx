@@ -559,9 +559,9 @@ export default function AdminReports({ profile, onNavigate }) {
                   padding: '9px 16px', borderRadius: '999px', fontSize: '13px', fontWeight: 700, cursor: 'pointer',
                   display: 'inline-flex', alignItems: 'center', gap: '8px',
                   border: active ? 'none' : `1px solid ${COLORS.slate200}`,
-                  background: active ? COLORS.brandNavy : COLORS.white,
+                  background: active ? COLORS.slate900 : COLORS.white,
                   color: active ? COLORS.white : COLORS.slate600,
-                  boxShadow: active ? '0 4px 14px rgba(13,27,62,0.35)' : 'none',
+                  boxShadow: active ? '0 4px 14px rgba(15,23,42,0.35)' : 'none',
                 })
                 const tabCountStyle = (active) => ({
                   fontSize: '10.5px', fontWeight: 800, padding: '1px 7px', borderRadius: '999px',
@@ -604,11 +604,11 @@ export default function AdminReports({ profile, onNavigate }) {
                       </button>
                     </div>
 
-                    <div style={{ borderRadius: '16px', overflow: 'hidden', boxShadow: '0 10px 30px rgba(13,27,62,0.14)' }}>
+                    <div style={{ borderRadius: '16px', overflow: 'hidden', boxShadow: '0 10px 30px rgba(15,23,42,0.14)' }}>
                       <div style={{ overflowX: 'auto' }}>
                         <table style={{ width: '100%', borderCollapse: 'collapse', background: COLORS.white }}>
                           <thead>
-                            <tr style={{ background: COLORS.brandNavy }}>
+                            <tr style={{ background: COLORS.slate900 }}>
                               <th style={{ ...navyThStyle, textAlign: 'center', width: '44px' }}>★</th>
                               <th style={navyThStyle}>Asked</th>
                               <th style={{ ...navyThStyle, color: COLORS.white }}>Question</th>
