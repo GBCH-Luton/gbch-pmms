@@ -16,6 +16,7 @@ import {
   isoDateNDaysAgo, todayIso, extractFunctionError, formatUKDateTime, formatUKDate, computeComplianceAging, COMPLIANCE_TYPES,
   fetchComplianceAgingCounts, statusColour, statusLabel,
   modalOverlayStyle, modalCardStyle, modalTitleStyle, modalSubtitleStyle, modalCancelBtnStyle,
+  shiftDateKey, mondayOfWeek, firstOfMonth,
 } from './shared'
 import SimpleBarChart from '../../components/SimpleBarChart'
 import PrintableOperationsSnapshot from '../../components/PrintableOperationsSnapshot'
@@ -468,13 +469,45 @@ export default function AdminReports({ profile, onNavigate }) {
     photosUploaded, videosUploaded,
   }
 
+  // Quick-access ranges next to the calendar pickers -- computed off
+  // today's UK date every render (cheap, and stays correct across midnight
+  // without a timer). "This Week" starts Monday, matching mondayOfWeek's
+  // use everywhere else in this app.
+  const presetToday = todayIso()
+  const snapshotPresets = [
+    { label: 'Today', from: presetToday, to: presetToday },
+    { label: 'Yesterday', from: shiftDateKey(presetToday, -1), to: shiftDateKey(presetToday, -1) },
+    { label: 'This Week', from: mondayOfWeek(presetToday), to: presetToday },
+    { label: 'This Month', from: firstOfMonth(presetToday), to: presetToday },
+    { label: 'This Year', from: `${presetToday.slice(0, 4)}-01-01`, to: presetToday },
+  ]
+  const activePresetLabel = snapshotPresets.find(p => p.from === snapshotFromDate && p.to === snapshotToDate)?.label
+
   // Reused in two spots below (side-by-side with Ask AI for admins, alone
   // for managers who don't get the AI box at all) -- built once so there's
   // one source of truth for it rather than two copies drifting apart.
+  // height/flex column so it stretches to match the Ask AI column's height
+  // when the two sit side by side in the grid below.
   const snapshotCard = (
-    <div style={cardStyle}>
+    <div style={{ ...cardStyle, height: '100%', display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }}>
       <p style={{ margin: '0 0 2px 0', fontSize: '14px', fontWeight: 800, color: COLORS.slate900 }}>Operations Snapshot</p>
       <p style={{ margin: '0 0 10px 0', fontSize: '12.5px', color: COLORS.slate500 }}>A board-ready page — raised/completed, the ticket pipeline, top issue categories, compliance health and team activity — built live from real data, no AI involved.</p>
+      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
+        {snapshotPresets.map(p => (
+          <button
+            key={p.label}
+            onClick={() => { setSnapshotFromDate(p.from); setSnapshotToDate(p.to) }}
+            style={{
+              fontSize: '11.5px', fontWeight: 700, padding: '6px 12px', borderRadius: '999px', cursor: 'pointer',
+              border: activePresetLabel === p.label ? 'none' : `1px solid ${COLORS.slate200}`,
+              background: activePresetLabel === p.label ? COLORS.brandNavy : COLORS.slate50,
+              color: activePresetLabel === p.label ? COLORS.white : COLORS.slate600,
+            }}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
       <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: '14px' }}>
         <div>
           <label style={filterLabelStyle}>From</label>
@@ -485,12 +518,14 @@ export default function AdminReports({ profile, onNavigate }) {
           <input type="date" value={snapshotToDate} min={snapshotFromDate} max={todayIso()} onChange={(e) => setSnapshotToDate(e.target.value)} style={filterSelectStyle} />
         </div>
       </div>
-      <button
-        onClick={() => setShowSnapshot(true)}
-        style={{ padding: '10px 18px', borderRadius: '10px', border: 'none', background: COLORS.brandNavy, color: COLORS.white, fontWeight: 700, fontSize: '13px', cursor: 'pointer' }}
-      >
-        📊 Generate Snapshot
-      </button>
+      <div style={{ marginTop: 'auto' }}>
+        <button
+          onClick={() => setShowSnapshot(true)}
+          style={{ padding: '10px 18px', borderRadius: '10px', border: 'none', background: COLORS.brandNavy, color: COLORS.white, fontWeight: 700, fontSize: '13px', cursor: 'pointer' }}
+        >
+          📊 Generate Snapshot
+        </button>
+      </div>
     </div>
   )
 
@@ -499,8 +534,8 @@ export default function AdminReports({ profile, onNavigate }) {
       <h2 style={{ margin: '0 0 16px 0', fontSize: '18px', fontWeight: 800, color: COLORS.slate900 }}>Reports</h2>
 
       {isAdmin ? (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', alignItems: 'start' }}>
-          <div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', alignItems: 'stretch' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: COLORS.violet100, border: `1px solid ${COLORS.violet500}`, borderRadius: '12px', padding: '12px 16px', marginBottom: '12px' }}>
               <span style={{ fontSize: '18px' }}>✨</span>
               <p style={{ margin: 0, fontSize: '12.5px', color: COLORS.slate600, lineHeight: 1.5 }}>
@@ -508,7 +543,7 @@ export default function AdminReports({ profile, onNavigate }) {
               </p>
             </div>
 
-            <div style={cardStyle}>
+            <div style={{ ...cardStyle, flex: 1, boxSizing: 'border-box' }}>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <input
                   type="text"
