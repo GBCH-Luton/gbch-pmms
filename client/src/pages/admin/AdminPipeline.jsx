@@ -835,7 +835,7 @@ export default function AdminPipeline({
           onClick={() => setReportSectionOpen(prev => !prev)}
           style={{
             display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between', gap: '12px',
-            padding: '10px 16px', background: COLORS.slate50, border: `1px solid ${COLORS.slate200}`, borderRadius: '12px',
+            padding: '10px 16px', background: COLORS.slate100, border: `1px solid ${COLORS.slate200}`, borderRadius: '12px',
             cursor: 'pointer', fontSize: '11px', fontWeight: 800, color: COLORS.slate500, textTransform: 'uppercase', letterSpacing: '0.05em',
           }}
         >
