@@ -63,6 +63,8 @@ export default function AdminClocking({ profile, onNavigate }) {
   const [completedRows, setCompletedRows] = useState([])
   const [builders, setBuilders] = useState([])
   const [builderFilter, setBuilderFilter] = useState('All')
+  const [completedSortColumn, setCompletedSortColumn] = useState(null)
+  const [completedSortDirection, setCompletedSortDirection] = useState('asc')
   const [distanceThresholdM, setDistanceThresholdM] = useState(DEFAULT_CLOCK_DISTANCE_THRESHOLD_M)
   const [, setTick] = useState(0)
 
@@ -585,6 +587,39 @@ export default function AdminClocking({ profile, onNavigate }) {
     ? completedRows
     : completedRows.filter(r => r.ticket.assigned_builder_id === builderFilter)
 
+  // "Correct" (the Edit button) isn't in here -- there's nothing to sort
+  // an action column by. Route sorts by whether a pin-to-pin route
+  // actually exists (both clock events have GPS), not anything more
+  // specific -- that's the only orderable thing about it.
+  const COMPLETED_SORT_ACCESSORS = {
+    job: (r) => r.ticket.ticket_number,
+    builder: (r) => (r.builderName || '').toLowerCase(),
+    clockIn: (r) => new Date(r.firstIn).getTime(),
+    clockOut: (r) => new Date(r.lastOut).getTime(),
+    total: (r) => r.totalMs,
+    miles: (r) => r.ticket.mileage_logged || 0,
+    route: (r) => (r.firstSession.clock_in_lat != null && r.firstSession.clock_in_lng != null && r.lastSession.clock_out_lat != null && r.lastSession.clock_out_lng != null) ? 1 : 0,
+  }
+
+  function handleCompletedSort(column) {
+    if (completedSortColumn === column) {
+      setCompletedSortDirection(d => (d === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setCompletedSortColumn(column)
+      setCompletedSortDirection('asc')
+    }
+  }
+
+  const sortedCompletedRows = completedSortColumn
+    ? [...filteredCompletedRows].sort((a, b) => {
+        const accessor = COMPLETED_SORT_ACCESSORS[completedSortColumn]
+        const av = accessor(a)
+        const bv = accessor(b)
+        const cmp = typeof av === 'string' ? av.localeCompare(bv) : av - bv
+        return completedSortDirection === 'asc' ? cmp : -cmp
+      })
+    : filteredCompletedRows
+
   if (loading) return (
     <div style={{ minHeight: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <p style={{ color: COLORS.slate400, fontWeight: 600, fontFamily: 'system-ui' }}>Loading clocking data...</p>
@@ -805,25 +840,38 @@ export default function AdminClocking({ profile, onNavigate }) {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: COLORS.slate50, borderBottom: `1px solid ${COLORS.slate200}` }}>
-                <th style={thStyle}>Job</th>
-                <th style={thStyle}>Builder</th>
-                <th style={thStyle}>Clock-In</th>
-                <th style={thStyle}>Clock-Out</th>
-                <th style={thStyle}>Total Time</th>
-                <th style={thStyle}>Miles</th>
-                <th style={thStyle}>Route</th>
+                {[
+                  { key: 'job', label: 'Job' },
+                  { key: 'builder', label: 'Builder' },
+                  { key: 'clockIn', label: 'Clock-In' },
+                  { key: 'clockOut', label: 'Clock-Out' },
+                  { key: 'total', label: 'Total Time' },
+                  { key: 'miles', label: 'Miles' },
+                  { key: 'route', label: 'Route' },
+                ].map(col => (
+                  <th
+                    key={col.key}
+                    onClick={() => handleCompletedSort(col.key)}
+                    style={{ ...thStyle, cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}
+                  >
+                    {col.label}
+                    <span style={{ color: completedSortColumn === col.key ? COLORS.slate600 : COLORS.slate300 }}>
+                      {' '}{completedSortColumn === col.key ? (completedSortDirection === 'asc' ? '▲' : '▼') : '↕'}
+                    </span>
+                  </th>
+                ))}
                 <th style={{ ...thStyle, textAlign: 'right' }}>Correct</th>
               </tr>
             </thead>
             <tbody>
-              {filteredCompletedRows.length === 0 && (
+              {sortedCompletedRows.length === 0 && (
                 <tr>
                   <td colSpan={8} style={{ padding: '32px', textAlign: 'center', color: COLORS.slate400, fontWeight: 600 }}>
                     No completed jobs to show.
                   </td>
                 </tr>
               )}
-              {filteredCompletedRows.map(row => (
+              {sortedCompletedRows.map(row => (
                 <tr key={row.ticket.id} style={{ borderBottom: `1px solid ${COLORS.slate100}` }}>
                   <td
                     style={{ ...tdStyle, ...(onNavigate ? { cursor: 'pointer' } : {}) }}
