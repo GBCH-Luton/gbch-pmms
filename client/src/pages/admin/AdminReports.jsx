@@ -490,8 +490,7 @@ export default function AdminReports({ profile, onNavigate }) {
   // when the two sit side by side in the grid below.
   const snapshotCard = (
     <div style={{ ...cardStyle, height: '100%', display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }}>
-      <p style={{ margin: '0 0 2px 0', fontSize: '14px', fontWeight: 800, color: COLORS.slate900 }}>Operations Snapshot</p>
-      <p style={{ margin: '0 0 10px 0', fontSize: '12.5px', color: COLORS.slate500 }}>A board-ready page — raised/completed, the ticket pipeline, top issue categories, compliance health and team activity — built live from real data, no AI involved.</p>
+      <p style={{ margin: '0 0 10px 0', fontSize: '14px', fontWeight: 800, color: COLORS.slate900 }}>Operations Snapshot</p>
       <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
         {snapshotPresets.map(p => (
           <button
