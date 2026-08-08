@@ -309,7 +309,12 @@ function TeamWhereabouts({ profile, onNavigate }) {
               return (
                 <div key={b.id} style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: '7px', padding: '7px 12px', borderRadius: '999px', background: c.bg, fontSize: '12px', fontWeight: 700 }}>
                   <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: c.fg }} />
-                  <span style={{ color: COLORS.slate900 }}>{b.name.split(' ')[0]}</span>
+                  <span
+                    onClick={() => onNavigate?.('builders', { staffId: b.id })}
+                    style={{ color: COLORS.slate900, cursor: onNavigate ? 'pointer' : 'default' }}
+                  >
+                    {b.name.split(' ')[0]}
+                  </span>
                   <span style={{ color: c.fg }}>{s.status}</span>
                 </div>
               )
@@ -327,7 +332,12 @@ function TeamWhereabouts({ profile, onNavigate }) {
                 </span>
                 <span style={{ width: '7px', height: '7px', borderRadius: '50%', marginTop: '5px', flexShrink: 0, background: toneDot[e.tone] }} />
                 <div style={{ flex: 1 }}>
-                  <span style={{ fontSize: '12.5px', fontWeight: 700, color: COLORS.slate900 }}>{e.staffName}</span>
+                  <span
+                    onClick={() => onNavigate?.('builders', { staffId: e.staffId })}
+                    style={{ fontSize: '12.5px', fontWeight: 700, color: COLORS.slate900, cursor: onNavigate ? 'pointer' : 'default' }}
+                  >
+                    {e.staffName}
+                  </span>
                   <span style={{
                     fontSize: '12.5px',
                     color: (e.tone === 'early' || e.tone === 'hold') ? COLORS.amber700 : e.tone === 'noAccess' ? COLORS.red600 : COLORS.slate600,
