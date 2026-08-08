@@ -936,6 +936,245 @@ function ErrorLogsPanel({ logs }) {
   )
 }
 
+const NEW_RECORD = '__new__'
+
+const readonlyBoxStyle = { padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, background: COLORS.slate50, fontSize: '13px', color: COLORS.slate400 }
+
+function ReadonlyField({ label, value }) {
+  return (
+    <div>
+      <label style={modalLabelStyle}>{label}</label>
+      <div style={readonlyBoxStyle}>{value}</div>
+    </div>
+  )
+}
+
+const emptyStaffRecordForm = {
+  name: '', email: '', job_title: '', department: '', phone: '', skills: '', gender: '', home_postcode: '', photo_url: '', active: true,
+}
+
+const ADD_NEW_LABEL = '＋ Add a new staff record'
+
+function staffOptionLabel(s) {
+  return `${s.name}${s.email ? ` (${s.email})` : ''}`
+}
+
+// Stop-gap until there's a real staff/HR system: public.staff is shared
+// company-wide (other systems read/write it too, see the shared-Supabase
+// architecture note at the top of this file), and several of its columns
+// -- department, photo_url, and anything beyond what the Add/Edit Staff
+// modal above sets -- have no PMMS UI at all. This is a raw editor over
+// every column on that table, deliberately separate from the modal above:
+// it never touches Supabase Auth (no login, no temp password), it can add
+// a bare directory record for someone who doesn't need PMMS access, and it
+// can fill in gaps on staff who were onboarded through the real flow.
+function StaffRecordEditorPanel({ staffList, onSaved }) {
+  const [isOpen, setIsOpen] = useState(false)
+  const [selectedId, setSelectedId] = useState(NEW_RECORD)
+  const [searchText, setSearchText] = useState(ADD_NEW_LABEL)
+  const [form, setForm] = useState(emptyStaffRecordForm)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [savedMessage, setSavedMessage] = useState('')
+
+  const selected = selectedId === NEW_RECORD ? null : staffList.find(s => s.id === selectedId)
+  const sortedStaff = [...staffList].sort((a, b) => a.name.localeCompare(b.name))
+
+  useEffect(() => {
+    setError('')
+    setSavedMessage('')
+    if (selected) {
+      setForm({
+        name: selected.name || '',
+        email: selected.email || '',
+        job_title: selected.job_title || '',
+        department: selected.department || '',
+        phone: selected.phone || '',
+        skills: (selected.skills || []).join(', '),
+        gender: selected.gender || '',
+        home_postcode: selected.home_postcode || '',
+        photo_url: selected.photo_url || '',
+        active: selected.active !== false,
+      })
+      setSearchText(staffOptionLabel(selected))
+    } else {
+      setForm(emptyStaffRecordForm)
+      setSearchText(ADD_NEW_LABEL)
+    }
+    // Only reset when a different record is picked, not on every staffList
+    // refresh (that would wipe out whatever's mid-edit).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId])
+
+  // Backed by a <datalist> so typing the first few letters of a name
+  // filters the suggestions natively -- only commits a selection once the
+  // typed text exactly matches a suggestion (i.e. the admin picked one),
+  // so a selection stays put while they're still mid-search.
+  function handleSearchChange(e) {
+    const text = e.target.value
+    setSearchText(text)
+    if (text === ADD_NEW_LABEL) { setSelectedId(NEW_RECORD); return }
+    const match = sortedStaff.find(s => staffOptionLabel(s) === text)
+    if (match) setSelectedId(match.id)
+  }
+
+  function set(key, value) {
+    setForm(prev => ({ ...prev, [key]: value }))
+  }
+
+  async function handleSave() {
+    setError('')
+    setSavedMessage('')
+    if (!form.name.trim()) { setError('Name is required.'); return }
+
+    setSaving(true)
+
+    const newHomePostcode = form.home_postcode.trim() || null
+    const homePostcodeChanged = newHomePostcode !== (selected?.home_postcode || null)
+
+    const payload = {
+      name: form.name.trim(),
+      email: form.email.trim() || null,
+      job_title: form.job_title.trim() || null,
+      department: form.department.trim() || null,
+      phone: form.phone.trim() || null,
+      skills: form.skills.split(',').map(s => s.trim()).filter(Boolean),
+      gender: form.gender || null,
+      home_postcode: newHomePostcode,
+      photo_url: form.photo_url.trim() || null,
+      active: form.active,
+      // Same reset-on-postcode-change behaviour as the Add/Edit Staff modal
+      // -- these are auto-geocoded (ensureStaffHomeCoords), never hand-set.
+      ...(homePostcodeChanged ? { home_latitude: null, home_longitude: null } : {}),
+    }
+
+    const query = selected
+      ? supabase.from('staff').update(payload).eq('id', selected.id)
+      // user_id defaults to auth.uid() on public.staff -- without this
+      // explicit null, a plain insert would silently link the new record
+      // to whichever admin is signed in and filling out this form.
+      : supabase.from('staff').insert({ ...payload, user_id: null })
+
+    const { data, error: saveError } = await query.select().single()
+
+    setSaving(false)
+    if (saveError) { setError(saveError.message); return }
+
+    onSaved(data)
+    setSelectedId(data.id)
+    setSavedMessage('Saved.')
+  }
+
+  return (
+    <div style={{ marginTop: '16px' }}>
+      <button
+        onClick={() => setIsOpen(prev => !prev)}
+        style={{
+          display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between', gap: '12px',
+          padding: '14px 20px', background: COLORS.white, border: 'none', borderRadius: '16px',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.06)', cursor: 'pointer', fontSize: '14px', fontWeight: 800, color: COLORS.slate900,
+        }}
+      >
+        <span>Staff Record Editor (All Fields)</span>
+        <span style={{ fontSize: '13px', fontWeight: 700, color: COLORS.slate400 }}>{isOpen ? '▲ Collapse' : '▼ Expand'}</span>
+      </button>
+      {isOpen && (
+        <div style={{ background: COLORS.white, borderRadius: '16px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', marginTop: '10px' }}>
+          <p style={{ margin: '0 0 16px 0', fontSize: '12px', color: COLORS.slate400, lineHeight: 1.5 }}>
+            A stand-in for a proper staff system: edits every column on the shared staff directory directly. Doesn't create a PMMS login -- use "＋ Add Staff Member" above for that. Fields shown greyed out are system-managed and can't be changed here.
+          </p>
+
+          <label style={modalLabelStyle}>Record</label>
+          <input
+            type="text"
+            list="staff-record-options"
+            value={searchText}
+            onChange={handleSearchChange}
+            onFocus={(e) => e.target.select()}
+            placeholder="Type a name to search..."
+            style={inputStyle}
+          />
+          <datalist id="staff-record-options">
+            <option value={ADD_NEW_LABEL} />
+            {sortedStaff.map(s => (
+              <option key={s.id} value={staffOptionLabel(s)} />
+            ))}
+          </datalist>
+
+          {selected && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '10px', marginTop: '16px' }}>
+              <ReadonlyField label="Staff ID" value={selected.id} />
+              <ReadonlyField label="Created" value={formatUKDateTime(selected.created_at)} />
+              <ReadonlyField label="PMMS Login" value={selected.user_id ? 'Linked' : 'No login'} />
+              <ReadonlyField label="Must Reset Password" value={selected.must_reset_password ? 'Yes' : 'No'} />
+              <ReadonlyField label="Home Coordinates" value={selected.home_latitude != null ? `${selected.home_latitude.toFixed(4)}, ${selected.home_longitude.toFixed(4)}` : 'Not geocoded yet'} />
+            </div>
+          )}
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0 16px', marginTop: '4px' }}>
+            <div>
+              <label style={modalLabelStyle}>Full Name</label>
+              <input type="text" value={form.name} onChange={(e) => set('name', e.target.value)} style={inputStyle} />
+            </div>
+            <div>
+              <label style={modalLabelStyle}>Email</label>
+              <input type="email" value={form.email} onChange={(e) => set('email', e.target.value)} style={inputStyle} />
+            </div>
+            <div>
+              <label style={modalLabelStyle}>Job Title</label>
+              <input type="text" value={form.job_title} onChange={(e) => set('job_title', e.target.value)} style={inputStyle} />
+            </div>
+            <div>
+              <label style={modalLabelStyle}>Department</label>
+              <input type="text" value={form.department} onChange={(e) => set('department', e.target.value)} style={inputStyle} />
+            </div>
+            <div>
+              <label style={modalLabelStyle}>Phone</label>
+              <input type="text" value={form.phone} onChange={(e) => set('phone', e.target.value)} style={inputStyle} />
+            </div>
+            <div>
+              <label style={modalLabelStyle}>Gender</label>
+              <select value={form.gender} onChange={(e) => set('gender', e.target.value)} style={inputStyle}>
+                <option value="">Not set</option>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+              </select>
+            </div>
+            <div>
+              <label style={modalLabelStyle}>Home Postcode</label>
+              <input type="text" value={form.home_postcode} onChange={(e) => set('home_postcode', e.target.value)} placeholder="e.g. LU1 2AB" style={inputStyle} />
+            </div>
+            <div>
+              <label style={modalLabelStyle}>Photo URL</label>
+              <input type="text" value={form.photo_url} onChange={(e) => set('photo_url', e.target.value)} placeholder="https://..." style={inputStyle} />
+            </div>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label style={modalLabelStyle}>Skills (comma-separated)</label>
+              <input type="text" value={form.skills} onChange={(e) => set('skills', e.target.value)} placeholder="e.g. Plumbing, Electrical" style={inputStyle} />
+            </div>
+          </div>
+
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '16px', fontSize: '13px', fontWeight: 600, color: COLORS.slate600, cursor: 'pointer' }}>
+            <input type="checkbox" checked={form.active} onChange={(e) => set('active', e.target.checked)} />
+            Active
+          </label>
+
+          {error && <p style={modalErrorStyle}>{error}</p>}
+          {savedMessage && !error && <p style={{ margin: '10px 0 0 0', fontSize: '13px', color: COLORS.green600, fontWeight: 600 }}>{savedMessage}</p>}
+
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            style={{ marginTop: '16px', padding: '10px 20px', background: COLORS.blue700, color: COLORS.white, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.6 : 1 }}
+          >
+            {saving ? 'Saving...' : selected ? 'Save Changes' : 'Add Record'}
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function AdminAccess({ profile }) {
   const [staffList, setStaffList] = useState([])
   const [tickets, setTickets] = useState([])
@@ -1250,6 +1489,7 @@ export default function AdminAccess({ profile }) {
 
       <LoginActivityPanel events={loginEvents} />
       <ErrorLogsPanel logs={errorLogs} />
+      <StaffRecordEditorPanel staffList={staffList} onSaved={handleStaffSaved} />
 
       {modalStaff !== undefined && (
         <StaffFormModal
