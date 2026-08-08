@@ -49,9 +49,23 @@ function complianceAging(record: any, thresholdDays: number) {
   return 'green'
 }
 
+// UK wall-clock date/time, same Intl-based approach as
+// client/src/pages/admin/shared.jsx's ukDateKey/formatUKDateTime -- told to
+// Claude explicitly in the system prompt, since nothing about "today"
+// means anything to the model unless it's actually given the real current
+// UK date to reason against.
+function ukNow() {
+  const now = new Date()
+  const dateParts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/London', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(now)
+  const get = (parts: any, type: string) => parts.find((p: any) => p.type === type)?.value
+  const todayUkDate = `${get(dateParts, 'year')}-${get(dateParts, 'month')}-${get(dateParts, 'day')}`
+  const timeParts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(now)
+  return { todayUkDate, currentUkDateTime: `${todayUkDate} ${get(timeParts, 'hour')}:${get(timeParts, 'minute')}` }
+}
+
 async function buildContext(adminClient: any) {
   const [{ data: tickets }, { data: properties }, { data: complianceRecords }, { data: staff }, { data: thresholdRow }] = await Promise.all([
-    adminClient.schema('pmms').from('tickets').select('property_id, category, status, assigned_builder_id'),
+    adminClient.schema('pmms').from('tickets').select('ticket_number, property_id, category, status, assigned_builder_id, created_at, completed_at'),
     adminClient.schema('pmms').from('properties').select('id, address'),
     adminClient.schema('pmms').from('property_compliance').select('property_id, cert_type, expiry_date, not_applicable'),
     adminClient.from('staff').select('id, name'),
@@ -99,7 +113,32 @@ async function buildContext(adminClient: any) {
   const topN = (obj: Record<string, number>, n: number) =>
     Object.entries(obj).sort((a, b) => b[1] - a[1]).slice(0, n).map(([label, count]) => ({ label, count }))
 
+  // Every pre-aggregated field above is all-time and date-blind -- fine
+  // for "which category comes up most" but useless for "how many did
+  // Paulo finish today", which was the actual gap this was built to close
+  // (see conversation this came out of). Raw per-ticket rows let Claude
+  // answer ANY date-scoped question itself (today/this week/a specific
+  // person/a specific day) by reasoning against currentUkDateTime below,
+  // rather than needing a new pre-computed field invented for every
+  // possible question in advance. Capped at 500 (most recent first) to
+  // keep token cost bounded as ticket volume grows -- fine today at ~65
+  // total tickets, revisit the cap if that changes materially.
+  const recentTickets = (tickets || [])
+    .slice()
+    .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    .slice(0, 500)
+    .map((t: any) => ({
+      ticketNumber: t.ticket_number,
+      category: t.category,
+      status: t.status,
+      property: t.property_id ? addressById[t.property_id] : null,
+      builder: t.assigned_builder_id ? (nameById[t.assigned_builder_id] || 'Unknown') : null,
+      createdAt: t.created_at,
+      completedAt: t.completed_at,
+    }))
+
   return {
+    ...ukNow(),
     totalTickets: (tickets || []).length,
     totalProperties: (properties || []).length,
     ticketsByStatus: statusCounts,
@@ -107,6 +146,7 @@ async function buildContext(adminClient: any) {
     openTicketsByProperty: topN(openByProperty, 15),
     completedJobsByBuilder: topN(completedByBuilder, 15),
     compliance: { expired, dueSoon, valid, flaggedSample },
+    recentTickets,
   }
 }
 
@@ -129,7 +169,14 @@ Deno.serve(async (req: Request) => {
 
     const context = await buildContext(adminClient)
 
-    const systemPrompt = `You are answering a manager's question inside PMMS, a property maintenance management system, using ONLY the JSON data below -- it's a real snapshot of their live data, already aggregated (no resident names or personal details are included). Answer concisely, in plain prose (no markdown headers), citing real numbers from the data. If the question needs information that isn't in this snapshot, say so plainly rather than guessing or making up a number.\n\nDATA:\n${JSON.stringify(context)}`
+    const systemPrompt = `You are answering a manager's question inside PMMS, a property maintenance management system, using ONLY the JSON data below -- it's a real snapshot of their live data (no resident names or personal details are included). Answer concisely, in plain prose (no markdown headers), citing real numbers from the data.
+
+DATA.currentUkDateTime / DATA.todayUkDate is the real current UK date and time -- use it to work out "today", "yesterday", "this week" (Mon-Sun), "this month" etc. yourself from DATA.recentTickets' createdAt/completedAt fields (both UK-relevant timestamps -- treat a date as matching "today" if its UK calendar date equals todayUkDate). DATA.recentTickets holds the most recent 500 tickets (ticketNumber, category, status, property, builder, createdAt, completedAt) -- count, filter or group these yourself for anything date-scoped or person-scoped that isn't already in one of the pre-aggregated fields (ticketsByStatus/ticketsByCategory/openTicketsByProperty/completedJobsByBuilder are all-time totals, not date-scoped). "Completed" for a builder/date means status is Completed or Archived AND completedAt falls on that date -- a null completedAt means still open.
+
+If a question needs information genuinely outside this snapshot (e.g. older than the 500 most recent tickets, or data this snapshot doesn't carry at all), say so plainly rather than guessing or making up a number.
+
+DATA:
+${JSON.stringify(context)}`
 
     const claudeRes = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
