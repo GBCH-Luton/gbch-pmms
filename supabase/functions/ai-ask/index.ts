@@ -64,12 +64,19 @@ function ukNow() {
 }
 
 async function buildContext(adminClient: any) {
-  const [{ data: tickets }, { data: properties }, { data: complianceRecords }, { data: staff }, { data: thresholdRow }] = await Promise.all([
+  const [{ data: tickets }, { data: properties }, { data: complianceRecords }, { data: staff }, { data: thresholdRow }, { data: shifts }, { data: deadlineRow }] = await Promise.all([
     adminClient.schema('pmms').from('tickets').select('ticket_number, property_id, category, status, assigned_builder_id, created_at, completed_at'),
     adminClient.schema('pmms').from('properties').select('id, address'),
     adminClient.schema('pmms').from('property_compliance').select('property_id, cert_type, expiry_date, not_applicable'),
     adminClient.from('staff').select('id, name'),
     adminClient.schema('pmms').from('settings').select('setting_value').eq('setting_key', 'compliance_aging_threshold_days').maybeSingle(),
+    // Attendance was entirely missing before -- "do the builders clock in
+    // on time" had genuinely nothing to answer from. late_flag is already
+    // computed at clock-in time (see BuilderDashboard.jsx) against
+    // daily_clock_in_deadline, so this is just exposing that, not
+    // recomputing punctuality logic here.
+    adminClient.schema('pmms').from('daily_attendance').select('staff_id, work_date, clock_in_at, late_flag').order('clock_in_at', { ascending: false }).limit(500),
+    adminClient.schema('pmms').from('settings').select('setting_value').eq('setting_key', 'daily_clock_in_deadline').maybeSingle(),
   ])
 
   const thresholdDays = thresholdRow?.setting_value != null ? Number(thresholdRow.setting_value) : 90
@@ -82,7 +89,6 @@ async function buildContext(adminClient: any) {
   const statusCounts: Record<string, number> = {}
   const categoryCounts: Record<string, number> = {}
   const openByProperty: Record<string, number> = {}
-  const completedByBuilder: Record<string, number> = {}
 
   ;(tickets || []).forEach((t: any) => {
     statusCounts[t.status] = (statusCounts[t.status] || 0) + 1
@@ -91,11 +97,49 @@ async function buildContext(adminClient: any) {
       const addr = addressById[t.property_id] || 'Unknown property'
       openByProperty[addr] = (openByProperty[addr] || 0) + 1
     }
-    if (t.status === 'Completed' && t.assigned_builder_id) {
-      const name = nameById[t.assigned_builder_id] || 'Unknown'
-      completedByBuilder[name] = (completedByBuilder[name] || 0) + 1
-    }
   })
+
+  const dailyClockInDeadline = deadlineRow?.setting_value || '09:00'
+
+  // Per-builder rollup -- completed/open workload plus how they're doing
+  // on timekeeping, so "how is X performing" has real numbers to answer
+  // with instead of just an all-time completed count. Only builders who
+  // actually show up in tickets or shifts get a row (an inactive/unused
+  // builder account doesn't clutter this).
+  const builderIds = new Set<string>()
+  ;(tickets || []).forEach((t: any) => { if (t.assigned_builder_id) builderIds.add(t.assigned_builder_id) })
+  ;(shifts || []).forEach((s: any) => { if (s.staff_id) builderIds.add(s.staff_id) })
+
+  const builderPerformance = Array.from(builderIds).map((id) => {
+    const builderTickets = (tickets || []).filter((t: any) => t.assigned_builder_id === id)
+    const completed = builderTickets.filter((t: any) => t.completed_at)
+    const openCount = builderTickets.filter((t: any) => !t.completed_at && t.status !== 'Cancelled').length
+    const avgTurnaroundHours = completed.length > 0
+      ? completed.reduce((sum: number, t: any) => sum + Math.max(0, new Date(t.completed_at).getTime() - new Date(t.created_at).getTime()), 0) / completed.length / 3600000
+      : null
+
+    const builderShifts = (shifts || []).filter((s: any) => s.staff_id === id)
+    const lateCount = builderShifts.filter((s: any) => s.late_flag).length
+
+    return {
+      builder: nameById[id] || 'Unknown',
+      completedJobs: completed.length,
+      openJobs: openCount,
+      avgTurnaroundHours: avgTurnaroundHours != null ? Math.round(avgTurnaroundHours * 10) / 10 : null,
+      shiftsLogged: builderShifts.length,
+      lateClockIns: lateCount,
+      onTimeClockInPct: builderShifts.length > 0 ? Math.round(((builderShifts.length - lateCount) / builderShifts.length) * 1000) / 10 : null,
+    }
+  }).sort((a, b) => b.completedJobs - a.completedJobs)
+
+  const totalShifts = (shifts || []).length
+  const totalLateShifts = (shifts || []).filter((s: any) => s.late_flag).length
+  const attendanceOverall = {
+    dailyClockInDeadline,
+    shiftsLogged: totalShifts,
+    lateClockIns: totalLateShifts,
+    onTimeClockInPct: totalShifts > 0 ? Math.round(((totalShifts - totalLateShifts) / totalShifts) * 1000) / 10 : null,
+  }
 
   const recordsByKey: Record<string, any> = {}
   ;(complianceRecords || []).forEach((r: any) => { recordsByKey[`${r.property_id}:${r.cert_type}`] = r })
@@ -144,7 +188,8 @@ async function buildContext(adminClient: any) {
     ticketsByStatus: statusCounts,
     ticketsByCategory: topN(categoryCounts, 20),
     openTicketsByProperty: topN(openByProperty, 15),
-    completedJobsByBuilder: topN(completedByBuilder, 15),
+    builderPerformance,
+    attendanceOverall,
     compliance: { expired, dueSoon, valid, flaggedSample },
     recentTickets,
   }
@@ -171,9 +216,11 @@ Deno.serve(async (req: Request) => {
 
     const systemPrompt = `You are answering a manager's question inside PMMS, a property maintenance management system, using ONLY the JSON data below -- it's a real snapshot of their live data (no resident names or personal details are included). Answer concisely, in plain prose (no markdown headers), citing real numbers from the data.
 
-DATA.currentUkDateTime / DATA.todayUkDate is the real current UK date and time -- use it to work out "today", "yesterday", "this week" (Mon-Sun), "this month" etc. yourself from DATA.recentTickets' createdAt/completedAt fields (both UK-relevant timestamps -- treat a date as matching "today" if its UK calendar date equals todayUkDate). DATA.recentTickets holds the most recent 500 tickets (ticketNumber, category, status, property, builder, createdAt, completedAt) -- count, filter or group these yourself for anything date-scoped or person-scoped that isn't already in one of the pre-aggregated fields (ticketsByStatus/ticketsByCategory/openTicketsByProperty/completedJobsByBuilder are all-time totals, not date-scoped). "Completed" for a builder/date means status is Completed or Archived AND completedAt falls on that date -- a null completedAt means still open.
+DATA.currentUkDateTime / DATA.todayUkDate is the real current UK date and time -- use it to work out "today", "yesterday", "this week" (Mon-Sun), "this month" etc. yourself from DATA.recentTickets' createdAt/completedAt fields (both UK-relevant timestamps -- treat a date as matching "today" if its UK calendar date equals todayUkDate). DATA.recentTickets holds the most recent 500 tickets (ticketNumber, category, status, property, builder, createdAt, completedAt) -- count, filter or group these yourself for anything date-scoped that isn't already in one of the pre-aggregated fields (ticketsByStatus/ticketsByCategory/openTicketsByProperty are all-time totals, not date-scoped). A null completedAt means still open.
 
-If a question needs information genuinely outside this snapshot (e.g. older than the 500 most recent tickets, or data this snapshot doesn't carry at all), say so plainly rather than guessing or making up a number.
+DATA.builderPerformance is one row per active builder: completedJobs and openJobs (workload), avgTurnaroundHours (created-to-completed, all-time), and shiftsLogged/lateClockIns/onTimeClockInPct for timekeeping -- use this directly for "how is X performing" or "who's busiest" type questions rather than only citing completedJobs. DATA.attendanceOverall is the same timekeeping shape rolled up across everyone, plus dailyClockInDeadline (the UK "HH:mm" cutoff a clock-in after which counts as late) -- use it for portfolio-wide punctuality questions like "do builders clock in on time".
+
+If a question needs information genuinely outside this snapshot (e.g. older than the 500 most recent tickets/500 most recent shifts, job quality/customer feedback, or anything else this snapshot doesn't carry), say so plainly rather than guessing or making up a number.
 
 DATA:
 ${JSON.stringify(context)}`
