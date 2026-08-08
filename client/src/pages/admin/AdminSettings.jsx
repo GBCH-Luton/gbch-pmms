@@ -181,6 +181,7 @@ export default function AdminSettings() {
   // for current figures when setting these.
   const [aiInputCostPerMillion, setAiInputCostPerMillion] = useState('')
   const [aiOutputCostPerMillion, setAiOutputCostPerMillion] = useState('')
+  const [aiUsageLogPageSize, setAiUsageLogPageSize] = useState(5)
   const [aiPricingSaving, setAiPricingSaving] = useState(false)
   const [aiPricingSaved, setAiPricingSaved] = useState(false)
 
@@ -229,6 +230,7 @@ export default function AdminSettings() {
       if (map.sign_off_wait_threshold_hours != null) setSignOffThresholdHours(Number(map.sign_off_wait_threshold_hours))
       if (map.ai_cost_per_million_input_tokens != null) setAiInputCostPerMillion(map.ai_cost_per_million_input_tokens)
       if (map.ai_cost_per_million_output_tokens != null) setAiOutputCostPerMillion(map.ai_cost_per_million_output_tokens)
+      if (map.ai_usage_log_page_size != null) setAiUsageLogPageSize(Number(map.ai_usage_log_page_size))
       if (map.routine_visit_flag_days != null) setRoutineVisitFlagDays(map.routine_visit_flag_days)
       if (map.routine_visit_alerts_enabled != null) setRoutineVisitAlertsEnabled(map.routine_visit_alerts_enabled)
       if (map.routine_visit_estimated_minutes != null) setRoutineVisitEstimatedMinutes(map.routine_visit_estimated_minutes)
@@ -710,6 +712,7 @@ export default function AdminSettings() {
     setAiPricingSaved(false)
     await saveSetting('ai_cost_per_million_input_tokens', aiInputCostPerMillion === '' ? null : Number(aiInputCostPerMillion))
     await saveSetting('ai_cost_per_million_output_tokens', aiOutputCostPerMillion === '' ? null : Number(aiOutputCostPerMillion))
+    await saveSetting('ai_usage_log_page_size', Number(aiUsageLogPageSize))
     setAiPricingSaving(false)
     setAiPricingSaved(true)
     setTimeout(() => setAiPricingSaved(false), 2000)
@@ -1641,6 +1644,15 @@ export default function AdminSettings() {
             type="number" step="0.01" placeholder="e.g. 5.00"
             value={aiOutputCostPerMillion}
             onChange={(e) => setAiOutputCostPerMillion(e.target.value)}
+            style={inputStyle}
+          />
+        </div>
+        <div style={{ marginBottom: '16px', maxWidth: '260px' }}>
+          <label style={fieldLabelStyle}>Rows per page in the AI Usage log</label>
+          <input
+            type="number" min="1" step="1"
+            value={aiUsageLogPageSize}
+            onChange={(e) => setAiUsageLogPageSize(e.target.value)}
             style={inputStyle}
           />
         </div>

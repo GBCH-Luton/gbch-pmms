@@ -11,7 +11,7 @@ import { COLORS } from '../../lib/colors'
 import { attachProperties } from '../../lib/properties'
 import { fetchAllMaintenanceCategoryNames } from '../../lib/maintenanceCategories'
 import {
-  formatDuration, filterSelectStyle, thStyle, tdStyle,
+  formatDuration, filterSelectStyle, thStyle, tdStyle, actionBtnStyle,
   fetchAssignableBuilders, fetchAssignableStaffForDivision, resolveCategoryDivision, computeAvgTurnaroundMs, computeAvgResponseMs, buildWeeklyTrend,
   isoDateNDaysAgo, todayIso, extractFunctionError, formatUKDateTime, formatUKDate, computeComplianceAging, COMPLIANCE_TYPES,
   ukDateKey, mondayOfWeek, firstOfMonth, fetchComplianceAgingCounts, statusColour, statusLabel,
@@ -178,10 +178,16 @@ export default function AdminReports({ profile, onNavigate }) {
   const [aiError, setAiError] = useState('')
   const [aiUsageLog, setAiUsageLog] = useState([])
   const [viewingLogRow, setViewingLogRow] = useState(null)
+  const [aiUsagePage, setAiUsagePage] = useState(0)
+  const [aiUsagePageSize, setAiUsagePageSize] = useState(5)
 
   useEffect(() => {
     load()
-    if (isAdmin) loadAiUsage()
+    if (isAdmin) {
+      loadAiUsage()
+      supabase.schema('pmms').from('settings').select('setting_value').eq('setting_key', 'ai_usage_log_page_size').maybeSingle()
+        .then(({ data }) => { if (data?.setting_value != null) setAiUsagePageSize(Number(data.setting_value)) })
+    }
     // isAdmin is derived from profile, which doesn't change within a
     // session -- same one-time-on-mount intent as load() itself.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -211,6 +217,7 @@ export default function AdminReports({ profile, onNavigate }) {
     if (data?.error) { setAiError(data.error); return }
 
     setAiAnswer({ free: false, text: data.answer })
+    setAiUsagePage(0)
     loadAiUsage()
   }
 
@@ -530,6 +537,8 @@ export default function AdminReports({ profile, onNavigate }) {
                 const hasUnpriced = aiUsageLog.some(r => r.cost_usd == null)
                 const weekRows = aiUsageLog.filter(r => new Date(r.created_at).getTime() >= weekAgo)
                 const monthRows = aiUsageLog.filter(r => new Date(r.created_at).getTime() >= monthAgo)
+                const pageCount = Math.max(1, Math.ceil(aiUsageLog.length / aiUsagePageSize))
+                const pagedRows = aiUsageLog.slice(aiUsagePage * aiUsagePageSize, (aiUsagePage + 1) * aiUsagePageSize)
                 return (
                   <>
                     <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
@@ -562,7 +571,7 @@ export default function AdminReports({ profile, onNavigate }) {
                           </tr>
                         </thead>
                         <tbody>
-                          {aiUsageLog.map(r => (
+                          {pagedRows.map(r => (
                             <tr key={r.id}>
                               <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>{formatUKDateTime(r.created_at)}</td>
                               <td
@@ -577,6 +586,23 @@ export default function AdminReports({ profile, onNavigate }) {
                           ))}
                         </tbody>
                       </table>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '10px', marginTop: '12px' }}>
+                      <span style={{ fontSize: '12px', color: COLORS.slate500 }}>Page {aiUsagePage + 1} of {pageCount}</span>
+                      <button
+                        onClick={() => setAiUsagePage(p => Math.max(0, p - 1))}
+                        disabled={aiUsagePage === 0}
+                        style={{ ...actionBtnStyle, opacity: aiUsagePage === 0 ? 0.4 : 1, cursor: aiUsagePage === 0 ? 'not-allowed' : 'pointer' }}
+                      >
+                        ← Previous
+                      </button>
+                      <button
+                        onClick={() => setAiUsagePage(p => Math.min(pageCount - 1, p + 1))}
+                        disabled={aiUsagePage >= pageCount - 1}
+                        style={{ ...actionBtnStyle, opacity: aiUsagePage >= pageCount - 1 ? 0.4 : 1, cursor: aiUsagePage >= pageCount - 1 ? 'not-allowed' : 'pointer' }}
+                      >
+                        Next →
+                      </button>
                     </div>
                   </>
                 )
