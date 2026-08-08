@@ -116,7 +116,7 @@ export default function PrintableOperationsSnapshot({ summary, onClose }) {
           </div>
         </div>
 
-        <div>
+        <div style={{ marginBottom: '20px' }}>
           <p style={{ margin: '0 0 2px 0', fontSize: '13px', fontWeight: 800, color: COLORS.slate900 }}>Team Activity</p>
           <p style={{ margin: '0 0 12px 0', fontSize: '11.5px', color: COLORS.slate500 }}>Completed jobs by builder, this period.</p>
           {summary.teamActivity.length === 0 ? (
@@ -139,6 +139,56 @@ export default function PrintableOperationsSnapshot({ summary, onClose }) {
               </tbody>
             </table>
           )}
+        </div>
+
+        <div style={{ marginBottom: '20px' }}>
+          <p style={{ margin: '0 0 2px 0', fontSize: '13px', fontWeight: 800, color: COLORS.slate900 }}>Mileage</p>
+          <p style={{ margin: '0 0 12px 0', fontSize: '11.5px', color: COLORS.slate500 }}>Trips logged in this period.</p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+            {[
+              ['Total Miles', summary.totalMilesInPeriod.toFixed(1)],
+              ['Trips Logged', summary.tripsInPeriod],
+              ['Avg Miles / Trip', summary.avgMilesPerTrip != null ? summary.avgMilesPerTrip.toFixed(1) : '—'],
+            ].map(([label, value]) => (
+              <div key={label} style={{ background: COLORS.slate50, borderRadius: '12px', padding: '14px', borderTop: `3px solid ${COLORS.blue600}` }}>
+                <p style={{ margin: '0 0 4px 0', fontSize: '10px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</p>
+                <p style={{ margin: 0, fontSize: '22px', fontWeight: 800, color: COLORS.slate900 }}>{value}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ marginBottom: '20px' }}>
+          <p style={{ margin: '0 0 2px 0', fontSize: '13px', fontWeight: 800, color: COLORS.slate900 }}>Attendance &amp; Punctuality</p>
+          <p style={{ margin: '0 0 12px 0', fontSize: '11.5px', color: COLORS.slate500 }}>Daily clock-ins in this period.</p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+            {[
+              ['Shifts Logged', summary.shiftsInPeriod],
+              ['Late Clock-Ins', summary.lateShiftsInPeriod],
+              ['On-Time %', summary.onTimePct != null ? `${summary.onTimePct}%` : '—'],
+            ].map(([label, value]) => (
+              <div key={label} style={{ background: COLORS.slate50, borderRadius: '12px', padding: '14px', borderTop: `3px solid ${COLORS.teal700}` }}>
+                <p style={{ margin: '0 0 4px 0', fontSize: '10px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</p>
+                <p style={{ margin: 0, fontSize: '22px', fontWeight: 800, color: COLORS.slate900 }}>{value}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <p style={{ margin: '0 0 2px 0', fontSize: '13px', fontWeight: 800, color: COLORS.slate900 }}>Attachments</p>
+          <p style={{ margin: '0 0 12px 0', fontSize: '11.5px', color: COLORS.slate500 }}>Photos and videos uploaded to jobs in this period.</p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
+            {[
+              ['Photos Uploaded', summary.photosUploaded],
+              ['Videos Uploaded', summary.videosUploaded],
+            ].map(([label, value]) => (
+              <div key={label} style={{ background: COLORS.slate50, borderRadius: '12px', padding: '14px', borderTop: `3px solid ${COLORS.violet600}` }}>
+                <p style={{ margin: '0 0 4px 0', fontSize: '10px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</p>
+                <p style={{ margin: 0, fontSize: '22px', fontWeight: 800, color: COLORS.slate900 }}>{value}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>

@@ -14,11 +14,12 @@ import {
   formatDuration, filterSelectStyle, thStyle, tdStyle,
   fetchAssignableBuilders, fetchAssignableStaffForDivision, resolveCategoryDivision, computeAvgTurnaroundMs, computeAvgResponseMs, buildWeeklyTrend,
   isoDateNDaysAgo, todayIso, extractFunctionError, formatUKDateTime, formatUKDate, computeComplianceAging, COMPLIANCE_TYPES,
-  ukDateKey, mondayOfWeek, firstOfMonth, fetchComplianceAgingCounts, statusColour, statusLabel,
+  fetchComplianceAgingCounts, statusColour, statusLabel,
   modalOverlayStyle, modalCardStyle, modalTitleStyle, modalSubtitleStyle, modalCancelBtnStyle,
 } from './shared'
 import SimpleBarChart from '../../components/SimpleBarChart'
 import PrintableOperationsSnapshot from '../../components/PrintableOperationsSnapshot'
+import { isVideoAttachment } from '../../components/AttachmentMedia'
 
 const tileStyle = (colour) => ({ flex: '1 1 160px', background: colour, borderRadius: '16px', padding: '16px', textAlign: 'center' })
 const tileLabelStyle = { margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase', letterSpacing: '0.06em' }
@@ -27,19 +28,6 @@ const cardStyle = { background: COLORS.white, borderRadius: '16px', padding: '18
 const cardLabelStyle = { margin: '0 0 12px 0', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }
 const filterLabelStyle = { display: 'block', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, marginBottom: '4px' }
 
-// Operations Snapshot period tabs -- calendar-based like Attendance &
-// Hours's own period tabs, not rolling windows, so "This Week" means the
-// week-to-date rather than a floating 7-day lookback.
-const SNAPSHOT_PERIODS = [
-  { key: 'today', label: 'Today' },
-  { key: 'week', label: 'This Week' },
-  { key: 'month', label: 'This Month' },
-]
-const SNAPSHOT_RANGE_FOR = {
-  today: (today) => ({ from: today, to: today }),
-  week: (today) => ({ from: mondayOfWeek(today), to: today }),
-  month: (today) => ({ from: firstOfMonth(today), to: today }),
-}
 
 function avgMsLabel(ms) {
   if (ms == null) return 'N/A'
@@ -161,8 +149,11 @@ export default function AdminReports({ profile, onNavigate }) {
   const [properties, setProperties] = useState([])
   const [complianceCounts, setComplianceCounts] = useState(null)
   const [staffNames, setStaffNames] = useState({})
+  const [attendanceShifts, setAttendanceShifts] = useState([])
+  const [attachments, setAttachments] = useState([])
   const [showSnapshot, setShowSnapshot] = useState(false)
-  const [snapshotPeriod, setSnapshotPeriod] = useState('today')
+  const [snapshotFromDate, setSnapshotFromDate] = useState(todayIso())
+  const [snapshotToDate, setSnapshotToDate] = useState(todayIso())
 
   const [fromDate, setFromDate] = useState(isoDateNDaysAgo(30))
   const [toDate, setToDate] = useState(todayIso())
@@ -248,7 +239,7 @@ export default function AdminReports({ profile, onNavigate }) {
     const { data, error } = await supabase
       .schema('pmms')
       .from('tickets')
-      .select('id, ticket_number, status, category, created_at, completed_at, first_assigned_at, property_id, assigned_builder_id')
+      .select('id, ticket_number, status, category, created_at, completed_at, first_assigned_at, property_id, assigned_builder_id, mileage_logged, mileage_logged_at')
 
     if (error) { setLoadError(error.message); setTickets([]); return }
 
@@ -274,6 +265,16 @@ export default function AdminReports({ profile, onNavigate }) {
     const nameById = {}
     ;(staffRows || []).forEach(s => { nameById[s.id] = s.name })
     setStaffNames(nameById)
+
+    // Attendance/punctuality and attachment counts for the snapshot --
+    // fetched whole and filtered client-side by the selected date range,
+    // same "fetch once, filter locally" approach the ticket data above
+    // already uses (real scale here is tiny).
+    const { data: shiftRows } = await supabase.schema('pmms').from('daily_attendance').select('staff_id, work_date, late_flag')
+    setAttendanceShifts(shiftRows || [])
+
+    const { data: attachmentRows } = await supabase.schema('pmms').from('ticket_attachments').select('id, url, created_at')
+    setAttachments(attachmentRows || [])
   }
 
   if (tickets === null) {
@@ -383,7 +384,8 @@ export default function AdminReports({ profile, onNavigate }) {
   // return text. Computed here (not inside the printable component) so
   // it's built once from data this page has already loaded, rather than
   // the report component re-deriving it on every open.
-  const { from: snapshotFrom, to: snapshotTo } = SNAPSHOT_RANGE_FOR[snapshotPeriod](ukDateKey())
+  const snapshotFrom = snapshotFromDate
+  const snapshotTo = snapshotToDate
   const snapshotFromMs = new Date(snapshotFrom).getTime()
   const snapshotToMs = new Date(snapshotTo).getTime() + 86400000 - 1
   const inSnapshotPeriod = (iso) => {
@@ -431,81 +433,113 @@ export default function AdminReports({ profile, onNavigate }) {
     .sort((a, b) => b.count - a.count)
     .slice(0, 10)
 
+  // Mileage -- keyed off mileage_logged_at (the actual clock-in moment a
+  // trip was logged), same field the Mileage card on the builder profile
+  // page already uses, not created_at -- a job can sit in the queue for
+  // days before the trip that mileage belongs to actually happens.
+  const mileageTripsInPeriod = tickets.filter(t => t.mileage_logged_at && inSnapshotPeriod(t.mileage_logged_at) && (t.mileage_logged || 0) > 0)
+  const totalMilesInPeriod = mileageTripsInPeriod.reduce((sum, t) => sum + (t.mileage_logged || 0), 0)
+  const avgMilesPerTrip = mileageTripsInPeriod.length > 0 ? totalMilesInPeriod / mileageTripsInPeriod.length : null
+
+  // Attendance/punctuality -- work_date is already a "YYYY-MM-DD" string,
+  // same format the date pickers produce, so a plain string comparison is
+  // enough without any timezone conversion.
+  const shiftsInPeriod = attendanceShifts.filter(s => s.work_date >= snapshotFrom && s.work_date <= snapshotTo)
+  const lateShiftsInPeriod = shiftsInPeriod.filter(s => s.late_flag).length
+  const onTimePct = shiftsInPeriod.length > 0 ? Math.round(((shiftsInPeriod.length - lateShiftsInPeriod) / shiftsInPeriod.length) * 100) : null
+
+  // Attachments -- photo vs video is never stored, only inferable from the
+  // file extension in the URL (see AttachmentMedia.jsx's own isVideoAttachment,
+  // reused here rather than re-implementing the same extension check).
+  const attachmentsInPeriod = attachments.filter(a => inSnapshotPeriod(a.created_at))
+  const videosUploaded = attachmentsInPeriod.filter(a => isVideoAttachment(a.url)).length
+  const photosUploaded = attachmentsInPeriod.length - videosUploaded
+
   const snapshotSummary = {
-    periodLabel: SNAPSHOT_PERIODS.find(p => p.key === snapshotPeriod)?.label,
+    periodLabel: snapshotFrom === snapshotTo ? 'Selected Day' : 'Selected Range',
     rangeLabel: snapshotFrom === snapshotTo ? formatUKDate(snapshotFrom) : `${formatUKDate(snapshotFrom)} – ${formatUKDate(snapshotTo)}`,
     raisedCount: raisedInPeriod.length, completedCount: completedInPeriod.length,
     currentlyOpenCount, totalProperties: properties.length,
     pipelineBars, categoryChartData,
     complianceValid, complianceDueSoon, complianceExpired,
     teamActivity,
+    totalMilesInPeriod, tripsInPeriod: mileageTripsInPeriod.length, avgMilesPerTrip,
+    shiftsInPeriod: shiftsInPeriod.length, lateShiftsInPeriod, onTimePct,
+    photosUploaded, videosUploaded,
   }
+
+  // Reused in two spots below (side-by-side with Ask AI for admins, alone
+  // for managers who don't get the AI box at all) -- built once so there's
+  // one source of truth for it rather than two copies drifting apart.
+  const snapshotCard = (
+    <div style={cardStyle}>
+      <p style={{ margin: '0 0 2px 0', fontSize: '14px', fontWeight: 800, color: COLORS.slate900 }}>Operations Snapshot</p>
+      <p style={{ margin: '0 0 10px 0', fontSize: '12.5px', color: COLORS.slate500 }}>A board-ready page — raised/completed, the ticket pipeline, top issue categories, compliance health and team activity — built live from real data, no AI involved.</p>
+      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: '14px' }}>
+        <div>
+          <label style={filterLabelStyle}>From</label>
+          <input type="date" value={snapshotFromDate} max={snapshotToDate} onChange={(e) => setSnapshotFromDate(e.target.value)} style={filterSelectStyle} />
+        </div>
+        <div>
+          <label style={filterLabelStyle}>To</label>
+          <input type="date" value={snapshotToDate} min={snapshotFromDate} max={todayIso()} onChange={(e) => setSnapshotToDate(e.target.value)} style={filterSelectStyle} />
+        </div>
+      </div>
+      <button
+        onClick={() => setShowSnapshot(true)}
+        style={{ padding: '10px 18px', borderRadius: '10px', border: 'none', background: COLORS.brandNavy, color: COLORS.white, fontWeight: 700, fontSize: '13px', cursor: 'pointer' }}
+      >
+        📊 Generate Snapshot
+      </button>
+    </div>
+  )
 
   return (
     <div>
       <h2 style={{ margin: '0 0 16px 0', fontSize: '18px', fontWeight: 800, color: COLORS.slate900 }}>Reports</h2>
 
-      <div style={{ ...cardStyle, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '14px' }}>
-        <div>
-          <p style={{ margin: '0 0 2px 0', fontSize: '14px', fontWeight: 800, color: COLORS.slate900 }}>Operations Snapshot</p>
-          <p style={{ margin: '0 0 10px 0', fontSize: '12.5px', color: COLORS.slate500 }}>A board-ready page — raised/completed, the ticket pipeline, top issue categories, compliance health and team activity — built live from real data, no AI involved.</p>
-          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-            {SNAPSHOT_PERIODS.map(p => (
-              <button
-                key={p.key}
-                onClick={() => setSnapshotPeriod(p.key)}
-                style={{
-                  padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer',
-                  border: snapshotPeriod === p.key ? `1px solid ${COLORS.brandNavy}` : `1px solid ${COLORS.slate200}`,
-                  background: snapshotPeriod === p.key ? COLORS.brandNavy : COLORS.white,
-                  color: snapshotPeriod === p.key ? COLORS.white : COLORS.slate600,
-                }}
-              >
-                {p.label}
-              </button>
-            ))}
+      {isAdmin ? (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', alignItems: 'start' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: COLORS.violet100, border: `1px solid ${COLORS.violet500}`, borderRadius: '12px', padding: '12px 16px', marginBottom: '12px' }}>
+              <span style={{ fontSize: '18px' }}>✨</span>
+              <p style={{ margin: 0, fontSize: '12.5px', color: COLORS.slate600, lineHeight: 1.5 }}>
+                <b style={{ color: COLORS.slate900 }}>Ask AI</b> — the 4 example questions below are answered instantly and free. Anything else is sent to Claude Haiku 4.5, generated from a snapshot of your real data (review before relying on it for decisions) and has a small real cost (see AI Usage below).
+              </p>
+            </div>
+
+            <div style={cardStyle}>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input
+                  type="text"
+                  value={aiQuestion}
+                  onChange={(e) => setAiQuestion(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && !aiLoading && aiQuestion.trim() && handleAskAi()}
+                  placeholder="e.g. Which properties have the most open tickets?"
+                  style={{ flex: 1, height: '44px', padding: '0 14px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13.5px', boxSizing: 'border-box' }}
+                />
+                <button onClick={handleAskAi} disabled={!aiQuestion.trim() || aiLoading} style={{ padding: '0 20px', borderRadius: '10px', border: 'none', background: COLORS.teal700, color: COLORS.white, fontWeight: 700, fontSize: '13px', cursor: 'pointer', opacity: !aiQuestion.trim() || aiLoading ? 0.5 : 1 }}>
+                  {aiLoading ? '...' : 'Ask →'}
+                </button>
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '12px' }}>
+                {AI_EXAMPLE_QUESTIONS.map(q => (
+                  <button key={q} onClick={() => { setAiQuestion(q); setAiAnswer(null); setAiError('') }} style={{ fontSize: '11.5px', padding: '5px 10px', borderRadius: '999px', border: `1px solid ${COLORS.slate200}`, background: COLORS.slate50, color: COLORS.slate600, cursor: 'pointer' }}>
+                    {q}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
+
+          {snapshotCard}
         </div>
-        <button
-          onClick={() => setShowSnapshot(true)}
-          style={{ padding: '10px 18px', borderRadius: '10px', border: 'none', background: COLORS.brandNavy, color: COLORS.white, fontWeight: 700, fontSize: '13px', cursor: 'pointer', flexShrink: 0 }}
-        >
-          📊 Generate Snapshot
-        </button>
-      </div>
+      ) : (
+        snapshotCard
+      )}
 
       {isAdmin && (
         <>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: COLORS.violet100, border: `1px solid ${COLORS.violet500}`, borderRadius: '12px', padding: '12px 16px', marginBottom: '12px' }}>
-            <span style={{ fontSize: '18px' }}>✨</span>
-            <p style={{ margin: 0, fontSize: '12.5px', color: COLORS.slate600, lineHeight: 1.5 }}>
-              <b style={{ color: COLORS.slate900 }}>Ask AI</b> — the 4 example questions below are answered instantly and free. Anything else is sent to Claude Haiku 4.5, generated from a snapshot of your real data (review before relying on it for decisions) and has a small real cost (see AI Usage below).
-            </p>
-          </div>
-
-          <div style={cardStyle}>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <input
-                type="text"
-                value={aiQuestion}
-                onChange={(e) => setAiQuestion(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && !aiLoading && aiQuestion.trim() && handleAskAi()}
-                placeholder="e.g. Which properties have the most open tickets?"
-                style={{ flex: 1, height: '44px', padding: '0 14px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13.5px', boxSizing: 'border-box' }}
-              />
-              <button onClick={handleAskAi} disabled={!aiQuestion.trim() || aiLoading} style={{ padding: '0 20px', borderRadius: '10px', border: 'none', background: COLORS.teal700, color: COLORS.white, fontWeight: 700, fontSize: '13px', cursor: 'pointer', opacity: !aiQuestion.trim() || aiLoading ? 0.5 : 1 }}>
-                {aiLoading ? '...' : 'Ask →'}
-              </button>
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '12px' }}>
-              {AI_EXAMPLE_QUESTIONS.map(q => (
-                <button key={q} onClick={() => { setAiQuestion(q); setAiAnswer(null); setAiError('') }} style={{ fontSize: '11.5px', padding: '5px 10px', borderRadius: '999px', border: `1px solid ${COLORS.slate200}`, background: COLORS.slate50, color: COLORS.slate600, cursor: 'pointer' }}>
-                  {q}
-                </button>
-              ))}
-            </div>
-          </div>
-
           {aiError && (
             <div style={{ ...cardStyle, background: COLORS.red50, border: `1px solid ${COLORS.red200}` }}>
               <p style={{ margin: 0, fontSize: '13px', color: COLORS.red900 }}>{aiError}</p>
