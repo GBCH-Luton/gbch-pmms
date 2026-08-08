@@ -489,7 +489,7 @@ export default function AdminReports({ profile, onNavigate }) {
   // height/flex column so it stretches to match the Ask AI column's height
   // when the two sit side by side in the grid below.
   const snapshotCard = (
-    <div style={{ ...cardStyle, height: '100%', display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }}>
+    <div style={{ ...cardStyle, display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }}>
       <p style={{ margin: '0 0 10px 0', fontSize: '14px', fontWeight: 800, color: COLORS.slate900 }}>Operations Snapshot</p>
       <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
         {snapshotPresets.map(p => (
@@ -534,7 +534,7 @@ export default function AdminReports({ profile, onNavigate }) {
 
       {isAdmin ? (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', alignItems: 'stretch' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: COLORS.violet100, border: `1px solid ${COLORS.violet500}`, borderRadius: '12px', padding: '12px 16px', marginBottom: '12px' }}>
               <span style={{ fontSize: '18px' }}>✨</span>
               <p style={{ margin: 0, fontSize: '12.5px', color: COLORS.slate600, lineHeight: 1.5 }}>
