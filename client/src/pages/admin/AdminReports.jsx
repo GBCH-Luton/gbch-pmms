@@ -11,7 +11,7 @@ import { COLORS } from '../../lib/colors'
 import { attachProperties } from '../../lib/properties'
 import { fetchAllMaintenanceCategoryNames } from '../../lib/maintenanceCategories'
 import {
-  formatDuration, filterSelectStyle, thStyle, tdStyle, actionBtnStyle,
+  formatDuration, filterSelectStyle, thStyle, tdStyle,
   fetchAssignableBuilders, fetchAssignableStaffForDivision, resolveCategoryDivision, computeAvgTurnaroundMs, computeAvgResponseMs, buildWeeklyTrend,
   isoDateNDaysAgo, todayIso, extractFunctionError, formatUKDateTime, formatUKDate, computeComplianceAging, COMPLIANCE_TYPES,
   ukDateKey, mondayOfWeek, firstOfMonth, fetchComplianceAgingCounts, statusColour, statusLabel,
@@ -180,6 +180,7 @@ export default function AdminReports({ profile, onNavigate }) {
   const [viewingLogRow, setViewingLogRow] = useState(null)
   const [aiUsagePage, setAiUsagePage] = useState(0)
   const [aiUsagePageSize, setAiUsagePageSize] = useState(5)
+  const [aiUsageTab, setAiUsageTab] = useState('history')
 
   useEffect(() => {
     load()
@@ -225,10 +226,22 @@ export default function AdminReports({ profile, onNavigate }) {
     const { data } = await supabase
       .schema('pmms')
       .from('ai_usage_log')
-      .select('id, question, answer, input_tokens, output_tokens, cost_usd, created_at')
+      .select('id, question, answer, input_tokens, output_tokens, cost_usd, created_at, is_favorite')
       .order('created_at', { ascending: false })
       .limit(50)
     setAiUsageLog(data || [])
+  }
+
+  // Optimistic -- flips immediately in the list (and the Favorites tab's
+  // count/contents), then persists. Shared across admins, not per-user,
+  // same as the rest of this log already is.
+  async function toggleFavorite(row) {
+    const nextValue = !row.is_favorite
+    setAiUsageLog(prev => prev.map(r => (r.id === row.id ? { ...r, is_favorite: nextValue } : r)))
+    const { error } = await supabase.schema('pmms').from('ai_usage_log').update({ is_favorite: nextValue }).eq('id', row.id)
+    if (error) {
+      setAiUsageLog(prev => prev.map(r => (r.id === row.id ? { ...r, is_favorite: !nextValue } : r)))
+    }
   }
 
   async function load() {
@@ -537,8 +550,29 @@ export default function AdminReports({ profile, onNavigate }) {
                 const hasUnpriced = aiUsageLog.some(r => r.cost_usd == null)
                 const weekRows = aiUsageLog.filter(r => new Date(r.created_at).getTime() >= weekAgo)
                 const monthRows = aiUsageLog.filter(r => new Date(r.created_at).getTime() >= monthAgo)
-                const pageCount = Math.max(1, Math.ceil(aiUsageLog.length / aiUsagePageSize))
-                const pagedRows = aiUsageLog.slice(aiUsagePage * aiUsagePageSize, (aiUsagePage + 1) * aiUsagePageSize)
+                const favoriteRows = aiUsageLog.filter(r => r.is_favorite)
+                const tabRows = aiUsageTab === 'favorites' ? favoriteRows : aiUsageLog
+                const pageCount = Math.max(1, Math.ceil(tabRows.length / aiUsagePageSize))
+                const pagedRows = tabRows.slice(aiUsagePage * aiUsagePageSize, (aiUsagePage + 1) * aiUsagePageSize)
+
+                const tabBtnStyle = (active) => ({
+                  padding: '9px 16px', borderRadius: '999px', fontSize: '13px', fontWeight: 700, cursor: 'pointer',
+                  display: 'inline-flex', alignItems: 'center', gap: '8px',
+                  border: active ? 'none' : `1px solid ${COLORS.slate200}`,
+                  background: active ? COLORS.brandNavy : COLORS.white,
+                  color: active ? COLORS.white : COLORS.slate600,
+                  boxShadow: active ? '0 4px 14px rgba(13,27,62,0.35)' : 'none',
+                })
+                const tabCountStyle = (active) => ({
+                  fontSize: '10.5px', fontWeight: 800, padding: '1px 7px', borderRadius: '999px',
+                  background: active ? 'rgba(255,255,255,0.25)' : COLORS.slate200, color: active ? COLORS.white : COLORS.slate600,
+                })
+                const navyThStyle = { textAlign: 'left', padding: '14px', fontSize: '10.5px', fontWeight: 800, color: 'rgba(255,255,255,0.55)', textTransform: 'uppercase', letterSpacing: '0.07em' }
+                const pagerBtnStyle = (disabled) => ({
+                  padding: '8px 16px', borderRadius: '8px', border: `1px solid ${COLORS.slate200}`, background: COLORS.white,
+                  color: COLORS.slate600, fontSize: '12.5px', fontWeight: 700, opacity: disabled ? 0.4 : 1, cursor: disabled ? 'not-allowed' : 'pointer',
+                })
+
                 return (
                   <>
                     <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
@@ -560,46 +594,78 @@ export default function AdminReports({ profile, onNavigate }) {
                         Some queries show no cost because pricing isn't set yet -- see Settings &gt; AI Usage Pricing.
                       </p>
                     )}
-                    <div style={{ overflowX: 'auto' }}>
-                      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                        <thead>
-                          <tr>
-                            <th style={thStyle}>Asked</th>
-                            <th style={thStyle}>Question</th>
-                            <th style={thStyle}>Tokens (in / out)</th>
-                            <th style={thStyle}>Cost</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {pagedRows.map(r => (
-                            <tr key={r.id}>
-                              <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>{formatUKDateTime(r.created_at)}</td>
-                              <td
-                                style={{ ...tdStyle, cursor: 'pointer', color: COLORS.blue700, fontWeight: 600 }}
-                                onClick={() => setViewingLogRow(r)}
-                              >
-                                {r.question}
-                              </td>
-                              <td style={tdStyle}>{r.input_tokens ?? '—'} / {r.output_tokens ?? '—'}</td>
-                              <td style={tdStyle}>{r.cost_usd != null ? `$${r.cost_usd.toFixed(4)}` : '—'}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+
+                    <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+                      <button onClick={() => { setAiUsageTab('history'); setAiUsagePage(0) }} style={tabBtnStyle(aiUsageTab === 'history')}>
+                        🕐 History <span style={tabCountStyle(aiUsageTab === 'history')}>{aiUsageLog.length}</span>
+                      </button>
+                      <button onClick={() => { setAiUsageTab('favorites'); setAiUsagePage(0) }} style={tabBtnStyle(aiUsageTab === 'favorites')}>
+                        ★ Favorites <span style={tabCountStyle(aiUsageTab === 'favorites')}>{favoriteRows.length}</span>
+                      </button>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '10px', marginTop: '12px' }}>
-                      <span style={{ fontSize: '12px', color: COLORS.slate500 }}>Page {aiUsagePage + 1} of {pageCount}</span>
+
+                    <div style={{ borderRadius: '16px', overflow: 'hidden', boxShadow: '0 10px 30px rgba(13,27,62,0.14)' }}>
+                      <div style={{ overflowX: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', background: COLORS.white }}>
+                          <thead>
+                            <tr style={{ background: COLORS.brandNavy }}>
+                              <th style={{ ...navyThStyle, textAlign: 'center', width: '44px' }}>★</th>
+                              <th style={navyThStyle}>Asked</th>
+                              <th style={{ ...navyThStyle, color: COLORS.white }}>Question</th>
+                              <th style={navyThStyle}>Tokens (in / out)</th>
+                              <th style={navyThStyle}>Cost</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {pagedRows.length === 0 ? (
+                              <tr>
+                                <td colSpan={5} style={{ padding: '32px 14px', textAlign: 'center', fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>
+                                  No favourites yet — click ☆ on any question to save it here.
+                                </td>
+                              </tr>
+                            ) : pagedRows.map(r => (
+                              <tr key={r.id} style={{ background: r.is_favorite ? COLORS.amber50 : COLORS.white }}>
+                                <td style={{ ...tdStyle, textAlign: 'center' }}>
+                                  <button
+                                    onClick={() => toggleFavorite(r)}
+                                    aria-label={r.is_favorite ? 'Unfavorite' : 'Favorite'}
+                                    style={{
+                                      background: 'none', border: 'none', cursor: 'pointer', fontSize: '17px', lineHeight: 1, padding: '2px',
+                                      color: r.is_favorite ? COLORS.amber500 : COLORS.slate300,
+                                    }}
+                                  >
+                                    {r.is_favorite ? '★' : '☆'}
+                                  </button>
+                                </td>
+                                <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>{formatUKDateTime(r.created_at)}</td>
+                                <td
+                                  style={{ ...tdStyle, cursor: 'pointer', color: COLORS.teal700, fontWeight: 700 }}
+                                  onClick={() => setViewingLogRow(r)}
+                                >
+                                  {r.question}
+                                </td>
+                                <td style={tdStyle}>{r.input_tokens ?? '—'} / {r.output_tokens ?? '—'}</td>
+                                <td style={{ ...tdStyle, fontWeight: 700 }}>{r.cost_usd != null ? `$${r.cost_usd.toFixed(4)}` : '—'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '14px', marginTop: '16px' }}>
                       <button
                         onClick={() => setAiUsagePage(p => Math.max(0, p - 1))}
                         disabled={aiUsagePage === 0}
-                        style={{ ...actionBtnStyle, opacity: aiUsagePage === 0 ? 0.4 : 1, cursor: aiUsagePage === 0 ? 'not-allowed' : 'pointer' }}
+                        style={pagerBtnStyle(aiUsagePage === 0)}
                       >
                         ← Previous
                       </button>
+                      <span style={{ fontSize: '12.5px', color: COLORS.slate400, fontWeight: 600, minWidth: '90px', textAlign: 'center' }}>Page {aiUsagePage + 1} of {pageCount}</span>
                       <button
                         onClick={() => setAiUsagePage(p => Math.min(pageCount - 1, p + 1))}
                         disabled={aiUsagePage >= pageCount - 1}
-                        style={{ ...actionBtnStyle, opacity: aiUsagePage >= pageCount - 1 ? 0.4 : 1, cursor: aiUsagePage >= pageCount - 1 ? 'not-allowed' : 'pointer' }}
+                        style={pagerBtnStyle(aiUsagePage >= pageCount - 1)}
                       >
                         Next →
                       </button>
