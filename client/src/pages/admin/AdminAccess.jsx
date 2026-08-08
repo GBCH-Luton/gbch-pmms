@@ -52,10 +52,12 @@ import { COLORS } from '../../lib/colors'
 import { fetchDivisions, saveDivisions, DEFAULT_DIVISIONS } from '../../lib/divisions'
 import { fetchMaintenanceCategories, sortedCategoryEntries } from '../../lib/maintenanceCategories'
 import { supabase } from '../../lib/supabase'
+import { compressImage } from '../../lib/imageCompression'
 import {
   actionBtnStyle, Avatar, thStyle, tdStyle, formatUKDateTime, filterSelectStyle,
   modalOverlayStyle, modalCardStyle, modalTitleStyle, modalLabelStyle, modalErrorStyle,
   modalCancelBtnStyle, modalConfirmBtnStyle, autoReassignDepartingStaffTickets, extractFunctionError,
+  resolveStaffPhotoUrl,
 } from './shared'
 
 const LOGIN_EVENTS_LIMIT = 50
@@ -974,6 +976,7 @@ function StaffRecordEditorPanel({ staffList, onSaved }) {
   const [searchText, setSearchText] = useState(ADD_NEW_LABEL)
   const [form, setForm] = useState(emptyStaffRecordForm)
   const [saving, setSaving] = useState(false)
+  const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const [error, setError] = useState('')
   const [savedMessage, setSavedMessage] = useState('')
 
@@ -1020,6 +1023,28 @@ function StaffRecordEditorPanel({ staffList, onSaved }) {
 
   function set(key, value) {
     setForm(prev => ({ ...prev, [key]: value }))
+  }
+
+  // Uploads straight into the shared "staff-photos" bucket (public, already
+  // used to display photos via resolveStaffPhotoUrl -- see shared.jsx --
+  // just never had anything to upload into it before). Scoped under the
+  // staff id folder same as every other upload site in this app; a new,
+  // not-yet-saved record uses "new" since there's no id yet.
+  async function handlePhotoUpload(e) {
+    const file = e.target.files[0]
+    e.target.value = ''
+    if (!file) return
+
+    setUploadingPhoto(true)
+    setError('')
+    const compressed = await compressImage(file)
+    const path = `${selected ? selected.id : 'new'}/${Date.now()}-${compressed.name}`
+    const { error: uploadError } = await supabase.storage.from('staff-photos').upload(path, compressed)
+    setUploadingPhoto(false)
+
+    if (uploadError) { setError(`Photo upload failed: ${uploadError.message}`); return }
+    const { data } = supabase.storage.from('staff-photos').getPublicUrl(path)
+    set('photo_url', data.publicUrl)
   }
 
   async function handleSave() {
@@ -1145,8 +1170,26 @@ function StaffRecordEditorPanel({ staffList, onSaved }) {
               <input type="text" value={form.home_postcode} onChange={(e) => set('home_postcode', e.target.value)} placeholder="e.g. LU1 2AB" style={inputStyle} />
             </div>
             <div>
-              <label style={modalLabelStyle}>Photo URL</label>
-              <input type="text" value={form.photo_url} onChange={(e) => set('photo_url', e.target.value)} placeholder="https://..." style={inputStyle} />
+              <label style={modalLabelStyle}>Photo</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                {form.photo_url ? (
+                  <img src={resolveStaffPhotoUrl(form.photo_url)} alt="" style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                ) : (
+                  <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: COLORS.slate100, flexShrink: 0 }} />
+                )}
+                <input type="file" accept="image/*" id="staff-record-photo-input" onChange={handlePhotoUpload} style={{ display: 'none' }} />
+                <label
+                  htmlFor="staff-record-photo-input"
+                  style={{ fontSize: '12px', fontWeight: 700, color: COLORS.blue700, background: COLORS.blue100, borderRadius: '8px', padding: '8px 12px', cursor: uploadingPhoto ? 'not-allowed' : 'pointer', opacity: uploadingPhoto ? 0.6 : 1 }}
+                >
+                  {uploadingPhoto ? 'Uploading...' : form.photo_url ? 'Change Photo' : 'Upload Photo'}
+                </label>
+                {form.photo_url && (
+                  <button type="button" onClick={() => set('photo_url', '')} style={{ fontSize: '12px', fontWeight: 700, color: COLORS.slate500, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                    Remove
+                  </button>
+                )}
+              </div>
             </div>
             <div style={{ gridColumn: '1 / -1' }}>
               <label style={modalLabelStyle}>Skills (comma-separated)</label>
