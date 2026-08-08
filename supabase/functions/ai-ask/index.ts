@@ -65,7 +65,7 @@ function ukNow() {
 
 async function buildContext(adminClient: any) {
   const [{ data: tickets }, { data: properties }, { data: complianceRecords }, { data: staff }, { data: thresholdRow }, { data: shifts }, { data: deadlineRow }] = await Promise.all([
-    adminClient.schema('pmms').from('tickets').select('ticket_number, property_id, category, status, assigned_builder_id, created_at, completed_at'),
+    adminClient.schema('pmms').from('tickets').select('ticket_number, property_id, category, status, assigned_builder_id, created_at, completed_at, first_assigned_at, mileage_logged, transit_start'),
     adminClient.schema('pmms').from('properties').select('id, address'),
     adminClient.schema('pmms').from('property_compliance').select('property_id, cert_type, expiry_date, not_applicable'),
     adminClient.from('staff').select('id, name'),
@@ -178,7 +178,10 @@ async function buildContext(adminClient: any) {
       property: t.property_id ? addressById[t.property_id] : null,
       builder: t.assigned_builder_id ? (nameById[t.assigned_builder_id] || 'Unknown') : null,
       createdAt: t.created_at,
+      firstAssignedAt: t.first_assigned_at,
       completedAt: t.completed_at,
+      mileageLogged: t.mileage_logged,
+      comingFrom: t.transit_start,
     }))
 
   return {
@@ -216,11 +219,11 @@ Deno.serve(async (req: Request) => {
 
     const systemPrompt = `You are answering a manager's question inside PMMS, a property maintenance management system, using ONLY the JSON data below -- it's a real snapshot of their live data (no resident names or personal details are included). Answer concisely, in plain prose (no markdown headers), citing real numbers from the data.
 
-DATA.currentUkDateTime / DATA.todayUkDate is the real current UK date and time -- use it to work out "today", "yesterday", "this week" (Mon-Sun), "this month" etc. yourself from DATA.recentTickets' createdAt/completedAt fields (both UK-relevant timestamps -- treat a date as matching "today" if its UK calendar date equals todayUkDate). DATA.recentTickets holds the most recent 500 tickets (ticketNumber, category, status, property, builder, createdAt, completedAt) -- count, filter or group these yourself for anything date-scoped that isn't already in one of the pre-aggregated fields (ticketsByStatus/ticketsByCategory/openTicketsByProperty are all-time totals, not date-scoped). A null completedAt means still open.
+DATA.currentUkDateTime / DATA.todayUkDate is the real current UK date and time -- use it to work out "today", "yesterday", "this week" (Mon-Sun), "this month" etc. yourself from DATA.recentTickets' date fields (all UK-relevant timestamps -- treat a date as matching "today" if its UK calendar date equals todayUkDate). DATA.recentTickets holds the most recent 500 tickets (ticketNumber, category, status, property, builder, createdAt, firstAssignedAt, completedAt, mileageLogged, comingFrom) -- count, filter or group these yourself for anything date-scoped or mileage-related that isn't already in one of the pre-aggregated fields (ticketsByStatus/ticketsByCategory/openTicketsByProperty are all-time totals, not date-scoped). A null completedAt means still open. mileageLogged is the miles the builder actually entered when starting that job (0 or null means none logged); comingFrom is where they said they travelled from ("Home"/"Office / depot"/a shop name/etc, or "Already on site"). There is NO estimated/expected mileage figure anywhere in this snapshot -- that comparison only exists live on the Clocking page and isn't something this data can answer; say so rather than guessing at an estimate.
 
 DATA.builderPerformance is one row per active builder: completedJobs and openJobs (workload), avgTurnaroundHours (created-to-completed, all-time), and shiftsLogged/lateClockIns/onTimeClockInPct for timekeeping -- use this directly for "how is X performing" or "who's busiest" type questions rather than only citing completedJobs. DATA.attendanceOverall is the same timekeeping shape rolled up across everyone, plus dailyClockInDeadline (the UK "HH:mm" cutoff a clock-in after which counts as late) -- use it for portfolio-wide punctuality questions like "do builders clock in on time".
 
-If a question needs information genuinely outside this snapshot (e.g. older than the 500 most recent tickets/500 most recent shifts, job quality/customer feedback, or anything else this snapshot doesn't carry), say so plainly rather than guessing or making up a number.
+If a question needs information genuinely outside this snapshot (e.g. older than the 500 most recent tickets/500 most recent shifts, job quality/customer feedback, estimated mileage, or anything else this snapshot doesn't carry), say so plainly rather than guessing or making up a number.
 
 DATA:
 ${JSON.stringify(context)}`
