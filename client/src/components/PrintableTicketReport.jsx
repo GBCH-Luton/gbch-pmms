@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { resolveCategoryDivision, priorityTierLabel, formatUKDate, statusLabel } from '../pages/admin/shared'
 import { COLORS } from '../lib/colors'
 
@@ -12,6 +13,35 @@ import { COLORS } from '../lib/colors'
 // z-index/overlay stacking elsewhere in the app.
 export default function PrintableTicketReport({ tickets, categoriesSettingsRow, divisionLabel, fromDate, toDate, onClose }) {
   const generatedAt = new Date()
+  const [columnsOpen, setColumnsOpen] = useState(false)
+
+  // Single source of truth for both the CSV export and the on-screen/print
+  // table, so picking columns only has to happen once and the two can never
+  // drift out of sync with each other.
+  const COLUMN_DEFS = [
+    { key: 'ticketNumber', label: 'Ticket #', value: t => t.ticket_number },
+    { key: 'property', label: 'Property', value: t => t.property?.address || '' },
+    { key: 'category', label: 'Category', value: t => t.category || '' },
+    { key: 'division', label: 'Division', value: t => resolveCategoryDivision(t.category, categoriesSettingsRow) },
+    { key: 'status', label: 'Status', value: t => statusLabel(t.status) },
+    { key: 'priority', label: 'Priority', value: t => t.priority_override || priorityTierLabel(t.priority_score) },
+    { key: 'raised', label: 'Raised', value: t => t.created_at ? formatUKDate(t.created_at) : '' },
+    { key: 'completed', label: 'Completed', value: t => t.completed_at ? formatUKDate(t.completed_at) : '' },
+    { key: 'builder', label: 'Assigned Builder', value: t => t.builderName || '' },
+  ]
+
+  const [visibleKeys, setVisibleKeys] = useState(() => COLUMN_DEFS.map(c => c.key))
+  const activeColumns = COLUMN_DEFS.filter(c => visibleKeys.includes(c.key))
+
+  function toggleColumn(key) {
+    setVisibleKeys(prev => {
+      if (prev.includes(key)) {
+        if (prev.length === 1) return prev // always leave at least one column showing
+        return prev.filter(k => k !== key)
+      }
+      return [...prev, key]
+    })
+  }
 
   const rangeLabel = fromDate || toDate
     ? `${fromDate ? formatUKDate(fromDate) : 'Any'} — ${toDate ? formatUKDate(toDate) : 'Any'}`
@@ -23,18 +53,8 @@ export default function PrintableTicketReport({ tickets, categoriesSettingsRow, 
   }
 
   function handleDownloadCsv() {
-    const headers = ['Ticket #', 'Property', 'Category', 'Division', 'Status', 'Priority', 'Raised', 'Completed', 'Assigned Builder']
-    const rows = tickets.map(t => [
-      t.ticket_number,
-      t.property?.address || '',
-      t.category || '',
-      resolveCategoryDivision(t.category, categoriesSettingsRow),
-      statusLabel(t.status),
-      t.priority_override || priorityTierLabel(t.priority_score),
-      t.created_at ? formatUKDate(t.created_at) : '',
-      t.completed_at ? formatUKDate(t.completed_at) : '',
-      t.builderName || '',
-    ])
+    const headers = activeColumns.map(c => c.label)
+    const rows = tickets.map(t => activeColumns.map(c => c.value(t)))
     const csv = [headers, ...rows].map(row => row.map(csvEscape).join(',')).join('\n')
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
@@ -49,17 +69,41 @@ export default function PrintableTicketReport({ tickets, categoriesSettingsRow, 
     <div style={{ position: 'fixed', inset: 0, zIndex: 100000, background: COLORS.white, overflowY: 'auto' }}>
       <div className="pmms-no-print" style={{
         position: 'sticky', top: 0, background: COLORS.slate50, borderBottom: `1px solid ${COLORS.slate200}`,
-        padding: '12px 20px', display: 'flex', gap: '10px', justifyContent: 'flex-end', zIndex: 1,
+        padding: '12px 20px', display: 'flex', gap: '10px', justifyContent: 'space-between', alignItems: 'flex-start', zIndex: 1,
       }}>
-        <button onClick={handleDownloadCsv} style={{ padding: '8px 14px', borderRadius: '8px', border: `1px solid ${COLORS.slate200}`, background: COLORS.white, color: COLORS.slate900, fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
-          Download CSV
-        </button>
-        <button onClick={() => window.print()} style={{ padding: '8px 14px', borderRadius: '8px', border: 'none', background: COLORS.slate900, color: COLORS.white, fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
-          Print
-        </button>
-        <button onClick={onClose} style={{ padding: '8px 14px', borderRadius: '8px', border: `1px solid ${COLORS.slate200}`, background: COLORS.white, color: COLORS.slate500, fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
-          Close
-        </button>
+        <div style={{ position: 'relative' }}>
+          <button
+            onClick={() => setColumnsOpen(prev => !prev)}
+            style={{ padding: '8px 14px', borderRadius: '8px', border: `1px solid ${COLORS.slate200}`, background: COLORS.white, color: COLORS.slate900, fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}
+          >
+            Columns ({activeColumns.length}/{COLUMN_DEFS.length}) {columnsOpen ? '▲' : '▼'}
+          </button>
+          {columnsOpen && (
+            <div style={{
+              position: 'absolute', top: 'calc(100% + 6px)', left: 0, background: COLORS.white, border: `1px solid ${COLORS.slate200}`,
+              borderRadius: '10px', padding: '10px 14px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', minWidth: '200px',
+            }}>
+              {COLUMN_DEFS.map(c => (
+                <label key={c.key} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: COLORS.slate600, padding: '4px 0', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                  <input type="checkbox" checked={visibleKeys.includes(c.key)} onChange={() => toggleColumn(c.key)} />
+                  {c.label}
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button onClick={handleDownloadCsv} style={{ padding: '8px 14px', borderRadius: '8px', border: `1px solid ${COLORS.slate200}`, background: COLORS.white, color: COLORS.slate900, fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
+            Download CSV
+          </button>
+          <button onClick={() => window.print()} style={{ padding: '8px 14px', borderRadius: '8px', border: 'none', background: COLORS.slate900, color: COLORS.white, fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
+            Print
+          </button>
+          <button onClick={onClose} style={{ padding: '8px 14px', borderRadius: '8px', border: `1px solid ${COLORS.slate200}`, background: COLORS.white, color: COLORS.slate500, fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
+            Close
+          </button>
+        </div>
       </div>
 
       <div className="pmms-print-area" style={{ padding: '32px', fontFamily: 'system-ui, sans-serif' }}>
@@ -73,29 +117,23 @@ export default function PrintableTicketReport({ tickets, categoriesSettingsRow, 
 
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
           <thead>
-            <tr style={{ borderBottom: `2px solid ${COLORS.slate900}` }}>
-              {['Ticket #', 'Property', 'Category', 'Division', 'Status', 'Priority', 'Raised', 'Completed', 'Assigned Builder'].map(h => (
-                <th key={h} style={{ textAlign: 'left', padding: '6px 8px', fontWeight: 800, color: COLORS.slate900 }}>{h}</th>
+            <tr style={{ background: COLORS.slate100, borderBottom: `2px solid ${COLORS.slate900}` }}>
+              {activeColumns.map(c => (
+                <th key={c.key} style={{ textAlign: 'left', padding: '8px', fontWeight: 800, color: COLORS.slate900 }}>{c.label}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {tickets.map(t => (
               <tr key={t.id} style={{ borderBottom: `1px solid ${COLORS.slate200}` }}>
-                <td style={{ padding: '6px 8px' }}>{t.ticket_number}</td>
-                <td style={{ padding: '6px 8px' }}>{t.property?.address || '—'}</td>
-                <td style={{ padding: '6px 8px' }}>{t.category || '—'}</td>
-                <td style={{ padding: '6px 8px' }}>{resolveCategoryDivision(t.category, categoriesSettingsRow)}</td>
-                <td style={{ padding: '6px 8px' }}>{statusLabel(t.status)}</td>
-                <td style={{ padding: '6px 8px' }}>{t.priority_override || priorityTierLabel(t.priority_score)}</td>
-                <td style={{ padding: '6px 8px' }}>{t.created_at ? formatUKDate(t.created_at) : '—'}</td>
-                <td style={{ padding: '6px 8px' }}>{t.completed_at ? formatUKDate(t.completed_at) : '—'}</td>
-                <td style={{ padding: '6px 8px' }}>{t.builderName || '—'}</td>
+                {activeColumns.map(c => (
+                  <td key={c.key} style={{ padding: '6px 8px' }}>{c.value(t) || '—'}</td>
+                ))}
               </tr>
             ))}
             {tickets.length === 0 && (
               <tr>
-                <td colSpan={9} style={{ padding: '20px 8px', textAlign: 'center', color: COLORS.slate400 }}>No tickets match the current filters.</td>
+                <td colSpan={activeColumns.length} style={{ padding: '20px 8px', textAlign: 'center', color: COLORS.slate400 }}>No tickets match the current filters.</td>
               </tr>
             )}
           </tbody>
