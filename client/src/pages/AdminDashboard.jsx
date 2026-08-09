@@ -7,7 +7,7 @@ import { COLORS } from '../lib/colors'
 import { logLoginEvent } from '../lib/loginEvents'
 import { pushNotificationsSupported, hasActivePushSubscription, enablePushNotifications } from '../lib/pushNotifications'
 import gbchLogo from '../assets/gbch-logo.svg'
-import { EVENTS_FEATURE_ENABLED, resolveStaffPhotoUrl } from './admin/shared'
+import { EVENTS_FEATURE_ENABLED, AI_TRIAL_FEATURE_ENABLED, resolveStaffPhotoUrl } from './admin/shared'
 import { getImpersonationMarker, returnToAdmin } from '../lib/impersonation'
 import { countUnreadMessages } from '../lib/chat'
 import { countUnreadDms } from '../lib/dm'
@@ -61,10 +61,14 @@ const NAV_ITEMS = [
   { key: 'housekeeping', label: 'Housekeeping', icon: 'broom', Component: AdminHousekeeping, divisionOnly: 'Housekeeping' },
   { key: 'builders', label: 'Staff', icon: 'users', Component: AdminBuilders },
   { key: 'clocking', label: 'Clocking', icon: 'clock', Component: AdminClocking },
-  // Read-only for admin AND manager -- deliberately not adminOnly, unlike
-  // Help & Guide below. No divisions/divisionOnly gating either: a
-  // division-scoped manager (e.g. Housekeeping) still benefits from being
-  // able to open the other division's guide for context.
+  { key: 'stock', label: 'Stock', icon: 'box', Component: AdminStock, divisions: ['Maintenance'] },
+  { key: 'reports', label: 'Reports', icon: 'chart', Component: AdminReports },
+  // Sits in AI Trial's old slot (see AI_TRIAL_FEATURE_ENABLED, hidden
+  // 2026-08-09) -- read-only for admin AND manager, deliberately not
+  // adminOnly, unlike Help & Guide below. No divisions/divisionOnly
+  // gating either: a division-scoped manager (e.g. Housekeeping) still
+  // benefits from being able to open the other division's guide for
+  // context.
   {
     key: 'quick-guide', label: 'Quick Guide', icon: 'phone',
     children: [
@@ -72,22 +76,20 @@ const NAV_ITEMS = [
       { key: 'housekeeper-guide', label: 'Housekeeper', Component: AdminHousekeepingGuide },
     ],
   },
-  { key: 'stock', label: 'Stock', icon: 'box', Component: AdminStock, divisions: ['Maintenance'] },
-  { key: 'reports', label: 'Reports', icon: 'chart', Component: AdminReports },
   // Trial section, admin-only while it's being tried out and shown to
   // managers -- free, rule-based (no external AI service, no cost), see
   // client/src/pages/admin/ai-trial/keywordEngine.js. Each child also
   // carries adminOnly itself (not just the parent) so the defense-in-depth
   // check below (activeNavItem + isNavItemVisible) still holds if one is
   // ever resolved directly by key.
-  {
+  ...(AI_TRIAL_FEATURE_ENABLED ? [{
     key: 'ai-trial', label: 'AI Trial', icon: 'sparkle', adminOnly: true,
     children: [
       { key: 'ai-ticket', label: 'Ticket Logging', Component: AiTicketLogging, adminOnly: true },
       { key: 'ai-priority', label: 'Priority Scoring', Component: AiPriorityScoring, adminOnly: true },
       { key: 'ai-compliance', label: 'Compliance Digest', Component: AiComplianceDigest, adminOnly: true },
     ],
-  },
+  }] : []),
   // These three are rendered in the profile popover, not the main nav list
   // (see SidebarContent) -- still present here so NAV_ITEMS/isNavItemVisible
   // keep working as the single source of truth for routing + visibility.
@@ -102,9 +104,9 @@ const POPOVER_ITEM_KEYS = ['settings', 'admin', 'view-as', 'help']
 // Visual grouping dividers in the main nav: Dashboard alone, then the
 // ticket lifecycle (Pipeline/Log a Ticket/Sign-Off), then property/
 // division monitoring (Properties/Voids/Compliance/Housekeeping), then
-// people-ops (Staff/Clocking/Quick Guide), then Stock/Reports, then
-// the AI Trial section set apart on its own.
-const DIVIDER_AFTER_KEYS = ['team-chat', 'sign-off', 'housekeeping', 'quick-guide', 'reports']
+// people-ops (Staff/Clocking), then Stock/Reports, then Quick Guide (and
+// AI Trial, while re-enabled) set apart on their own.
+const DIVIDER_AFTER_KEYS = ['team-chat', 'sign-off', 'housekeeping', 'clocking', 'reports']
 
 const PENDING_SIGN_OFF_POLL_MS = 20000
 

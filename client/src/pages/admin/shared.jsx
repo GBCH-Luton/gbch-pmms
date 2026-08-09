@@ -31,6 +31,12 @@ export function todayIso() {
 // bring it all back with no rebuilding.
 export const EVENTS_FEATURE_ENABLED = false
 
+// Hidden 2026-08-09 to make room for Quick Guide in the sidebar -- the AI
+// Trial pages, RLS and route all still exist (see admin/ai-trial/*.jsx)
+// this just pulls its nav item out of view. Flip back to true to bring it
+// back with no rebuilding.
+export const AI_TRIAL_FEATURE_ENABLED = false
+
 export const GLOBAL_TRIAGE_THRESHOLD = 70
 export const P2_URGENT_THRESHOLD = 40
 
