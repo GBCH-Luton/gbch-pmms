@@ -31,6 +31,7 @@ const AdminSettings = lazy(() => import('./admin/AdminSettings'))
 const AdminAccess = lazy(() => import('./admin/AdminAccess'))
 const AdminHelp = lazy(() => import('./admin/AdminHelp'))
 const AdminBuilderGuide = lazy(() => import('./admin/AdminBuilderGuide'))
+const AdminHousekeepingGuide = lazy(() => import('./admin/AdminHousekeepingGuide'))
 const AdminHousekeeping = lazy(() => import('./admin/AdminHousekeeping'))
 const AdminEvents = lazy(() => import('./admin/AdminEvents'))
 const AdminViewAs = lazy(() => import('./admin/AdminViewAs'))
@@ -38,13 +39,6 @@ const AdminTeamChat = lazy(() => import('./admin/AdminTeamChat'))
 const AiTicketLogging = lazy(() => import('./admin/ai-trial/AiTicketLogging'))
 const AiPriorityScoring = lazy(() => import('./admin/ai-trial/AiPriorityScoring'))
 const AiComplianceDigest = lazy(() => import('./admin/ai-trial/AiComplianceDigest'))
-
-// Keys of every AI Trial submenu child -- used to auto-expand that section
-// in the sidebar if you're already on one of its pages, and to resolve
-// currentPage -> nav item for the ones nested under 'ai-trial' below.
-// 'ai-reports' merged into the real Reports page (see AdminReports.jsx) --
-// no longer a separate AI Trial child.
-const AI_TRIAL_CHILD_KEYS = ['ai-ticket', 'ai-priority', 'ai-compliance']
 
 const NAV_ITEMS = [
   // Grouped by what they're actually for: core ticket lifecycle first,
@@ -68,9 +62,16 @@ const NAV_ITEMS = [
   { key: 'builders', label: 'Staff', icon: 'users', Component: AdminBuilders },
   { key: 'clocking', label: 'Clocking', icon: 'clock', Component: AdminClocking },
   // Read-only for admin AND manager -- deliberately not adminOnly, unlike
-  // Help & Guide below. No divisions/divisionOnly gating either: Daily
-  // Attendance is a company-wide layer, not Maintenance-specific.
-  { key: 'builder-guide', label: 'Builder App Guide', icon: 'phone', Component: AdminBuilderGuide },
+  // Help & Guide below. No divisions/divisionOnly gating either: a
+  // division-scoped manager (e.g. Housekeeping) still benefits from being
+  // able to open the other division's guide for context.
+  {
+    key: 'quick-guide', label: 'Quick Guide', icon: 'phone',
+    children: [
+      { key: 'builder-guide', label: 'Builder', Component: AdminBuilderGuide },
+      { key: 'housekeeper-guide', label: 'Housekeeper', Component: AdminHousekeepingGuide },
+    ],
+  },
   { key: 'stock', label: 'Stock', icon: 'box', Component: AdminStock, divisions: ['Maintenance'] },
   { key: 'reports', label: 'Reports', icon: 'chart', Component: AdminReports },
   // Trial section, admin-only while it's being tried out and shown to
@@ -101,9 +102,9 @@ const POPOVER_ITEM_KEYS = ['settings', 'admin', 'view-as', 'help']
 // Visual grouping dividers in the main nav: Dashboard alone, then the
 // ticket lifecycle (Pipeline/Log a Ticket/Sign-Off), then property/
 // division monitoring (Properties/Voids/Compliance/Housekeeping), then
-// people-ops (Staff/Clocking/Builder App Guide), then Stock/Reports, then
+// people-ops (Staff/Clocking/Quick Guide), then Stock/Reports, then
 // the AI Trial section set apart on its own.
-const DIVIDER_AFTER_KEYS = ['team-chat', 'sign-off', 'housekeeping', 'builder-guide', 'reports']
+const DIVIDER_AFTER_KEYS = ['team-chat', 'sign-off', 'housekeeping', 'quick-guide', 'reports']
 
 const PENDING_SIGN_OFF_POLL_MS = 20000
 
@@ -318,9 +319,14 @@ export default function AdminDashboard({ profile }) {
   function SidebarContent({ allowCollapse = false }) {
     const [popoverOpen, setPopoverOpen] = useState(false)
     const [returning, setReturning] = useState(false)
-    // Lazy-initialized so reopening the sidebar while already on an AI
-    // Trial page doesn't collapse the section you're currently in.
-    const [aiTrialOpen, setAiTrialOpen] = useState(() => AI_TRIAL_CHILD_KEYS.includes(currentPage))
+    // Which parent-with-children nav items (AI Trial, Quick Guide) are
+    // currently expanded, keyed by item.key -- a Set rather than one
+    // boolean per group, since either could be independently open/closed.
+    // Lazy-initialized so reopening the sidebar while already on a child
+    // page doesn't collapse the section you're currently in.
+    const [openGroups, setOpenGroups] = useState(() => new Set(
+      NAV_ITEMS.filter(item => item.children?.some(c => c.key === currentPage)).map(item => item.key)
+    ))
     const isCollapsed = allowCollapse && sidebarCollapsed
     const impersonationMarker = getImpersonationMarker()
     const popoverRef = useRef(null)
@@ -344,8 +350,17 @@ export default function AdminDashboard({ profile }) {
 
     function handleNavItemClick(item) {
       if (item.children) {
-        if (isCollapsed) { setSidebarCollapsed(false); setAiTrialOpen(true) }
-        else setAiTrialOpen(o => !o)
+        if (isCollapsed) {
+          setSidebarCollapsed(false)
+          setOpenGroups(prev => new Set(prev).add(item.key))
+        } else {
+          setOpenGroups(prev => {
+            const next = new Set(prev)
+            if (next.has(item.key)) next.delete(item.key)
+            else next.add(item.key)
+            return next
+          })
+        }
       } else {
         goToPage(item.key)
       }
@@ -450,12 +465,12 @@ export default function AdminDashboard({ profile }) {
                         {!isCollapsed && (
                           <span style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label}</span>
-                            <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.5)', transform: aiTrialOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s ease' }}>▶</span>
+                            <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.5)', transform: openGroups.has(item.key) ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s ease' }}>▶</span>
                           </span>
                         )}
                       </button>
                     </div>
-                    {aiTrialOpen && !isCollapsed && item.children.filter(child => isNavItemVisible(child, profile)).map(child => (
+                    {openGroups.has(item.key) && !isCollapsed && item.children.filter(child => isNavItemVisible(child, profile)).map(child => (
                       <button
                         key={child.key}
                         onClick={() => goToPage(child.key)}

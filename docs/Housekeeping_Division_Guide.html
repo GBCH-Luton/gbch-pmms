@@ -1,0 +1,1058 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PMMS Housekeeping Division Guide</title>
+<style>
+  :root {
+    --guide-bg: #f8fafc;
+    --guide-surface: #ffffff;
+    --guide-surface-2: #f1f5f9;
+    --guide-border: #e2e8f0;
+    --guide-text: #0f172a;
+    --guide-text-dim: #64748b;
+    --guide-text-faint: #94a3b8;
+    --guide-accent: #0d9488;
+    --guide-accent-dark: #0f766e;
+    --guide-accent-bg: #f0fdfa;
+    --frame-bezel: #1e293b;
+    --frame-bezel-2: #334155;
+    --shadow: 0 1px 3px rgba(15,23,42,0.08), 0 8px 24px rgba(15,23,42,0.06);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--guide-bg);
+    color: var(--guide-text);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    line-height: 1.5;
+  }
+
+  .wrap { max-width: 980px; margin: 0 auto; padding: 28px 20px 80px; }
+
+  header.hero {
+    padding: 8px 0 24px;
+    border-bottom: 1px solid var(--guide-border);
+    margin-bottom: 24px;
+  }
+  .eyebrow {
+    font-size: 12px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--guide-accent-dark); margin: 0 0 8px 0;
+  }
+  h1 { font-size: clamp(24px, 4vw, 32px); font-weight: 800; margin: 0 0 10px 0; letter-spacing: -0.01em; }
+  .sub { font-size: 15px; color: var(--guide-text-dim); max-width: 640px; margin: 0; }
+
+  .disclaimer {
+    display: flex; gap: 12px; align-items: flex-start;
+    background: var(--guide-surface-2); border: 1px solid var(--guide-border);
+    border-radius: 12px; padding: 14px 16px; margin: 20px 0 0 0; font-size: 13px; color: var(--guide-text-dim);
+  }
+  .disclaimer b { color: var(--guide-text); }
+
+  .not-published {
+    display: flex; gap: 12px; align-items: flex-start;
+    background: #fffbeb; border: 1px solid #fcd34d;
+    border-radius: 12px; padding: 14px 16px; margin: 12px 0 0 0; font-size: 13px; color: #78350f;
+  }
+  .not-published b { color: #78350f; }
+
+  .print-hint {
+    display: flex; gap: 10px; align-items: center;
+    background: var(--guide-accent-bg); border: 1px solid var(--guide-accent); border-radius: 12px;
+    padding: 12px 16px; margin: 12px 0 0 0; font-size: 13px; color: var(--guide-accent-dark); font-weight: 600;
+  }
+
+  /* Tabs */
+  .tabs {
+    position: sticky; top: 0; z-index: 20;
+    display: flex; gap: 8px; background: var(--guide-bg);
+    padding: 14px 0; margin-bottom: 8px;
+  }
+  .tab-btn {
+    flex: 1; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--guide-border);
+    background: var(--guide-surface); color: var(--guide-text-dim); font-weight: 700; font-size: 13.5px;
+    cursor: pointer; font-family: inherit; transition: background 0.15s, color 0.15s, border-color 0.15s;
+  }
+  .tab-btn.active { background: var(--guide-accent); border-color: var(--guide-accent); color: #ffffff; }
+  .tab-btn:focus-visible { outline: 2px solid var(--guide-accent); outline-offset: 2px; }
+
+  .track { display: none; }
+  .track.active { display: block; }
+
+  .track-intro { font-size: 14px; color: var(--guide-text-dim); margin: 8px 0 28px 0; max-width: 680px; }
+
+  /* Overview strip (division/category summary, no mock) */
+  .overview-grid {
+    display: grid; grid-template-columns: 1fr; gap: 10px; margin: 0 0 32px 0;
+  }
+  @media (min-width: 640px) { .overview-grid { grid-template-columns: 1fr 1fr; } }
+  .overview-card {
+    background: var(--guide-surface); border: 1px solid var(--guide-border); border-radius: 14px; padding: 16px 18px;
+  }
+  .overview-card h4 { margin: 0 0 6px 0; font-size: 13.5px; font-weight: 800; color: var(--guide-text); display: flex; align-items: center; gap: 8px; }
+  .overview-card p { margin: 0; font-size: 12.5px; color: var(--guide-text-dim); }
+  .overview-card .tag-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .tag { font-size: 10.5px; font-weight: 700; padding: 4px 9px; border-radius: 999px; background: #f0fdfa; color: #0f766e; }
+
+  /* Step card */
+  .step {
+    display: grid; grid-template-columns: 1fr; gap: 18px;
+    padding: 26px 0; border-top: 1px solid var(--guide-border);
+  }
+  .step:first-of-type { border-top: none; }
+  @media (min-width: 760px) {
+    .step { grid-template-columns: minmax(240px, 320px) 1fr; align-items: start; }
+    .step.reverse { grid-template-columns: 1fr minmax(240px, 320px); }
+    .step.reverse .step-mock { order: 2; }
+  }
+  .step-num {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 26px; height: 26px; border-radius: 50%; background: var(--guide-accent); color: #fff;
+    font-size: 12px; font-weight: 800; flex-shrink: 0;
+  }
+  .step-title { display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 800; margin: 0 0 8px 0; }
+  .step-body p { font-size: 14px; color: var(--guide-text-dim); margin: 0 0 8px 0; }
+  .step-body ul { margin: 8px 0 0 0; padding-left: 18px; font-size: 14px; color: var(--guide-text-dim); }
+  .step-body li { margin-bottom: 4px; }
+  .step-mock { display: flex; justify-content: center; }
+
+  .callout {
+    display: inline-block; margin-top: 10px; font-size: 12px; font-weight: 700;
+    padding: 5px 10px; border-radius: 999px;
+  }
+  .callout.tap { background: var(--guide-accent-bg); color: var(--guide-accent-dark); }
+  .callout.warn { background: #fffbeb; color: #92400e; }
+  .callout.gap { background: #fee2e2; color: #dc2626; }
+
+  /* Phone frame */
+  .phone {
+    width: 100%; max-width: 300px; background: var(--frame-bezel); border-radius: 34px; padding: 10px;
+    box-shadow: var(--shadow);
+  }
+  .phone .notch { width: 70px; height: 6px; background: var(--frame-bezel-2); border-radius: 4px; margin: 0 auto 8px; }
+  .phone .screen {
+    background: #f1f5f9; border-radius: 22px; overflow: hidden; font-family: system-ui, sans-serif;
+    min-height: 420px; display: flex; flex-direction: column;
+  }
+
+  /* Browser frame */
+  .browser {
+    width: 100%; background: var(--frame-bezel); border-radius: 14px; padding: 8px;
+    box-shadow: var(--shadow);
+  }
+  .browser .bar { display: flex; align-items: center; gap: 6px; padding: 6px 8px 10px 8px; }
+  .browser .dot { width: 9px; height: 9px; border-radius: 50%; }
+  .browser .url {
+    flex: 1; margin-left: 8px; background: var(--frame-bezel-2); color: #94a3b8; font-size: 11px;
+    padding: 5px 10px; border-radius: 6px; font-family: monospace;
+  }
+  .browser .screen { background: #f8fafc; border-radius: 8px; overflow: hidden; font-family: system-ui, sans-serif; }
+
+  /* ---- Mock UI atoms (recreations of the real app, real hex values) ---- */
+  .mock-header {
+    background: #ffffff; border-bottom: 1px solid #e2e8f0; padding: 12px 16px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .mock-logo { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 13px; color: #0f172a; }
+  .mock-logo .sq { width: 22px; height: 22px; border-radius: 6px; background: linear-gradient(135deg,#0D1B3E,#0D2F5E); }
+  .mock-icons { display: flex; gap: 10px; font-size: 15px; }
+
+  .mock-card {
+    background: #fff; border-radius: 14px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+  .mock-btn {
+    display: inline-block; border: none; border-radius: 10px; font-weight: 700; font-size: 13px;
+    padding: 10px 16px; text-align: center; cursor: default; font-family: inherit;
+  }
+  .mock-btn.primary { background: #0d9488; color: #fff; }
+  .mock-btn.dark { background: #0f172a; color: #fff; }
+  .mock-btn.ghost { background: #fff; color: #475569; border: 1px solid #e2e8f0; }
+  .mock-btn.amber { background: #fff; color: #92400e; border: 1px dashed #fcd34d; }
+  .mock-btn.block { display: block; width: 100%; }
+
+  .mock-banner {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;
+    border-radius: 12px; padding: 10px 14px; font-size: 12.5px; font-weight: 600;
+  }
+  .mock-banner.ok { background: #f8fafc; border: 1px solid #e2e8f0; color: #475569; }
+  .mock-banner.late { background: #fffbeb; border: 1px solid #fcd34d; color: #92400e; }
+  .mock-banner.away { background: #ede9fe; border: 1px solid #8b5cf6; color: #7c3aed; }
+
+  .mock-pill { display: inline-block; font-size: 10.5px; font-weight: 700; padding: 3px 10px; border-radius: 999px; }
+
+  .mock-table { width: 100%; border-collapse: collapse; font-size: 11.5px; background: #fff; }
+  .mock-table th {
+    text-align: left; font-size: 9.5px; font-weight: 800; color: #94a3b8; text-transform: uppercase;
+    letter-spacing: 0.05em; padding: 8px 10px; background: #f8fafc; border-bottom: 1px solid #e2e8f0;
+  }
+  .mock-table td { padding: 9px 10px; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
+
+  .mock-modal-overlay {
+    position: absolute; inset: 0; background: rgba(15,23,42,0.45); display: flex; align-items: center;
+    justify-content: center; padding: 14px;
+  }
+  .mock-modal {
+    background: #fff; border-radius: 14px; padding: 16px; width: 100%; max-width: 250px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+  }
+  .mock-modal-title { font-size: 13px; font-weight: 800; color: #0f172a; margin: 0 0 4px 0; }
+  .mock-modal-sub { font-size: 11px; color: #64748b; margin: 0 0 10px 0; }
+  .mock-input {
+    width: 100%; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 10px; font-size: 12px;
+    color: #0f172a; background: #fff; margin-bottom: 8px; font-family: inherit;
+  }
+
+  .mock-kpi-row { display: flex; gap: 6px; }
+  .mock-kpi { flex: 1; border-radius: 10px; padding: 10px 6px; text-align: center; color: #fff; }
+  .mock-kpi .n { font-size: 17px; font-weight: 800; display: block; }
+  .mock-kpi .l { font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+
+  .mock-ticket {
+    background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 12px; margin-top: 8px;
+  }
+  .mock-ticket .addr { font-weight: 700; font-size: 12px; color: #0f172a; }
+  .mock-ticket .meta { font-size: 10.5px; color: #64748b; margin-top: 2px; }
+
+  .mock-chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 999px; font-size: 10.5px; font-weight: 700; }
+  .mock-chip .d { width: 6px; height: 6px; border-radius: 50%; }
+
+  .mock-check-row {
+    display: flex; align-items: center; gap: 10px; padding: 9px 11px; border-radius: 9px;
+    border: 1px solid #e2e8f0; font-size: 11.5px; font-weight: 600; color: #0f172a; margin-bottom: 7px;
+  }
+  .mock-check-row.done { background: #f0fdf4; border-color: #bbf7d0; }
+  .mock-check-row .box {
+    width: 15px; height: 15px; border-radius: 4px; border: 1.5px solid #cbd5e1; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; font-size: 10px; color: #fff;
+  }
+  .mock-check-row.done .box { background: #16a34a; border-color: #16a34a; }
+
+  .browser-page-title { padding: 14px 16px 0 16px; }
+  .browser-page-title h3 { margin: 0 0 2px 0; font-size: 14px; font-weight: 800; color: #0f172a; }
+  .browser-page-title p { margin: 0; font-size: 11px; color: #64748b; }
+
+  /* Concept / flow diagram card (no fake screenshot -- there's no UI to
+     click for a background cron job, so this stays visually distinct
+     from the phone/browser mocks rather than pretending to be one). */
+  .concept-card {
+    width: 100%; max-width: 320px; background: #fff; border: 1px solid var(--guide-border); border-radius: 16px;
+    padding: 18px; box-shadow: var(--shadow);
+  }
+  .concept-card .eyebrow2 { font-size: 10px; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.06em; margin: 0 0 10px 0; }
+  .flow-step { display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; }
+  .flow-step .dot2 { width: 22px; height: 22px; border-radius: 50%; background: #f1f5f9; color: #475569; font-size: 10px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+  .flow-step p { margin: 0; font-size: 11.5px; color: #334155; line-height: 1.4; }
+  .flow-arrow { text-align: center; font-size: 12px; color: #cbd5e1; }
+
+  footer.end {
+    margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--guide-border);
+    font-size: 12.5px; color: var(--guide-text-faint); text-align: center;
+  }
+
+  /* ===================== PRINT / PDF ===================== */
+  @media print {
+    @page { size: A4; margin: 12mm 10mm; }
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    body { background: #fff; }
+    .wrap { max-width: none; padding: 0; }
+    .tabs, .disclaimer, .print-hint, .not-published { display: none !important; }
+    header.hero { border-bottom: none; margin-bottom: 6px; padding-bottom: 0; }
+    .track { display: block !important; }
+    #track-manager, #track-admin { break-before: page; }
+    .track-intro { break-after: avoid; }
+    .overview-grid { break-inside: avoid; }
+    .step {
+      break-inside: avoid; padding: 0; border-top: none;
+      display: grid !important; grid-template-columns: 220px 1fr !important;
+      gap: 14px !important; align-items: start !important;
+    }
+    .step.reverse { grid-template-columns: 1fr 220px !important; }
+    .step.reverse .step-mock { order: 2 !important; }
+    .step + .step { break-before: page; }
+    .phone, .browser, .concept-card { box-shadow: none; border: 1px solid #cbd5e1; }
+    .phone .screen { min-height: 0 !important; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <p class="eyebrow">GBCH PMMS &middot; Division Guide</p>
+    <h1>How the Housekeeping Division Works</h1>
+    <p class="sub">From setting it up, to a manager's day-to-day, to what a Housekeeper sees on their phone &mdash; every step, A to Z.</p>
+    <div class="disclaimer">
+      <span style="font-size:18px;">&#9432;</span>
+      <span><b>These are recreated mockups, not live screenshots</b> &mdash; built from the same colours, wording and layout as the real, already-deployed code, since screenshots of a running app weren't available when this was written. Every screen, label, button and number shown here matches what's actually live in production, read directly from the codebase and the real Housekeeping settings currently saved.</span>
+    </div>
+    <div class="not-published">
+      <span style="font-size:18px;">&#128274;</span>
+      <span><b>Not published anywhere in PMMS.</b> This file lives at <code>docs/Housekeeping_Division_Guide.html</code> only &mdash; it isn't linked from the sidebar, Help &amp; Guide, or any nav item. Nobody using the app can stumble onto it.</span>
+    </div>
+    <div class="print-hint">
+      🖨️ <span>To save as PDF: <b>Print this page</b> (Ctrl/Cmd+P) &rarr; destination "Save as PDF" &rarr; make sure <b>"Background graphics"</b> is turned on so the mockups render. All three tracks print in full, one step per page.</span>
+    </div>
+  </header>
+
+  <div class="overview-grid">
+    <div class="overview-card">
+      <h4>🏢 What "Housekeeping" is</h4>
+      <p>A full division, same standing as Maintenance and Compliance &mdash; its own nav item, its own scoped managers, its own slice of Pipeline/Reports/Sign-Off. Not a bolt-on to Maintenance.</p>
+    </div>
+    <div class="overview-card">
+      <h4>🗂️ The 4 categories routed to it</h4>
+      <p>Any ticket in one of these categories is automatically Housekeeping's, no manual division picker involved:</p>
+      <div class="tag-row">
+        <span class="tag">Cleaning Rota</span>
+        <span class="tag">Housekeeping &amp; Cleaning</span>
+        <span class="tag">Pest Control</span>
+        <span class="tag">Rubbish &amp; Clearance</span>
+      </div>
+    </div>
+    <div class="overview-card">
+      <h4>👥 The two roles</h4>
+      <p><b>Housekeeping Manager</b> (division-scoped manager access) and <b>Housekeeper</b> (division-scoped builder access) &mdash; both are Custom Roles set up under Admin &rarr; Access &amp; Roles. See the Setup track for exactly how.</p>
+    </div>
+    <div class="overview-card">
+      <h4>🔁 Its one automatic engine</h4>
+      <p>A daily background job creates a <b>"Routine 2-Week Visit"</b> ticket for every property with a cleaner assigned, once it's overdue &mdash; the only division in PMMS where tickets can create themselves.</p>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active" onclick="showTrack('cleaner', this)">🧹 For Housekeepers</button>
+    <button class="tab-btn" onclick="showTrack('manager', this)">🖥️ For Housekeeping Managers</button>
+    <button class="tab-btn" onclick="showTrack('admin', this)">⚙️ Setup (Admin)</button>
+  </div>
+
+  <!-- ============================= HOUSEKEEPER TRACK ============================= -->
+  <section class="track active" id="track-cleaner">
+    <p class="track-intro">This is exactly what a Housekeeper sees on their phone &mdash; the same app every builder uses, with two extra bits that only appear on a <b>Routine 2-Week Visit</b> job: reporting a delay, and a completion checklist.</p>
+
+    <!-- Step 1 -->
+    <div class="step">
+      <div class="step-mock">
+        <div class="phone"><div class="notch"></div>
+          <div class="screen" style="align-items:center; justify-content:center; padding:20px; text-align:center;">
+            <div style="background:#fff; border-radius:20px; padding:28px 20px; box-shadow:0 4px 20px rgba(0,0,0,0.08); width:100%;">
+              <div style="width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,#0D1B3E,#0D2F5E);margin:0 auto 14px;"></div>
+              <p style="font-size:15px;font-weight:800;color:#0f172a;margin:0 0 6px 0;">Good morning, Grace</p>
+              <p style="font-size:11.5px;color:#64748b;margin:0 0 20px 0;line-height:1.5;">Clock in to start your working day and see your jobs.</p>
+              <button class="mock-btn primary block">✓ Clock In for the Day</button>
+              <p style="font-size:10px;color:#94a3b8;margin-top:14px;text-decoration:underline;">Sign out</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="step-body">
+        <p class="step-title"><span class="step-num">1</span> Open the app, clock in</p>
+        <p>A Housekeeper logs into the exact same PMMS app as a Maintenance builder &mdash; same login screen, same "Clock In for the Day" gate. There's no separate cleaner app.</p>
+        <ul>
+          <li>They can't see any jobs at all until they clock in for the day.</li>
+          <li>Clocking in after <b>9:00am</b> flags the day as late, same rule as everyone else.</li>
+        </ul>
+        <span class="callout tap">👉 Tap "Clock In for the Day"</span>
+      </div>
+    </div>
+
+    <!-- Step 2 -->
+    <div class="step reverse">
+      <div class="step-mock">
+        <div class="phone"><div class="notch"></div>
+          <div class="screen" style="position:relative;">
+            <div style="padding:20px;opacity:0.35;">
+              <div style="width:44px;height:44px;border-radius:10px;background:#0D1B3E;margin:0 auto;"></div>
+            </div>
+            <div style="position:absolute; left:10px; right:10px; top:60px; background:#fff; border-radius:12px; box-shadow:0 8px 24px rgba(0,0,0,0.18); padding:16px; font-size:11.5px;">
+              <p style="font-weight:700; color:#0f172a; margin:0 0 4px 0;">Allow "pmms" to use your location?</p>
+              <p style="color:#64748b; margin:0 0 12px 0;">This lets the app record where you clocked in from.</p>
+              <div style="display:flex; gap:8px;">
+                <div style="flex:1; text-align:center; padding:8px; border-radius:8px; background:#f1f5f9; color:#475569; font-weight:700;">Don't Allow</div>
+                <div style="flex:1; text-align:center; padding:8px; border-radius:8px; background:#0d9488; color:#fff; font-weight:700;">Allow</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="step-body">
+        <p class="step-title"><span class="step-num">2</span> Allow location when asked</p>
+        <p>Same permission prompt as every builder gets &mdash; it's how the app records where a shift or a job started from.</p>
+        <span class="callout tap">👉 Tap "Allow"</span>
+      </div>
+    </div>
+
+    <!-- Step 3 -->
+    <div class="step">
+      <div class="step-mock">
+        <div class="phone"><div class="notch"></div>
+          <div class="screen">
+            <div class="mock-header">
+              <div class="mock-logo"><div class="sq"></div>PMMS</div>
+              <div class="mock-icons">🔔 ☰</div>
+            </div>
+            <div style="padding:10px 14px 0;">
+              <div class="mock-banner ok"><span>🟢 Clocked in since 08:15</span></div>
+            </div>
+            <div style="padding:12px 14px;">
+              <div class="mock-kpi-row">
+                <div class="mock-kpi" style="background:#0d9488;"><span class="n">0</span><span class="l">Working Now</span></div>
+                <div class="mock-kpi" style="background:#3b82f6;"><span class="n">2</span><span class="l">To Do</span></div>
+              </div>
+              <div class="mock-ticket">
+                <div class="addr">10 Red Rails, Luton</div>
+                <div class="meta">🧹 Cleaning Rota &middot; Routine 2-Week Visit</div>
+              </div>
+              <div class="mock-ticket">
+                <div class="addr">27 Chalk Hill, Luton</div>
+                <div class="meta">Housekeeping &amp; Cleaning &middot; End of tenancy clean</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="step-body">
+        <p class="step-title"><span class="step-num">3</span> Their job list</p>
+        <p>Same job list layout as any builder. A Housekeeper's jobs are a mix of two kinds:</p>
+        <ul>
+          <li><b>Routine 2-Week Visit</b> &mdash; created automatically by PMMS itself for a property they're assigned to (see the Setup track for how). Category shows as <b>Cleaning Rota</b>.</li>
+          <li>Anything else raised for their property manually &mdash; <b>Urgent Clean</b>, <b>Void property clean</b>, <b>Pest Control</b>, <b>Rubbish &amp; Clearance</b>, etc.</li>
+        </ul>
+        <p>Only the Routine 2-Week Visit gets the two extra steps below (delay reporting + checklist) &mdash; everything else behaves exactly like a normal job.</p>
+      </div>
+    </div>
+
+    <!-- Step 4 -->
+    <div class="step reverse">
+      <div class="step-mock">
+        <div class="phone"><div class="notch"></div>
+          <div class="screen">
+            <div class="mock-header">
+              <div class="mock-logo"><div class="sq"></div>PMMS</div>
+              <div class="mock-icons">🔔 ☰</div>
+            </div>
+            <div style="padding:12px 14px;">
+              <div class="mock-card">
+                <p style="font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;margin:0 0 8px 0;">Coming from</p>
+                <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:10px;">
+                  <div class="mock-btn ghost" style="font-size:11px; text-align:left;">🏠 Home</div>
+                  <div class="mock-btn" style="background:rgba(13,148,136,0.08); border:2px solid #0d9488; color:#0f172a; font-size:11px; text-align:left;">📍 Already on site</div>
+                </div>
+                <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:10px 12px; margin-bottom:10px; font-size:11.5px; font-weight:600; color:#475569;">📍 0 miles &mdash; already at this property.</div>
+                <div class="mock-btn primary block">✓ I've arrived &mdash; start work</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="step-body">
+        <p class="step-title"><span class="step-num">4</span> Starting the visit</p>
+        <p>Tap the job, say where they're travelling from (or "Already on site"), log miles if any, then <b>"I've arrived &mdash; start work"</b>. Identical to any other job &mdash; see the Builder App Guide for the full detail on this step.</p>
+      </div>
+    </div>
+
+    <!-- Step 5 -->
+    <div class="step">
+      <div class="step-mock">
+        <div class="phone"><div class="notch"></div>
+          <div class="screen">
+            <div class="mock-header">
+              <div class="mock-logo"><div class="sq"></div>PMMS</div>
+              <div class="mock-icons">🔔 ☰</div>
+            </div>
+            <div style="padding:12px 14px;">
+              <div class="mock-card">
+                <p style="font-size:13px;font-weight:800;color:#0f172a;margin:0 0 2px 0;">Why can't this be done on time?</p>
+                <p style="font-size:11px;color:#64748b;margin:0 0 12px 0;">A manager will review this before it's accepted</p>
+                <div style="display:flex; flex-direction:column; gap:7px;">
+                  <div class="mock-btn" style="background:rgba(217,119,6,0.08); border:2px solid #d97706; color:#0f172a; font-size:11.5px; text-align:left;">Couldn't get access</div>
+                  <div class="mock-btn ghost" style="font-size:11.5px; text-align:left;">Ran out of time today</div>
+                  <div class="mock-btn ghost" style="font-size:11.5px; text-align:left;">Property not ready for cleaning</div>
+                  <div class="mock-btn ghost" style="font-size:11.5px; text-align:left;">Other</div>
+                </div>
+                <div class="mock-btn dark block" style="margin-top:10px;">Submit for review</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="step-body">
+        <p class="step-title"><span class="step-num">5</span> Routine visit only &mdash; report a delay</p>
+        <p>Before starting the visit, an amber <b>"⚠ Can't do this on time? Report a delay"</b> button sits on that same screen &mdash; only ever shown on a Routine 2-Week Visit, never on any other job type.</p>
+        <ul>
+          <li>Pick one of the four reasons above, add an optional note, tap <b>Submit for review</b>.</li>
+          <li>The ticket then shows <b>"Delay reason submitted &mdash; awaiting manager review"</b> until a Housekeeping Manager approves or rejects it (see Manager track, step 4).</li>
+        </ul>
+        <span class="callout tap">👉 Only appears on a Routine 2-Week Visit job</span>
+      </div>
+    </div>
+
+    <!-- Step 6 -->
+    <div class="step reverse">
+      <div class="step-mock">
+        <div class="phone"><div class="notch"></div>
+          <div class="screen">
+            <div class="mock-header">
+              <div class="mock-logo"><div class="sq"></div>PMMS</div>
+              <div class="mock-icons">🔔 ☰</div>
+            </div>
+            <div style="padding:10px 14px 0;">
+              <div class="mock-banner away">
+                <span>🚶 Away &mdash; Travelling: Lunch break since 12:05</span>
+                <button class="mock-btn primary" style="padding:6px 10px;font-size:10.5px;">✓ I'm Back</button>
+              </div>
+            </div>
+            <div style="padding:12px 14px;">
+              <div class="mock-ticket">
+                <div class="addr">10 Red Rails, Luton</div>
+                <div class="meta">Cleaning Rota &middot; Routine 2-Week Visit &middot; In Progress</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="step-body">
+        <p class="step-title"><span class="step-num">6</span> Popping out mid-visit</p>
+        <p>Materials run, lunch break, heading to another job &mdash; tap "Leaving Site" on the banner first, exactly like any builder. The banner turns purple while they're away; the job itself keeps running underneath.</p>
+      </div>
+    </div>
+
+    <!-- Step 7 -->
+    <div class="step">
+      <div class="step-mock">
+        <div class="phone"><div class="notch"></div>
+          <div class="screen">
+            <div class="mock-header">
+              <div class="mock-logo"><div class="sq"></div>PMMS</div>
+              <div class="mock-icons">🔔 ☰</div>
+            </div>
+            <div style="padding:12px 14px;">
+              <p style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;margin:0 0 8px 0;">Checklist</p>
+              <div class="mock-check-row done"><span class="box">✓</span>Kitchen surfaces and appliances wiped down</div>
+              <div class="mock-check-row done"><span class="box">✓</span>Bathroom cleaned and sanitised</div>
+              <div class="mock-check-row done"><span class="box">✓</span>Floors vacuumed and mopped</div>
+              <div class="mock-check-row"><span class="box"></span>Bins emptied</div>
+              <div class="mock-check-row"><span class="box"></span>Communal areas tidied</div>
+              <div class="mock-check-row"><span class="box"></span>Windows and mirrors cleaned</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="step-body">
+        <p class="step-title"><span class="step-num">7</span> Routine visit only &mdash; the checklist</p>
+        <p>Tapping <b>"✓ Mark complete"</b> on a Routine 2-Week Visit shows this 6-item checklist first (the exact wording currently set in Settings &rarr; Routine Visit Checklist &mdash; see Setup track, step 5). Nothing else in PMMS has a checklist like this.</p>
+        <ul>
+          <li>Every item must be ticked &mdash; <b>"Confirm complete" stays disabled</b> and shows "Complete every checklist item before confirming" until all six are checked.</li>
+          <li>Ad-hoc Housekeeping jobs (Urgent Clean, Pest Control, etc.) skip this entirely &mdash; just a note and a photo, same as any other job.</li>
+        </ul>
+        <span class="callout warn">⚠ All 6 items required before the job can be confirmed complete</span>
+      </div>
+    </div>
+
+    <!-- Step 8 -->
+    <div class="step reverse">
+      <div class="step-mock">
+        <div class="phone"><div class="notch"></div>
+          <div class="screen">
+            <div class="mock-header">
+              <div class="mock-logo"><div class="sq"></div>PMMS</div>
+              <div class="mock-icons">🔔 ☰</div>
+            </div>
+            <div style="padding:12px 14px;">
+              <div class="mock-card">
+                <p style="font-size:13px;font-weight:800;color:#0f172a;margin:0 0 10px 0;">Confirm job complete</p>
+                <textarea class="mock-input" style="height:44px;" readonly>All areas cleaned, bins emptied and collected.</textarea>
+                <div class="mock-btn ghost block">📷 Add a photo (required)</div>
+                <div class="mock-btn primary block" style="margin-top:10px;">✓ Confirm complete</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="step-body">
+        <p class="step-title"><span class="step-num">8</span> Note, photo, confirm</p>
+        <p>Same as any job: a short note on the work done, and a photo &mdash; <b>required</b>, the confirm button won't work without one. On a Routine Visit, this comes right after the checklist above.</p>
+      </div>
+    </div>
+
+    <!-- Step 9 -->
+    <div class="step">
+      <div class="step-mock">
+        <div class="phone"><div class="notch"></div>
+          <div class="screen" style="position:relative;">
+            <div class="mock-header">
+              <div class="mock-logo"><div class="sq"></div>PMMS</div>
+              <div class="mock-icons">🔔 ☰</div>
+            </div>
+            <div style="padding:12px 14px;">
+              <div class="mock-card" style="border:1px solid #fcd34d;">
+                <p style="font-size:13px;font-weight:800;color:#92400e;margin:0 0 4px 0;">⚠ Finishing before 17:00</p>
+                <p style="font-size:11px;color:#64748b;margin:0 0 10px 0;">Just so your manager knows why.</p>
+                <input class="mock-input" placeholder="Reason for finishing early..." value="Both jobs done for today" readonly>
+                <div class="mock-btn dark block">Confirm Clock Out</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="step-body">
+        <p class="step-title"><span class="step-num">9</span> Clocking out for the day</p>
+        <p>Tap <b>"Clock Out for the Day"</b> once every job is finished or paused. Finishing before 5:00pm asks for a short reason first &mdash; same rule as every builder.</p>
+      </div>
+    </div>
+
+    <!-- Step 10 -->
+    <div class="step reverse">
+      <div class="step-mock">
+        <div class="phone"><div class="notch"></div>
+          <div class="screen" style="align-items:center; justify-content:center; padding:20px; text-align:center;">
+            <div style="background:#fff; border-radius:20px; padding:28px 20px; box-shadow:0 4px 20px rgba(0,0,0,0.08); width:100%;">
+              <div style="width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,#0D1B3E,#0D2F5E);margin:0 auto 14px;"></div>
+              <p style="font-size:15px;font-weight:800;color:#0f172a;margin:0 0 6px 0;">Good afternoon, Grace</p>
+              <p style="font-size:11.5px;color:#64748b;margin:0 0 20px 0;line-height:1.5;">Clock in to start your working day and see your jobs.</p>
+              <button class="mock-btn primary block">✓ Clock In for the Day</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="step-body">
+        <p class="step-title"><span class="step-num">10</span> Done for the day</p>
+        <p>Back at the clock-in screen &mdash; that's normal, it just means they're clocked out. No jobs show again until they clock in tomorrow. Any property left un-visited stays in their list, unaffected &mdash; it isn't cleared at day's end.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================= MANAGER TRACK ============================= -->
+  <section class="track" id="track-manager">
+    <p class="track-intro">Everything below is scoped to whoever holds the <b>Housekeeping Manager</b> role &mdash; a manager restricted to just this division, seeing only Housekeeping's tickets, properties (partially) and staff.</p>
+
+    <!-- Step 1 -->
+    <div class="step">
+      <div class="step-mock">
+        <div class="browser">
+          <div class="bar"><span class="dot" style="background:#ef4444"></span><span class="dot" style="background:#f59e0b"></span><span class="dot" style="background:#22c55e"></span><span class="url">pmms.greenbridgehousing.com/housekeeping</span></div>
+          <div class="screen">
+            <div class="browser-page-title">
+              <h3>🧹 Housekeeping</h3>
+              <p>Only visible to a manager scoped to the Housekeeping division, or an Admin.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="step-body">
+        <p class="step-title"><span class="step-num">1</span> The Housekeeping nav item</p>
+        <p>A dedicated sidebar item, sitting alongside Compliance in the "division dashboards" group. It only appears for someone whose Role is scoped to Housekeeping (or an Admin) &mdash; an unscoped manager (e.g. a Maintenance Manager) never sees it at all.</p>
+        <p>It has three sections, in order: <b>Routine Visits Due</b>, <b>Cleaner Workload</b>, <b>Pending Delay Reasons</b>. Reassigning a cleaner isn't done here &mdash; this page links out to the property instead (step 5).</p>
+      </div>
+    </div>
+
+    <!-- Step 2 -->
+    <div class="step reverse">
+      <div class="step-mock">
+        <div class="browser">
+          <div class="bar"><span class="dot" style="background:#ef4444"></span><span class="dot" style="background:#f59e0b"></span><span class="dot" style="background:#22c55e"></span><span class="url">pmms.greenbridgehousing.com/housekeeping</span></div>
+          <div class="screen">
+            <div class="browser-page-title"><h3>Routine Visits Due</h3><p>Every property with a cleaner assigned, ordered by how overdue it is.</p></div>
+            <div style="padding:10px 16px 16px; display:flex; flex-direction:column; gap:7px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; padding:9px 11px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:9px;">
+                <div><b style="font-size:11.5px;color:#0f172a;">10 Red Rails, Luton</b><div style="font-size:10px;color:#64748b;">Grace Adeyemi &mdash; 15 days since last visit</div></div>
+                <span class="mock-pill" style="background:#fee2e2;color:#dc2626;">Overdue</span>
+              </div>
+              <div style="display:flex; justify-content:space-between; align-items:center; padding:9px 11px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:9px;">
+                <div><b style="font-size:11.5px;color:#0f172a;">27 Chalk Hill, Luton</b><div style="font-size:10px;color:#64748b;">Grace Adeyemi &mdash; 8 days since last visit</div></div>
+                <span class="mock-pill" style="background:#fef3c7;color:#d97706;">Due Soon</span>
+              </div>
+              <div style="display:flex; justify-content:space-between; align-items:center; padding:9px 11px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:9px;">
+                <div><b style="font-size:11.5px;color:#0f172a;">4 Alpine Way, Luton</b><div style="font-size:10px;color:#64748b;">Tunde Bello &mdash; 2 days since last visit</div></div>
+                <span class="mock-pill" style="background:#dcfce7;color:#16a34a;">OK</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="step-body">
+        <p class="step-title"><span class="step-num">2</span> Routine Visits Due</p>
+        <p>One row per property that has a cleaner assigned, ranked worst-first by days since its last completed visit (or since the cleaner was assigned, if it's never had one).</p>
+        <ul>
+          <li><b style="color:#16a34a;">OK</b> (green) &mdash; under half the threshold.</li>
+          <li><b style="color:#d97706;">Due Soon</b> (amber) &mdash; past half the threshold.</li>
+          <li><b style="color:#dc2626;">Overdue</b> (red) &mdash; past the full threshold (12 days by default &mdash; see Setup track, step 4). This is also the exact point the automatic engine creates a new visit ticket.</li>
+          <li><b style="color:#64748b;">Unknown</b> (grey) &mdash; no baseline yet to measure from.</li>
+        </ul>
+        <p>Tap any row to jump straight to that property's profile.</p>
+      </div>
+    </div>
+
+    <!-- Step 3 -->
+    <div class="step">
+      <div class="step-mock">
+        <div class="browser">
+          <div class="bar"><span class="dot" style="background:#ef4444"></span><span class="dot" style="background:#f59e0b"></span><span class="dot" style="background:#22c55e"></span><span class="url">pmms.greenbridgehousing.com/housekeeping</span></div>
+          <div class="screen">
+            <div class="browser-page-title"><h3>Cleaner Workload</h3><p>How many properties and open jobs each cleaner currently has.</p></div>
+            <div style="padding:10px 16px 16px; display:flex; flex-direction:column; gap:7px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; padding:9px 11px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:9px;">
+                <div><b style="font-size:11.5px;color:#0f172a;">Grace Adeyemi</b><div style="font-size:10px;color:#64748b;">6 properties &middot; 2 open jobs</div></div>
+                <span class="mock-pill" style="background:#dcfce7;color:#16a34a;">Available</span>
+              </div>
+              <div style="display:flex; justify-content:space-between; align-items:center; padding:9px 11px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:9px;">
+                <div><b style="font-size:11.5px;color:#0f172a;">Tunde Bello</b><div style="font-size:10px;color:#64748b;">4 properties &middot; 1 open job</div></div>
+                <span class="mock-pill" style="background:#fef3c7;color:#d97706;">On Leave</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="step-body">
+        <p class="step-title"><span class="step-num">3</span> Cleaner Workload</p>
+        <p>Every Housekeeper, with how many properties they're the assigned cleaner for and how many jobs they currently have open (Pending/Assigned/In Progress/On Hold, across every Housekeeping category, not just routine visits).</p>
+        <p>The badge on the right is their current availability &mdash; <span style="color:#16a34a;font-weight:700;">Available</span>, <span style="color:#d97706;font-weight:700;">On Leave</span>, or <span style="color:#dc2626;font-weight:700;">Sick</span> &mdash; worth checking before assigning them a new property.</p>
+      </div>
+    </div>
+
+    <!-- Step 4 -->
+    <div class="step reverse">
+      <div class="step-mock">
+        <div class="browser">
+          <div class="bar"><span class="dot" style="background:#ef4444"></span><span class="dot" style="background:#f59e0b"></span><span class="dot" style="background:#22c55e"></span><span class="url">pmms.greenbridgehousing.com/housekeeping</span></div>
+          <div class="screen">
+            <div class="browser-page-title"><h3>Pending Delay Reasons</h3><p>A cleaner reported they couldn't complete a routine visit on time.</p></div>
+            <div style="padding:10px 16px 16px;">
+              <div style="padding:11px; background:#fffbeb; border:1px solid #fcd34d; border-radius:10px;">
+                <p style="font-size:9.5px;font-weight:700;color:#94a3b8;margin:0 0 2px 0;">#412</p>
+                <p style="font-size:12px;font-weight:700;color:#0f172a;margin:0 0 4px 0;">10 Red Rails, Luton</p>
+                <p style="font-size:11.5px;color:#78350f;margin:0 0 10px 0;"><b>Grace Adeyemi</b>: Couldn't get access &mdash; No one answered, tried twice</p>
+                <div style="display:flex; gap:8px;">
+                  <div class="mock-btn" style="flex:1; background:#16a34a; color:#fff; font-size:11px;">✓ Approve</div>
+                  <div class="mock-btn ghost" style="flex:1; color:#dc2626; font-size:11px;">✕ Reject</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="step-body">
+        <p class="step-title"><span class="step-num">4</span> Reviewing a delay reason</p>
+        <p>Whenever a Housekeeper submits a delay on a Routine Visit (see Housekeeper track, step 5), it lands here, oldest first, until a manager acts on it.</p>
+        <ul>
+          <li><b>Approve</b> or <b>Reject</b> &mdash; either way, the cleaner gets a notification and it's logged to the ticket's audit trail.</li>
+          <li>Rejecting doesn't undo anything automatically &mdash; it just tells the cleaner to speak to their manager; the ticket itself is untouched.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Step 5 -->
+    <div class="step">
+      <div class="step-mock">
+        <div class="browser">
+          <div class="bar"><span class="dot" style="background:#ef4444"></span><span class="dot" style="background:#f59e0b"></span><span class="dot" style="background:#22c55e"></span><span class="url">pmms.greenbridgehousing.com/properties</span></div>
+          <div class="screen">
+            <div class="browser-page-title"><h3>10 Red Rails, Luton &middot; Core</h3></div>
+            <div style="padding:12px 16px;">
+              <div class="mock-card" style="margin-bottom:10px;">
+                <p style="font-size:11px;font-weight:800;color:#0f172a;margin:0 0 8px 0;">Assigned Cleaner</p>
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <span style="font-size:11.5px;color:#0f172a;font-weight:700;">Grace Adeyemi</span>
+                  <div class="mock-btn ghost" style="font-size:10px; padding:6px 10px;">Reassign</div>
+                </div>
+              </div>
+              <p style="font-size:9.5px;color:#94a3b8;">Dropdown only offers cleaners matching this property's gender restriction, if one is set.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="step-body">
+        <p class="step-title"><span class="step-num">5</span> Assigning a cleaner to a property</p>
+        <p>On the property's <b>Core</b> tab &mdash; the "Assigned Cleaner" section. Click <b>Assign</b> (or <b>Reassign</b>), pick a Housekeeper from the dropdown, save.</p>
+        <ul>
+          <li>Saving stamps <i>today</i> as the property's cleaning baseline &mdash; the 12-day countdown to its first automatic visit starts from here.</li>
+          <li>If the property's <b>Staff Gender Restriction</b> (Restrictions tab, labelled "Support Worker Restrictions" &mdash; a name held over from an earlier feature, not Housekeeping-specific wording) is set to <b>Male Only</b> or <b>Female Only</b>, the dropdown only offers Housekeepers whose own gender field matches. A Housekeeper with no gender set on their staff record is treated as "don't offer" on a restricted property.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Step 6 -->
+    <div class="step reverse">
+      <div class="step-mock">
+        <div class="browser">
+          <div class="bar"><span class="dot" style="background:#ef4444"></span><span class="dot" style="background:#f59e0b"></span><span class="dot" style="background:#22c55e"></span><span class="url">pmms.greenbridgehousing.com/properties</span></div>
+          <div class="screen">
+            <div class="browser-page-title"><h3>10 Red Rails, Luton</h3></div>
+            <div style="padding:10px 16px 16px;">
+              <div style="display:flex; gap:6px; margin-bottom:10px;">
+                <span class="mock-pill" style="background:#0d9488;color:#fff;">Core</span>
+                <span class="mock-pill" style="background:#f1f5f9;color:#94a3b8;">Restrictions</span>
+              </div>
+              <p style="font-size:10.5px; color:#94a3b8; font-style:italic;">Compliance, Assets, Maintenance, Lease &amp; Legal, Documents, Notes, Rooms and Gardens tabs are hidden &mdash; Maintenance/Compliance territory, not Housekeeping's.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="step-body">
+        <p class="step-title"><span class="step-num">6</span> What a Housekeeping Manager sees on a property</p>
+        <p>Only two tabs: <b>Core</b> (which itself is stripped down to just a vulnerable-occupant warning, read-only, plus the Assigned Cleaner section) and <b>Restrictions</b>, also read-only for this role.</p>
+        <p>Every other property tab &mdash; Compliance, Assets, Maintenance, Lease &amp; Legal, Documents, Notes, Rooms, Gardens &mdash; simply isn't shown. This is a UI-level restriction, not a database-level one; a Housekeeping Manager's underlying access isn't narrower, the page just doesn't offer those tabs.</p>
+      </div>
+    </div>
+
+    <!-- Step 7 -->
+    <div class="step">
+      <div class="step-mock">
+        <div class="browser">
+          <div class="bar"><span class="dot" style="background:#ef4444"></span><span class="dot" style="background:#f59e0b"></span><span class="dot" style="background:#22c55e"></span><span class="url">pmms.greenbridgehousing.com/raise-ticket</span></div>
+          <div class="screen">
+            <div class="browser-page-title"><h3>Log a Ticket</h3></div>
+            <div style="padding:12px 16px;">
+              <div class="mock-card">
+                <p style="font-size:9.5px;font-weight:700;color:#94a3b8;margin:0 0 6px 0;text-transform:uppercase;">Category</p>
+                <div class="mock-input" style="margin-bottom:8px;">Cleaning Rota</div>
+                <p style="font-size:9.5px;font-weight:700;color:#94a3b8;margin:0 0 6px 0;text-transform:uppercase;">Issue</p>
+                <div class="mock-input" style="margin-bottom:0;">Urgent Clean</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="step-body">
+        <p class="step-title"><span class="step-num">7</span> Raising an ad-hoc Housekeeping ticket</p>
+        <p>Anything that isn't the automatic routine visit &mdash; a one-off mess, a pest sighting, a void that needs clearing &mdash; goes through <b>Log a Ticket</b> exactly like any other job. Picking a Housekeeping category routes it to this division automatically; there's no separate division picker to remember.</p>
+        <ul>
+          <li><b>Cleaning Rota</b> &rarr; Urgent Clean</li>
+          <li><b>Housekeeping &amp; Cleaning</b> &rarr; Void property clean, Deep clean required, End of tenancy clean, Communal area cleaning, Carpet cleaning, Window cleaning</li>
+          <li><b>Pest Control</b> &rarr; Rodent infestation, Bed bug treatment, Insect infestation, Bird/pigeon issue, Preventative treatment</li>
+          <li><b>Rubbish &amp; Clearance</b> &rarr; Hazardous waste disposal, Fly-tipping removal, Property clearance, Bulk waste removal, Garden waste clearance</li>
+        </ul>
+        <p>It's assigned automatically to whichever eligible Housekeeper currently has the fewest open jobs &mdash; same auto-assign logic Maintenance uses, just scoped to Housekeeper-role staff.</p>
+      </div>
+    </div>
+
+    <!-- Step 8 -->
+    <div class="step reverse">
+      <div class="step-mock">
+        <div class="browser">
+          <div class="bar"><span class="dot" style="background:#ef4444"></span><span class="dot" style="background:#f59e0b"></span><span class="dot" style="background:#22c55e"></span><span class="url">pmms.greenbridgehousing.com/pipeline</span></div>
+          <div class="screen">
+            <div class="browser-page-title"><h3>Pipeline</h3><p>Scoped automatically to this manager's division.</p></div>
+            <div style="padding:10px 16px 16px;">
+              <table class="mock-table">
+                <thead><tr><th>Job</th><th>Category</th><th>Status</th></tr></thead>
+                <tbody>
+                  <tr><td>#412</td><td>Cleaning Rota</td><td>In Progress</td></tr>
+                  <tr><td>#409</td><td>Pest Control</td><td>Assigned</td></tr>
+                </tbody>
+              </table>
+              <p style="font-size:9.5px;color:#94a3b8;margin-top:8px;">A Maintenance ticket for the same property never appears here.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="step-body">
+        <p class="step-title"><span class="step-num">8</span> Pipeline, Reports, Sign-Off &mdash; all scoped too</p>
+        <p>Wherever a Housekeeping Manager looks &mdash; Pipeline, Reports, Sign-Off &mdash; they only ever see tickets in the 4 Housekeeping categories. This is enforced at the database level (row-level security), not just hidden in the UI, so it holds even if a ticket is opened by a direct link.</p>
+      </div>
+    </div>
+
+    <!-- Step 9 -->
+    <div class="step">
+      <div class="step-mock">
+        <div class="browser">
+          <div class="bar"><span class="dot" style="background:#ef4444"></span><span class="dot" style="background:#f59e0b"></span><span class="dot" style="background:#22c55e"></span><span class="url">pmms.greenbridgehousing.com/sign-off</span></div>
+          <div class="screen">
+            <div class="browser-page-title"><h3>Sign-Off</h3><p>Only the person who raised a ticket can archive it.</p></div>
+            <div style="padding:10px 16px 16px;">
+              <div style="padding:10px; background:#fee2e2; border:1px solid #fca5a5; border-radius:9px; font-size:11px; color:#7f1d1d;">
+                A Routine 2-Week Visit ticket has no raiser &mdash; PMMS created it, not a person &mdash; so it currently has nobody able to sign it off. See the note below.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="step-body">
+        <p class="step-title"><span class="step-num">9</span> Signing off completed work</p>
+        <p>An ad-hoc Housekeeping ticket (raised by a manager through Log a Ticket) works exactly like any other division: once <b>Completed</b>, it sits in Sign-Off for whoever raised it to review and archive.</p>
+        <p><b>A genuine current gap, found while writing this guide, not a design choice:</b> a Routine 2-Week Visit ticket is created by the automatic daily engine, not by a person &mdash; so it has no "raised by" on it. PMMS's sign-off rule is "only the raiser can archive it," which for these means <b>nobody currently can</b> &mdash; they'll sit in "Completed" indefinitely once a Housekeeper finishes one. This hasn't shown up yet in production simply because no property has crossed the 12-day threshold and had one finished yet.</p>
+        <span class="callout gap">⚠ Not fixed yet &mdash; flagged separately, outside this guide</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================= SETUP (ADMIN) TRACK ============================= -->
+  <section class="track" id="track-admin">
+    <p class="track-intro">How Housekeeping is actually configured &mdash; useful if you're setting up a second Housekeeping team, adjusting the routine-visit schedule, or just want to see where every number above actually comes from.</p>
+
+    <!-- Step 1 -->
+    <div class="step">
+      <div class="step-mock">
+        <div class="browser">
+          <div class="bar"><span class="dot" style="background:#ef4444"></span><span class="dot" style="background:#f59e0b"></span><span class="dot" style="background:#22c55e"></span><span class="url">pmms.greenbridgehousing.com/admin</span></div>
+          <div class="screen">
+            <div class="browser-page-title"><h3>Divisions</h3></div>
+            <div style="padding:12px 16px; display:flex; gap:6px; flex-wrap:wrap;">
+              <span class="mock-pill" style="background:#0d9488;color:#fff;">Maintenance</span>
+              <span class="mock-pill" style="background:#0d9488;color:#fff;">Housekeeping</span>
+              <span class="mock-pill" style="background:#0d9488;color:#fff;">Compliance</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="step-body">
+        <p class="step-title"><span class="step-num">1</span> Housekeeping already exists as a division</p>
+        <p>Divisions are just a plain list, managed on the Roles panel of Admin &rarr; Access &amp; Roles. Housekeeping already sits alongside Maintenance and Compliance &mdash; nothing to create here unless you're renaming it or adding a further one.</p>
+      </div>
+    </div>
+
+    <!-- Step 2 -->
+    <div class="step reverse">
+      <div class="step-mock">
+        <div class="browser">
+          <div class="bar"><span class="dot" style="background:#ef4444"></span><span class="dot" style="background:#f59e0b"></span><span class="dot" style="background:#22c55e"></span><span class="url">pmms.greenbridgehousing.com/settings</span></div>
+          <div class="screen">
+            <div class="browser-page-title"><h3>Maintenance Categories</h3></div>
+            <div style="padding:10px 16px 16px;">
+              <table class="mock-table">
+                <thead><tr><th>Category</th><th>Division</th><th>Top score</th></tr></thead>
+                <tbody>
+                  <tr><td>Cleaning Rota</td><td><span class="mock-pill" style="background:#f0fdfa;color:#0f766e;">Housekeeping</span></td><td>90 (Urgent Clean)</td></tr>
+                  <tr><td>Housekeeping &amp; Cleaning</td><td><span class="mock-pill" style="background:#f0fdfa;color:#0f766e;">Housekeeping</span></td><td>40 (Void clean)</td></tr>
+                  <tr><td>Pest Control</td><td><span class="mock-pill" style="background:#f0fdfa;color:#0f766e;">Housekeeping</span></td><td>90 (Rodents)</td></tr>
+                  <tr><td>Rubbish &amp; Clearance</td><td><span class="mock-pill" style="background:#f0fdfa;color:#0f766e;">Housekeeping</span></td><td>70 (Hazardous waste)</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="step-body">
+        <p class="step-title"><span class="step-num">2</span> Which categories route here</p>
+        <p>Under Settings &rarr; Maintenance Categories, each category has an optional <b>division</b> field. These four are tagged <code>"division": "Housekeeping"</code> &mdash; every other category defaults to Maintenance. Tag a fifth category the same way to route it here too; no code change needed.</p>
+        <p>Each sub-issue has its own priority score (shown for the highest-scoring one above) &mdash; same P1/P2/P3 scoring system every division shares.</p>
+      </div>
+    </div>
+
+    <!-- Step 3 -->
+    <div class="step">
+      <div class="step-mock">
+        <div class="browser">
+          <div class="bar"><span class="dot" style="background:#ef4444"></span><span class="dot" style="background:#f59e0b"></span><span class="dot" style="background:#22c55e"></span><span class="url">pmms.greenbridgehousing.com/admin</span></div>
+          <div class="screen">
+            <div class="browser-page-title"><h3>Custom Roles</h3></div>
+            <div style="padding:10px 16px 16px;">
+              <table class="mock-table">
+                <thead><tr><th>Role</th><th>Access Level</th><th>Division</th></tr></thead>
+                <tbody>
+                  <tr><td>Housekeeping Manager</td><td><span class="mock-pill" style="background:#dbeafe;color:#1e3a8a;">Manager</span></td><td>Housekeeping</td></tr>
+                  <tr><td>Housekeeper</td><td><span class="mock-pill" style="background:#ccfbf1;color:#0f766e;">Builder</span></td><td>Housekeeping</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="step-body">
+        <p class="step-title"><span class="step-num">3</span> The two roles that already exist</p>
+        <p>Under Admin &rarr; Access &amp; Roles &rarr; Roles panel, two custom roles are already set up:</p>
+        <ul>
+          <li><b>Housekeeping Manager</b> &mdash; Access Level "Manager", Division "Housekeeping". Gives everything shown in the Manager track above, and nothing outside it.</li>
+          <li><b>Housekeeper</b> &mdash; Access Level "Builder", Division "Housekeeping". Logs in through the same builder app as any other tradesperson (see the Housekeeper track).</li>
+        </ul>
+        <p>Assign either to a real staff member the same way as any role: Admin &rarr; Access &amp; Roles &rarr; find or add them &rarr; set their Role.</p>
+        <p style="font-size:12.5px;color:#94a3b8;font-style:italic;">Worth knowing: there's also a much older, built-in "Cleaner" role label with no division and no login access at all &mdash; a leftover organisational tag, not the same thing as the "Housekeeper" custom role above. Giving someone the built-in "Cleaner" role does not let them log in; "Housekeeper" is what actually grants access.</p>
+      </div>
+    </div>
+
+    <!-- Step 4 -->
+    <div class="step reverse">
+      <div class="step-mock">
+        <div class="browser">
+          <div class="bar"><span class="dot" style="background:#ef4444"></span><span class="dot" style="background:#f59e0b"></span><span class="dot" style="background:#22c55e"></span><span class="url">pmms.greenbridgehousing.com/settings</span></div>
+          <div class="screen">
+            <div class="browser-page-title"><h3>Routine Cleaning Visits</h3></div>
+            <div style="padding:12px 16px;">
+              <div style="display:flex; gap:8px; margin-bottom:10px;">
+                <div style="flex:1;"><p style="font-size:9.5px;font-weight:700;color:#64748b;margin:0 0 4px 0;">Flag as due after (days)</p><div class="mock-input" style="margin:0;">12</div></div>
+                <div style="flex:1;"><p style="font-size:9.5px;font-weight:700;color:#64748b;margin:0 0 4px 0;">Estimated minutes</p><div class="mock-input" style="margin:0;">30</div></div>
+              </div>
+              <label style="display:flex; align-items:center; gap:6px; font-size:11px; color:#0f172a; font-weight:600;"><input type="checkbox" checked disabled> Automatic routine-visit alerts enabled</label>
+              <div class="mock-btn primary" style="font-size:11px; margin-top:12px;">Save Routine Visit Settings</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="step-body">
+        <p class="step-title"><span class="step-num">4</span> Settings &rarr; Routine Cleaning Visits</p>
+        <p>Three numbers currently live here, all shown at their real, currently-saved values:</p>
+        <ul>
+          <li><b>Flag as due after 12 days</b> &mdash; the threshold used both for the Overdue/Due Soon colour tiers and for when the automatic engine creates a new ticket.</li>
+          <li><b>Estimated minutes: 30</b> &mdash; stamped onto every auto-created visit ticket (there's no manager assignment step to type one in, since nobody assigns these by hand).</li>
+          <li><b>Alerts enabled: on</b> &mdash; a single switch. Turning it off stops the daily engine from creating any new visit tickets at all, portfolio-wide, without touching existing ones.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Step 5 -->
+    <div class="step">
+      <div class="step-mock">
+        <div class="browser">
+          <div class="bar"><span class="dot" style="background:#ef4444"></span><span class="dot" style="background:#f59e0b"></span><span class="dot" style="background:#22c55e"></span><span class="url">pmms.greenbridgehousing.com/settings</span></div>
+          <div class="screen">
+            <div class="browser-page-title"><h3>Routine Visit Checklist</h3></div>
+            <div style="padding:12px 16px;">
+              <div style="display:flex; flex-direction:column; gap:6px; font-size:11px; color:#0f172a;">
+                <div style="display:flex; justify-content:space-between; padding:7px 9px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:7px;">Kitchen surfaces and appliances wiped down <span style="color:#dc2626;">✕</span></div>
+                <div style="display:flex; justify-content:space-between; padding:7px 9px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:7px;">Bathroom cleaned and sanitised <span style="color:#dc2626;">✕</span></div>
+                <div style="display:flex; justify-content:space-between; padding:7px 9px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:7px;">Floors vacuumed and mopped <span style="color:#dc2626;">✕</span></div>
+                <div style="display:flex; justify-content:space-between; padding:7px 9px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:7px;">Bins emptied <span style="color:#dc2626;">✕</span></div>
+                <div style="display:flex; justify-content:space-between; padding:7px 9px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:7px;">Communal areas tidied <span style="color:#dc2626;">✕</span></div>
+                <div style="display:flex; justify-content:space-between; padding:7px 9px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:7px;">Windows and mirrors cleaned <span style="color:#dc2626;">✕</span></div>
+              </div>
+              <div class="mock-btn ghost" style="font-size:10.5px; margin-top:10px;">+ Add item</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="step-body">
+        <p class="step-title"><span class="step-num">5</span> Settings &rarr; Routine Visit Checklist</p>
+        <p>The exact 6 items every Housekeeper currently has to tick off (see Housekeeper track, step 7), editable as a plain list &mdash; add, remove, or reword an item and it applies to the next visit a Housekeeper opens, no code change or deploy involved.</p>
+      </div>
+    </div>
+
+    <!-- Step 6 -->
+    <div class="step reverse">
+      <div class="step-mock">
+        <div class="concept-card">
+          <p class="eyebrow2">Runs automatically, once a day &mdash; no screen to open</p>
+          <div class="flow-step"><span class="dot2">1</span><p>Checks every property that has a cleaner assigned.</p></div>
+          <div class="flow-arrow">↓</div>
+          <div class="flow-step"><span class="dot2">2</span><p>Skips it if an open Routine Visit ticket already exists for that property &mdash; never creates a duplicate.</p></div>
+          <div class="flow-arrow">↓</div>
+          <div class="flow-step"><span class="dot2">3</span><p>Works out its baseline: last <i>completed</i> routine visit, or the date a cleaner was assigned if it's never had one.</p></div>
+          <div class="flow-arrow">↓</div>
+          <div class="flow-step"><span class="dot2">4</span><p>If today is 12+ days past that baseline &mdash; creates a new ticket, straight to <b>Assigned</b>, straight to that property's cleaner. No manager touches it.</p></div>
+        </div>
+      </div>
+      <div class="step-body">
+        <p class="step-title"><span class="step-num">6</span> How the automatic engine actually works</p>
+        <p>There's no screen for this &mdash; it's a background job (a scheduled Supabase Edge Function) that runs once daily and quietly creates tickets when they're due, which is why it's shown here as a flow rather than a screenshot.</p>
+        <ul>
+          <li>It's safe to run more than once &mdash; the duplicate-guard in step 2 means re-running it never creates two open visits for the same property.</li>
+          <li>This is the <b>only</b> place in all of PMMS where a ticket creates itself with no person raising it &mdash; which is exactly what causes the Sign-Off gap noted on the Manager track, step 9.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <footer class="end">GBCH PMMS &middot; Housekeeping Division Guide &middot; internal reference, not published in-app &middot; last updated 2026-08-09</footer>
+</div>
+
+<script>
+  function showTrack(name, btn) {
+    document.querySelectorAll('.track').forEach(function(el) { el.classList.remove('active'); });
+    document.getElementById('track-' + name).classList.add('active');
+    document.querySelectorAll('.tab-btn').forEach(function(el) { el.classList.remove('active'); });
+    btn.classList.add('active');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+</script>
+</body>
+</html>
