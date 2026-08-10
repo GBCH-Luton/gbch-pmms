@@ -25,25 +25,38 @@ export default class ErrorBoundary extends Component {
   }
 
   componentDidCatch(error, info) {
+    const isStaleChunk = STALE_CHUNK_PATTERN.test(error.message || '')
+
+    if (isStaleChunk) {
+      const lastReload = Number(sessionStorage.getItem(LAST_RELOAD_KEY) || 0)
+      const loopedRecently = Date.now() - lastReload < RELOOP_GUARD_MS
+      if (loopedRecently) {
+        // The auto-reload below already ran once and didn't fix it -- a
+        // genuinely broken deploy, not just a stale tab. This is the one
+        // stale-chunk case actually worth a log entry.
+        logClientError('react_render', error.message, {
+          stack: error.stack,
+          context: { componentStack: info.componentStack },
+        })
+        this.setState({ reloadLooped: true })
+        return
+      }
+
+      // Reload once, automatically, instead of showing a scary "something
+      // went wrong" card for what's really just "you need the newer
+      // version". Every tab left open across a deploy hits this, which is
+      // constant and never actionable -- not logged, so it stops burying
+      // real crashes under noise (see the not-a-bug case this recovers
+      // from, e.g. 2026-08-10's Abu-Sayed Kalam entry).
+      sessionStorage.setItem(LAST_RELOAD_KEY, String(Date.now()))
+      window.location.reload()
+      return
+    }
+
     logClientError('react_render', error.message, {
       stack: error.stack,
       context: { componentStack: info.componentStack },
     })
-
-    const isStaleChunk = STALE_CHUNK_PATTERN.test(error.message || '')
-    if (!isStaleChunk) return
-
-    const lastReload = Number(sessionStorage.getItem(LAST_RELOAD_KEY) || 0)
-    const loopedRecently = Date.now() - lastReload < RELOOP_GUARD_MS
-    if (loopedRecently) {
-      this.setState({ reloadLooped: true })
-      return
-    }
-
-    // Reload once, automatically, instead of showing a scary "something
-    // went wrong" card for what's really just "you need the newer version".
-    sessionStorage.setItem(LAST_RELOAD_KEY, String(Date.now()))
-    window.location.reload()
   }
 
   render() {
