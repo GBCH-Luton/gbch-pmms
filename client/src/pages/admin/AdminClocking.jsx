@@ -78,6 +78,18 @@ function formatDuration(ms) {
   return `${h}h ${m}m`
 }
 
+// One-glance punctuality summary for Today's Attendance -- late_flag and
+// early_leave_reason already exist on the shift (used inline under
+// Clocked In/Out below), this just collapses both into a single badge so
+// a manager doesn't have to read two cells to know if today was clean.
+function dailyStatusFor(shift) {
+  if (!shift) return { label: 'Not Clocked In', color: COLORS.slate400, bg: COLORS.slate100 }
+  if (shift.late_flag && shift.early_leave_reason) return { label: 'Late & Left Early', color: COLORS.red600, bg: COLORS.red100 }
+  if (shift.late_flag) return { label: 'Late', color: COLORS.amber700, bg: COLORS.amber100 }
+  if (shift.early_leave_reason) return { label: 'Left Early', color: COLORS.amber700, bg: COLORS.amber100 }
+  return { label: 'On Time', color: COLORS.green600, bg: COLORS.green100 }
+}
+
 export default function AdminClocking({ profile, onNavigate }) {
   const [loading, setLoading] = useState(true)
   const [liveSessions, setLiveSessions] = useState([])
@@ -806,6 +818,7 @@ export default function AdminClocking({ profile, onNavigate }) {
                 <th style={thStyle}>Builder</th>
                 <th style={thStyle}>Clocked In</th>
                 <th style={thStyle}>Clocked Out</th>
+                <th style={thStyle}>Daily Status</th>
                 <th style={thStyle}>Right Now</th>
                 <th style={thStyle}>Hours Today</th>
                 <th style={{ ...thStyle, textAlign: 'right' }}>Actions</th>
@@ -867,6 +880,16 @@ export default function AdminClocking({ profile, onNavigate }) {
                       : row.shift
                         ? <span style={{ color: COLORS.teal600, fontWeight: 700, fontFamily: 'system-ui' }}>Still clocked in</span>
                         : <span style={{ color: COLORS.slate300 }}>—</span>}
+                  </td>
+                  <td style={tdStyle}>
+                    {(() => {
+                      const status = dailyStatusFor(row.shift)
+                      return (
+                        <span style={{ fontSize: '11px', fontWeight: 700, padding: '3px 10px', borderRadius: '999px', color: status.color, background: status.bg }}>
+                          {status.label}
+                        </span>
+                      )
+                    })()}
                   </td>
                   <td style={tdStyle}>
                     <span style={{
