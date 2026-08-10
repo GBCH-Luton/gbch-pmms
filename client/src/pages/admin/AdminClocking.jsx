@@ -26,7 +26,11 @@ const ROAD_DISTANCE_MULTIPLIER = 1.3
 // location. Opens the in-app map modal instead of a new browser tab.
 // dismissal (a clocking_flag_dismissals row, or null) swaps the red
 // warning + "Dismiss" for a quieter "Reviewed" tag + "Undo" once a manager
-// has checked it -- see handleDismissFlag/handleUndoDismiss.
+// has checked it -- see handleDismissFlag/handleUndoDismiss. onDismiss/
+// onUndoDismiss are already bound to this specific job by the caller
+// (dismissing/undoing always acts on the whole job, both clock-in and
+// clock-out together -- see handleDismissFlag's own comment), so this
+// component just calls them with no arguments.
 function LocationCell({ distance, thresholdM, lat, lng, onOpenMap, dismissal, onDismiss, onUndoDismiss }) {
   // getCurrentPositionSafe() (lib/geo.js) never blocks clocking in/out --
   // it resolves to null on denial/timeout/no GPS lock rather than making
@@ -47,7 +51,7 @@ function LocationCell({ distance, thresholdM, lat, lng, onOpenMap, dismissal, on
         dismissal ? (
           <span style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
             <span style={{ fontSize: '10px', fontWeight: 800, color: COLORS.slate400 }}>✓ Reviewed</span>
-            <button onClick={() => onUndoDismiss(dismissal.id)} style={{ background: 'none', border: 'none', padding: 0, fontSize: '10px', fontWeight: 700, color: COLORS.blue700, cursor: 'pointer' }}>
+            <button onClick={onUndoDismiss} style={{ background: 'none', border: 'none', padding: 0, fontSize: '10px', fontWeight: 700, color: COLORS.blue700, cursor: 'pointer' }}>
               Undo
             </button>
           </span>
@@ -134,19 +138,26 @@ export default function AdminClocking({ profile, onNavigate }) {
     return dismissals.find(d => d.ticket_id === ticketId && d.kind === kind) || null
   }
 
-  async function handleDismissFlag(ticketId, kind) {
+  // Dismiss/undo act on the whole job, not one field at a time -- the
+  // Flagged Locations count treats a job as "1 flagged" if EITHER its
+  // clock-in OR clock-out was too far (see fetchFlaggedClockingCount,
+  // shared.jsx), so dismissing only one side of a job flagged on both
+  // would silently leave it still counted. flaggedKinds is whichever of
+  // 'clock_in'/'clock_out' actually needs reviewing for this ticket right
+  // now -- usually one, sometimes both.
+  async function handleDismissFlag(ticketId, flaggedKinds) {
+    if (flaggedKinds.length === 0) return
     const { data, error } = await supabase
       .schema('pmms')
       .from('clocking_flag_dismissals')
-      .insert({ ticket_id: ticketId, kind, dismissed_by: profile.id })
+      .insert(flaggedKinds.map(kind => ({ ticket_id: ticketId, kind, dismissed_by: profile.id })))
       .select('id, ticket_id, kind')
-      .single()
-    if (!error) setDismissals(prev => [...prev, data])
+    if (!error) setDismissals(prev => [...prev, ...data])
   }
 
-  async function handleUndoDismiss(dismissalId) {
-    setDismissals(prev => prev.filter(d => d.id !== dismissalId))
-    await supabase.schema('pmms').from('clocking_flag_dismissals').delete().eq('id', dismissalId)
+  async function handleUndoDismiss(ticketId) {
+    setDismissals(prev => prev.filter(d => d.ticket_id !== ticketId))
+    await supabase.schema('pmms').from('clocking_flag_dismissals').delete().eq('ticket_id', ticketId)
   }
 
   useEffect(() => {
@@ -749,7 +760,7 @@ export default function AdminClocking({ profile, onNavigate }) {
                     findDismissal(row.ticket.id, 'clock_in') ? (
                       <span style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
                         <span style={{ fontSize: '11px', fontWeight: 800, color: COLORS.slate400 }}>✓ Reviewed</span>
-                        <button onClick={() => handleUndoDismiss(findDismissal(row.ticket.id, 'clock_in').id)} style={{ background: 'none', border: 'none', padding: 0, fontSize: '11px', fontWeight: 700, color: COLORS.blue700, cursor: 'pointer' }}>
+                        <button onClick={() => handleUndoDismiss(row.ticket.id)} style={{ background: 'none', border: 'none', padding: 0, fontSize: '11px', fontWeight: 700, color: COLORS.blue700, cursor: 'pointer' }}>
                           Undo
                         </button>
                       </span>
@@ -758,7 +769,7 @@ export default function AdminClocking({ profile, onNavigate }) {
                         <span style={{ fontSize: '11px', fontWeight: 800, color: COLORS.red600 }}>
                           ⚠ Clocked in {formatDistanceMetres(row.clockInDistance)} from the property
                         </span>
-                        <button onClick={() => handleDismissFlag(row.ticket.id, 'clock_in')} style={{ background: 'none', border: 'none', padding: 0, fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textDecoration: 'underline', cursor: 'pointer' }}>
+                        <button onClick={() => handleDismissFlag(row.ticket.id, ['clock_in'])} style={{ background: 'none', border: 'none', padding: 0, fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textDecoration: 'underline', cursor: 'pointer' }}>
                           Dismiss
                         </button>
                       </span>
@@ -934,7 +945,14 @@ export default function AdminClocking({ profile, onNavigate }) {
                   </td>
                 </tr>
               )}
-              {sortedCompletedRows.map(row => (
+              {sortedCompletedRows.map(row => {
+                const flaggedKinds = [
+                  row.clockInDistance != null && row.clockInDistance > distanceThresholdM && 'clock_in',
+                  row.clockOutDistance != null && row.clockOutDistance > distanceThresholdM && 'clock_out',
+                ].filter(Boolean)
+                const dismissRow = () => handleDismissFlag(row.ticket.id, flaggedKinds)
+                const undoRow = () => handleUndoDismiss(row.ticket.id)
+                return (
                 <tr key={row.ticket.id} style={{ borderBottom: `1px solid ${COLORS.slate100}` }}>
                   <td
                     style={{ ...tdStyle, ...(onNavigate ? { cursor: 'pointer' } : {}) }}
@@ -951,8 +969,8 @@ export default function AdminClocking({ profile, onNavigate }) {
                       distance={row.clockInDistance} thresholdM={distanceThresholdM}
                       lat={row.firstSession.clock_in_lat} lng={row.firstSession.clock_in_lng} onOpenMap={openPinMap}
                       dismissal={findDismissal(row.ticket.id, 'clock_in')}
-                      onDismiss={() => handleDismissFlag(row.ticket.id, 'clock_in')}
-                      onUndoDismiss={handleUndoDismiss}
+                      onDismiss={dismissRow}
+                      onUndoDismiss={undoRow}
                     />
                   </td>
                   <td style={{ ...tdStyle, fontFamily: 'monospace', fontSize: '12px' }}>
@@ -961,8 +979,8 @@ export default function AdminClocking({ profile, onNavigate }) {
                       distance={row.clockOutDistance} thresholdM={distanceThresholdM}
                       lat={row.lastSession.clock_out_lat} lng={row.lastSession.clock_out_lng} onOpenMap={openPinMap}
                       dismissal={findDismissal(row.ticket.id, 'clock_out')}
-                      onDismiss={() => handleDismissFlag(row.ticket.id, 'clock_out')}
-                      onUndoDismiss={handleUndoDismiss}
+                      onDismiss={dismissRow}
+                      onUndoDismiss={undoRow}
                     />
                   </td>
                   <td style={{ ...tdStyle, fontWeight: 800, color: COLORS.teal600, fontFamily: 'monospace' }}>
@@ -1026,7 +1044,8 @@ export default function AdminClocking({ profile, onNavigate }) {
                     <button onClick={() => openEditModal(row)} style={actionBtnStyle}>Edit</button>
                   </td>
                 </tr>
-              ))}
+                )
+              })}
             </tbody>
           </table>
         </div>
