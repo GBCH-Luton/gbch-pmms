@@ -972,20 +972,42 @@ export async function fetchAssignableStaffForCategory(category) {
   return filtered.sort((a, b) => a.name.localeCompare(b.name))
 }
 
+const DEFAULT_CLOCK_FLAG_LOOKBACK_DAYS = 30
+
 // Counts jobs whose recorded clock-in/out location was further than the
 // configured threshold from the property -- the exact same "flagged"
 // definition the Clocking page itself uses, so this number always matches
 // what a manager finds after clicking through. Counts a live session once
 // (by its clock-in) and a completed job once (if either its first clock-in
 // or its last clock-out was out of range).
+//
+// Two things keep this from only ever going up, never down (found live --
+// a manager had no way to bring this number down at all):
+//   1. Completed/archived tickets are scoped to the last
+//      clock_flag_lookback_days (default 30) by completed_at -- an old
+//      flag ages out on its own instead of counting forever. Live
+//      (still-open) sessions are never windowed -- they're happening now.
+//   2. pmms.clocking_flag_dismissals (see
+//      scripts/add_clocking_flag_dismissals.sql) lets a manager dismiss
+//      one early from the Clocking page after checking it -- a dismissed
+//      (ticket_id, kind) pair is excluded even within the window.
 export async function fetchFlaggedClockingCount() {
-  const { data: settingsRow } = await supabase
+  const { data: settingsRows } = await supabase
     .schema('pmms')
     .from('settings')
-    .select('setting_value')
-    .eq('setting_key', 'clock_distance_threshold_meters')
-    .maybeSingle()
-  const thresholdM = settingsRow?.setting_value != null ? Number(settingsRow.setting_value) : DEFAULT_CLOCK_DISTANCE_THRESHOLD_M
+    .select('setting_key, setting_value')
+    .in('setting_key', ['clock_distance_threshold_meters', 'clock_flag_lookback_days'])
+  const settingsByKey = {}
+  ;(settingsRows || []).forEach(r => { settingsByKey[r.setting_key] = r.setting_value })
+  const thresholdM = settingsByKey.clock_distance_threshold_meters != null ? Number(settingsByKey.clock_distance_threshold_meters) : DEFAULT_CLOCK_DISTANCE_THRESHOLD_M
+  const lookbackDays = settingsByKey.clock_flag_lookback_days != null ? Number(settingsByKey.clock_flag_lookback_days) : DEFAULT_CLOCK_FLAG_LOOKBACK_DAYS
+  const cutoffIso = new Date(Date.now() - lookbackDays * 86400000).toISOString()
+
+  const { data: dismissals } = await supabase
+    .schema('pmms')
+    .from('clocking_flag_dismissals')
+    .select('ticket_id, kind')
+  const isDismissed = (ticketId, kind) => (dismissals || []).some(d => d.ticket_id === ticketId && d.kind === kind)
 
   const { data: openSessions } = await supabase
     .schema('pmms')
@@ -996,8 +1018,9 @@ export async function fetchFlaggedClockingCount() {
   const { data: completedTicketsRaw } = await supabase
     .schema('pmms')
     .from('tickets')
-    .select('id, property_id')
+    .select('id, property_id, completed_at')
     .in('status', ['Completed', 'Archived'])
+    .gte('completed_at', cutoffIso)
   const completedTickets = await attachProperties(completedTicketsRaw || [], 'address, postcode, latitude, longitude')
 
   let liveTickets = []
@@ -1016,6 +1039,7 @@ export async function fetchFlaggedClockingCount() {
   let flaggedCount = 0
 
   ;(openSessions || []).forEach(s => {
+    if (isDismissed(s.ticket_id, 'clock_in')) return
     const ticket = liveTickets.find(t => t.id === s.ticket_id)
     const coords = ticket?.property ? coordsByPropertyId[ticket.property.id] : null
     if (coords && s.clock_in_lat != null && s.clock_in_lng != null) {
@@ -1041,10 +1065,10 @@ export async function fetchFlaggedClockingCount() {
 
       const first = sessions[0]
       const last = sessions[sessions.length - 1]
-      const inDistance = (first.clock_in_lat != null && first.clock_in_lng != null)
+      const inDistance = (first.clock_in_lat != null && first.clock_in_lng != null && !isDismissed(t.id, 'clock_in'))
         ? distanceMetres(first.clock_in_lat, first.clock_in_lng, coords.latitude, coords.longitude)
         : null
-      const outDistance = (last.clock_out_lat != null && last.clock_out_lng != null)
+      const outDistance = (last.clock_out_lat != null && last.clock_out_lng != null && !isDismissed(t.id, 'clock_out'))
         ? distanceMetres(last.clock_out_lat, last.clock_out_lng, coords.latitude, coords.longitude)
         : null
 

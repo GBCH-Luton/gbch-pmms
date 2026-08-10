@@ -24,7 +24,10 @@ const ROAD_DISTANCE_MULTIPLIER = 1.3
 // Compact map-pin button + optional "too far" flag shown under a clock-in
 // or clock-out time in the timesheet, when that event has a recorded
 // location. Opens the in-app map modal instead of a new browser tab.
-function LocationCell({ distance, thresholdM, lat, lng, onOpenMap }) {
+// dismissal (a clocking_flag_dismissals row, or null) swaps the red
+// warning + "Dismiss" for a quieter "Reviewed" tag + "Undo" once a manager
+// has checked it -- see handleDismissFlag/handleUndoDismiss.
+function LocationCell({ distance, thresholdM, lat, lng, onOpenMap, dismissal, onDismiss, onUndoDismiss }) {
   // getCurrentPositionSafe() (lib/geo.js) never blocks clocking in/out --
   // it resolves to null on denial/timeout/no GPS lock rather than making
   // the builder wait or fail. That's silent by design at the point of
@@ -41,9 +44,23 @@ function LocationCell({ distance, thresholdM, lat, lng, onOpenMap }) {
         📍 Map
       </button>
       {tooFar && (
-        <span style={{ display: 'block', fontSize: '10px', fontWeight: 800, color: COLORS.red600 }}>
-          ⚠ {formatDistanceMetres(distance)} away
-        </span>
+        dismissal ? (
+          <span style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+            <span style={{ fontSize: '10px', fontWeight: 800, color: COLORS.slate400 }}>✓ Reviewed</span>
+            <button onClick={() => onUndoDismiss(dismissal.id)} style={{ background: 'none', border: 'none', padding: 0, fontSize: '10px', fontWeight: 700, color: COLORS.blue700, cursor: 'pointer' }}>
+              Undo
+            </button>
+          </span>
+        ) : (
+          <span style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+            <span style={{ fontSize: '10px', fontWeight: 800, color: COLORS.red600 }}>
+              ⚠ {formatDistanceMetres(distance)} away
+            </span>
+            <button onClick={onDismiss} style={{ background: 'none', border: 'none', padding: 0, fontSize: '10px', fontWeight: 700, color: COLORS.slate400, textDecoration: 'underline', cursor: 'pointer' }}>
+              Dismiss
+            </button>
+          </span>
+        )
       )}
     </div>
   )
@@ -67,6 +84,13 @@ export default function AdminClocking({ profile, onNavigate }) {
   const [completedSortDirection, setCompletedSortDirection] = useState('asc')
   const [distanceThresholdM, setDistanceThresholdM] = useState(DEFAULT_CLOCK_DISTANCE_THRESHOLD_M)
   const [, setTick] = useState(0)
+  // Lets a manager say "I checked this, it's fine" on a flagged clock-in/
+  // out from this page -- the Dashboard's Flagged Locations count then
+  // excludes it (see fetchFlaggedClockingCount, shared.jsx). This page
+  // itself still shows every flag regardless of dismissal (an audit
+  // trail, not just a to-do list) -- dismissing just swaps the red
+  // warning for a quieter "Reviewed" tag with an Undo.
+  const [dismissals, setDismissals] = useState([])
 
   const [editRow, setEditRow] = useState(null)
   const [editClockIn, setEditClockIn] = useState('')
@@ -104,6 +128,25 @@ export default function AdminClocking({ profile, onNavigate }) {
   function openRouteMap(inLat, inLng, outLat, outLng) {
     const distanceMiles = metresToMiles(distanceMetres(inLat, inLng, outLat, outLng))
     setMapModal({ mode: 'route', embedUrl: googleMapsRouteEmbedLink(inLat, inLng, outLat, outLng), distanceMiles })
+  }
+
+  function findDismissal(ticketId, kind) {
+    return dismissals.find(d => d.ticket_id === ticketId && d.kind === kind) || null
+  }
+
+  async function handleDismissFlag(ticketId, kind) {
+    const { data, error } = await supabase
+      .schema('pmms')
+      .from('clocking_flag_dismissals')
+      .insert({ ticket_id: ticketId, kind, dismissed_by: profile.id })
+      .select('id, ticket_id, kind')
+      .single()
+    if (!error) setDismissals(prev => [...prev, data])
+  }
+
+  async function handleUndoDismiss(dismissalId) {
+    setDismissals(prev => prev.filter(d => d.id !== dismissalId))
+    await supabase.schema('pmms').from('clocking_flag_dismissals').delete().eq('id', dismissalId)
   }
 
   useEffect(() => {
@@ -173,6 +216,12 @@ export default function AdminClocking({ profile, onNavigate }) {
       .maybeSingle()
     const thresholdM = settingsRow?.setting_value != null ? Number(settingsRow.setting_value) : DEFAULT_CLOCK_DISTANCE_THRESHOLD_M
     setDistanceThresholdM(thresholdM)
+
+    const { data: dismissalRows } = await supabase
+      .schema('pmms')
+      .from('clocking_flag_dismissals')
+      .select('id, ticket_id, kind')
+    setDismissals(dismissalRows || [])
 
     // Two different builder lists, same distinction AdminPipeline draws: an
     // unfiltered staff lookup to resolve names for ANY historical assignee
@@ -697,9 +746,23 @@ export default function AdminClocking({ profile, onNavigate }) {
                     </span>
                   )}
                   {tooFar && (
-                    <span style={{ display: 'block', marginTop: '4px', fontSize: '11px', fontWeight: 800, color: COLORS.red600 }}>
-                      ⚠ Clocked in {formatDistanceMetres(row.clockInDistance)} from the property
-                    </span>
+                    findDismissal(row.ticket.id, 'clock_in') ? (
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
+                        <span style={{ fontSize: '11px', fontWeight: 800, color: COLORS.slate400 }}>✓ Reviewed</span>
+                        <button onClick={() => handleUndoDismiss(findDismissal(row.ticket.id, 'clock_in').id)} style={{ background: 'none', border: 'none', padding: 0, fontSize: '11px', fontWeight: 700, color: COLORS.blue700, cursor: 'pointer' }}>
+                          Undo
+                        </button>
+                      </span>
+                    ) : (
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
+                        <span style={{ fontSize: '11px', fontWeight: 800, color: COLORS.red600 }}>
+                          ⚠ Clocked in {formatDistanceMetres(row.clockInDistance)} from the property
+                        </span>
+                        <button onClick={() => handleDismissFlag(row.ticket.id, 'clock_in')} style={{ background: 'none', border: 'none', padding: 0, fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textDecoration: 'underline', cursor: 'pointer' }}>
+                          Dismiss
+                        </button>
+                      </span>
+                    )
                   )}
                   {hasPin && (
                     <button
@@ -884,11 +947,23 @@ export default function AdminClocking({ profile, onNavigate }) {
                   <td style={tdStyle}>{row.builderName}</td>
                   <td style={{ ...tdStyle, fontFamily: 'monospace', fontSize: '12px' }}>
                     {formatUKDateTime(row.firstIn)}
-                    <LocationCell distance={row.clockInDistance} thresholdM={distanceThresholdM} lat={row.firstSession.clock_in_lat} lng={row.firstSession.clock_in_lng} onOpenMap={openPinMap} />
+                    <LocationCell
+                      distance={row.clockInDistance} thresholdM={distanceThresholdM}
+                      lat={row.firstSession.clock_in_lat} lng={row.firstSession.clock_in_lng} onOpenMap={openPinMap}
+                      dismissal={findDismissal(row.ticket.id, 'clock_in')}
+                      onDismiss={() => handleDismissFlag(row.ticket.id, 'clock_in')}
+                      onUndoDismiss={handleUndoDismiss}
+                    />
                   </td>
                   <td style={{ ...tdStyle, fontFamily: 'monospace', fontSize: '12px' }}>
                     {formatUKDateTime(row.lastOut)}
-                    <LocationCell distance={row.clockOutDistance} thresholdM={distanceThresholdM} lat={row.lastSession.clock_out_lat} lng={row.lastSession.clock_out_lng} onOpenMap={openPinMap} />
+                    <LocationCell
+                      distance={row.clockOutDistance} thresholdM={distanceThresholdM}
+                      lat={row.lastSession.clock_out_lat} lng={row.lastSession.clock_out_lng} onOpenMap={openPinMap}
+                      dismissal={findDismissal(row.ticket.id, 'clock_out')}
+                      onDismiss={() => handleDismissFlag(row.ticket.id, 'clock_out')}
+                      onUndoDismiss={handleUndoDismiss}
+                    />
                   </td>
                   <td style={{ ...tdStyle, fontWeight: 800, color: COLORS.teal600, fontFamily: 'monospace' }}>
                     {formatDuration(row.totalMs)}

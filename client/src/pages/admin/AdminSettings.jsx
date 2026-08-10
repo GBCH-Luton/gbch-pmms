@@ -113,6 +113,7 @@ export default function AdminSettings() {
   const [clockOverrunHours, setClockOverrunHours] = useState(8)
   const [doneWindowHours, setDoneWindowHours] = useState(24)
   const [clockDistanceThresholdM, setClockDistanceThresholdM] = useState(250)
+  const [clockFlagLookbackDays, setClockFlagLookbackDays] = useState(30)
   const [clockingSaving, setClockingSaving] = useState(false)
   const [clockingSaved, setClockingSaved] = useState(false)
 
@@ -242,6 +243,7 @@ export default function AdminSettings() {
       if (map.clock_overrun_hours != null) setClockOverrunHours(map.clock_overrun_hours)
       if (map.done_window_hours != null) setDoneWindowHours(map.done_window_hours)
       if (map.clock_distance_threshold_meters != null) setClockDistanceThresholdM(map.clock_distance_threshold_meters)
+      if (map.clock_flag_lookback_days != null) setClockFlagLookbackDays(map.clock_flag_lookback_days)
       if (map.daily_clock_in_deadline != null) setDailyClockInDeadline(map.daily_clock_in_deadline)
       if (map.daily_clock_out_reminder_time != null) setDailyClockOutReminderTime(map.daily_clock_out_reminder_time)
       if (map.daily_overtime_threshold_hours != null) setOvertimeThresholdHours(Number(map.daily_overtime_threshold_hours))
@@ -572,6 +574,7 @@ export default function AdminSettings() {
     await saveSetting('clock_overrun_hours', Number(clockOverrunHours))
     await saveSetting('done_window_hours', Number(doneWindowHours))
     await saveSetting('clock_distance_threshold_meters', Number(clockDistanceThresholdM))
+    await saveSetting('clock_flag_lookback_days', Number(clockFlagLookbackDays))
     setClockingSaving(false)
     setClockingSaved(true)
     setTimeout(() => setClockingSaved(false), 2000)
@@ -1192,6 +1195,16 @@ export default function AdminSettings() {
               style={inputStyle}
             />
             <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: COLORS.slate400 }}>Clock-in/out points further than this from the property are flagged on the Clocking page.</p>
+          </div>
+          <div style={{ flex: '1 1 200px' }}>
+            <label style={fieldLabelStyle}>Flagged locations lookback (days)</label>
+            <input
+              type="number"
+              value={clockFlagLookbackDays}
+              onChange={(e) => setClockFlagLookbackDays(e.target.value)}
+              style={inputStyle}
+            />
+            <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: COLORS.slate400 }}>How far back the Dashboard's "Flagged Locations" tile looks -- older flags age out on their own. The Clocking page itself still shows every flag, all-time.</p>
           </div>
         </div>
 
