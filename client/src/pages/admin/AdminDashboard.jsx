@@ -748,7 +748,7 @@ export default function AdminDashboard({ profile, onNavigate }) {
         <button
           onClick={() => onNavigate?.('sign-off')}
           style={{
-            flex: '1 1 220px', background: COLORS.blue600, borderRadius: '16px', padding: '16px',
+            flex: '1 1 220px', background: pendingSignOffCount > 0 ? COLORS.red600 : COLORS.blue600, borderRadius: '16px', padding: '16px',
             border: 'none', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', textAlign: 'center',
           }}
         >
