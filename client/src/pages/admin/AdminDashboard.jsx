@@ -621,8 +621,9 @@ export default function AdminDashboard({ profile, onNavigate }) {
   quietLines.push({ target: 'properties', tone: 'quiet', text: <>Properties — no updates. {totalPropertiesCount} total, {newPropertiesCount} new recently.</> })
   quietLines.push({ target: 'jobs-completed', tone: 'quiet', text: <>Jobs Completed — no updates. {completedThisMonth} this month.</> })
 
+  if (pendingSignOffCount > 0) flaggedLines.push({ target: 'sign-off-mileage', tone: 'warning', text: <><b>{pendingSignOffCount} job{pendingSignOffCount === 1 ? '' : 's'}</b> {pendingSignOffCount === 1 ? 'is' : 'are'} waiting to be signed off.</> })
   if (flaggedLocationsCount > 0) flaggedLines.push({ target: 'sign-off-mileage', tone: 'warning', text: <><b>{flaggedLocationsCount} clocking location{flaggedLocationsCount === 1 ? '' : 's'}</b> flagged for review.</> })
-  else quietLines.push({ target: 'sign-off-mileage', tone: 'quiet', text: <>Sign-Off &amp; Mileage — no updates. {pendingSignOffCount} pending sign-off, nothing flagged.</> })
+  if (pendingSignOffCount === 0 && flaggedLocationsCount === 0) quietLines.push({ target: 'sign-off-mileage', tone: 'quiet', text: <>Sign-Off &amp; Mileage — no updates.</> })
 
   const briefingLines = [...flaggedLines, ...quietLines]
 
