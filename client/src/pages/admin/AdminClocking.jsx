@@ -1045,7 +1045,7 @@ export default function AdminClocking({ profile, onNavigate }) {
                       const mismatch = actual === 0 ? row.estimatedMiles > 0.3 : Math.abs(actual - row.estimatedMiles) > Math.max(1, row.estimatedMiles * 0.5)
                       return (
                         <span style={{ display: 'block', marginTop: '2px', fontSize: '10px', fontWeight: 700, color: mismatch ? COLORS.red600 : COLORS.slate400 }}>
-                          Est. {row.estimatedMiles.toFixed(1)}mi
+                          Est. travel to job: {row.estimatedMiles.toFixed(1)}mi
                           {mismatch && ' — check against logged mileage'}
                         </span>
                       )
@@ -1311,7 +1311,11 @@ export default function AdminClocking({ profile, onNavigate }) {
             <p style={modalTitleStyle}>{mapModal.mode === 'route' ? 'Clock-In → Clock-Out Route' : 'Location'}</p>
             {mapModal.mode === 'route' && (
               <p style={{ margin: '2px 0 12px 0', fontSize: '13px', color: COLORS.slate500 }}>
-                Estimated straight-line distance: <strong>{mapModal.distanceMiles.toFixed(2)} miles</strong>
+                How far apart the clock-in and clock-out points were: <strong>{mapModal.distanceMiles.toFixed(2)} miles</strong>
+                <br />
+                <span style={{ fontSize: '12px', color: COLORS.slate400 }}>
+                  Not the same as "Est." in the table -- that's the distance travelled to reach this job, not movement during it.
+                </span>
               </p>
             )}
             <iframe
