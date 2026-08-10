@@ -141,9 +141,19 @@ export default function AdminClocking({ profile, onNavigate }) {
     setMapModal({ mode: 'pin', embedUrl: googleMapsEmbedLink(lat, lng) })
   }
 
-  function openRouteMap(inLat, inLng, outLat, outLng) {
-    const distanceMiles = metresToMiles(distanceMetres(inLat, inLng, outLat, outLng))
-    setMapModal({ mode: 'route', embedUrl: googleMapsRouteEmbedLink(inLat, inLng, outLat, outLng), distanceMiles })
+  // Draws the same origin -> this job's property the Est. mileage figure
+  // was calculated from (previous job that day, or home for the first one)
+  // -- not clock-in -> clock-out, which is nearly always ~0 since builders
+  // clock in/out right at the property and doesn't show anything useful.
+  function openEstimatedRouteMap(row) {
+    if (!row.estimatedOrigin || !row.propertyCoords) return
+    setMapModal({
+      mode: 'route',
+      embedUrl: googleMapsRouteEmbedLink(row.estimatedOrigin.latitude, row.estimatedOrigin.longitude, row.propertyCoords.latitude, row.propertyCoords.longitude),
+      distanceMiles: row.estimatedMiles,
+      originLabel: row.estimatedOriginLabel,
+      destinationLabel: row.ticket.property?.address,
+    })
   }
 
   function findDismissal(ticketId, kind) {
@@ -441,10 +451,18 @@ export default function AdminClocking({ profile, onNavigate }) {
       let prevDateStr = null
       builderRows.forEach(r => {
         const dateStr = formatUKDate(r.firstIn)
-        const origin = (prevRow && prevDateStr === dateStr) ? prevRow.propertyCoords : homeCoordsByStaffId[r.ticket.assigned_builder_id]
+        const cameFromPrevJob = prevRow && prevDateStr === dateStr
+        const origin = cameFromPrevJob ? prevRow.propertyCoords : homeCoordsByStaffId[r.ticket.assigned_builder_id]
         r.estimatedMiles = (origin && r.propertyCoords)
           ? metresToMiles(distanceMetres(origin.latitude, origin.longitude, r.propertyCoords.latitude, r.propertyCoords.longitude)) * ROAD_DISTANCE_MULTIPLIER
           : null
+        // Kept alongside estimatedMiles so the Route button can draw the
+        // exact same origin -> this job the estimate was calculated from,
+        // instead of clock-in -> clock-out (nearly always ~0, since
+        // builders clock in/out right at the property, not a meaningful
+        // route -- found live on ticket #17).
+        r.estimatedOrigin = origin || null
+        r.estimatedOriginLabel = cameFromPrevJob ? (prevRow.ticket.property?.address || 'Previous job') : 'Home'
         prevRow = r
         prevDateStr = dateStr
       })
@@ -1052,9 +1070,9 @@ export default function AdminClocking({ profile, onNavigate }) {
                     })()}
                   </td>
                   <td style={tdStyle}>
-                    {row.firstSession.clock_in_lat != null && row.firstSession.clock_in_lng != null && row.lastSession.clock_out_lat != null && row.lastSession.clock_out_lng != null ? (
+                    {row.estimatedOrigin && row.propertyCoords ? (
                       <button
-                        onClick={() => openRouteMap(row.firstSession.clock_in_lat, row.firstSession.clock_in_lng, row.lastSession.clock_out_lat, row.lastSession.clock_out_lng)}
+                        onClick={() => openEstimatedRouteMap(row)}
                         style={{ background: 'none', border: 'none', padding: 0, fontSize: '11px', fontWeight: 700, color: COLORS.blue700, cursor: 'pointer' }}
                       >
                         🧭 Route
@@ -1308,13 +1326,13 @@ export default function AdminClocking({ profile, onNavigate }) {
       {mapModal && (
         <div style={modalOverlayStyle}>
           <div style={{ ...modalCardStyle, maxWidth: '640px' }}>
-            <p style={modalTitleStyle}>{mapModal.mode === 'route' ? 'Clock-In → Clock-Out Route' : 'Location'}</p>
+            <p style={modalTitleStyle}>{mapModal.mode === 'route' ? 'Estimated Route to This Job' : 'Location'}</p>
             {mapModal.mode === 'route' && (
               <p style={{ margin: '2px 0 12px 0', fontSize: '13px', color: COLORS.slate500 }}>
-                How far apart the clock-in and clock-out points were: <strong>{mapModal.distanceMiles.toFixed(2)} miles</strong>
+                From <strong>{mapModal.originLabel}</strong> to <strong>{mapModal.destinationLabel}</strong>: <strong>{mapModal.distanceMiles.toFixed(1)} miles</strong>
                 <br />
                 <span style={{ fontSize: '12px', color: COLORS.slate400 }}>
-                  Not the same as "Est." in the table -- that's the distance travelled to reach this job, not movement during it.
+                  Same figure as "Est. travel to job" in the table -- a straight-line estimate with a road-distance adjustment, not an exact route match.
                 </span>
               </p>
             )}
