@@ -24,6 +24,36 @@ const expandValueStyle = { margin: '0 0 10px 0', fontSize: '13px', fontWeight: 6
 const expandSectionStyle = { background: COLORS.white, borderRadius: '12px', padding: '16px', border: `1px solid ${COLORS.slate200}` }
 const expandSectionTitleStyle = { margin: '0 0 12px 0', fontSize: '11px', fontWeight: 800, color: COLORS.slate500, textTransform: 'uppercase', letterSpacing: '0.05em' }
 
+// Actual hands-on-the-job time, not wall-clock turnaround -- same
+// work_sessions-summed definition as the Clocking page's "Total Time"
+// column and Sign-Off's workedMsByTicket, so this always matches what a
+// manager finds on either of those. Fetches for itself only when its
+// ticket's row is actually expanded, rather than bloating the main
+// ticket list query with a join every Pipeline load never needed.
+function TicketWorkedTime({ ticketId }) {
+  const [workedMs, setWorkedMs] = useState(null)
+
+  useEffect(() => {
+    let cancelled = false
+    supabase
+      .schema('pmms')
+      .from('work_sessions')
+      .select('started_at, ended_at')
+      .eq('ticket_id', ticketId)
+      .not('ended_at', 'is', null)
+      .then(({ data }) => {
+        if (cancelled) return
+        const totalMs = (data || []).reduce((sum, s) => sum + (new Date(s.ended_at) - new Date(s.started_at)), 0)
+        setWorkedMs(totalMs)
+      })
+    return () => { cancelled = true }
+  }, [ticketId])
+
+  if (workedMs === null) return <p style={expandValueStyle}>Loading…</p>
+  if (workedMs === 0) return <p style={expandValueStyle}>No clocked time recorded</p>
+  return <p style={expandValueStyle}>{formatDuration(workedMs)}</p>
+}
+
 export default function AdminPipeline({
   profile, onTicketsChanged, initialStatusFilter, initialPriorityFilter, initialStuckFilter, initialTicketNumberSearch,
   initialCategoryFilter, initialDivisionFilter, initialBuilderFilter, initialPropertyFilter, initialFromDate, initialToDate,
@@ -1091,6 +1121,13 @@ export default function AdminPipeline({
                                 <>
                                   <p style={expandLabelStyle}>Estimated Time</p>
                                   <p style={expandValueStyle}>{formatDuration(t.estimated_minutes * 60000)}</p>
+                                </>
+                              )}
+
+                              {(t.status === 'Completed' || t.status === 'Archived' || t.status === 'In Progress' || t.status === 'On Hold') && (
+                                <>
+                                  <p style={expandLabelStyle}>Time Worked</p>
+                                  <TicketWorkedTime ticketId={t.id} />
                                 </>
                               )}
 
