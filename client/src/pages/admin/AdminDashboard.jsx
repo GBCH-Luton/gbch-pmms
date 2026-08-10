@@ -591,9 +591,13 @@ export default function AdminDashboard({ profile, onNavigate }) {
   const complianceVisible = !profile.division || profile.division === 'Compliance'
   const voidGardensVisible = !profile.division
 
-  const p1UnassignedCount = tickets.filter(t => (
-    t.status === 'Pending' && (t.priority_override || priorityTierLabel(t.priority_score, p1Threshold, p2Threshold)) === 'P1 Critical'
-  )).length
+  // Mirrors every red-coloured Pipeline KPI tile exactly (see kpis above)
+  // rather than a narrower hand-picked metric -- a tile showing red on the
+  // dashboard with no matching line here was exactly the gap that left a
+  // real unassigned backlog invisible in the briefing (only its P1 subset
+  // was ever checked).
+  const unassignedCount = kpis.find(k => k.label === 'Unassigned')?.value || 0
+  const p1CriticalCount = kpis.find(k => k.label === 'P1 Critical')?.value || 0
   const stuckCount = kpis.find(k => k.label === 'Stuck')?.value || 0
   const completedToday = completionKpis.find(k => k.label === 'Today')?.value || 0
   const completedThisMonth = completionKpis.find(k => k.label === 'This Month')?.value || 0
@@ -602,8 +606,9 @@ export default function AdminDashboard({ profile, onNavigate }) {
   const quietLines = []
 
   if (stuckCount > 0) flaggedLines.push({ target: 'pipeline', tone: 'critical', text: <><b>{stuckCount} ticket{stuckCount === 1 ? '' : 's'}</b> {stuckCount === 1 ? 'is' : 'are'} stuck — no update in longer than usual, worth a check.</> })
-  if (p1UnassignedCount > 0) flaggedLines.push({ target: 'pipeline', tone: 'critical', text: <><b>{p1UnassignedCount} P1 Critical ticket{p1UnassignedCount === 1 ? '' : 's'}</b> {p1UnassignedCount === 1 ? 'is' : 'are'} still unassigned.</> })
-  if (stuckCount === 0 && p1UnassignedCount === 0) quietLines.push({ target: 'pipeline', tone: 'quiet', text: <>Ticket Pipeline — no updates. {totalTicketsCount} total, {completedToday} completed today.</> })
+  if (unassignedCount > 0) flaggedLines.push({ target: 'pipeline', tone: 'critical', text: <><b>{unassignedCount} ticket{unassignedCount === 1 ? '' : 's'}</b> {unassignedCount === 1 ? 'is' : 'are'} still unassigned.</> })
+  if (p1CriticalCount > 0) flaggedLines.push({ target: 'pipeline', tone: 'critical', text: <><b>{p1CriticalCount} P1 Critical ticket{p1CriticalCount === 1 ? '' : 's'}</b> {p1CriticalCount === 1 ? 'needs' : 'need'} attention.</> })
+  if (stuckCount === 0 && unassignedCount === 0 && p1CriticalCount === 0) quietLines.push({ target: 'pipeline', tone: 'quiet', text: <>Ticket Pipeline — no updates. {totalTicketsCount} total, {completedToday} completed today.</> })
 
   if (complianceVisible) {
     if (complianceCounts.expired > 0) flaggedLines.push({ target: 'compliance', tone: 'warning', text: <><b>{complianceCounts.expired} compliance certificate{complianceCounts.expired === 1 ? '' : 's'}</b> {complianceCounts.expired === 1 ? 'has' : 'have'} expired.</> })
