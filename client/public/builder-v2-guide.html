@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>PMMS Builder Workflow v2 — Draft Proposal</title>
+<title>PMMS Builder Workflow v2 — Locked Job Focus Mode</title>
 <style>
   :root {
     --guide-bg: #f8fafc;
@@ -37,14 +37,6 @@
   ::-webkit-scrollbar-thumb:hover { background: rgba(15,23,42,0.38); }
 
   .wrap { max-width: 980px; margin: 0 auto; padding: 28px 20px 80px; }
-
-  .draft-ribbon {
-    display: flex; align-items: center; gap: 10px; background: #fffbeb; border: 1px solid #fcd34d;
-    color: #92400e; border-radius: 12px; padding: 12px 16px; font-size: 13px; font-weight: 700;
-    margin-bottom: 22px;
-  }
-  .draft-ribbon .tag { flex-shrink: 0; background: #d97706; color: #fff; font-size: 10.5px; font-weight: 800;
-    padding: 4px 9px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.05em; }
 
   header.hero { padding: 8px 0 24px; border-bottom: 1px solid var(--guide-border); margin-bottom: 24px; }
   .eyebrow { font-size: 12px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;
@@ -189,15 +181,10 @@
 <body>
 <div class="wrap">
 
-  <div class="draft-ribbon">
-    <span class="tag">Draft</span>
-    <span>This is a proposal for review — nothing on this page is built yet. Every screen is a mockup of what <b>could</b> be built, not what exists today.</span>
-  </div>
-
   <header class="hero">
     <p class="eyebrow">GBCH PMMS &middot; Builder Workflow v2</p>
     <h1>Locked Job Focus Mode</h1>
-    <p class="sub">A proposal to stop builders forgetting to clock in/out and logging jobs after the fact, by locking the app down to one job at a time with a big running timer and a single, mandatory "why did you stop" step.</p>
+    <p class="sub">Built and live since 2026-08-11. Stops builders forgetting to clock in/out and logging jobs after the fact, by locking the app down to one job at a time with a big running timer and a single, mandatory "why did you stop" step.</p>
   </header>
 
   <div class="tabs">
@@ -208,7 +195,7 @@
 
   <!-- ============================= BUILDER FLOW ============================= -->
   <section class="track active" id="track-builder">
-    <p class="track-intro">Steps 1&ndash;2 are exactly what exists today, shown for context. Everything from step 3 onward is the new, locked-down experience.</p>
+    <p class="track-intro">Steps 1&ndash;2 are unchanged from before this feature, shown for context. Everything from step 3 onward is the locked-down experience now live for every builder.</p>
 
     <!-- Step 1 -->
     <div class="step">
@@ -261,9 +248,9 @@
         </div>
       </div>
       <div class="step-body">
-        <p class="step-title"><span class="step-num">2</span> Today: the full dashboard stays reachable</p>
-        <p>This is the actual gap. Once clocked in, a builder can still open the ☰ menu at any time &mdash; Team Chat, Metrics, Mileage, raise a new ticket, browse Available Jobs &mdash; even while a job is running. Nothing stops them wandering off mid-job, which is part of why logging happens after the fact instead of in real time.</p>
-        <span class="callout gap">The gap this proposal closes</span>
+        <p class="step-title"><span class="step-num">2</span> Before: the full dashboard stayed reachable</p>
+        <p>This was the actual gap. Once clocked in, a builder could still open the ☰ menu at any time &mdash; Team Chat, Metrics, Mileage, raise a new ticket, browse Available Jobs &mdash; even while a job was running. Nothing stopped them wandering off mid-job, which was part of why logging happened after the fact instead of in real time.</p>
+        <span class="callout gap">The gap this feature closed</span>
       </div>
     </div>
 
@@ -295,7 +282,7 @@
           <li>What's hidden is anything job-related: the job list, Available Jobs, raising a new ticket. Team Chat, Metrics, Mileage stay open.</li>
           <li>The estimate is whatever's already set on the ticket (Estimated Time, used elsewhere in PMMS already) &mdash; not a new field.</li>
         </ul>
-        <span class="callout new">New</span>
+        <span class="callout new">Built</span>
       </div>
     </div>
 
@@ -331,10 +318,10 @@
           <li><b>Job Completed</b> &mdash; goes to the existing note + photo completion screen.</li>
           <li><b>Waiting for Materials</b> &mdash; asks one more question first. It's not one thing &mdash; see steps 5 &amp; 6, and step 7.</li>
           <li><b>Going to the Office</b> / <b>Lunch Break</b> &mdash; a short personal trip, timed. See step 6.</li>
-          <li><b>Unable to Do the Job</b> &mdash; job pauses, note optional, flags the new manager metric (see Manager tab).</li>
+          <li><b>Unable to Do the Job</b> &mdash; job pauses, note <b>required</b>, flags the new manager metric (see Manager tab). Started as optional; changed to required once it was clear an optional note made this the easiest zero-friction way to drop any job.</li>
           <li><b>Other</b> &mdash; note becomes <b>required</b>, not optional.</li>
         </ul>
-        <span class="callout new">New &mdash; replaces 3 existing actions</span>
+        <span class="callout new">Built &mdash; replaces the old Complete / Pause / Couldn't-get-access actions</span>
       </div>
     </div>
 
@@ -366,7 +353,7 @@
           <li><b>Going myself</b> &mdash; a short trip, timed exactly like a lunch break. See step 6.</li>
           <li><b>On order / delivery</b> &mdash; could be days. The builder shouldn't sit locked and idle for that &mdash; see step 7.</li>
         </ul>
-        <span class="callout new">New</span>
+        <span class="callout new">Built</span>
       </div>
     </div>
 
@@ -392,8 +379,9 @@
       <div class="step-body">
         <p class="step-title"><span class="step-num">6</span> Going myself / Going to the Office / Lunch Break &rarr; still locked, timed</p>
         <p>All three are the same mechanic: a short, specific trip the builder is personally making. The lock stays on (menu still reachable, same as step 3), but switches to a second, smaller timer counting exactly how long they're away, with one button: <b>Resume Job</b>. Tapping it un-freezes the original job timer and returns to step 3.</p>
-        <p>This is the actual point of the whole proposal &mdash; today a materials run just disappears into "logged after the fact"; here it's timed to the minute, automatically, tied to the exact job it was for.</p>
-        <span class="callout new">New</span>
+        <p>This is the actual point of the whole feature &mdash; before, a materials run just disappeared into "logged after the fact"; now it's timed to the minute, automatically, tied to the exact job it was for.</p>
+        <p>Added after launch: if one of these breaks runs past a configurable threshold (default 45 minutes) without being resumed, the builder's manager gets an alert too &mdash; see Manager tab, step 5.</p>
+        <span class="callout new">Built</span>
       </div>
     </div>
 
@@ -426,7 +414,7 @@
       <div class="step-body">
         <p class="step-title"><span class="step-num">7</span> On order / delivery &rarr; lock releases, other jobs stay available</p>
         <p>Unlike step 6, this fully ends the lock &mdash; there's nothing to time, since the builder isn't going anywhere. The job drops to On Hold and stays visible in their list so they can pick up a <b>different</b> job while they wait, exactly as it should &mdash; no one sits idle for a delivery that might take days.</p>
-        <span class="callout new">New outcome</span>
+        <span class="callout new">Built</span>
       </div>
     </div>
 
@@ -452,7 +440,7 @@
       <div class="step-body">
         <p class="step-title"><span class="step-num">8</span> Unable to Do the Job &rarr; lock releases</p>
         <p>Same as an On Hold materials wait &mdash; the lock fully releases, nothing to time or resume. The difference is what it feeds: this one lands on its own separate <b>"Unable to Do"</b> metric on the manager's dashboard (see Manager tab, step 1), not just a normal On Hold job &mdash; it needs a manager's eyes and a manual reassignment, not a wait.</p>
-        <span class="callout new">New outcome</span>
+        <span class="callout new">Built</span>
       </div>
     </div>
 
@@ -496,7 +484,7 @@
           <li>A small <b>"📍 Closest to you"</b> strip sits above the full list, showing the 1&ndash;2 assigned jobs nearest to wherever the builder just stopped, with a distance badge &mdash; worked out the same way the Clocking page already estimates travel mileage.</li>
           <li>It's a nudge, not a reorder: in the example here, the P1 Critical three miles away still sits above the routine job next door once you look at the full list below it.</li>
         </ul>
-        <span class="callout new">New</span>
+        <span class="callout new">Built</span>
       </div>
     </div>
 
@@ -516,12 +504,12 @@
       </div>
       <div class="step-body">
         <p class="step-title"><span class="step-num">10</span> End-of-day clock-out escalation</p>
-        <p>Today, a builder still clocked in past 17:00 gets one reminder push and nothing else happens &mdash; the shift stays open until a manager manually closes it, however long that takes. This proposal keeps that manual path exactly as it is, and adds a safety net on top:</p>
+        <p>Before this feature, a builder still clocked in past 17:00 got one reminder push and nothing else happened &mdash; the shift stayed open until a manager manually closed it, however long that took. That manual path still works exactly as it did &mdash; a safety net was added on top:</p>
         <ul>
           <li>The manager gets told too, not just the builder &mdash; and can act on it themselves, same as today.</li>
           <li>Only if <b>both</b> of them ignore it past a configurable grace period does the system step in and close the shift itself &mdash; backdated to the 17:00 deadline, not whenever the auto-close actually ran.</li>
         </ul>
-        <span class="callout new">New safety net &mdash; existing manual close stays untouched</span>
+        <span class="callout new">Built &mdash; safety net on top of the existing manual close, unchanged</span>
       </div>
     </div>
   </section>
@@ -551,7 +539,7 @@
         <p class="step-title"><span class="step-num">1</span> New tile: "Unable to Do"</p>
         <p>Counts every job currently sitting in the new Unable-to-Do state &mdash; same red-tile treatment as Unassigned or P1 Critical, and already part of the Daily Briefing's "any red tile gets surfaced" rule built earlier this year, so it would show up there too with no extra work.</p>
         <p>Tapping it jumps to Pipeline filtered to just those jobs, ready to reassign.</p>
-        <span class="callout new">New KPI</span>
+        <span class="callout new">Built</span>
       </div>
     </div>
 
@@ -623,22 +611,55 @@
         <p>So it's never mistaken for a real 17:00 clock-out later, the log entry says plainly that it was an automatic close and shows both times &mdash; the stamped 17:00, and when the system actually acted.</p>
       </div>
     </div>
-  </section>
 
-  <!-- ============================= OPEN QUESTIONS ============================= -->
-  <section class="track" id="track-questions">
-    <p class="track-intro">Still open, found while checking this proposal against what's already in PMMS today.</p>
-
-    <div class="qa-list">
-      <div class="qa-item">
-        <p class="qa-num">Question 1</p>
-        <h5>One grace period for everyone?</h5>
-        <p>Drafted as a single global setting (default 2 hours). Does it need to vary by division or role, or is one number for the whole company fine to start with?</p>
+    <!-- Step 5 -->
+    <div class="step reverse">
+      <div class="step-mock">
+        <div class="phone"><div class="notch"></div>
+          <div class="screen">
+            <div style="padding:16px 14px; display:flex; flex-direction:column; gap:10px;">
+              <div class="mock-card" style="border:1px solid #fcd34d;">
+                <p style="font-size:9.5px;font-weight:700;color:#94a3b8;margin:0 0 4px 0;">🔔 Still on a break</p>
+                <p style="font-size:11.5px;color:#0f172a;">Daniel has been away 52 min (Lunch Break, Job #38) &mdash; past the 45 min alert threshold.</p>
+              </div>
+              <div class="mock-card">
+                <p style="font-size:10px;font-weight:800;color:#0d9488;text-transform:uppercase;letter-spacing:0.05em;margin:0 0 8px 0;">📍 Where's the Team</p>
+                <div class="mock-chip" style="background:#ede9fe;">
+                  <span class="d" style="background:#7c3aed;"></span>
+                  <span style="color:#0f172a;">Daniel</span>
+                  <span style="color:#7c3aed;">Lunch Break (Job #38)</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="step-body">
+        <p class="step-title"><span class="step-num">5</span> Long breaks get flagged too &mdash; and show up live</p>
+        <p>Added after launch, alongside the required note on Unable to Do (step 4, Builder tab). Two more things happen automatically while a builder is on one of the timed short trips:</p>
+        <ul>
+          <li>If the break runs past a configurable threshold (default 45 minutes) without them resuming, their manager gets a push &mdash; same idea as the end-of-day escalation, just for a single break instead of the whole day.</li>
+          <li>Where's the Team (Dashboard) and Today's Attendance (Clocking) both show exactly what the builder is doing and which job it's tied to, live &mdash; found and fixed the same day: these two views only ever checked for a clocked job or the older travel/break log, so a builder on one of these newer short trips was misread as simply "Available".</li>
+        </ul>
+        <span class="callout new">Built</span>
       </div>
     </div>
   </section>
 
-  <footer class="end">GBCH PMMS &middot; Builder Workflow v2 &middot; Draft Proposal &middot; not yet built &middot; 2026-08-11</footer>
+  <!-- ============================= OPEN QUESTIONS ============================= -->
+  <section class="track" id="track-questions">
+    <p class="track-intro">The one thing left unresolved when this was built, kept here rather than deleted since it hasn't actually been settled &mdash; just left as-is.</p>
+
+    <div class="qa-list">
+      <div class="qa-item">
+        <p class="qa-num">Not yet revisited</p>
+        <h5>One grace period for everyone?</h5>
+        <p>Built as a single global setting (Settings &rarr; Daily Attendance &rarr; "Auto clock-out grace period", default 2 hours), the same for every division. Whether it needs to vary by division or role was never revisited after launch &mdash; flag it if that turns out to matter in practice.</p>
+      </div>
+    </div>
+  </section>
+
+  <footer class="end">GBCH PMMS &middot; Builder Workflow v2 &middot; Built and live &middot; 2026-08-11</footer>
 </div>
 
 <script>
