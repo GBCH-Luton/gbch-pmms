@@ -229,7 +229,7 @@
     </div>
     <div class="overview-card warn">
       <h4>⚠️ Needs a decision first</h4>
-      <p>Three open points have been decided already (auto-clock-out as a last resort, Unable-to-Do staying manager-actioned, the materials-wait split). Two are still open &mdash; see the <b>Open Questions</b> tab.</p>
+      <p>Four points are decided already (auto-clock-out as a last resort, Unable-to-Do staying manager-actioned, the materials-wait split, and the menu staying reachable while locked). One is still open &mdash; see the <b>Open Questions</b> tab.</p>
     </div>
   </div>
 
@@ -305,22 +305,27 @@
       <div class="step-mock">
         <div class="phone"><div class="notch"></div>
           <div class="screen dark" style="min-height:420px;">
-            <div class="lock-screen">
+            <div class="mock-header" style="background:#1e293b; border-bottom:1px solid #334155;">
+              <div class="mock-logo" style="color:#fff;"><div class="sq"></div>PMMS</div>
+              <div class="mock-icons">🔔 ☰</div>
+            </div>
+            <div class="lock-screen" style="flex:1;">
               <p class="estimate">Estimated time for this job</p>
               <p class="job-name">≈ 45 min &middot; 12 Stanley Road &middot; Leaking tap</p>
               <div class="mock-timer">00:07:32</div>
               <div class="mock-timer-label">Time on this job</div>
               <button class="mock-btn red block" style="max-width:220px;">⏹ Stop</button>
-              <p class="lock-note">Nothing else in the app is reachable &mdash; no menu, no notifications, no other jobs &mdash; until Stop is tapped.</p>
+              <p class="lock-note">☰ still opens Team Chat, Metrics, Mileage, notifications &mdash; the job list and Available Jobs are the only things hidden until Stop is tapped.</p>
             </div>
           </div>
         </div>
       </div>
       <div class="step-body">
         <p class="step-title"><span class="step-num">3</span> Tap "Start Job" &rarr; the screen locks</p>
-        <p>The whole app is replaced by one screen: a big running timer counting up from the moment they started, a small line above it showing the estimated time for this specific job, and one button &mdash; <b>Stop</b>.</p>
+        <p>The main screen is replaced by the timer: a big running clock counting up from the moment they started, a small line above it showing the estimated time for this specific job, and one button &mdash; <b>Stop</b>.</p>
         <ul>
-          <li>No header, no ☰ menu, no notifications bell, no way to back out to the job list.</li>
+          <li>The header and ☰ menu stay reachable &mdash; this isn't a total lock, see the Open Questions tab for why.</li>
+          <li>What's hidden is anything job-related: the job list, Available Jobs, raising a new ticket. Team Chat, Metrics, Mileage stay open.</li>
           <li>The estimate is whatever's already set on the ticket (Estimated Time, used elsewhere in PMMS already) &mdash; not a new field.</li>
         </ul>
         <span class="callout new">New</span>
@@ -403,7 +408,11 @@
       <div class="step-mock">
         <div class="phone"><div class="notch"></div>
           <div class="screen dark" style="min-height:420px;">
-            <div class="lock-screen">
+            <div class="mock-header" style="background:#1e293b; border-bottom:1px solid #334155;">
+              <div class="mock-logo" style="color:#fff;"><div class="sq"></div>PMMS</div>
+              <div class="mock-icons">🔔 ☰</div>
+            </div>
+            <div class="lock-screen" style="flex:1;">
               <p class="estimate" style="color:#a78bfa;">Away &mdash; Getting materials myself</p>
               <div class="mock-timer small">00:12:44</div>
               <div class="mock-timer-label">Time since you left</div>
@@ -415,7 +424,7 @@
       </div>
       <div class="step-body">
         <p class="step-title"><span class="step-num">6</span> Going myself / Going to the Office / Lunch Break &rarr; still locked, timed</p>
-        <p>All three are the same mechanic: a short, specific trip the builder is personally making. The lock stays on, but switches to a second, smaller timer counting exactly how long they're away, with one button: <b>Resume Job</b>. Tapping it un-freezes the original job timer and returns to step 3.</p>
+        <p>All three are the same mechanic: a short, specific trip the builder is personally making. The lock stays on (menu still reachable, same as step 3), but switches to a second, smaller timer counting exactly how long they're away, with one button: <b>Resume Job</b>. Tapping it un-freezes the original job timer and returns to step 3.</p>
         <p>This is the actual point of the whole proposal &mdash; today a materials run just disappears into "logged after the fact"; here it's timed to the minute, automatically, tied to the exact job it was for.</p>
         <span class="callout new">New</span>
       </div>
@@ -628,14 +637,14 @@
         <p>"Waiting for Materials" now asks which kind it is (step 5): ordered/delivered means the job goes On Hold and releases the builder to work on something else while they wait; going to fetch it themselves is a short, timed personal trip that stays locked, exactly like a lunch break. Getting that second case timed accurately &mdash; instead of guessed at afterwards &mdash; is the actual point of this whole proposal.</p>
       </div>
 
-      <div class="qa-item">
-        <p class="qa-num">Question 1</p>
-        <h5>Is the lock truly total?</h5>
-        <p>As drafted, nothing else is reachable while a job or a personal-trip timer is running &mdash; no Team Chat, no notifications, no way back to the menu. Should there be any escape hatch at all (e.g. an emergency contact button, or a way to sign out), or is a hard lock genuinely the intent?</p>
+      <div class="qa-item decided">
+        <p class="qa-num">✅ Decided</p>
+        <h5>The menu stays reachable &mdash; job screens don't</h5>
+        <p>The header and ☰ menu stay accessible even while a job or a personal-trip timer is locked &mdash; Team Chat, Metrics, Mileage, notifications all still work. What stays hidden is anything job-related: the job list, Available Jobs, raising a new ticket. So there's always a way to reach a manager or check something, without being able to wander off to another job.</p>
       </div>
 
       <div class="qa-item">
-        <p class="qa-num">Question 2</p>
+        <p class="qa-num">Question 1</p>
         <h5>One grace period for everyone?</h5>
         <p>Drafted as a single global setting (default 2 hours). Does it need to vary by division or role, or is one number for the whole company fine to start with?</p>
       </div>

@@ -1629,10 +1629,14 @@ export default function BuilderDashboard({ profile }) {
   )
 
   return (
-    <div style={{ minHeight: '100%', background: COLORS.slate100, fontFamily: 'system-ui, sans-serif' }}>
+    <div style={{ minHeight: '100%', background: COLORS.slate100, fontFamily: 'system-ui, sans-serif', paddingTop: 'var(--pmms-banner-offset, 0px)' }}>
 
-      {/* Header */}
-      <div style={{ position: 'sticky', top: 0, zIndex: 10 }}>
+      {/* Header -- unlike every other screen in this file, this one isn't
+          `position: fixed`, so it can't just read the offset as `top`; the
+          paddingTop above does the same job by pushing this whole page down
+          instead. Missing this is exactly what let the impersonation banner
+          cover the ☰ menu button here (found live, View As). */}
+      <div style={{ position: 'sticky', top: 'var(--pmms-banner-offset, 0px)', zIndex: 10 }}>
         <div style={{ background: COLORS.white, borderBottom: `1px solid ${COLORS.slate200}`, padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <button
             onClick={goHome}
