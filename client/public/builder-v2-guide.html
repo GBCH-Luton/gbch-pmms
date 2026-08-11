@@ -172,6 +172,8 @@
   .qa-list { display: flex; flex-direction: column; gap: 14px; }
   .qa-item { background: #fff; border: 1px solid var(--guide-border); border-radius: 14px; padding: 16px 18px; }
   .qa-item.flag { border-color: #fca5a5; background: #fef2f2; }
+  .qa-item.decided { border-color: #bbf7d0; background: #f0fdf4; }
+  .qa-item.decided .qa-num { color: #16a34a; }
   .qa-item .qa-num { font-size: 10.5px; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.06em; margin: 0 0 6px 0; }
   .qa-item h5 { margin: 0 0 6px 0; font-size: 14.5px; font-weight: 800; color: #0f172a; }
   .qa-item p { margin: 0; font-size: 13px; color: #475569; line-height: 1.55; }
@@ -227,7 +229,7 @@
     </div>
     <div class="overview-card warn">
       <h4>⚠️ Needs a decision first</h4>
-      <p>A few things below touch a previous director-approved rule or leave an edge case open &mdash; see the <b>Open Questions</b> tab before any of this gets built.</p>
+      <p>Three open points have been decided already (auto-clock-out as a last resort, Unable-to-Do staying manager-actioned, the materials-wait split). Two are still open &mdash; see the <b>Open Questions</b> tab.</p>
     </div>
   </div>
 
@@ -340,6 +342,7 @@
                 <div style="display:flex; flex-direction:column; gap:7px;">
                   <div class="mock-btn primary block" style="text-align:left;">✓ Job Completed</div>
                   <div class="mock-btn ghost block" style="text-align:left;">📦 Waiting for Materials</div>
+                  <div class="mock-btn ghost block" style="text-align:left;">🏢 Going to the Office</div>
                   <div class="mock-btn ghost block" style="text-align:left;">🍽 Lunch Break</div>
                   <div class="mock-btn ghost block" style="text-align:left; color:#dc2626; border-color:#fca5a5;">🚫 Unable to Do the Job</div>
                   <div class="mock-btn ghost block" style="text-align:left;">Other</div>
@@ -350,11 +353,12 @@
         </div>
       </div>
       <div class="step-body">
-        <p class="step-title"><span class="step-num">4</span> Tap Stop &rarr; one dropdown, five options</p>
+        <p class="step-title"><span class="step-num">4</span> Tap Stop &rarr; one dropdown, six options</p>
         <p>Replaces today's three separate actions (Complete / Pause / Couldn't get access) with a single control:</p>
         <ul>
           <li><b>Job Completed</b> &mdash; goes to the existing note + photo completion screen.</li>
-          <li><b>Waiting for Materials</b> / <b>Lunch Break</b> &mdash; job pauses, note optional.</li>
+          <li><b>Waiting for Materials</b> &mdash; asks one more question first. It's not one thing &mdash; see steps 5 &amp; 6, and step 7.</li>
+          <li><b>Going to the Office</b> / <b>Lunch Break</b> &mdash; a short personal trip, timed. See step 6.</li>
           <li><b>Unable to Do the Job</b> &mdash; job pauses, note optional, flags the new manager metric (see Manager tab).</li>
           <li><b>Other</b> &mdash; note becomes <b>required</b>, not optional.</li>
         </ul>
@@ -366,25 +370,91 @@
     <div class="step">
       <div class="step-mock">
         <div class="phone"><div class="notch"></div>
-          <div class="screen dark" style="min-height:420px;">
-            <div class="lock-screen">
-              <p class="estimate" style="color:#a78bfa;">On break &mdash; Waiting for Materials</p>
-              <div class="mock-timer small">00:12:44</div>
-              <div class="mock-timer-label">Time since you stopped</div>
-              <button class="mock-btn primary block" style="max-width:220px;">▶ Resume Job</button>
-              <p class="lock-note">The job's own timer is frozen. This second timer counts the break itself, and stops the moment "Resume Job" is tapped.</p>
+          <div class="screen dark" style="min-height:420px; position:relative;">
+            <div class="lock-screen" style="opacity:0.25;">
+              <div class="mock-timer">00:07:32</div>
+            </div>
+            <div class="mock-modal-overlay">
+              <div class="mock-modal">
+                <p class="mock-modal-title">Waiting for Materials</p>
+                <p class="mock-modal-sub">Are you going yourself, or is it on order?</p>
+                <div style="display:flex; flex-direction:column; gap:7px;">
+                  <div class="mock-btn primary block" style="text-align:left;">🚗 I'm going myself</div>
+                  <div class="mock-btn ghost block" style="text-align:left;">📬 It's on order / being delivered</div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </div>
       <div class="step-body">
-        <p class="step-title"><span class="step-num">5</span> Waiting for Materials / Lunch Break &rarr; still locked, still running</p>
-        <p>Choosing either of these doesn't release the lock &mdash; it switches to a second, smaller timer counting exactly how long the break lasts, with one button: <b>Resume Job</b>. Tapping it un-freezes the original job timer and returns to step 3.</p>
+        <p class="step-title"><span class="step-num">5</span> "Waiting for Materials" isn't one thing &mdash; it asks which</p>
+        <p>These two cases need to behave completely differently, so choosing this reason asks one more question before doing anything:</p>
+        <ul>
+          <li><b>Going myself</b> &mdash; a short trip, timed exactly like a lunch break. See step 6.</li>
+          <li><b>On order / delivery</b> &mdash; could be days. The builder shouldn't sit locked and idle for that &mdash; see step 7.</li>
+        </ul>
         <span class="callout new">New</span>
       </div>
     </div>
 
     <!-- Step 6 -->
+    <div class="step reverse">
+      <div class="step-mock">
+        <div class="phone"><div class="notch"></div>
+          <div class="screen dark" style="min-height:420px;">
+            <div class="lock-screen">
+              <p class="estimate" style="color:#a78bfa;">Away &mdash; Getting materials myself</p>
+              <div class="mock-timer small">00:12:44</div>
+              <div class="mock-timer-label">Time since you left</div>
+              <button class="mock-btn primary block" style="max-width:220px;">▶ Resume Job</button>
+              <p class="lock-note">The job's own timer is frozen. This second timer times the trip itself &mdash; leave to return &mdash; and stops the moment "Resume Job" is tapped.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="step-body">
+        <p class="step-title"><span class="step-num">6</span> Going myself / Going to the Office / Lunch Break &rarr; still locked, timed</p>
+        <p>All three are the same mechanic: a short, specific trip the builder is personally making. The lock stays on, but switches to a second, smaller timer counting exactly how long they're away, with one button: <b>Resume Job</b>. Tapping it un-freezes the original job timer and returns to step 3.</p>
+        <p>This is the actual point of the whole proposal &mdash; today a materials run just disappears into "logged after the fact"; here it's timed to the minute, automatically, tied to the exact job it was for.</p>
+        <span class="callout new">New</span>
+      </div>
+    </div>
+
+    <!-- Step 7 -->
+    <div class="step">
+      <div class="step-mock">
+        <div class="phone"><div class="notch"></div>
+          <div class="screen">
+            <div class="mock-header">
+              <div class="mock-logo"><div class="sq"></div>PMMS</div>
+              <div class="mock-icons">🔔 ☰</div>
+            </div>
+            <div style="padding:12px 14px;">
+              <div class="mock-kpi-row">
+                <div class="mock-kpi" style="background:#0d9488;"><span class="n">0</span><span class="l">Working Now</span></div>
+                <div class="mock-kpi" style="background:#3b82f6;"><span class="n">2</span><span class="l">To Do</span></div>
+              </div>
+              <div class="mock-ticket" style="border-color:#fcd34d;">
+                <div class="addr">12 Stanley Road, Luton</div>
+                <div class="meta">⏸ On Hold &middot; Waiting for Materials (on order)</div>
+              </div>
+              <div class="mock-ticket">
+                <div class="addr">4 Alpine Way, Luton</div>
+                <div class="meta">Electrical &middot; Socket not working</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="step-body">
+        <p class="step-title"><span class="step-num">7</span> On order / delivery &rarr; lock releases, other jobs stay available</p>
+        <p>Unlike step 6, this fully ends the lock &mdash; there's nothing to time, since the builder isn't going anywhere. The job drops to On Hold and stays visible in their list so they can pick up a <b>different</b> job while they wait, exactly as it should &mdash; no one sits idle for a delivery that might take days.</p>
+        <span class="callout new">New outcome</span>
+      </div>
+    </div>
+
+    <!-- Step 8 -->
     <div class="step reverse">
       <div class="step-mock">
         <div class="phone"><div class="notch"></div>
@@ -404,63 +474,34 @@
         </div>
       </div>
       <div class="step-body">
-        <p class="step-title"><span class="step-num">6</span> Unable to Do the Job &rarr; lock releases</p>
-        <p>Unlike a break, this fully ends the lock &mdash; there's nothing to resume. The job stops counting against the builder, they're told it's been logged, and they're released back to the job list.</p>
-        <p>This is what feeds the new <b>"Unable to Do"</b> metric on the manager's dashboard (see Manager tab, step 1) so a manager can reassign it.</p>
+        <p class="step-title"><span class="step-num">8</span> Unable to Do the Job &rarr; lock releases</p>
+        <p>Same as an On Hold materials wait &mdash; the lock fully releases, nothing to time or resume. The difference is what it feeds: this one lands on its own separate <b>"Unable to Do"</b> metric on the manager's dashboard (see Manager tab, step 1), not just a normal On Hold job &mdash; it needs a manager's eyes and a manual reassignment, not a wait.</p>
         <span class="callout new">New outcome</span>
       </div>
     </div>
 
-    <!-- Step 7 -->
-    <div class="step">
-      <div class="step-mock">
-        <div class="phone"><div class="notch"></div>
-          <div class="screen">
-            <div class="mock-header">
-              <div class="mock-logo"><div class="sq"></div>PMMS</div>
-              <div class="mock-icons">🔔 ☰</div>
-            </div>
-            <div style="padding:12px 14px;">
-              <div class="mock-kpi-row">
-                <div class="mock-kpi" style="background:#0d9488;"><span class="n">0</span><span class="l">Working Now</span></div>
-                <div class="mock-kpi" style="background:#3b82f6;"><span class="n">2</span><span class="l">To Do</span></div>
-              </div>
-              <div class="mock-ticket">
-                <div class="addr">4 Alpine Way, Luton</div>
-                <div class="meta">Electrical &middot; Socket not working</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="step-body">
-        <p class="step-title"><span class="step-num">7</span> Only now can they pick another job</p>
-        <p>The job list, and the rest of the app, only becomes reachable again once a Stop outcome has actually been resolved &mdash; either fully (Job Completed / Unable to Do) or paused (Materials / Lunch, waiting on Resume). There's no way to see or start a second job while one is still open.</p>
-      </div>
-    </div>
-
-    <!-- Step 8 -->
+    <!-- Step 9 -->
     <div class="step reverse">
       <div class="step-mock">
         <div class="concept-card">
           <p class="eyebrow2">End of day &mdash; runs automatically</p>
           <div class="flow-step"><span class="dot2">1</span><p>17:00 passes and the builder is still clocked in for the day.</p></div>
           <div class="flow-arrow">↓</div>
-          <div class="flow-step"><span class="dot2">2</span><p>A reminder push goes to the builder <b>and</b>, new, to their manager.</p></div>
+          <div class="flow-step"><span class="dot2">2</span><p>A reminder push goes to the builder <b>and</b>, new, to their manager, who can still manually close the shift themselves &mdash; unchanged from today.</p></div>
           <div class="flow-arrow">↓</div>
-          <div class="flow-step"><span class="dot2">3</span><p>Grace period elapses (setting, default 2 hours) with still no clock-out.</p></div>
+          <div class="flow-step"><span class="dot2">3</span><p>Grace period elapses (setting, default 2 hours) and <b>neither</b> of them has acted.</p></div>
           <div class="flow-arrow">↓</div>
-          <div class="flow-step"><span class="dot2">4</span><p>System clocks them out automatically. The <b>timestamp saved is 17:00</b>, not the real moment it ran.</p></div>
+          <div class="flow-step"><span class="dot2">4</span><p>Only then does the system clock them out itself, as a last resort. The <b>timestamp saved is 17:00</b>, not the real moment it ran.</p></div>
         </div>
       </div>
       <div class="step-body">
-        <p class="step-title"><span class="step-num">8</span> End-of-day clock-out escalation</p>
-        <p>Today, a builder still clocked in past 17:00 gets one reminder push and nothing else happens &mdash; the shift stays open until someone acts. This proposal adds two things:</p>
+        <p class="step-title"><span class="step-num">9</span> End-of-day clock-out escalation</p>
+        <p>Today, a builder still clocked in past 17:00 gets one reminder push and nothing else happens &mdash; the shift stays open until a manager manually closes it, however long that takes. This proposal keeps that manual path exactly as it is, and adds a safety net on top:</p>
         <ul>
-          <li>The manager gets told too, not just the builder.</li>
-          <li>If it's still ignored after a configurable grace period, the system closes the shift itself &mdash; backdated to the 17:00 deadline, not whenever the auto-close actually ran.</li>
+          <li>The manager gets told too, not just the builder &mdash; and can act on it themselves, same as today.</li>
+          <li>Only if <b>both</b> of them ignore it past a configurable grace period does the system step in and close the shift itself &mdash; backdated to the 17:00 deadline, not whenever the auto-close actually ran.</li>
         </ul>
-        <span class="callout new">New &mdash; see Open Questions, this touches an existing rule</span>
+        <span class="callout new">New safety net &mdash; existing manual close stays untouched</span>
       </div>
     </div>
   </section>
@@ -535,7 +576,7 @@
       </div>
       <div class="step-body">
         <p class="step-title"><span class="step-num">3</span> Manager sees the escalation too</p>
-        <p>If the builder's own 17:00 reminder gets ignored, the manager gets their own notification once the grace period is about to expire &mdash; a chance to step in before the automatic clock-out fires.</p>
+        <p>If the builder's own 17:00 reminder gets ignored, the manager gets their own notification &mdash; and can close the shift themselves right away, exactly like they can today. The automatic clock-out is only a last resort if <b>neither</b> of them acts before the grace period runs out.</p>
       </div>
     </div>
 
@@ -566,36 +607,35 @@
 
   <!-- ============================= OPEN QUESTIONS ============================= -->
   <section class="track" id="track-questions">
-    <p class="track-intro">Worth deciding before any of this is built &mdash; found while checking this proposal against what's already in PMMS today.</p>
+    <p class="track-intro">Found while checking this proposal against what's already in PMMS today. Three are now decided; two are still open.</p>
 
     <div class="qa-list">
-      <div class="qa-item flag">
-        <p class="qa-num">Flag &middot; touches an existing rule</p>
-        <h5>Auto clock-out reverses a documented decision</h5>
-        <p>The code that blocks a builder from clocking in the next day if yesterday's shift was never closed currently says, in so many words: <i>"Director-approved: no self-service way past this, and deliberately no automatic clock-out on the old shift either."</i></p>
-        <p>That was about a shift left open <i>overnight</i>, and this proposal is about auto-closing it the <i>same evening</i> &mdash; different scenario, but close enough that it's worth explicitly confirming this supersedes that earlier ruling, rather than the two rules quietly disagreeing with each other.</p>
+      <div class="qa-item decided">
+        <p class="qa-num">✅ Decided</p>
+        <h5>Auto clock-out is a last resort, not a replacement</h5>
+        <p>The existing rule that a manager has to manually close a shift stays exactly as it is &mdash; the builder's own clock-out and the manager's manual close both still work like today. The system only steps in on its own if <b>both</b> of them ignore it past the grace period, so it doesn't actually contradict the earlier "no automatic clock-out" ruling &mdash; it's a safety net behind the human paths, not instead of them.</p>
+      </div>
+
+      <div class="qa-item decided">
+        <p class="qa-num">✅ Decided</p>
+        <h5>"Unable to Do the Job" stays manager-actioned, not automatic</h5>
+        <p>It gets its own separate metric on the dashboard (not folded into a general On Hold count) specifically so a manager sees it and reassigns it themselves &mdash; no automatic unassignment.</p>
+      </div>
+
+      <div class="qa-item decided">
+        <p class="qa-num">✅ Decided</p>
+        <h5>A multi-day materials wait doesn't lock the builder idle</h5>
+        <p>"Waiting for Materials" now asks which kind it is (step 5): ordered/delivered means the job goes On Hold and releases the builder to work on something else while they wait; going to fetch it themselves is a short, timed personal trip that stays locked, exactly like a lunch break. Getting that second case timed accurately &mdash; instead of guessed at afterwards &mdash; is the actual point of this whole proposal.</p>
+      </div>
+
+      <div class="qa-item">
+        <p class="qa-num">Question 1</p>
+        <h5>Is the lock truly total?</h5>
+        <p>As drafted, nothing else is reachable while a job or a personal-trip timer is running &mdash; no Team Chat, no notifications, no way back to the menu. Should there be any escape hatch at all (e.g. an emergency contact button, or a way to sign out), or is a hard lock genuinely the intent?</p>
       </div>
 
       <div class="qa-item">
         <p class="qa-num">Question 2</p>
-        <h5>Does "Unable to Do the Job" unassign the ticket?</h5>
-        <p>Right now the mockup just flags it and releases the builder. Should the ticket also drop back to unassigned automatically so it shows up for reassignment, or does it stay assigned to the original builder until a manager manually reassigns it?</p>
-      </div>
-
-      <div class="qa-item">
-        <p class="qa-num">Question 3</p>
-        <h5>Is the lock truly total?</h5>
-        <p>As drafted, nothing else is reachable while a job or a break is running &mdash; no Team Chat, no notifications, no way back to the menu. Should there be any escape hatch at all (e.g. an emergency contact button, or a way to sign out), or is a hard lock genuinely the intent?</p>
-      </div>
-
-      <div class="qa-item">
-        <p class="qa-num">Question 4</p>
-        <h5>What about a multi-day materials wait?</h5>
-        <p>If "Waiting for Materials" genuinely takes 2&ndash;3 days (a special order, say), should the break timer really keep counting that whole time, or should a long-enough pause nudge the builder to clock out for the day instead and pick it back up tomorrow?</p>
-      </div>
-
-      <div class="qa-item">
-        <p class="qa-num">Question 5</p>
         <h5>One grace period for everyone?</h5>
         <p>Drafted as a single global setting (default 2 hours). Does it need to vary by division or role, or is one number for the whole company fine to start with?</p>
       </div>
