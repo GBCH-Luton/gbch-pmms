@@ -145,8 +145,28 @@ export default function AdminClocking({ profile, onNavigate }) {
   // was calculated from (previous job that day, or home for the first one)
   // -- not clock-in -> clock-out, which is nearly always ~0 since builders
   // clock in/out right at the property and doesn't show anything useful.
+  //
+  // When the origin and destination are (near enough) the same spot --
+  // very common, since builders often log several separate tickets from
+  // one visit to the same property -- Google's saddr/daddr route embed
+  // can't draw a route between two identical points and falls back to a
+  // whole-world default view instead of the property, which reads as
+  // broken. Fall back to a single pin at the property in that case; the
+  // 0.0mi figure itself is correct, not a bug.
   function openEstimatedRouteMap(row) {
     if (!row.estimatedOrigin || !row.propertyCoords) return
+    const sameSpot = distanceMetres(row.estimatedOrigin.latitude, row.estimatedOrigin.longitude, row.propertyCoords.latitude, row.propertyCoords.longitude) < 50
+    if (sameSpot) {
+      setMapModal({
+        mode: 'route',
+        embedUrl: googleMapsEmbedLink(row.propertyCoords.latitude, row.propertyCoords.longitude),
+        distanceMiles: row.estimatedMiles,
+        originLabel: row.estimatedOriginLabel,
+        destinationLabel: row.ticket.property?.address,
+        sameSpot: true,
+      })
+      return
+    }
     setMapModal({
       mode: 'route',
       embedUrl: googleMapsRouteEmbedLink(row.estimatedOrigin.latitude, row.estimatedOrigin.longitude, row.propertyCoords.latitude, row.propertyCoords.longitude),
@@ -1329,7 +1349,16 @@ export default function AdminClocking({ profile, onNavigate }) {
         <div style={modalOverlayStyle}>
           <div style={{ ...modalCardStyle, maxWidth: '640px' }}>
             <p style={modalTitleStyle}>{mapModal.mode === 'route' ? 'Estimated Route to This Job' : 'Location'}</p>
-            {mapModal.mode === 'route' && (
+            {mapModal.mode === 'route' && mapModal.sameSpot && (
+              <p style={{ margin: '2px 0 12px 0', fontSize: '13px', color: COLORS.slate500 }}>
+                <strong>{mapModal.originLabel}</strong> and <strong>{mapModal.destinationLabel}</strong> are the same property -- <strong>0.0 miles</strong> of travel between them.
+                <br />
+                <span style={{ fontSize: '12px', color: COLORS.slate400 }}>
+                  This is usually a second ticket logged from the same visit. No route to draw, so this just shows the property.
+                </span>
+              </p>
+            )}
+            {mapModal.mode === 'route' && !mapModal.sameSpot && (
               <p style={{ margin: '2px 0 12px 0', fontSize: '13px', color: COLORS.slate500 }}>
                 From <strong>{mapModal.originLabel}</strong> to <strong>{mapModal.destinationLabel}</strong>: <strong>{mapModal.distanceMiles.toFixed(1)} miles</strong>
                 <br />
