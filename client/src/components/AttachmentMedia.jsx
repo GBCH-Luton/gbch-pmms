@@ -17,15 +17,22 @@ export function isVideoAttachment(url) {
 }
 
 // controls=true (the default) makes a video playable in place -- the fix
-// for "can't click to see the video". linkImages wraps a plain photo in a
-// same-tab-safe link to view it full-size, matching how photo attachments
-// already behaved in most of this app; set false for a small list-card
-// thumbnail that was never clickable before either.
-export default function AttachmentMedia({ url, alt = '', style, linkImages = true, controls = true }) {
+// for "can't click to see the video". onClick, when given, makes a plain
+// photo open in the caller's own in-page PhotoLightbox instead (a new tab
+// loses the page context, which is why a plain target="_blank" link wasn't
+// the right fix -- found on Pipeline's expanded ticket photos). Falls back
+// to linkImages' target="_blank" link for callers that haven't been moved
+// onto a lightbox yet; set both false for a small list-card thumbnail that
+// was never clickable before either.
+export default function AttachmentMedia({ url, alt = '', style, linkImages = true, controls = true, onClick }) {
   if (!url) return null
 
   if (isVideoAttachment(url)) {
     return <video src={url} controls={controls} muted={!controls} playsInline style={style} />
+  }
+
+  if (onClick) {
+    return <img src={url} alt={alt} style={{ ...style, cursor: 'pointer' }} onClick={onClick} />
   }
 
   const img = <img src={url} alt={alt} style={style} />

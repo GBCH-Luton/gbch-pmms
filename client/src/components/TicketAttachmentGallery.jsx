@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import AttachmentMedia from './AttachmentMedia'
+import AttachmentMedia, { isVideoAttachment } from './AttachmentMedia'
+import PhotoLightbox from './PhotoLightbox'
 import { fetchTicketAttachments } from '../lib/ticketAttachments'
 import { COLORS } from '../lib/colors'
 
@@ -21,6 +22,7 @@ import { COLORS } from '../lib/colors'
 // that wants an explicit "No photo" placeholder still gets one.
 export default function TicketAttachmentGallery({ ticketId, fallbackUrl, mediaHeight = '140px', emptyLabel }) {
   const [attachments, setAttachments] = useState(null) // null = loading
+  const [lightboxIndex, setLightboxIndex] = useState(null) // index into imageUrls, or null
 
   useEffect(() => {
     let cancelled = false
@@ -37,11 +39,29 @@ export default function TicketAttachmentGallery({ ticketId, fallbackUrl, mediaHe
     return <p style={{ margin: 0, fontSize: '12px', color: COLORS.slate400, fontStyle: 'italic' }}>{emptyLabel}</p>
   }
 
+  // Videos already play in place (see AttachmentMedia) and were never
+  // wrapped in the new-tab link this replaces, so only photos go through
+  // the lightbox -- Next/Previous below steps through this photos-only
+  // list, not the mixed photos+videos grid.
+  const imageUrls = urls.filter(u => !isVideoAttachment(u))
+
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '8px' }}>
-      {urls.map((url, idx) => (
-        <AttachmentMedia key={idx} url={url} alt="Ticket attachment" style={{ width: '100%', height: mediaHeight, objectFit: 'cover', borderRadius: '10px', display: 'block' }} />
-      ))}
+      {urls.map((url, idx) => {
+        const imageIdx = imageUrls.indexOf(url)
+        return (
+          <AttachmentMedia
+            key={idx}
+            url={url}
+            alt="Ticket attachment"
+            style={{ width: '100%', height: mediaHeight, objectFit: 'cover', borderRadius: '10px', display: 'block' }}
+            onClick={imageIdx !== -1 ? () => setLightboxIndex(imageIdx) : undefined}
+          />
+        )
+      })}
+      {lightboxIndex !== null && (
+        <PhotoLightbox urls={imageUrls} index={lightboxIndex} onNavigate={setLightboxIndex} onClose={() => setLightboxIndex(null)} />
+      )}
     </div>
   )
 }

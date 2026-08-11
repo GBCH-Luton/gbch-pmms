@@ -9,6 +9,7 @@ import { fetchDivisions } from '../../lib/divisions'
 import PrintableTicketReport from '../../components/PrintableTicketReport'
 import AttachmentMedia from '../../components/AttachmentMedia'
 import TicketAttachmentGallery from '../../components/TicketAttachmentGallery'
+import PhotoLightbox from '../../components/PhotoLightbox'
 import {
   priorityTierLabel, priorityBadgeStyle, statusColour, statusLabel, formatUKDate, formatUKDateTime, formatDurationDays, formatDuration,
   filterSelectStyle, thStyle, tdStyle, actionBtnStyle,
@@ -165,6 +166,11 @@ export default function AdminPipeline({
   const [addToEventSubmitting, setAddToEventSubmitting] = useState(false)
 
   const [builderProfileId, setBuilderProfileId] = useState(null)
+
+  // Completion photo has no gallery -- just the one image, so no
+  // next/prev needed, unlike TicketAttachmentGallery which manages its
+  // own lightbox internally for the (often multi-photo) reported set.
+  const [completionLightboxUrl, setCompletionLightboxUrl] = useState(null)
 
   useEffect(() => {
     fetchTickets()
@@ -1094,7 +1100,12 @@ export default function AdminPipeline({
                                 {t.completion_photo_url && (
                                   <div>
                                     <p style={expandLabelStyle}>Completion Photo</p>
-                                    <AttachmentMedia url={t.completion_photo_url} alt="Completed job" style={{ width: '140px', height: '140px', objectFit: 'cover', borderRadius: '10px', border: `1px solid ${COLORS.slate200}` }} />
+                                    <AttachmentMedia
+                                      url={t.completion_photo_url}
+                                      alt="Completed job"
+                                      style={{ width: '140px', height: '140px', objectFit: 'cover', borderRadius: '10px', border: `1px solid ${COLORS.slate200}` }}
+                                      onClick={() => setCompletionLightboxUrl(t.completion_photo_url)}
+                                    />
                                   </div>
                                 )}
                               </div>
@@ -1697,6 +1708,8 @@ export default function AdminPipeline({
       )}
 
       <BuilderProfileModal builderId={builderProfileId} onClose={() => setBuilderProfileId(null)} />
+
+      {completionLightboxUrl && <PhotoLightbox url={completionLightboxUrl} onClose={() => setCompletionLightboxUrl(null)} />}
 
     </div>
   )
