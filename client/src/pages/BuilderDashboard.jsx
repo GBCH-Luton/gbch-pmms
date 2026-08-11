@@ -1510,6 +1510,17 @@ export default function BuilderDashboard({ profile }) {
   const onBreakTicket = tickets.find(t => t.status === 'On Hold' && SHORT_TRIP_REASONS.includes(t.hold_reason)) || null
   const lockedTicket = activeTicket || onBreakTicket || null
 
+  // Without this, the guards in openTicket/closeTicket only stop someone
+  // *leaving* an already-open lock screen -- a fresh login or page refresh
+  // with a job already running would land on the ordinary dashboard
+  // first (selectedTicket starts null) and never force Focus Mode open at
+  // all. This keeps selectedTicket in sync with lockedTicket on every
+  // render, not just at the moment a user taps something, so refreshing
+  // mid-job (or mid-break) always lands straight back on the lock screen.
+  useEffect(() => {
+    if (lockedTicket && selectedTicket?.id !== lockedTicket.id) setSelectedTicket(lockedTicket)
+  }, [lockedTicket?.id, lockedTicket?.status, lockedTicket?.hold_reason])
+
   function openTicket(t) {
     setSelectedTicket(lockedTicket || t)
   }
