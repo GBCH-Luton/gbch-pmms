@@ -212,6 +212,11 @@ function StaffFormModal({ staff, roleOptions, staffDirectory, onClose, onSaved }
         .filter(([, c]) => (c.division || 'Maintenance') === 'Maintenance')
         .map(([name]) => name)
       setSkillOptions(names)
+      // New staff start with every skill checked -- most builders can do
+      // most of these, so it's faster to uncheck the few that don't apply
+      // than to hunt down and check every one that does. Editing an
+      // existing person's real skills is left untouched.
+      if (!staff) setForm(prev => ({ ...prev, skills: names }))
     })
   }, [])
 
