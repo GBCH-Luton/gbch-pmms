@@ -7,7 +7,8 @@ import { fetchMaintenanceCategories, fetchAllMaintenanceCategoryNames, sortedCat
 import { attachBuilderSafeProperties } from '../lib/properties'
 import { logLoginEvent } from '../lib/loginEvents'
 import { pushNotificationsSupported, hasActivePushSubscription, enablePushNotifications } from '../lib/pushNotifications'
-import { pushEmergencyAlert, priorityTierLabel, fetchPriorityThresholds, Avatar, formatUKDate, formatUKDateTime, ukDateKey, ukTimeHHMM, minutesLate, shiftDateKey, fetchAttendanceSummary, formatDuration, formatDurationDays } from './admin/shared'
+import { pushEmergencyAlert, priorityTierLabel, fetchPriorityThresholds, Avatar, formatUKDate, formatUKDateTime, ukDateKey, ukTimeHHMM, minutesLate, shiftDateKey, fetchAttendanceSummary, formatDuration, formatDurationDays, fetchManagersForDivision, createNotification, sendPushNotification } from './admin/shared'
+import { distanceMetres, metresToMiles } from '../lib/geo'
 import { fetchAvailableMaterials, logMaterialUsage } from '../lib/simsMaterialsBridge'
 import { fetchChannelMessages, subscribeToChannel, postMessage, markChannelRead, markChannelReadRemote, fetchChannelReads, countUnreadMentions, colorForSender } from '../lib/chat'
 import { fetchDmContacts, fetchConversations, fetchThreadMessages, subscribeToDm, postDm, markThreadRead, countUnreadDms } from '../lib/dm'
@@ -39,6 +40,19 @@ const SHOW_AVAILABLE_JOBS_NAV = false
 // Sandbox-only prototype (see lib/simsMaterialsBridge.js) -- not
 // production-bound, not required for either PMMS or SIMS's launch.
 const SIMS_MATERIALS_PROTOTYPE_ENABLED = true
+
+// The 3 Stop reasons that are a short, specific personal trip -- the
+// builder stays locked to a small break timer (see the break-timer effect
+// and BreakTimerBanner) with a single Resume Job button, rather than being
+// released back to the job list the way "Waiting for Materials (ordered)"
+// and "Unable to Do the Job" are. All three are just a hold_reason value
+// on an ordinary On Hold ticket -- no new ticket status, no new table.
+const SHORT_TRIP_REASONS = ['Going to the Office', 'Lunch Break', 'Getting materials myself']
+
+// Matches AdminClocking.jsx's own ROAD_DISTANCE_MULTIPLIER -- straight-line
+// distance undercounts real road travel, so both places nudge it the same
+// amount rather than showing a number that never matches the other page's.
+const ROAD_DISTANCE_MULTIPLIER = 1.3
 
 export default function BuilderDashboard({ profile }) {
   const [tickets, setTickets] = useState([])
@@ -140,9 +154,20 @@ export default function BuilderDashboard({ profile }) {
   const [commentText, setCommentText] = useState('')
   const [commentError, setCommentError] = useState('')
   const [elapsed, setElapsed] = useState(0)
-  const [showPauseReasons, setShowPauseReasons] = useState(false)
-  const [pauseReason, setPauseReason] = useState(null)
-  const [pauseNote, setPauseNote] = useState('')
+  // Break-mode timer -- same idea as `elapsed` above, but counts from
+  // whenever a short-trip Stop reason (Going to the Office / Lunch Break /
+  // Getting materials myself) was chosen, via status_changed_at, rather
+  // than a work_session row (there isn't one while paused).
+  const [breakElapsed, setBreakElapsed] = useState(0)
+  // Unified "why are you stopping" flow -- replaces the old separate
+  // Pause-reason-picker and "Couldn't get access" confirm screens (both
+  // removed) with one Stop button and one 6-option sheet. See handleStop.
+  const [stopSheetOpen, setStopSheetOpen] = useState(false)
+  const [materialsAskOpen, setMaterialsAskOpen] = useState(false)
+  const [stopReasonPicked, setStopReasonPicked] = useState(null)
+  const [stopNote, setStopNote] = useState('')
+  const [stopSubmitting, setStopSubmitting] = useState(false)
+  const [stopError, setStopError] = useState('')
   const [showDelayReasonForm, setShowDelayReasonForm] = useState(false)
   const [delayReason, setDelayReason] = useState(null)
   const [delayReasonNote, setDelayReasonNote] = useState('')
@@ -159,12 +184,6 @@ export default function BuilderDashboard({ profile }) {
   const [materialRows, setMaterialRows] = useState([])
   const [routineVisitChecklistTemplate, setRoutineVisitChecklistTemplate] = useState([])
   const [checklistChecked, setChecklistChecked] = useState({})
-  const [showNoAccessConfirm, setShowNoAccessConfirm] = useState(false)
-  const [noAccessNote, setNoAccessNote] = useState('')
-  const [noAccessPhotoFile, setNoAccessPhotoFile] = useState(null)
-  const [noAccessPhotoPreview, setNoAccessPhotoPreview] = useState(null)
-  const [noAccessSubmitting, setNoAccessSubmitting] = useState(false)
-  const [noAccessError, setNoAccessError] = useState('')
   const [loggingMode, setLoggingMode] = useState('maintenance') // 'maintenance' | 'compliance'
   const [p1Threshold, setP1Threshold] = useState(70)
   const [p2Threshold, setP2Threshold] = useState(40)
@@ -377,19 +396,16 @@ export default function BuilderDashboard({ profile }) {
     setMiles(0)
     setClockingIn(false)
     setClockInError('')
-    setShowPauseReasons(false)
-    setPauseReason(null)
-    setPauseNote('')
+    setStopSheetOpen(false)
+    setMaterialsAskOpen(false)
+    setStopReasonPicked(null)
+    setStopNote('')
+    setStopError('')
     setShowCompleteConfirm(false)
     setCompleteNote('')
     setCompletePhotoFile(null)
     setCompletePhotoPreview(null)
     setCompleteError('')
-    setShowNoAccessConfirm(false)
-    setNoAccessNote('')
-    setNoAccessPhotoFile(null)
-    setNoAccessPhotoPreview(null)
-    setNoAccessError('')
   }, [selectedTicket?.id])
 
   useEffect(() => {
@@ -431,6 +447,20 @@ export default function BuilderDashboard({ profile }) {
       if (interval) clearInterval(interval)
     }
   }, [selectedTicket?.id, selectedTicket?.status])
+
+  useEffect(() => {
+    const onBreak = selectedTicket?.status === 'On Hold' && SHORT_TRIP_REASONS.includes(selectedTicket.hold_reason)
+    if (!onBreak) { setBreakElapsed(0); return }
+
+    // status_changed_at is set the moment handlePause runs, same instant
+    // work_sessions.ended_at freezes the job's own timer -- no separate
+    // "break started" column needed.
+    const startedAt = new Date(selectedTicket.status_changed_at || Date.now())
+    setBreakElapsed(Math.max(0, Math.floor((Date.now() - startedAt.getTime()) / 1000)))
+
+    const interval = setInterval(() => setBreakElapsed(prev => prev + 1), 1000)
+    return () => clearInterval(interval)
+  }, [selectedTicket?.id, selectedTicket?.status, selectedTicket?.hold_reason, selectedTicket?.status_changed_at])
 
   async function fetchComments() {
     const { data, error } = await supabase
@@ -477,7 +507,7 @@ export default function BuilderDashboard({ profile }) {
       .schema('pmms')
       .from('tickets')
       .select(`
-        id, ticket_number, status, category, issue_tag, description, room, priority_score, mileage_logged, transit_start, created_at, completed_at, hold_reason, hold_note, photo_url, property_id, checklist_responses, delay_reason, delay_reason_note, delay_reason_status
+        id, ticket_number, status, status_changed_at, category, issue_tag, description, room, priority_score, estimated_minutes, mileage_logged, transit_start, created_at, completed_at, hold_reason, hold_note, photo_url, property_id, checklist_responses, delay_reason, delay_reason_note, delay_reason_status
       `)
       .eq('assigned_builder_id', profile.id)
       .not('status', 'in', '("Archived","Cancelled")')
@@ -981,28 +1011,74 @@ export default function BuilderDashboard({ profile }) {
     setSelectedTicket(null)
   }
 
-  async function handlePause(reason, note) {
+  // keepLocked: true for the 3 short-trip Stop reasons (Going to the
+  // Office / Lunch Break / Getting materials myself) -- the builder stays
+  // on this same ticket, now showing the break timer, instead of being
+  // released back to the job list. Everything else about the pause is
+  // identical regardless of which reason it is.
+  async function handlePause(reason, note, { keepLocked = false } = {}) {
     const now = new Date().toISOString()
-    const previousStatus = selectedTicket.status
+    const ticket = selectedTicket
+    const previousStatus = ticket.status
     const position = await getCurrentPositionSafe()
 
     await supabase
       .schema('pmms')
       .from('tickets')
       .update({ status: 'On Hold', status_changed_at: now, stuck_alert_sent_at: null, hold_reason: reason, hold_note: note })
-      .eq('id', selectedTicket.id)
+      .eq('id', ticket.id)
 
     await supabase
       .schema('pmms')
       .from('work_sessions')
       .update({ ended_at: now, clock_out_lat: position?.latitude ?? null, clock_out_lng: position?.longitude ?? null })
-      .eq('ticket_id', selectedTicket.id)
+      .eq('ticket_id', ticket.id)
       .is('ended_at', null)
 
-    await postAuditEvent(selectedTicket.id, 'Status Changed', `${previousStatus} → On Hold (${reason}${note ? ' — ' + note : ''})`)
+    await postAuditEvent(ticket.id, 'Status Changed', `${previousStatus} → On Hold (${reason}${note ? ' — ' + note : ''})`)
+
+    if (reason === 'Unable to Do the Job') {
+      await notifyUnableToDo(ticket, note)
+    }
 
     await fetchTickets()
-    setSelectedTicket(null)
+    if (keepLocked) {
+      setSelectedTicket(prev => (prev ? { ...prev, status: 'On Hold', status_changed_at: now, hold_reason: reason, hold_note: note } : prev))
+    } else {
+      setSelectedTicket(null)
+    }
+  }
+
+  // Instant push + in-app notification to whoever manages this ticket's
+  // division, the moment a builder flags a job they can't do -- the whole
+  // point is a manager finding out right away, not stumbling on it later
+  // via the dashboard tile (see notifyUnableToDo's caller, and the new
+  // "Unable to Do" KPI on AdminDashboard.jsx).
+  async function notifyUnableToDo(ticket, note) {
+    const division = maintenanceCategories[ticket.category]?.division || 'Maintenance'
+    const managers = await fetchManagersForDivision(division)
+    if (managers.length === 0) return
+
+    const message = `Job #${ticket.ticket_number} flagged: ${profile.name} can't do this job${note ? ' — ' + note : ''}`
+    for (const manager of managers) {
+      await createNotification(manager.id, ticket.id, message)
+    }
+    await sendPushNotification(managers.map(m => m.id), 'Job flagged: Unable to Do', `#${ticket.ticket_number} — ${ticket.property?.address || 'a property'}`)
+  }
+
+  // Handles all 6 Stop-sheet outcomes -- see the Stop sheet's onClick
+  // handlers, which are the only callers. "Job Completed" is the one
+  // exception, handled by the existing completion flow instead (never
+  // routes through here).
+  async function handleStop(reason, note) {
+    setStopSubmitting(true)
+    setStopError('')
+    await handlePause(reason, note, { keepLocked: SHORT_TRIP_REASONS.includes(reason) })
+    setStopSubmitting(false)
+    setStopSheetOpen(false)
+    setMaterialsAskOpen(false)
+    setStopReasonPicked(null)
+    setStopNote('')
   }
 
   async function handleReportDelay(reason, note) {
@@ -1078,53 +1154,6 @@ export default function BuilderDashboard({ profile }) {
     setClockingIn(false)
   }
 
-  async function handleNoAccess(note, photoFile) {
-    setNoAccessError('')
-
-    if (!note || !note.trim()) {
-      setNoAccessError('Please add a note explaining why access could not be gained.')
-      return
-    }
-
-    setNoAccessSubmitting(true)
-
-    let photoUrl = null
-    if (photoFile) {
-      const compressed = await compressImage(photoFile)
-      const path = `${profile.id}/${Date.now()}-${compressed.name}`
-      const { error: uploadError } = await supabase.storage.from('ticket-photos').upload(path, compressed)
-      if (uploadError) {
-        setNoAccessSubmitting(false)
-        setNoAccessError(`Photo upload failed: ${uploadError.message}`)
-        return
-      }
-      photoUrl = await getSignedUrl('ticket-photos', path)
-    }
-
-    const now = new Date().toISOString()
-    const previousStatus = selectedTicket.status
-    const position = await getCurrentPositionSafe()
-
-    await supabase
-      .schema('pmms')
-      .from('tickets')
-      .update({ status: 'Assigned', status_changed_at: now, stuck_alert_sent_at: null, no_access_flag: true, no_access_note: note.trim(), no_access_photo_url: photoUrl })
-      .eq('id', selectedTicket.id)
-
-    await supabase
-      .schema('pmms')
-      .from('work_sessions')
-      .update({ ended_at: now, clock_out_lat: position?.latitude ?? null, clock_out_lng: position?.longitude ?? null })
-      .eq('ticket_id', selectedTicket.id)
-      .is('ended_at', null)
-
-    await postAuditEvent(selectedTicket.id, 'Status Changed', `${previousStatus} → Assigned (couldn't get access to property — ${note.trim()})`)
-
-    setNoAccessSubmitting(false)
-    await fetchTickets()
-    setSelectedTicket(null)
-  }
-
   async function handleSignOut() {
     // Logged here, before signOut() -- by the time the auth listener sees
     // the session go away, the token's already cleared and an insert from
@@ -1134,7 +1163,7 @@ export default function BuilderDashboard({ profile }) {
   }
 
   function goHome() {
-    setSelectedTicket(null)
+    closeTicket()
     setPage('jobs')
     setMenuOpen(false)
   }
@@ -1253,16 +1282,6 @@ export default function BuilderDashboard({ profile }) {
     setCompletePhotoFile(file)
     const reader = new FileReader()
     reader.onload = () => setCompletePhotoPreview(reader.result)
-    reader.readAsDataURL(file)
-  }
-
-  function handleNoAccessPhoto(e) {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    setNoAccessPhotoFile(file)
-    const reader = new FileReader()
-    reader.onload = () => setNoAccessPhotoPreview(reader.result)
     reader.readAsDataURL(file)
   }
 
@@ -1480,6 +1499,24 @@ export default function BuilderDashboard({ profile }) {
 
   const inProgressTickets = tickets.filter(t => t.status === 'In Progress')
   const activeTicket = inProgressTickets[0] || null
+  // Whichever ticket has the builder "locked" to it right now -- either
+  // actually running (In Progress) or on one of the 3 short, timed trips
+  // (see SHORT_TRIP_REASONS). Everywhere the app would otherwise let a
+  // builder leave a ticket (Back button, the header logo, tapping another
+  // job, tapping a notification) is guarded through openTicket/closeTicket
+  // below instead of setSelectedTicket directly, so it always redirects
+  // back to this one job until Stop resolves it -- see the Focus Mode
+  // proposal ("Builder v.2") this implements.
+  const onBreakTicket = tickets.find(t => t.status === 'On Hold' && SHORT_TRIP_REASONS.includes(t.hold_reason)) || null
+  const lockedTicket = activeTicket || onBreakTicket || null
+
+  function openTicket(t) {
+    setSelectedTicket(lockedTicket || t)
+  }
+  function closeTicket() {
+    setSelectedTicket(lockedTicket || null)
+  }
+
   // True when the job he's about to start is exactly the destination he
   // named when he left the last one -- see "Going to Another Job" on the
   // Leaving Site picker. Skips the "Coming from" question for that one
@@ -1503,6 +1540,31 @@ export default function BuilderDashboard({ profile }) {
     statusFilter === 'HOLD'   ? onHoldTickets :
     statusFilter === 'DONE'   ? doneTickets :
     tickets.filter(t => t.status !== 'Completed')
+
+  // "Closest to you" -- a nudge, not a reorder (see the Builder v.2
+  // guide's step 9): the main list below stays exactly as it always was,
+  // priority first. This just surfaces the 1-2 remaining assigned jobs
+  // nearest to wherever the builder most recently stopped, using the same
+  // straight-line-times-multiplier estimate AdminClocking.jsx already
+  // shows managers for travel mileage.
+  const recentlyLeftTicket = [...tickets]
+    .filter(t => (t.status === 'Completed' || t.status === 'On Hold') && t.property?.latitude != null && t.property?.longitude != null)
+    .sort((a, b) => new Date(b.status_changed_at || 0) - new Date(a.status_changed_at || 0))[0] || null
+
+  const nearbyJobs = (() => {
+    if (!recentlyLeftTicket) return []
+    const candidates = [...urgentTickets, ...toDoTickets].filter(t => t.property?.latitude != null && t.property?.longitude != null)
+    return candidates
+      .map(t => ({
+        ticket: t,
+        miles: metresToMiles(distanceMetres(
+          recentlyLeftTicket.property.latitude, recentlyLeftTicket.property.longitude,
+          t.property.latitude, t.property.longitude,
+        )) * ROAD_DISTANCE_MULTIPLIER,
+      }))
+      .sort((a, b) => a.miles - b.miles)
+      .slice(0, 2)
+  })()
 
   const mileageTickets = tickets
     .filter(t => t.mileage_logged > 0)
@@ -1686,7 +1748,7 @@ export default function BuilderDashboard({ profile }) {
                   onClick={() => {
                     if (!n.read) markNotificationRead(n.id)
                     const t = tickets.find(t => t.id === n.ticket_id)
-                    if (t) setSelectedTicket(t)
+                    if (t) openTicket(t)
                     setNotifPanelOpen(false)
                   }}
                   style={{
@@ -1996,6 +2058,31 @@ export default function BuilderDashboard({ profile }) {
         </select>
       </div>
 
+      {/* Closest to you -- a nudge, not a reorder. The full list below is
+          untouched (still priority first); this just calls out the 1-2
+          remaining jobs nearest to wherever the builder most recently
+          stopped, so an urgent-but-distant job never gets buried. */}
+      {statusFilter === 'ALL' && nearbyJobs.length > 0 && (
+        <div style={{ padding: '16px 16px 0', maxWidth: '600px', margin: '0 auto' }}>
+          <p style={{ margin: '0 0 8px 0', fontSize: '11px', fontWeight: 800, color: COLORS.teal700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>📍 Closest to you</p>
+          {nearbyJobs.map(({ ticket: t, miles }) => (
+            <div key={t.id} style={{ background: COLORS.teal50, border: `1px solid ${COLORS.teal600}`, borderRadius: '16px', marginBottom: '10px', overflow: 'hidden' }}>
+              <div style={{ padding: '14px 16px' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px', marginBottom: '6px' }}>
+                  <p style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: COLORS.slate900 }}>{t.property?.address}</p>
+                  <span style={{ flexShrink: 0, fontSize: '11px', fontWeight: 800, color: COLORS.white, background: COLORS.teal600, padding: '3px 9px', borderRadius: '20px', whiteSpace: 'nowrap' }}>{miles.toFixed(1)} mi</span>
+                </div>
+                <p style={{ margin: '0 0 12px 0', fontSize: '13px', color: COLORS.slate500 }}>{t.description}{t.room ? ` — ${t.room}` : ''}</p>
+                <button onClick={() => openTicket(t)} style={{ width: '100%', padding: '12px', background: COLORS.teal600, color: COLORS.white, border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: 700, cursor: 'pointer' }}>
+                  View job
+                </button>
+              </div>
+            </div>
+          ))}
+          <p style={{ margin: '0 0 4px 0', fontSize: '10px', fontWeight: 800, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.05em' }}>All jobs</p>
+        </div>
+      )}
+
       {/* Job list */}
       <div style={{ padding: '16px', maxWidth: '600px', margin: '0 auto' }}>
         {filteredTickets.length === 0 && (
@@ -2013,7 +2100,7 @@ export default function BuilderDashboard({ profile }) {
               </div>
               <p style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: 700, color: COLORS.slate900 }}>{t.property?.address}</p>
               <p style={{ margin: '0 0 12px 0', fontSize: '13px', color: COLORS.slate500 }}>{t.description}{t.room ? ` — ${t.room}` : ''}</p>
-              <button onClick={() => setSelectedTicket(t)} style={{ width: '100%', padding: '12px', background: statusColour(t.status), color: COLORS.white, border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: 700, cursor: 'pointer' }}>
+              <button onClick={() => openTicket(t)} style={{ width: '100%', padding: '12px', background: statusColour(t.status), color: COLORS.white, border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: 700, cursor: 'pointer' }}>
   View job
 </button>
 
@@ -2028,9 +2115,16 @@ export default function BuilderDashboard({ profile }) {
     {/* Header */}
     <div style={{ position: 'sticky', top: 0, zIndex: 10 }}>
       <div style={{ background: COLORS.white, borderBottom: `1px solid ${COLORS.slate200}`, padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <button onClick={() => setSelectedTicket(null)} style={{ background: COLORS.slate100, border: 'none', borderRadius: '8px', padding: '8px 14px', fontSize: '13px', fontWeight: 700, color: COLORS.slate500, cursor: 'pointer' }}>
-          ← Back
-        </button>
+        {/* Hidden rather than redirecting to itself while locked (In
+            Progress, or on a short-trip break) -- there's nowhere else to
+            go until Stop resolves, see lockedTicket above. The ☰ menu next
+            to it stays fully usable either way -- Team Chat, Metrics,
+            Mileage are never part of the lock, only the job list is. */}
+        {!lockedTicket ? (
+          <button onClick={closeTicket} style={{ background: COLORS.slate100, border: 'none', borderRadius: '8px', padding: '8px 14px', fontSize: '13px', fontWeight: 700, color: COLORS.slate500, cursor: 'pointer' }}>
+            ← Back
+          </button>
+        ) : <span />}
         <button
           onClick={() => setMenuOpen(prev => !prev)}
           aria-label="Menu"
@@ -2144,14 +2238,31 @@ export default function BuilderDashboard({ profile }) {
         <TicketAttachmentGallery ticketId={selectedTicket.id} fallbackUrl={selectedTicket.photo_url} emptyLabel="No photo" />
       </div>
 
-      {/* Clock running banner */}
+      {/* Focus Mode timer -- Builder v.2: the dominant thing on screen
+          whenever this ticket is what's locking the app (see lockedTicket).
+          Big enough to read at a glance, with the estimate right above it
+          so "how long should this take" is answered before "how long has
+          it taken". */}
       {selectedTicket.status === 'In Progress' && (
-        <div style={{ background: COLORS.teal600, borderRadius: '16px', padding: '18px 20px', marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ width: '16px', height: '16px', borderRadius: '50%', border: '2px solid rgba(255,255,255,0.4)', borderTopColor: COLORS.white, animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
-            <span style={{ fontSize: '11px', fontWeight: 700, color: COLORS.white, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Clock running</span>
+        <div style={{ background: COLORS.teal600, borderRadius: '16px', padding: '24px 20px', marginBottom: '12px', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+          {selectedTicket.estimated_minutes != null && (
+            <p style={{ margin: '0 0 4px 0', fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.75)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              Estimated {selectedTicket.estimated_minutes >= 60 ? `${Math.floor(selectedTicket.estimated_minutes / 60)}h ${selectedTicket.estimated_minutes % 60}m` : `${selectedTicket.estimated_minutes}m`} for this job
+            </p>
+          )}
+          <p style={{ margin: '0 0 6px 0', fontSize: '40px', fontWeight: 800, color: COLORS.white, fontFamily: 'monospace', letterSpacing: '0.02em' }}>{formatElapsed(elapsed)}</p>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+            <div style={{ width: '10px', height: '10px', borderRadius: '50%', border: '2px solid rgba(255,255,255,0.4)', borderTopColor: COLORS.white, animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
+            <span style={{ fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.85)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Time on this job</span>
           </div>
-          <span style={{ fontSize: '24px', fontWeight: 800, color: COLORS.white, fontFamily: 'monospace' }}>{formatElapsed(elapsed)}</span>
+        </div>
+      )}
+
+      {selectedTicket.status === 'On Hold' && SHORT_TRIP_REASONS.includes(selectedTicket.hold_reason) && (
+        <div style={{ background: COLORS.purple600, borderRadius: '16px', padding: '24px 20px', marginBottom: '12px', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+          <p style={{ margin: '0 0 4px 0', fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.75)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Away &mdash; {selectedTicket.hold_reason}</p>
+          <p style={{ margin: '0 0 6px 0', fontSize: '32px', fontWeight: 800, color: COLORS.white, fontFamily: 'monospace', letterSpacing: '0.02em' }}>{formatElapsed(breakElapsed)}</p>
+          <p style={{ margin: 0, fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.85)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Time since you left</p>
         </div>
       )}
 
@@ -2332,18 +2443,10 @@ export default function BuilderDashboard({ profile }) {
             )}
           </div>
         ))}
-        {selectedTicket.status === 'In Progress' && !showPauseReasons && !showCompleteConfirm && !showNoAccessConfirm && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <button onClick={() => { setChecklistChecked({}); setMaterialRows([]); setShowCompleteConfirm(true) }} style={{ width: '100%', padding: '16px', background: COLORS.green600, color: COLORS.white, border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: 700, cursor: 'pointer' }}>
-              ✓ Mark complete
-            </button>
-            <button onClick={() => setShowPauseReasons(true)} style={{ width: '100%', padding: '14px', background: COLORS.amber50, color: COLORS.amber800, border: `2px solid ${COLORS.amber300}`, borderRadius: '12px', fontSize: '14px', fontWeight: 700, cursor: 'pointer' }}>
-              ⏸ Pause / put on hold
-            </button>
-            <button onClick={() => setShowNoAccessConfirm(true)} style={{ width: '100%', padding: '14px', background: COLORS.slate50, color: COLORS.slate500, border: `1px solid ${COLORS.slate200}`, borderRadius: '12px', fontSize: '14px', fontWeight: 700, cursor: 'pointer' }}>
-              🚪 Couldn't get access
-            </button>
-          </div>
+        {selectedTicket.status === 'In Progress' && !showCompleteConfirm && (
+          <button onClick={() => setStopSheetOpen(true)} style={{ width: '100%', padding: '18px', background: COLORS.red600, color: COLORS.white, border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: 800, cursor: 'pointer' }}>
+            ⏹ Stop
+          </button>
         )}
         {selectedTicket.status === 'In Progress' && showCompleteConfirm && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -2461,114 +2564,7 @@ export default function BuilderDashboard({ profile }) {
             </button>
           </div>
         )}
-        {selectedTicket.status === 'In Progress' && showNoAccessConfirm && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div>
-              <p style={{ margin: '0 0 2px 0', fontSize: '16px', fontWeight: 800, color: COLORS.slate900 }}>Confirm couldn't get access</p>
-              <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate500 }}>Add a note explaining what happened, and a photo if you have one</p>
-            </div>
-
-            <textarea
-              value={noAccessNote}
-              onChange={(e) => setNoAccessNote(e.target.value)}
-              placeholder="e.g. No answer at the door after 3 attempts..."
-              rows={3}
-              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '14px', fontFamily: 'inherit', boxSizing: 'border-box', resize: 'vertical' }}
-            />
-
-            <input type="file" accept="image/*" id="no-access-photo-input" onChange={handleNoAccessPhoto} style={{ display: 'none' }} />
-            <button
-              onClick={() => document.getElementById('no-access-photo-input').click()}
-              style={{ width: '100%', height: '44px', borderRadius: '10px', border: `2px dashed ${COLORS.slate300}`, background: COLORS.white, color: COLORS.slate500, fontSize: '13px', fontWeight: 600, cursor: 'pointer', boxSizing: 'border-box' }}
-            >
-              {noAccessPhotoFile ? 'Change photo' : 'Add a photo (optional)'}
-            </button>
-            {noAccessPhotoPreview && (
-              <img src={noAccessPhotoPreview} alt="No access preview" style={{ width: '100%', borderRadius: '10px', display: 'block' }} />
-            )}
-
-            {noAccessError && (
-              <p style={{ margin: 0, fontSize: '13px', color: COLORS.red500 }}>{noAccessError}</p>
-            )}
-
-            <button
-              onClick={() => handleNoAccess(noAccessNote, noAccessPhotoFile)}
-              disabled={noAccessSubmitting}
-              style={{ width: '100%', padding: '16px', background: COLORS.slate500, color: COLORS.white, border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: 700, cursor: noAccessSubmitting ? 'not-allowed' : 'pointer', opacity: noAccessSubmitting ? 0.6 : 1 }}
-            >
-              {noAccessSubmitting ? 'Submitting...' : "🚪 Confirm couldn't get access"}
-            </button>
-            <button
-              onClick={() => setShowNoAccessConfirm(false)}
-              style={{ width: '100%', padding: '10px', background: 'none', border: 'none', color: COLORS.slate500, fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}
-            >
-              Cancel
-            </button>
-          </div>
-        )}
-        {selectedTicket.status === 'In Progress' && showPauseReasons && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div>
-              <p style={{ margin: '0 0 2px 0', fontSize: '16px', fontWeight: 800, color: COLORS.slate900 }}>Why are you pausing?</p>
-              <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate500 }}>This is shown to the office</p>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {[
-                'Waiting for parts or materials',
-                'Need access to property',
-                'Waiting for another contractor',
-                'Resident not available',
-                'Need office approval',
-                'Other',
-              ].map(reason => {
-                const active = pauseReason === reason
-                return (
-                  <button
-                    key={reason}
-                    onClick={() => setPauseReason(reason)}
-                    style={{
-                      width: '100%',
-                      padding: '12px',
-                      borderRadius: '10px',
-                      border: active ? `2px solid ${COLORS.amber600}` : `1px solid ${COLORS.slate200}`,
-                      background: active ? `${COLORS.amber600}14` : COLORS.slate50,
-                      color: COLORS.slate900,
-                      fontSize: '14px',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      textAlign: 'left',
-                    }}
-                  >
-                    {reason}
-                  </button>
-                )
-              })}
-            </div>
-
-            <textarea
-              value={pauseNote}
-              onChange={(e) => setPauseNote(e.target.value)}
-              placeholder="Add a note (optional)"
-              rows={3}
-              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '14px', fontFamily: 'inherit', boxSizing: 'border-box', resize: 'vertical' }}
-            />
-
-            <button
-              onClick={() => handlePause(pauseReason, pauseNote)}
-              style={{ width: '100%', padding: '16px', background: COLORS.amber600, color: COLORS.white, border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: 700, cursor: 'pointer' }}
-            >
-              Confirm pause
-            </button>
-            <button
-              onClick={() => setShowPauseReasons(false)}
-              style={{ width: '100%', padding: '10px', background: 'none', border: 'none', color: COLORS.slate500, fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}
-            >
-              Cancel
-            </button>
-          </div>
-        )}
-        {selectedTicket.status === 'On Hold' && (
+        {selectedTicket.status === 'On Hold' && !SHORT_TRIP_REASONS.includes(selectedTicket.hold_reason) && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             {(selectedTicket.hold_reason || selectedTicket.hold_note) && (
               <div style={{ padding: '14px', borderRadius: '10px', background: COLORS.amber50, border: `1px solid ${COLORS.amber300}` }}>
@@ -2597,6 +2593,18 @@ export default function BuilderDashboard({ profile }) {
                 {clockInError && <p style={{ margin: 0, fontSize: '13px', color: COLORS.red500, fontWeight: 600 }}>{clockInError}</p>}
               </>
             )}
+          </div>
+        )}
+        {selectedTicket.status === 'On Hold' && SHORT_TRIP_REASONS.includes(selectedTicket.hold_reason) && (
+          <div>
+            <button
+              onClick={handleResumeWork}
+              disabled={clockingIn}
+              style={{ width: '100%', padding: '18px', background: COLORS.teal600, color: COLORS.white, border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: 800, cursor: clockingIn ? 'not-allowed' : 'pointer', opacity: clockingIn ? 0.7 : 1 }}
+            >
+              {clockingIn ? 'Getting your location…' : '▶ Resume Job'}
+            </button>
+            {clockInError && <p style={{ margin: '8px 0 0 0', fontSize: '13px', color: COLORS.red500, fontWeight: 600 }}>{clockInError}</p>}
           </div>
         )}
       </div>
@@ -2640,6 +2648,118 @@ export default function BuilderDashboard({ profile }) {
       </div>
 
     </div>
+
+    {/* Stop sheet -- the single unified "why are you stopping" flow that
+        replaces the old separate Mark complete / Pause / Couldn't get
+        access buttons. Job Completed hands straight to the existing
+        completion flow (showCompleteConfirm); Waiting for Materials asks
+        one more question first since "going myself" and "on order" behave
+        completely differently (see handleStop / SHORT_TRIP_REASONS). */}
+    {stopSheetOpen && (
+      <div
+        onClick={() => { if (!stopSubmitting) { setStopSheetOpen(false); setMaterialsAskOpen(false); setStopReasonPicked(null); setStopNote(''); setStopError('') } }}
+        style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.45)', display: 'flex', alignItems: 'flex-end', zIndex: 60 }}
+      >
+        <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxHeight: '80vh', overflowY: 'auto', background: COLORS.white, borderRadius: '18px 18px 0 0' }}>
+          {!materialsAskOpen && !stopReasonPicked && (
+            <div style={{ padding: '20px' }}>
+              <p style={{ margin: '0 0 2px 0', fontSize: '16px', fontWeight: 800, color: COLORS.slate900 }}>Why are you stopping?</p>
+              <p style={{ margin: '0 0 16px 0', fontSize: '13px', fontWeight: 500, color: COLORS.slate500 }}>This is logged and shown to the office</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <button
+                  onClick={() => { setChecklistChecked({}); setMaterialRows([]); setStopSheetOpen(false); setShowCompleteConfirm(true) }}
+                  style={{ width: '100%', padding: '14px', borderRadius: '10px', border: 'none', background: COLORS.green600, color: COLORS.white, fontSize: '14px', fontWeight: 700, cursor: 'pointer', textAlign: 'left' }}
+                >
+                  ✓ Job Completed
+                </button>
+                <button onClick={() => setMaterialsAskOpen(true)} style={{ width: '100%', padding: '14px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, background: COLORS.slate50, color: COLORS.slate900, fontSize: '14px', fontWeight: 700, cursor: 'pointer', textAlign: 'left' }}>
+                  📦 Waiting for Materials
+                </button>
+                <button onClick={() => setStopReasonPicked('Going to the Office')} style={{ width: '100%', padding: '14px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, background: COLORS.slate50, color: COLORS.slate900, fontSize: '14px', fontWeight: 700, cursor: 'pointer', textAlign: 'left' }}>
+                  🏢 Going to the Office
+                </button>
+                <button onClick={() => setStopReasonPicked('Lunch Break')} style={{ width: '100%', padding: '14px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, background: COLORS.slate50, color: COLORS.slate900, fontSize: '14px', fontWeight: 700, cursor: 'pointer', textAlign: 'left' }}>
+                  🍽 Lunch Break
+                </button>
+                <button onClick={() => setStopReasonPicked('Unable to Do the Job')} style={{ width: '100%', padding: '14px', borderRadius: '10px', border: `1px solid ${COLORS.red200}`, background: COLORS.white, color: COLORS.red600, fontSize: '14px', fontWeight: 700, cursor: 'pointer', textAlign: 'left' }}>
+                  🚫 Unable to Do the Job
+                </button>
+                <button onClick={() => setStopReasonPicked('Other')} style={{ width: '100%', padding: '14px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, background: COLORS.slate50, color: COLORS.slate900, fontSize: '14px', fontWeight: 700, cursor: 'pointer', textAlign: 'left' }}>
+                  Other
+                </button>
+              </div>
+              <button
+                onClick={() => setStopSheetOpen(false)}
+                style={{ width: '100%', padding: '10px', marginTop: '10px', background: 'none', border: 'none', color: COLORS.slate500, fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+
+          {materialsAskOpen && (
+            <div style={{ padding: '20px' }}>
+              <p style={{ margin: '0 0 2px 0', fontSize: '16px', fontWeight: 800, color: COLORS.slate900 }}>Waiting for Materials</p>
+              <p style={{ margin: '0 0 16px 0', fontSize: '13px', fontWeight: 500, color: COLORS.slate500 }}>Are you going yourself, or is it on order?</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <button
+                  onClick={() => { setMaterialsAskOpen(false); setStopReasonPicked('Getting materials myself') }}
+                  style={{ width: '100%', padding: '14px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, background: COLORS.slate50, color: COLORS.slate900, fontSize: '14px', fontWeight: 700, cursor: 'pointer', textAlign: 'left' }}
+                >
+                  🚗 I'm going myself
+                </button>
+                <button
+                  onClick={() => { setMaterialsAskOpen(false); setStopReasonPicked('Waiting for materials (ordered)') }}
+                  style={{ width: '100%', padding: '14px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, background: COLORS.slate50, color: COLORS.slate900, fontSize: '14px', fontWeight: 700, cursor: 'pointer', textAlign: 'left' }}
+                >
+                  📬 It's on order / being delivered
+                </button>
+              </div>
+              <button
+                onClick={() => setMaterialsAskOpen(false)}
+                style={{ width: '100%', padding: '10px', marginTop: '10px', background: 'none', border: 'none', color: COLORS.slate500, fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}
+              >
+                Back
+              </button>
+            </div>
+          )}
+
+          {stopReasonPicked && (
+            <div style={{ padding: '20px' }}>
+              <p style={{ margin: '0 0 2px 0', fontSize: '16px', fontWeight: 800, color: COLORS.slate900 }}>{stopReasonPicked}</p>
+              <p style={{ margin: '0 0 12px 0', fontSize: '13px', fontWeight: 500, color: COLORS.slate500 }}>
+                {stopReasonPicked === 'Other' ? 'Please say what happened' : 'Add a note (optional)'}
+              </p>
+              <textarea
+                value={stopNote}
+                onChange={(e) => setStopNote(e.target.value)}
+                placeholder={stopReasonPicked === 'Other' ? 'e.g. Ran out of a specific part, coming back tomorrow...' : 'Add a note...'}
+                rows={3}
+                style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '14px', fontFamily: 'inherit', boxSizing: 'border-box', resize: 'vertical', marginBottom: '10px' }}
+              />
+              {stopError && <p style={{ margin: '0 0 10px 0', fontSize: '13px', color: COLORS.red500, fontWeight: 600 }}>{stopError}</p>}
+              <button
+                onClick={() => {
+                  if (stopReasonPicked === 'Other' && !stopNote.trim()) { setStopError('Please add a note explaining what happened.'); return }
+                  setStopError('')
+                  handleStop(stopReasonPicked, stopNote.trim())
+                }}
+                disabled={stopSubmitting}
+                style={{ width: '100%', padding: '16px', background: COLORS.amber600, color: COLORS.white, border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: 700, cursor: stopSubmitting ? 'not-allowed' : 'pointer', opacity: stopSubmitting ? 0.6 : 1 }}
+              >
+                {stopSubmitting ? 'Submitting...' : 'Confirm'}
+              </button>
+              <button
+                onClick={() => setStopReasonPicked(null)}
+                style={{ width: '100%', padding: '10px', marginTop: '4px', background: 'none', border: 'none', color: COLORS.slate500, fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}
+              >
+                Back
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    )}
   </div>
 )}
 

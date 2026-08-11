@@ -398,7 +398,7 @@ export default function AdminDashboard({ profile, onNavigate }) {
     const { data, error } = await supabase
       .schema('pmms')
       .from('tickets')
-      .select('id, status, created_at, completed_at, status_changed_at, first_assigned_at, priority_score, priority_override, mileage_logged')
+      .select('id, status, created_at, completed_at, status_changed_at, first_assigned_at, priority_score, priority_override, mileage_logged, hold_reason')
 
     if (!error) setTickets(data)
     setLoading(false)
@@ -524,6 +524,13 @@ export default function AdminDashboard({ profile, onNavigate }) {
     { label: 'Unassigned', value: tickets.filter(t => t.status === 'Pending').length, colour: COLORS.red600, statusFilter: 'Pending' },
     { label: 'In Progress', value: tickets.filter(t => t.status === 'In Progress').length, colour: COLORS.teal600, statusFilter: 'In Progress' },
     { label: 'On Hold', value: tickets.filter(t => t.status === 'On Hold').length, colour: COLORS.amber500, statusFilter: 'On Hold' },
+    // Builder v.2's "Stop" sheet flags a job this way when a builder can't
+    // do it for any reason -- it's still just an On Hold ticket underneath
+    // (hold_reason is the only thing that marks it out), but it needs its
+    // own tile so it can't get lost among ordinary materials/lunch pauses:
+    // this is the one On Hold reason that needs a manager to actually act
+    // (reassign), not just wait.
+    { label: 'Unable to Do', value: tickets.filter(t => t.status === 'On Hold' && t.hold_reason === 'Unable to Do the Job').length, colour: COLORS.red600, statusFilter: 'On Hold' },
     // 'Completed' alone undercounts -- a signed-off job moves to 'Archived',
     // so a job finished this morning and signed off by lunchtime would drop
     // out of this tile entirely even though it's very much still completed
@@ -598,6 +605,7 @@ export default function AdminDashboard({ profile, onNavigate }) {
   // was ever checked).
   const unassignedCount = kpis.find(k => k.label === 'Unassigned')?.value || 0
   const p1CriticalCount = kpis.find(k => k.label === 'P1 Critical')?.value || 0
+  const unableToDoCount = kpis.find(k => k.label === 'Unable to Do')?.value || 0
   const stuckCount = kpis.find(k => k.label === 'Stuck')?.value || 0
   const completedToday = completionKpis.find(k => k.label === 'Today')?.value || 0
   const completedThisMonth = completionKpis.find(k => k.label === 'This Month')?.value || 0
@@ -608,7 +616,8 @@ export default function AdminDashboard({ profile, onNavigate }) {
   if (stuckCount > 0) flaggedLines.push({ target: 'pipeline', tone: 'critical', text: <><b>{stuckCount} ticket{stuckCount === 1 ? '' : 's'}</b> {stuckCount === 1 ? 'is' : 'are'} stuck — no update in longer than usual, worth a check.</> })
   if (unassignedCount > 0) flaggedLines.push({ target: 'pipeline', tone: 'critical', text: <><b>{unassignedCount} ticket{unassignedCount === 1 ? '' : 's'}</b> {unassignedCount === 1 ? 'is' : 'are'} still unassigned.</> })
   if (p1CriticalCount > 0) flaggedLines.push({ target: 'pipeline', tone: 'critical', text: <><b>{p1CriticalCount} P1 Critical ticket{p1CriticalCount === 1 ? '' : 's'}</b> {p1CriticalCount === 1 ? 'needs' : 'need'} attention.</> })
-  if (stuckCount === 0 && unassignedCount === 0 && p1CriticalCount === 0) quietLines.push({ target: 'pipeline', tone: 'quiet', text: <>Ticket Pipeline — no updates. {totalTicketsCount} total, {completedToday} completed today.</> })
+  if (unableToDoCount > 0) flaggedLines.push({ target: 'pipeline', tone: 'warning', text: <><b>{unableToDoCount} job{unableToDoCount === 1 ? '' : 's'}</b> {unableToDoCount === 1 ? 'was' : 'were'} flagged as unable to do — needs reassigning.</> })
+  if (stuckCount === 0 && unassignedCount === 0 && p1CriticalCount === 0 && unableToDoCount === 0) quietLines.push({ target: 'pipeline', tone: 'quiet', text: <>Ticket Pipeline — no updates. {totalTicketsCount} total, {completedToday} completed today.</> })
 
   if (complianceVisible) {
     if (complianceCounts.expired > 0) flaggedLines.push({ target: 'compliance', tone: 'warning', text: <><b>{complianceCounts.expired} compliance certificate{complianceCounts.expired === 1 ? '' : 's'}</b> {complianceCounts.expired === 1 ? 'has' : 'have'} expired.</> })

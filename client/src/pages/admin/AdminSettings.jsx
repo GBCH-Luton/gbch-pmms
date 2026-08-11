@@ -121,6 +121,7 @@ export default function AdminSettings() {
   const [dailyClockOutReminderTime, setDailyClockOutReminderTime] = useState('17:00')
   const [overtimeThresholdHours, setOvertimeThresholdHours] = useState(8)
   const [staleShiftHours, setStaleShiftHours] = useState(16)
+  const [autoClockOutGraceMinutes, setAutoClockOutGraceMinutes] = useState(120)
   const [dailyAttendanceSaving, setDailyAttendanceSaving] = useState(false)
   const [dailyAttendanceSaved, setDailyAttendanceSaved] = useState(false)
 
@@ -248,6 +249,7 @@ export default function AdminSettings() {
       if (map.daily_clock_out_reminder_time != null) setDailyClockOutReminderTime(map.daily_clock_out_reminder_time)
       if (map.daily_overtime_threshold_hours != null) setOvertimeThresholdHours(Number(map.daily_overtime_threshold_hours))
       if (map.stale_shift_hours != null) setStaleShiftHours(Number(map.stale_shift_hours))
+      if (map.auto_clock_out_grace_minutes != null) setAutoClockOutGraceMinutes(Number(map.auto_clock_out_grace_minutes))
       if (map.new_property_window_hours != null) setNewPropertyWindowHours(map.new_property_window_hours)
       if (map.dashboard_total_tickets_period != null) setTotalTicketsPeriod(map.dashboard_total_tickets_period)
       if (Array.isArray(map.divisions) && map.divisions.length > 0) setDivisions(map.divisions)
@@ -587,6 +589,7 @@ export default function AdminSettings() {
     await saveSetting('daily_clock_out_reminder_time', dailyClockOutReminderTime)
     await saveSetting('daily_overtime_threshold_hours', Number(overtimeThresholdHours))
     await saveSetting('stale_shift_hours', Number(staleShiftHours))
+    await saveSetting('auto_clock_out_grace_minutes', Number(autoClockOutGraceMinutes))
     setDailyAttendanceSaving(false)
     setDailyAttendanceSaved(true)
     setTimeout(() => setDailyAttendanceSaved(false), 2000)
@@ -1264,7 +1267,19 @@ export default function AdminSettings() {
               onChange={(e) => setStaleShiftHours(e.target.value)}
               style={inputStyle}
             />
-            <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: COLORS.slate400 }}>A shift still open past this many hours, into a new day, locks the builder out and pushes every admin/manager to close it out for them -- no auto clock-out.</p>
+            <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: COLORS.slate400 }}>A shift still open past this many hours, into a new day, locks the builder out and pushes every admin/manager to close it out for them by hand -- this one never auto closes, even with the setting below (it's for a shift that's already sat open overnight, well past a same-day grace period).</p>
+          </div>
+          <div style={{ flex: '1 1 200px' }}>
+            <label style={fieldLabelStyle}>Auto clock-out grace period (minutes)</label>
+            <input
+              type="number"
+              min="15"
+              step="15"
+              value={autoClockOutGraceMinutes}
+              onChange={(e) => setAutoClockOutGraceMinutes(e.target.value)}
+              style={inputStyle}
+            />
+            <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: COLORS.slate400 }}>If a builder is still clocked in this long past the clock-out reminder above, and neither they nor a manager has closed the shift by then, the system clocks them out itself -- backdated to the reminder time, not whenever this actually ran. Managers get their own alert 15 minutes before this fires, so there's a real chance to step in first.</p>
           </div>
         </div>
 

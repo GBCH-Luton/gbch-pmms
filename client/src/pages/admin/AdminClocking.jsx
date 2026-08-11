@@ -288,7 +288,7 @@ export default function AdminClocking({ profile, onNavigate }) {
     const { data: attendanceData } = await supabase
       .schema('pmms')
       .from('daily_attendance')
-      .select('id, staff_id, work_date, clock_in_at, clock_in_lat, clock_in_lng, late_flag, clock_out_at, clock_out_lat, clock_out_lng, clock_in_override, clock_out_override, early_leave_reason')
+      .select('id, staff_id, work_date, clock_in_at, clock_in_lat, clock_in_lng, late_flag, clock_out_at, clock_out_lat, clock_out_lng, clock_in_override, clock_out_override, early_leave_reason, auto_clocked_out')
       .or(`work_date.eq.${todayKey},clock_out_at.is.null`)
       .order('clock_in_at', { ascending: false })
 
@@ -504,7 +504,7 @@ export default function AdminClocking({ profile, onNavigate }) {
     const { data: shifts } = await supabase
       .schema('pmms')
       .from('daily_attendance')
-      .select('id, clock_in_at, clock_in_lat, clock_in_lng, clock_out_at, clock_out_lat, clock_out_lng, late_flag, early_leave_reason, clock_in_override, clock_out_override')
+      .select('id, clock_in_at, clock_in_lat, clock_in_lng, clock_out_at, clock_out_lat, clock_out_lng, late_flag, early_leave_reason, clock_in_override, clock_out_override, auto_clocked_out')
       .eq('staff_id', staffId)
       .eq('work_date', dateKey)
       .order('clock_in_at', { ascending: true })
@@ -885,6 +885,7 @@ export default function AdminClocking({ profile, onNavigate }) {
                             </span>
                           )}
                           {row.shift.clock_out_override && <span style={{ display: 'block', fontSize: '10px', fontWeight: 700, color: COLORS.slate400 }}>Manager override</span>}
+                          {row.shift.auto_clocked_out && <span style={{ display: 'block', fontSize: '10px', fontWeight: 700, color: COLORS.amber700 }}>⚠ Auto clocked out — grace period expired</span>}
                           {row.shift.clock_out_lat != null && row.shift.clock_out_lng != null && (
                             <button
                               onClick={() => openPinMap(row.shift.clock_out_lat, row.shift.clock_out_lng)}
@@ -1258,6 +1259,7 @@ export default function AdminClocking({ profile, onNavigate }) {
                     time: shift.clock_out_at,
                     label: shift.early_leave_reason
                       ? `Clocked out for the day — left early: ${shift.early_leave_reason}`
+                      : shift.auto_clocked_out ? 'Auto clocked out — grace period expired'
                       : shift.clock_out_override ? 'Clocked out for the day (manager override)' : 'Clocked out for the day',
                     tone: shift.early_leave_reason ? 'early' : 'out',
                     lat: shift.clock_out_lat,
