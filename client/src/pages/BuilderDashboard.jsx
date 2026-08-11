@@ -13,8 +13,9 @@ import { fetchChannelMessages, subscribeToChannel, postMessage, markChannelRead,
 import { fetchDmContacts, fetchConversations, fetchThreadMessages, subscribeToDm, postDm, markThreadRead, countUnreadDms } from '../lib/dm'
 import { NavIcon } from '../lib/icons'
 import { compressImage } from '../lib/imageCompression'
-import { getSignedUrl } from '../lib/storage'
-import { uploadTicketAttachments } from '../lib/ticketAttachments'
+import { compressVideo } from '../lib/videoCompression'
+import { getSignedUrl, uploadFileWithProgress } from '../lib/storage'
+import { uploadTicketAttachments, formatUploadProgress } from '../lib/ticketAttachments'
 import PropertySearchSelect from '../components/PropertySearchSelect'
 import ChatComposer from '../components/ChatComposer'
 import PhotoLightbox from '../components/PhotoLightbox'
@@ -179,6 +180,7 @@ export default function BuilderDashboard({ profile }) {
   const [ticketMediaFiles, setTicketMediaFiles] = useState([])
   const [ticketDuplicateWarning, setTicketDuplicateWarning] = useState(null)
   const [ticketSubmitting, setTicketSubmitting] = useState(false)
+  const [ticketUploadProgress, setTicketUploadProgress] = useState(null)
   const [ticketError, setTicketError] = useState('')
   const [ticketSuccess, setTicketSuccess] = useState(false)
   const [maintenanceCategories, setMaintenanceCategories] = useState({})
@@ -189,6 +191,7 @@ export default function BuilderDashboard({ profile }) {
   const [complianceMediaFiles, setComplianceMediaFiles] = useState([])
   const [complianceMediaPreviews, setComplianceMediaPreviews] = useState([])
   const [complianceSubmitting, setComplianceSubmitting] = useState(false)
+  const [complianceUploadProgress, setComplianceUploadProgress] = useState(null)
   const [complianceSuccess, setComplianceSuccess] = useState('')
   const [reportedTickets, setReportedTickets] = useState([])
   const [notifications, setNotifications] = useState([])
@@ -1326,16 +1329,18 @@ export default function BuilderDashboard({ profile }) {
 
     if (ticketMediaFiles.length > 0) {
       try {
-        const [firstUrl] = await uploadTicketAttachments(ticketMediaFiles, data[0].id, profile.id)
+        const [firstUrl] = await uploadTicketAttachments(ticketMediaFiles, data[0].id, profile.id, { onProgress: setTicketUploadProgress })
         await supabase.schema('pmms').from('tickets').update({ photo_url: firstUrl }).eq('id', data[0].id)
       } catch (uploadErr) {
         setTicketSubmitting(false)
+        setTicketUploadProgress(null)
         setTicketError(uploadErr.message)
         return
       }
     }
 
     setTicketSubmitting(false)
+    setTicketUploadProgress(null)
 
     if (priorityTierLabel(priorityScore, p1Threshold, p2Threshold) === 'P1 Critical') {
       const division = maintenanceCategories[ticketCategory]?.division || 'Maintenance'
@@ -1397,17 +1402,24 @@ export default function BuilderDashboard({ profile }) {
 
       let photoUrl = null
       if (failedItem.mediaFile) {
-        // compressImage() is a no-op pass-through for video -- this field
-        // can be either a photo or a video, per the input's accept attr.
-        const compressedMedia = await compressImage(failedItem.mediaFile)
+        // This field can be either a photo or a video, per the input's
+        // accept attr -- compressImage is a no-op for video, compressVideo
+        // is a no-op for photos, so exactly one of the two actually runs.
+        const isVideo = failedItem.mediaFile.type.startsWith('video/')
+        const compressedMedia = isVideo
+          ? await compressVideo(failedItem.mediaFile, { onProgress: pct => setComplianceUploadProgress({ index: 1, total: 1, stage: 'compressing', pct }) })
+          : await compressImage(failedItem.mediaFile)
         const path = `${profile.id}/${Date.now()}-${compressedMedia.name}`
-        const { error: uploadError } = await supabase.storage.from('ticket-photos').upload(path, compressedMedia)
-        if (uploadError) {
+        try {
+          await uploadFileWithProgress('ticket-photos', path, compressedMedia, pct => setComplianceUploadProgress({ index: 1, total: 1, stage: 'uploading', pct }))
+        } catch (uploadErr) {
           setComplianceSubmitting(false)
-          setTicketError(`Media upload failed: ${uploadError.message}`)
+          setComplianceUploadProgress(null)
+          setTicketError(`Media upload failed: ${uploadErr.message}`)
           return
         }
         photoUrl = await getSignedUrl('ticket-photos', path)
+        setComplianceUploadProgress(null)
       }
 
       const { data, error } = await supabase
@@ -3615,7 +3627,7 @@ export default function BuilderDashboard({ profile }) {
                             boxSizing: 'border-box',
                           }}
                         >
-                          {ticketSubmitting ? 'Submitting...' : 'Submit Ticket'}
+                          {ticketSubmitting ? (formatUploadProgress(ticketUploadProgress) || 'Submitting...') : 'Submit Ticket'}
                         </button>
                       </>
                     )}
@@ -3787,7 +3799,7 @@ export default function BuilderDashboard({ profile }) {
                         boxSizing: 'border-box',
                       }}
                     >
-                      {complianceSubmitting ? 'Submitting...' : 'Submit Compliance Check'}
+                      {complianceSubmitting ? (formatUploadProgress(complianceUploadProgress) || 'Submitting...') : 'Submit Compliance Check'}
                     </button>
                   </div>
                 )}

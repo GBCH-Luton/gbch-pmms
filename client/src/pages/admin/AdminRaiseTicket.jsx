@@ -7,7 +7,7 @@ import { fetchMaintenanceCategories, sortedCategoryEntries, UNLISTED_MARKER_PREF
 import { fetchDivisions } from '../../lib/divisions'
 import { compressImage } from '../../lib/imageCompression'
 import { getSignedUrl } from '../../lib/storage'
-import { uploadTicketAttachments } from '../../lib/ticketAttachments'
+import { uploadTicketAttachments, formatUploadProgress } from '../../lib/ticketAttachments'
 import PropertySearchSelect from '../../components/PropertySearchSelect'
 import VoiceInputButton from '../../components/VoiceInputButton'
 import TicketMediaPicker from '../../components/TicketMediaPicker'
@@ -71,6 +71,7 @@ export default function AdminRaiseTicket({ profile, onNavigate }) {
   const [ticketMediaFiles, setTicketMediaFiles] = useState([])
   const [ticketDuplicateWarning, setTicketDuplicateWarning] = useState(null)
   const [ticketSubmitting, setTicketSubmitting] = useState(false)
+  const [ticketUploadProgress, setTicketUploadProgress] = useState(null)
   const [ticketError, setTicketError] = useState('')
   const [ticketSuccess, setTicketSuccess] = useState('')
 
@@ -256,16 +257,18 @@ export default function AdminRaiseTicket({ profile, onNavigate }) {
 
     if (ticketMediaFiles.length > 0) {
       try {
-        const [firstUrl] = await uploadTicketAttachments(ticketMediaFiles, data[0].id, profile.id)
+        const [firstUrl] = await uploadTicketAttachments(ticketMediaFiles, data[0].id, profile.id, { onProgress: setTicketUploadProgress })
         await supabase.schema('pmms').from('tickets').update({ photo_url: firstUrl }).eq('id', data[0].id)
       } catch (uploadErr) {
         setTicketSubmitting(false)
+        setTicketUploadProgress(null)
         setTicketError(uploadErr.message)
         return
       }
     }
 
     setTicketSubmitting(false)
+    setTicketUploadProgress(null)
 
     if (assignedBuilderId) {
       await createNotification(assignedBuilderId, data[0].id, `You've been assigned Job #${data[0].ticket_number} at ${selectedTicketProperty?.address || 'a property'}.`)
@@ -809,7 +812,7 @@ export default function AdminRaiseTicket({ profile, onNavigate }) {
                       boxSizing: 'border-box',
                     }}
                   >
-                    {ticketSubmitting ? 'Submitting...' : 'Submit Ticket'}
+                    {ticketSubmitting ? (formatUploadProgress(ticketUploadProgress) || 'Submitting...') : 'Submit Ticket'}
                   </button>
                 </>
               )}

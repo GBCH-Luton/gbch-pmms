@@ -20,7 +20,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { COLORS } from '../lib/colors'
 import { logLoginEvent } from '../lib/loginEvents'
-import { uploadTicketAttachments } from '../lib/ticketAttachments'
+import { uploadTicketAttachments, formatUploadProgress } from '../lib/ticketAttachments'
 import { fetchMaintenanceCategories, sortedCategoryEntries, isUnlistedTag, unlistedTagFor, unlistedLabelFor, calculatePriorityScore } from '../lib/maintenanceCategories'
 import { attachBuilderSafeProperties } from '../lib/properties'
 import { statusColour, statusLabel, postSystemComment, postAuditEvent, KpiTiles } from './admin/shared'
@@ -119,6 +119,7 @@ function NewReportForm({ profile, onSubmitted }) {
   const [notes, setNotes] = useState('')
   const [mediaFiles, setMediaFiles] = useState([])
   const [submitting, setSubmitting] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(null)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
@@ -168,16 +169,18 @@ function NewReportForm({ profile, onSubmitted }) {
 
     if (mediaFiles.length > 0) {
       try {
-        const [firstUrl] = await uploadTicketAttachments(mediaFiles, data[0].id, profile.id)
+        const [firstUrl] = await uploadTicketAttachments(mediaFiles, data[0].id, profile.id, { onProgress: setUploadProgress })
         await supabase.schema('pmms').from('tickets').update({ photo_url: firstUrl }).eq('id', data[0].id)
       } catch (uploadErr) {
         setSubmitting(false)
+        setUploadProgress(null)
         setError(uploadErr.message)
         return
       }
     }
 
     setSubmitting(false)
+    setUploadProgress(null)
     setSuccess(`Thanks — your report has been logged as Job #${data[0].ticket_number}. Our team will review and assign it.`)
     setPropertyId(''); setRoom(null); setOtherArea(''); setCategory(null); setIssueTag(null); setIssueOther('')
     setNotes(''); setMediaFiles([])
@@ -268,7 +271,7 @@ function NewReportForm({ profile, onSubmitted }) {
 
       {issueTag && (
         <button onClick={handleSubmit} disabled={!canSubmit} style={{ ...choiceBtn(true), width: '100%', marginTop: '20px', opacity: canSubmit ? 1 : 0.5, cursor: canSubmit ? 'pointer' : 'not-allowed' }}>
-          {submitting ? 'Submitting...' : 'Submit Report'}
+          {submitting ? (formatUploadProgress(uploadProgress) || 'Submitting...') : 'Submit Report'}
         </button>
       )}
     </div>
