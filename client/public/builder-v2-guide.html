@@ -64,15 +64,6 @@
   .track.active { display: block; }
   .track-intro { font-size: 14px; color: var(--guide-text-dim); margin: 8px 0 28px 0; max-width: 700px; }
 
-  .overview-grid { display: grid; grid-template-columns: 1fr; gap: 10px; margin: 0 0 32px 0; }
-  @media (min-width: 640px) { .overview-grid { grid-template-columns: 1fr 1fr; } }
-  .overview-card { background: var(--guide-surface); border: 1px solid var(--guide-border); border-radius: 14px; padding: 16px 18px; }
-  .overview-card.warn { background: #fffbeb; border-color: #fcd34d; }
-  .overview-card h4 { margin: 0 0 6px 0; font-size: 13.5px; font-weight: 800; color: var(--guide-text); display: flex; align-items: center; gap: 8px; }
-  .overview-card p { margin: 0; font-size: 12.5px; color: var(--guide-text-dim); }
-  .overview-card .tag-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
-  .tag { font-size: 10.5px; font-weight: 700; padding: 4px 9px; border-radius: 999px; background: #f0fdfa; color: #0f766e; }
-  .tag.new { background: #eef2ff; color: #4338ca; }
 
   .step { display: grid; grid-template-columns: 1fr; gap: 18px; padding: 26px 0; border-top: 1px solid var(--guide-border); }
   .step:first-of-type { border-top: none; }
@@ -208,27 +199,6 @@
     <h1>Locked Job Focus Mode</h1>
     <p class="sub">A proposal to stop builders forgetting to clock in/out and logging jobs after the fact, by locking the app down to one job at a time with a big running timer and a single, mandatory "why did you stop" step.</p>
   </header>
-
-  <div class="overview-grid">
-    <div class="overview-card">
-      <h4>🎯 The problem this solves</h4>
-      <p>Managers report builders often forget to clock in or out, and don't log jobs in real time &mdash; they log them after finishing, which makes durations and location data unreliable.</p>
-    </div>
-    <div class="overview-card">
-      <h4>🧱 Already built (being reused)</h4>
-      <p>Daily "Clock In for the Day" gate, per-job Start/Pause/Resume/Complete, Hold reasons + note, "Couldn't get access", and a 17:00 clock-out reminder to the builder all already exist &mdash; this proposal restructures and tightens them, it doesn't start from zero.</p>
-      <div class="tag-row"><span class="tag">Existing</span></div>
-    </div>
-    <div class="overview-card">
-      <h4>🆕 What's actually new</h4>
-      <p>Full-screen lockdown while a job is active, one unified Stop button, a big live timer, nearby-job nudges when the list reappears, a new "Unable to Do Job" manager metric, and a real auto-clock-out (not just a reminder).</p>
-      <div class="tag-row"><span class="tag new">New</span></div>
-    </div>
-    <div class="overview-card warn">
-      <h4>⚠️ Needs a decision first</h4>
-      <p>One thing is still unresolved &mdash; whether the auto-clock-out grace period should be one number for everyone or vary by division. See the <b>Open Questions</b> tab.</p>
-    </div>
-  </div>
 
   <div class="tabs">
     <button class="tab-btn active" onclick="showTrack('builder', this)">🔒 Builder Flow</button>
