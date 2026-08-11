@@ -171,9 +171,6 @@
 
   .qa-list { display: flex; flex-direction: column; gap: 14px; }
   .qa-item { background: #fff; border: 1px solid var(--guide-border); border-radius: 14px; padding: 16px 18px; }
-  .qa-item.flag { border-color: #fca5a5; background: #fef2f2; }
-  .qa-item.decided { border-color: #bbf7d0; background: #f0fdf4; }
-  .qa-item.decided .qa-num { color: #16a34a; }
   .qa-item .qa-num { font-size: 10.5px; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.06em; margin: 0 0 6px 0; }
   .qa-item h5 { margin: 0 0 6px 0; font-size: 14.5px; font-weight: 800; color: #0f172a; }
   .qa-item p { margin: 0; font-size: 13px; color: #475569; line-height: 1.55; }
@@ -229,7 +226,7 @@
     </div>
     <div class="overview-card warn">
       <h4>⚠️ Needs a decision first</h4>
-      <p>Four points are decided already (auto-clock-out as a last resort, Unable-to-Do staying manager-actioned, the materials-wait split, and the menu staying reachable while locked). One is still open &mdash; see the <b>Open Questions</b> tab.</p>
+      <p>One thing is still unresolved &mdash; whether the auto-clock-out grace period should be one number for everyone or vary by division. See the <b>Open Questions</b> tab.</p>
     </div>
   </div>
 
@@ -616,33 +613,9 @@
 
   <!-- ============================= OPEN QUESTIONS ============================= -->
   <section class="track" id="track-questions">
-    <p class="track-intro">Found while checking this proposal against what's already in PMMS today. Three are now decided; two are still open.</p>
+    <p class="track-intro">Still open, found while checking this proposal against what's already in PMMS today.</p>
 
     <div class="qa-list">
-      <div class="qa-item decided">
-        <p class="qa-num">✅ Decided</p>
-        <h5>Auto clock-out is a last resort, not a replacement</h5>
-        <p>The existing rule that a manager has to manually close a shift stays exactly as it is &mdash; the builder's own clock-out and the manager's manual close both still work like today. The system only steps in on its own if <b>both</b> of them ignore it past the grace period, so it doesn't actually contradict the earlier "no automatic clock-out" ruling &mdash; it's a safety net behind the human paths, not instead of them.</p>
-      </div>
-
-      <div class="qa-item decided">
-        <p class="qa-num">✅ Decided</p>
-        <h5>"Unable to Do the Job" stays manager-actioned, not automatic</h5>
-        <p>It gets its own separate metric on the dashboard (not folded into a general On Hold count) specifically so a manager sees it and reassigns it themselves &mdash; no automatic unassignment.</p>
-      </div>
-
-      <div class="qa-item decided">
-        <p class="qa-num">✅ Decided</p>
-        <h5>A multi-day materials wait doesn't lock the builder idle</h5>
-        <p>"Waiting for Materials" now asks which kind it is (step 5): ordered/delivered means the job goes On Hold and releases the builder to work on something else while they wait; going to fetch it themselves is a short, timed personal trip that stays locked, exactly like a lunch break. Getting that second case timed accurately &mdash; instead of guessed at afterwards &mdash; is the actual point of this whole proposal.</p>
-      </div>
-
-      <div class="qa-item decided">
-        <p class="qa-num">✅ Decided</p>
-        <h5>The menu stays reachable &mdash; job screens don't</h5>
-        <p>The header and ☰ menu stay accessible even while a job or a personal-trip timer is locked &mdash; Team Chat, Metrics, Mileage, notifications all still work. What stays hidden is anything job-related: the job list, Available Jobs, raising a new ticket. So there's always a way to reach a manager or check something, without being able to wander off to another job.</p>
-      </div>
-
       <div class="qa-item">
         <p class="qa-num">Question 1</p>
         <h5>One grace period for everyone?</h5>
