@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { COLORS } from '../../lib/colors'
-import { priorityTierLabel, fetchFlaggedClockingCount, isTicketStuck, KpiTiles, fetchComplianceAgingCounts, fetchVoidAgingCounts, fetchGardenReviewAging, computeAvgResponseMs, formatDuration, fetchPriorityThresholds, fetchAssignableBuilders, fetchAssignableStaffForDivision, ukDateKey, formatUKDateTime, minutesLate } from './shared'
+import { priorityTierLabel, fetchFlaggedClockingCount, isTicketStuck, KpiTiles, fetchComplianceAgingCounts, fetchVoidAgingCounts, fetchGardenReviewAging, computeAvgResponseMs, formatDuration, fetchPriorityThresholds, fetchAssignableBuilders, fetchAssignableStaffForDivision, ukDateKey, formatUKDateTime, minutesLate, SHORT_TRIP_REASONS } from './shared'
 import { NavIcon } from '../../lib/icons'
 
 const DEFAULT_NEW_PROPERTY_WINDOW_HOURS = 48
@@ -157,7 +157,7 @@ function TeamWhereabouts({ profile, onNavigate }) {
       .maybeSingle()
     const deadline = deadlineRow?.setting_value || '09:00'
 
-    const [{ data: attendanceData }, { data: activityData }, { data: openSessions }, { data: auditData }] = await Promise.all([
+    const [{ data: attendanceData }, { data: activityData }, { data: openSessions }, { data: auditData }, { data: onHoldShortTrips }] = await Promise.all([
       supabase.schema('pmms').from('daily_attendance').select('id, staff_id, clock_in_at, late_flag, clock_out_at, early_leave_reason').or(`work_date.eq.${todayKey},clock_out_at.is.null`),
       supabase.schema('pmms').from('activity_log').select('id, staff_id, activity_type, note, started_at, ended_at, ticket_id, destination_ticket_id').or(`started_at.gte.${todayKey}T00:00:00,ended_at.is.null`),
       supabase.schema('pmms').from('work_sessions').select('id, ticket_id, builder_id').is('ended_at', null),
@@ -172,6 +172,13 @@ function TeamWhereabouts({ profile, onNavigate }) {
         .eq('action', 'Status Changed')
         .gte('created_at', `${todayKey}T00:00:00`)
         .in('actor_id', assignableBuilders.map(b => b.id)),
+      // Builder v2's Stop-sheet short trips (Lunch Break / Going to the
+      // Office / Getting materials myself) end the work_session and don't
+      // touch activity_log -- without this, a builder on one of these reads
+      // as "Available" below instead of actually away.
+      supabase.schema('pmms').from('tickets').select('id, ticket_number, assigned_builder_id, hold_reason, status_changed_at')
+        .eq('status', 'On Hold')
+        .in('hold_reason', SHORT_TRIP_REASONS),
     ])
 
     const ticketIds = [...new Set([
@@ -193,12 +200,16 @@ function TeamWhereabouts({ profile, onNavigate }) {
         .sort((x, y) => new Date(y.clock_in_at) - new Date(x.clock_in_at))[0]
       const openSession = (openSessions || []).find(s => s.builder_id === b.id)
       const openActivity = (activityData || []).find(a => a.staff_id === b.id && !a.ended_at)
+      const shortTripTicket = (onHoldShortTrips || []).find(t => t.assigned_builder_id === b.id)
 
       let status = 'Off shift'
       let tone = 'off'
       if (shift && !shift.clock_out_at) {
         if (openActivity) {
           status = `${openActivity.activity_type === 'Travel' ? 'Travelling' : 'On break'}${openActivity.note ? `: ${openActivity.note}` : ''}`
+          tone = 'away'
+        } else if (shortTripTicket) {
+          status = `${shortTripTicket.hold_reason} (Job #${shortTripTicket.ticket_number})`
           tone = 'away'
         } else if (openSession) {
           status = `On Job #${ticketsById[openSession.ticket_id]?.ticket_number ?? '?'}`

@@ -7,7 +7,7 @@ import { fetchMaintenanceCategories, fetchAllMaintenanceCategoryNames, sortedCat
 import { attachBuilderSafeProperties } from '../lib/properties'
 import { logLoginEvent } from '../lib/loginEvents'
 import { pushNotificationsSupported, hasActivePushSubscription, enablePushNotifications } from '../lib/pushNotifications'
-import { pushEmergencyAlert, priorityTierLabel, fetchPriorityThresholds, Avatar, formatUKDate, formatUKDateTime, ukDateKey, ukTimeHHMM, minutesLate, shiftDateKey, fetchAttendanceSummary, formatDuration, formatDurationDays, fetchManagersForDivision, createNotification, sendPushNotification } from './admin/shared'
+import { pushEmergencyAlert, priorityTierLabel, fetchPriorityThresholds, Avatar, formatUKDate, formatUKDateTime, ukDateKey, ukTimeHHMM, minutesLate, shiftDateKey, fetchAttendanceSummary, formatDuration, formatDurationDays, fetchManagersForDivision, createNotification, sendPushNotification, SHORT_TRIP_REASONS } from './admin/shared'
 import { distanceMetres, metresToMiles } from '../lib/geo'
 import { fetchAvailableMaterials, logMaterialUsage } from '../lib/simsMaterialsBridge'
 import { fetchChannelMessages, subscribeToChannel, postMessage, markChannelRead, markChannelReadRemote, fetchChannelReads, countUnreadMentions, colorForSender } from '../lib/chat'
@@ -41,13 +41,13 @@ const SHOW_AVAILABLE_JOBS_NAV = false
 // production-bound, not required for either PMMS or SIMS's launch.
 const SIMS_MATERIALS_PROTOTYPE_ENABLED = true
 
-// The 3 Stop reasons that are a short, specific personal trip -- the
-// builder stays locked to a small break timer (see the break-timer effect
-// and BreakTimerBanner) with a single Resume Job button, rather than being
+// SHORT_TRIP_REASONS (imported above, from admin/shared) are the 3 Stop
+// reasons that are a short, specific personal trip -- the builder stays
+// locked to a small break timer (see the break-timer effect and
+// BreakTimerBanner) with a single Resume Job button, rather than being
 // released back to the job list the way "Waiting for Materials (ordered)"
 // and "Unable to Do the Job" are. All three are just a hold_reason value
 // on an ordinary On Hold ticket -- no new ticket status, no new table.
-const SHORT_TRIP_REASONS = ['Going to the Office', 'Lunch Break', 'Getting materials myself']
 
 // Matches AdminClocking.jsx's own ROAD_DISTANCE_MULTIPLIER -- straight-line
 // distance undercounts real road travel, so both places nudge it the same

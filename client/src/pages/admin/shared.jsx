@@ -40,6 +40,15 @@ export const AI_TRIAL_FEATURE_ENABLED = false
 export const GLOBAL_TRIAGE_THRESHOLD = 70
 export const P2_URGENT_THRESHOLD = 40
 
+// Builder v2 Stop-sheet reasons that keep a builder locked to a break timer
+// on the same ticket rather than releasing them back to the job list (see
+// BuilderDashboard.jsx's handleStop). Centralised here -- rather than left
+// as BuilderDashboard.jsx's own local constant -- so the "where is everyone
+// right now" views (AdminClocking.jsx's Today's Attendance, AdminDashboard's
+// Where's the Team) can recognise the same on-hold-but-away state instead of
+// misreading it as "Available".
+export const SHORT_TRIP_REASONS = ['Going to the Office', 'Lunch Break', 'Getting materials myself']
+
 export const GENDER_RESTRICTION_OPTIONS = ['Male Only', 'Female Only', 'Both']
 export const GENDER_RESTRICTION_STYLES = {
   'Male Only': { bg: COLORS.indigo100, color: COLORS.indigo700 },

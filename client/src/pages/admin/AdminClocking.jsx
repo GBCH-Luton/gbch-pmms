@@ -7,7 +7,7 @@ import {
   thStyle, tdStyle, actionBtnStyle, filterSelectStyle, formatUKDate, formatUKDateTime, toUkDateTimeInputValue, ukDateTimeInputValueToMs,
   ukDateKey, ukTimeHHMM, minutesLate, shiftDateKey,
   modalOverlayStyle, modalCardStyle, modalTitleStyle, modalLabelStyle,
-  modalErrorStyle, modalCancelBtnStyle, modalConfirmBtnStyle, fetchAssignableBuilders, fetchAssignableStaffForDivision,
+  modalErrorStyle, modalCancelBtnStyle, modalConfirmBtnStyle, fetchAssignableBuilders, fetchAssignableStaffForDivision, SHORT_TRIP_REASONS,
 } from './shared'
 
 const EIGHT_HOURS_MS = 8 * 60 * 60 * 1000
@@ -326,6 +326,17 @@ export default function AdminClocking({ profile, onNavigate }) {
       .select('id, ticket_id, builder_id, started_at, clock_in_lat, clock_in_lng')
       .is('ended_at', null)
 
+    // Builder v2's Stop-sheet short trips (Lunch Break / Going to the
+    // Office / Getting materials myself) end the work_session and don't
+    // touch activity_log -- without this, a builder on one of these reads
+    // as "Available" below instead of actually away.
+    const { data: onHoldShortTrips } = await supabase
+      .schema('pmms')
+      .from('tickets')
+      .select('id, ticket_number, assigned_builder_id, hold_reason, status_changed_at')
+      .eq('status', 'On Hold')
+      .in('hold_reason', SHORT_TRIP_REASONS)
+
     let liveTicketData = []
     if (openSessions && openSessions.length > 0) {
       const ticketIds = openSessions.map(s => s.ticket_id)
@@ -382,11 +393,14 @@ export default function AdminClocking({ profile, onNavigate }) {
       const openSession = (openSessions || []).find(s => s.builder_id === b.id)
       const openSessionTicket = openSession ? liveTicketData.find(t => t.id === openSession.ticket_id) : null
       const openActivityForBuilder = (activityData || []).find(a => a.staff_id === b.id && !a.ended_at)
+      const shortTripTicket = (onHoldShortTrips || []).find(t => t.assigned_builder_id === b.id)
 
       let currentStatus = 'Off shift'
       if (shift && !shift.clock_out_at) {
         if (openActivityForBuilder) {
           currentStatus = `${openActivityForBuilder.activity_type === 'Travel' ? 'Travelling' : 'On break'}${openActivityForBuilder.note ? `: ${openActivityForBuilder.note}` : ''}`
+        } else if (shortTripTicket) {
+          currentStatus = `${shortTripTicket.hold_reason} (Job #${shortTripTicket.ticket_number})`
         } else if (openSessionTicket) {
           currentStatus = `On Job #${openSessionTicket.ticket_number}`
         } else {
