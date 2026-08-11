@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import AttachmentMedia from './AttachmentMedia'
 import { fetchTicketAttachments } from '../lib/ticketAttachments'
+import { COLORS } from '../lib/colors'
 
 // Shows every photo/video attached to a ticket, for the detail-level views
 // (Pipeline's ticket modal, Sign-Off, Builder's job detail) -- not list
@@ -8,7 +9,17 @@ import { fetchTicketAttachments } from '../lib/ticketAttachments'
 // per-row fetch. Tickets raised before this feature existed have no
 // ticket_attachments rows at all, so this falls back to fallbackUrl
 // (tickets.photo_url/completion_photo_url) whenever the gallery is empty.
-export default function TicketAttachmentGallery({ ticketId, fallbackUrl, mediaHeight = '140px' }) {
+//
+// Every call site used to gate rendering this component on `photo_url`
+// being set, on the wrong assumption that's still the source of truth --
+// it isn't, ticket_attachments is, and photo_url is only a best-effort
+// mirror of the first upload that doesn't always land (found live on
+// ticket #36: a real attachment existed, but photo_url was null, so the
+// whole gallery got hidden behind that check and never even tried to
+// fetch it). Always render this component instead; it decides for itself
+// whether there's anything to show. emptyLabel is optional so a caller
+// that wants an explicit "No photo" placeholder still gets one.
+export default function TicketAttachmentGallery({ ticketId, fallbackUrl, mediaHeight = '140px', emptyLabel }) {
   const [attachments, setAttachments] = useState(null) // null = loading
 
   useEffect(() => {
@@ -21,7 +32,10 @@ export default function TicketAttachmentGallery({ ticketId, fallbackUrl, mediaHe
   if (attachments === null) return null
 
   const urls = attachments.length > 0 ? attachments.map(a => a.url) : (fallbackUrl ? [fallbackUrl] : [])
-  if (urls.length === 0) return null
+  if (urls.length === 0) {
+    if (!emptyLabel) return null
+    return <p style={{ margin: 0, fontSize: '12px', color: COLORS.slate400, fontStyle: 'italic' }}>{emptyLabel}</p>
+  }
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '8px' }}>

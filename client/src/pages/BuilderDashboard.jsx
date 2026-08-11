@@ -2123,12 +2123,10 @@ export default function BuilderDashboard({ profile }) {
       )}
 
       {/* Photo */}
-      {selectedTicket.photo_url && (
-        <div style={{ background: COLORS.white, borderRadius: '16px', padding: '20px', marginBottom: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-          <p style={{ margin: '0 0 14px 0', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Photo</p>
-          <TicketAttachmentGallery ticketId={selectedTicket.id} fallbackUrl={selectedTicket.photo_url} />
-        </div>
-      )}
+      <div style={{ background: COLORS.white, borderRadius: '16px', padding: '20px', marginBottom: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+        <p style={{ margin: '0 0 14px 0', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Photo</p>
+        <TicketAttachmentGallery ticketId={selectedTicket.id} fallbackUrl={selectedTicket.photo_url} emptyLabel="No photo" />
+      </div>
 
       {/* Clock running banner */}
       {selectedTicket.status === 'In Progress' && (

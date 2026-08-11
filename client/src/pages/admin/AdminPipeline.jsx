@@ -1086,24 +1086,18 @@ export default function AdminPipeline({
 
                             <div style={expandSectionStyle}>
                               <p style={expandSectionTitleStyle}>Photos &amp; Videos</p>
-                              {(t.photo_url || t.completion_photo_url) ? (
-                                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                                  {t.photo_url && (
-                                    <div style={{ minWidth: '140px' }}>
-                                      <p style={expandLabelStyle}>Reported Photos / Videos</p>
-                                      <TicketAttachmentGallery ticketId={t.id} fallbackUrl={t.photo_url} mediaHeight="140px" />
-                                    </div>
-                                  )}
-                                  {t.completion_photo_url && (
-                                    <div>
-                                      <p style={expandLabelStyle}>Completion Photo</p>
-                                      <AttachmentMedia url={t.completion_photo_url} alt="Completed job" style={{ width: '140px', height: '140px', objectFit: 'cover', borderRadius: '10px', border: `1px solid ${COLORS.slate200}` }} />
-                                    </div>
-                                  )}
+                              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                                <div style={{ minWidth: '140px' }}>
+                                  <p style={expandLabelStyle}>Reported Photos / Videos</p>
+                                  <TicketAttachmentGallery ticketId={t.id} fallbackUrl={t.photo_url} mediaHeight="140px" emptyLabel="No photos or videos attached" />
                                 </div>
-                              ) : (
-                                <p style={{ fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic', margin: 0 }}>No photos or videos attached</p>
-                              )}
+                                {t.completion_photo_url && (
+                                  <div>
+                                    <p style={expandLabelStyle}>Completion Photo</p>
+                                    <AttachmentMedia url={t.completion_photo_url} alt="Completed job" style={{ width: '140px', height: '140px', objectFit: 'cover', borderRadius: '10px', border: `1px solid ${COLORS.slate200}` }} />
+                                  </div>
+                                )}
+                              </div>
                             </div>
 
                             <div style={expandSectionStyle}>
