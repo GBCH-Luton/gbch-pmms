@@ -31,6 +31,7 @@ const AdminSettings = lazy(() => import('./admin/AdminSettings'))
 const AdminAccess = lazy(() => import('./admin/AdminAccess'))
 const AdminHelp = lazy(() => import('./admin/AdminHelp'))
 const AdminBuilderGuide = lazy(() => import('./admin/AdminBuilderGuide'))
+const AdminBuilderGuideV2 = lazy(() => import('./admin/AdminBuilderGuideV2'))
 const AdminHousekeepingGuide = lazy(() => import('./admin/AdminHousekeepingGuide'))
 const AdminHousekeeping = lazy(() => import('./admin/AdminHousekeeping'))
 const AdminEvents = lazy(() => import('./admin/AdminEvents'))
@@ -73,6 +74,7 @@ const NAV_ITEMS = [
     key: 'quick-guide', label: 'Quick Guide', icon: 'phone',
     children: [
       { key: 'builder-guide', label: 'Builder', Component: AdminBuilderGuide },
+      { key: 'builder-guide-v2', label: 'Builder v.2', Component: AdminBuilderGuideV2 },
       { key: 'housekeeper-guide', label: 'Housekeeper', Component: AdminHousekeepingGuide },
     ],
   },

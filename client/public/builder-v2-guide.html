@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PMMS Builder Workflow v2 — Draft Proposal</title>
+<style>
+  :root {
+    --guide-bg: #f8fafc;
+    --guide-surface: #ffffff;
+    --guide-surface-2: #f1f5f9;
+    --guide-border: #e2e8f0;
+    --guide-text: #0f172a;
+    --guide-text-dim: #64748b;
+    --guide-text-faint: #94a3b8;
+    --guide-accent: #0d9488;
+    --guide-accent-dark: #0f766e;
+    --guide-accent-bg: #f0fdfa;
+    --frame-bezel: #1e293b;
+    --frame-bezel-2: #334155;
+    --shadow: 0 1px 3px rgba(15,23,42,0.08), 0 8px 24px rgba(15,23,42,0.06);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--guide-bg);
+    color: var(--guide-text);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    line-height: 1.5;
+  }
+
+  html { scrollbar-width: thin; scrollbar-color: rgba(15,23,42,0.22) transparent; }
+  ::-webkit-scrollbar { width: 9px; height: 9px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(15,23,42,0.22); border-radius: 999px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(15,23,42,0.38); }
+
+  .wrap { max-width: 980px; margin: 0 auto; padding: 28px 20px 80px; }
+
+  .draft-ribbon {
+    display: flex; align-items: center; gap: 10px; background: #fffbeb; border: 1px solid #fcd34d;
+    color: #92400e; border-radius: 12px; padding: 12px 16px; font-size: 13px; font-weight: 700;
+    margin-bottom: 22px;
+  }
+  .draft-ribbon .tag { flex-shrink: 0; background: #d97706; color: #fff; font-size: 10.5px; font-weight: 800;
+    padding: 4px 9px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.05em; }
+
+  header.hero { padding: 8px 0 24px; border-bottom: 1px solid var(--guide-border); margin-bottom: 24px; }
+  .eyebrow { font-size: 12px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--guide-accent-dark); margin: 0 0 8px 0; }
+  h1 { font-size: clamp(24px, 4vw, 32px); font-weight: 800; margin: 0 0 10px 0; letter-spacing: -0.01em; }
+  .sub { font-size: 15px; color: var(--guide-text-dim); max-width: 680px; margin: 0; }
+
+  .tabs { position: sticky; top: 0; z-index: 20; display: flex; gap: 8px; background: var(--guide-bg);
+    padding: 14px 0; margin-bottom: 8px; }
+  .tab-btn { flex: 1; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--guide-border);
+    background: var(--guide-surface); color: var(--guide-text-dim); font-weight: 700; font-size: 13.5px;
+    cursor: pointer; font-family: inherit; transition: background 0.15s, color 0.15s, border-color 0.15s; }
+  .tab-btn.active { background: var(--guide-accent); border-color: var(--guide-accent); color: #ffffff; }
+  .tab-btn:focus-visible { outline: 2px solid var(--guide-accent); outline-offset: 2px; }
+
+  .track { display: none; }
+  .track.active { display: block; }
+  .track-intro { font-size: 14px; color: var(--guide-text-dim); margin: 8px 0 28px 0; max-width: 700px; }
+
+  .overview-grid { display: grid; grid-template-columns: 1fr; gap: 10px; margin: 0 0 32px 0; }
+  @media (min-width: 640px) { .overview-grid { grid-template-columns: 1fr 1fr; } }
+  .overview-card { background: var(--guide-surface); border: 1px solid var(--guide-border); border-radius: 14px; padding: 16px 18px; }
+  .overview-card.warn { background: #fffbeb; border-color: #fcd34d; }
+  .overview-card h4 { margin: 0 0 6px 0; font-size: 13.5px; font-weight: 800; color: var(--guide-text); display: flex; align-items: center; gap: 8px; }
+  .overview-card p { margin: 0; font-size: 12.5px; color: var(--guide-text-dim); }
+  .overview-card .tag-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .tag { font-size: 10.5px; font-weight: 700; padding: 4px 9px; border-radius: 999px; background: #f0fdfa; color: #0f766e; }
+  .tag.new { background: #eef2ff; color: #4338ca; }
+
+  .step { display: grid; grid-template-columns: 1fr; gap: 18px; padding: 26px 0; border-top: 1px solid var(--guide-border); }
+  .step:first-of-type { border-top: none; }
+  @media (min-width: 760px) {
+    .step { grid-template-columns: minmax(240px, 320px) 1fr; align-items: start; }
+    .step.reverse { grid-template-columns: 1fr minmax(240px, 320px); }
+    .step.reverse .step-mock { order: 2; }
+  }
+  .step-num { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px;
+    border-radius: 50%; background: var(--guide-accent); color: #fff; font-size: 12px; font-weight: 800; flex-shrink: 0; }
+  .step-title { display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 800; margin: 0 0 8px 0; }
+  .step-body p { font-size: 14px; color: var(--guide-text-dim); margin: 0 0 8px 0; }
+  .step-body ul { margin: 8px 0 0 0; padding-left: 18px; font-size: 14px; color: var(--guide-text-dim); }
+  .step-body li { margin-bottom: 4px; }
+  .step-mock { display: flex; justify-content: center; }
+
+  .callout { display: inline-block; margin-top: 10px; margin-right: 6px; font-size: 12px; font-weight: 700; padding: 5px 10px; border-radius: 999px; }
+  .callout.tap { background: var(--guide-accent-bg); color: var(--guide-accent-dark); }
+  .callout.warn { background: #fffbeb; color: #92400e; }
+  .callout.gap { background: #fee2e2; color: #dc2626; }
+  .callout.new { background: #eef2ff; color: #4338ca; }
+  .callout.existing { background: #f1f5f9; color: #475569; }
+
+  .phone { width: 100%; max-width: 300px; background: var(--frame-bezel); border-radius: 34px; padding: 10px; box-shadow: var(--shadow); }
+  .phone .notch { width: 70px; height: 6px; background: var(--frame-bezel-2); border-radius: 4px; margin: 0 auto 8px; }
+  .phone .screen { background: #f1f5f9; border-radius: 22px; overflow: hidden; font-family: system-ui, sans-serif; min-height: 420px; display: flex; flex-direction: column; }
+  .phone .screen.dark { background: #0f172a; }
+
+  .browser { width: 100%; background: var(--frame-bezel); border-radius: 14px; padding: 8px; box-shadow: var(--shadow); }
+  .browser .bar { display: flex; align-items: center; gap: 6px; padding: 6px 8px 10px 8px; }
+  .browser .dot { width: 9px; height: 9px; border-radius: 50%; }
+  .browser .url { flex: 1; margin-left: 8px; background: var(--frame-bezel-2); color: #94a3b8; font-size: 11px; padding: 5px 10px; border-radius: 6px; font-family: monospace; }
+  .browser .screen { background: #f8fafc; border-radius: 8px; overflow: hidden; font-family: system-ui, sans-serif; }
+
+  .mock-header { background: #ffffff; border-bottom: 1px solid #e2e8f0; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; }
+  .mock-logo { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 13px; color: #0f172a; }
+  .mock-logo .sq { width: 22px; height: 22px; border-radius: 6px; background: linear-gradient(135deg,#0D1B3E,#0D2F5E); }
+  .mock-icons { display: flex; gap: 10px; font-size: 15px; }
+
+  .mock-card { background: #fff; border-radius: 14px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+  .mock-btn { display: inline-block; border: none; border-radius: 10px; font-weight: 700; font-size: 13px; padding: 10px 16px; text-align: center; cursor: default; font-family: inherit; }
+  .mock-btn.primary { background: #0d9488; color: #fff; }
+  .mock-btn.dark { background: #0f172a; color: #fff; }
+  .mock-btn.red { background: #dc2626; color: #fff; }
+  .mock-btn.ghost { background: #fff; color: #475569; border: 1px solid #e2e8f0; }
+  .mock-btn.amber { background: #fff; color: #92400e; border: 1px dashed #fcd34d; }
+  .mock-btn.block { display: block; width: 100%; }
+
+  .mock-banner { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; border-radius: 12px; padding: 10px 14px; font-size: 12.5px; font-weight: 600; }
+  .mock-banner.ok { background: #f8fafc; border: 1px solid #e2e8f0; color: #475569; }
+  .mock-banner.late { background: #fffbeb; border: 1px solid #fcd34d; color: #92400e; }
+  .mock-banner.away { background: #ede9fe; border: 1px solid #8b5cf6; color: #7c3aed; }
+
+  .mock-pill { display: inline-block; font-size: 10.5px; font-weight: 700; padding: 3px 10px; border-radius: 999px; }
+  .mock-table { width: 100%; border-collapse: collapse; font-size: 11.5px; background: #fff; }
+  .mock-table th { text-align: left; font-size: 9.5px; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; padding: 8px 10px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; }
+  .mock-table td { padding: 9px 10px; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
+
+  .mock-modal-overlay { position: absolute; inset: 0; background: rgba(15,23,42,0.45); display: flex; align-items: flex-end; justify-content: center; padding: 0; }
+  .mock-modal { background: #fff; border-radius: 18px 18px 0 0; padding: 18px 16px; width: 100%; box-shadow: 0 -10px 30px rgba(0,0,0,0.25); }
+  .mock-modal-title { font-size: 13px; font-weight: 800; color: #0f172a; margin: 0 0 4px 0; }
+  .mock-modal-sub { font-size: 11px; color: #64748b; margin: 0 0 10px 0; }
+  .mock-input { width: 100%; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 10px; font-size: 12px; color: #0f172a; background: #fff; margin-bottom: 8px; font-family: inherit; }
+
+  .mock-kpi-row { display: flex; gap: 6px; flex-wrap: wrap; }
+  .mock-kpi { flex: 1; min-width: 70px; border-radius: 10px; padding: 10px 6px; text-align: center; color: #fff; }
+  .mock-kpi .n { font-size: 17px; font-weight: 800; display: block; }
+  .mock-kpi .l { font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+
+  .mock-ticket { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 12px; margin-top: 8px; }
+  .mock-ticket .addr { font-weight: 700; font-size: 12px; color: #0f172a; }
+  .mock-ticket .meta { font-size: 10.5px; color: #64748b; margin-top: 2px; }
+
+  .mock-chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 999px; font-size: 10.5px; font-weight: 700; }
+  .mock-chip .d { width: 6px; height: 6px; border-radius: 50%; }
+
+  .browser-page-title { padding: 14px 16px 0 16px; }
+  .browser-page-title h3 { margin: 0 0 2px 0; font-size: 14px; font-weight: 800; color: #0f172a; }
+  .browser-page-title p { margin: 0; font-size: 11px; color: #64748b; }
+
+  .concept-card { width: 100%; max-width: 320px; background: #fff; border: 1px solid var(--guide-border); border-radius: 16px; padding: 18px; box-shadow: var(--shadow); }
+  .concept-card .eyebrow2 { font-size: 10px; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.06em; margin: 0 0 10px 0; }
+  .flow-step { display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; }
+  .flow-step .dot2 { width: 22px; height: 22px; border-radius: 50%; background: #f1f5f9; color: #475569; font-size: 10px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+  .flow-step p { margin: 0; font-size: 11.5px; color: #334155; line-height: 1.4; }
+  .flow-arrow { text-align: center; font-size: 12px; color: #cbd5e1; }
+
+  /* Focus-mode locked screen */
+  .lock-screen { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 22px 18px; text-align: center; }
+  .lock-screen .estimate { font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+  .lock-screen .job-name { font-size: 12.5px; color: #cbd5e1; margin-bottom: 22px; }
+  .mock-timer { font-size: 46px; font-weight: 800; font-variant-numeric: tabular-nums; color: #fff; letter-spacing: 0.01em; }
+  .mock-timer.small { font-size: 26px; }
+  .mock-timer-label { font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.08em; margin-top: 6px; margin-bottom: 26px; }
+  .lock-note { margin-top: 18px; font-size: 10.5px; color: #64748b; line-height: 1.5; max-width: 220px; }
+
+  .qa-list { display: flex; flex-direction: column; gap: 14px; }
+  .qa-item { background: #fff; border: 1px solid var(--guide-border); border-radius: 14px; padding: 16px 18px; }
+  .qa-item.flag { border-color: #fca5a5; background: #fef2f2; }
+  .qa-item .qa-num { font-size: 10.5px; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.06em; margin: 0 0 6px 0; }
+  .qa-item h5 { margin: 0 0 6px 0; font-size: 14.5px; font-weight: 800; color: #0f172a; }
+  .qa-item p { margin: 0; font-size: 13px; color: #475569; line-height: 1.55; }
+  .qa-item p + p { margin-top: 8px; }
+
+  footer.end { margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--guide-border); font-size: 12.5px; color: var(--guide-text-faint); text-align: center; }
+
+  @media print {
+    @page { size: A4; margin: 12mm 10mm; }
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    body { background: #fff; }
+    .wrap { max-width: none; padding: 0; }
+    .tabs { display: none !important; }
+    .track { display: block !important; }
+    #track-manager, #track-questions { break-before: page; }
+    .step { break-inside: avoid; padding: 0; border-top: none; display: grid !important; grid-template-columns: 220px 1fr !important; gap: 14px !important; align-items: start !important; }
+    .step.reverse { grid-template-columns: 1fr 220px !important; }
+    .step.reverse .step-mock { order: 2 !important; }
+    .step + .step { break-before: page; }
+    .phone, .browser, .concept-card { box-shadow: none; border: 1px solid #cbd5e1; }
+    .phone .screen { min-height: 0 !important; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="draft-ribbon">
+    <span class="tag">Draft</span>
+    <span>This is a proposal for review — nothing on this page is built yet. Every screen is a mockup of what <b>could</b> be built, not what exists today.</span>
+  </div>
+
+  <header class="hero">
+    <p class="eyebrow">GBCH PMMS &middot; Builder Workflow v2</p>
+    <h1>Locked Job Focus Mode</h1>
+    <p class="sub">A proposal to stop builders forgetting to clock in/out and logging jobs after the fact, by locking the app down to one job at a time with a big running timer and a single, mandatory "why did you stop" step.</p>
+  </header>
+
+  <div class="overview-grid">
+    <div class="overview-card">
+      <h4>🎯 The problem this solves</h4>
+      <p>Managers report builders often forget to clock in or out, and don't log jobs in real time &mdash; they log them after finishing, which makes durations and location data unreliable.</p>
+    </div>
+    <div class="overview-card">
+      <h4>🧱 Already built (being reused)</h4>
+      <p>Daily "Clock In for the Day" gate, per-job Start/Pause/Resume/Complete, Hold reasons + note, "Couldn't get access", and a 17:00 clock-out reminder to the builder all already exist &mdash; this proposal restructures and tightens them, it doesn't start from zero.</p>
+      <div class="tag-row"><span class="tag">Existing</span></div>
+    </div>
+    <div class="overview-card">
+      <h4>🆕 What's actually new</h4>
+      <p>Full-screen lockdown while a job is active, one unified Stop button, a big live timer, a new "Unable to Do Job" manager metric, and a real auto-clock-out (not just a reminder).</p>
+      <div class="tag-row"><span class="tag new">New</span></div>
+    </div>
+    <div class="overview-card warn">
+      <h4>⚠️ Needs a decision first</h4>
+      <p>A few things below touch a previous director-approved rule or leave an edge case open &mdash; see the <b>Open Questions</b> tab before any of this gets built.</p>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active" onclick="showTrack('builder', this)">🔒 Builder Flow</button>
+    <button class="tab-btn" onclick="showTrack('manager', this)">🖥️ Manager Side</button>
+    <button class="tab-btn" onclick="showTrack('questions', this)">❓ Open Questions</button>
+  </div>
+
+  <!-- ============================= BUILDER FLOW ============================= -->
+  <section class="track active" id="track-builder">
+    <p class="track-intro">Steps 1&ndash;2 are exactly what exists today, shown for context. Everything from step 3 onward is the new, locked-down experience.</p>
+
+    <!-- Step 1 -->
+    <div class="step">
+      <div class="step-mock">
+        <div class="phone"><div class="notch"></div>
+          <div class="screen" style="align-items:center; justify-content:center; padding:20px; text-align:center;">
+            <div style="background:#fff; border-radius:20px; padding:28px 20px; box-shadow:0 4px 20px rgba(0,0,0,0.08); width:100%;">
+              <div style="width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,#0D1B3E,#0D2F5E);margin:0 auto 14px;"></div>
+              <p style="font-size:15px;font-weight:800;color:#0f172a;margin:0 0 6px 0;">Good morning, Daniel</p>
+              <p style="font-size:11.5px;color:#64748b;margin:0 0 20px 0;line-height:1.5;">Clock in to start your working day and see your jobs.</p>
+              <button class="mock-btn primary block">✓ Clock In for the Day</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="step-body">
+        <p class="step-title"><span class="step-num">1</span> Clock in for the day</p>
+        <p>Unchanged. A builder already can't see any job, or anything else in the app, until they clock in for the day.</p>
+        <span class="callout existing">Already built</span>
+      </div>
+    </div>
+
+    <!-- Step 2 -->
+    <div class="step reverse">
+      <div class="step-mock">
+        <div class="phone"><div class="notch"></div>
+          <div class="screen">
+            <div class="mock-header">
+              <div class="mock-logo"><div class="sq"></div>PMMS</div>
+              <div class="mock-icons">🔔 ☰</div>
+            </div>
+            <div style="padding:10px 14px 0;">
+              <div class="mock-banner ok"><span>🟢 Clocked in since 08:02</span></div>
+            </div>
+            <div style="padding:12px 14px;">
+              <div class="mock-kpi-row">
+                <div class="mock-kpi" style="background:#0d9488;"><span class="n">0</span><span class="l">Working Now</span></div>
+                <div class="mock-kpi" style="background:#3b82f6;"><span class="n">3</span><span class="l">To Do</span></div>
+              </div>
+              <div class="mock-ticket">
+                <div class="addr">12 Stanley Road, Luton</div>
+                <div class="meta">Plumbing &middot; Leaking tap</div>
+              </div>
+              <div class="mock-ticket">
+                <div class="addr">4 Alpine Way, Luton</div>
+                <div class="meta">Electrical &middot; Socket not working</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="step-body">
+        <p class="step-title"><span class="step-num">2</span> Today: the full dashboard stays reachable</p>
+        <p>This is the actual gap. Once clocked in, a builder can still open the ☰ menu at any time &mdash; Team Chat, Metrics, Mileage, raise a new ticket, browse Available Jobs &mdash; even while a job is running. Nothing stops them wandering off mid-job, which is part of why logging happens after the fact instead of in real time.</p>
+        <span class="callout gap">The gap this proposal closes</span>
+      </div>
+    </div>
+
+    <!-- Step 3 -->
+    <div class="step">
+      <div class="step-mock">
+        <div class="phone"><div class="notch"></div>
+          <div class="screen dark" style="min-height:420px;">
+            <div class="lock-screen">
+              <p class="estimate">Estimated time for this job</p>
+              <p class="job-name">≈ 45 min &middot; 12 Stanley Road &middot; Leaking tap</p>
+              <div class="mock-timer">00:07:32</div>
+              <div class="mock-timer-label">Time on this job</div>
+              <button class="mock-btn red block" style="max-width:220px;">⏹ Stop</button>
+              <p class="lock-note">Nothing else in the app is reachable &mdash; no menu, no notifications, no other jobs &mdash; until Stop is tapped.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="step-body">
+        <p class="step-title"><span class="step-num">3</span> Tap "Start Job" &rarr; the screen locks</p>
+        <p>The whole app is replaced by one screen: a big running timer counting up from the moment they started, a small line above it showing the estimated time for this specific job, and one button &mdash; <b>Stop</b>.</p>
+        <ul>
+          <li>No header, no ☰ menu, no notifications bell, no way to back out to the job list.</li>
+          <li>The estimate is whatever's already set on the ticket (Estimated Time, used elsewhere in PMMS already) &mdash; not a new field.</li>
+        </ul>
+        <span class="callout new">New</span>
+      </div>
+    </div>
+
+    <!-- Step 4 -->
+    <div class="step reverse">
+      <div class="step-mock">
+        <div class="phone"><div class="notch"></div>
+          <div class="screen dark" style="min-height:420px; position:relative;">
+            <div class="lock-screen" style="opacity:0.25;">
+              <div class="mock-timer">00:07:32</div>
+            </div>
+            <div class="mock-modal-overlay">
+              <div class="mock-modal">
+                <p class="mock-modal-title">Why are you stopping?</p>
+                <p class="mock-modal-sub">This is logged and shown to the office</p>
+                <div style="display:flex; flex-direction:column; gap:7px;">
+                  <div class="mock-btn primary block" style="text-align:left;">✓ Job Completed</div>
+                  <div class="mock-btn ghost block" style="text-align:left;">📦 Waiting for Materials</div>
+                  <div class="mock-btn ghost block" style="text-align:left;">🍽 Lunch Break</div>
+                  <div class="mock-btn ghost block" style="text-align:left; color:#dc2626; border-color:#fca5a5;">🚫 Unable to Do the Job</div>
+                  <div class="mock-btn ghost block" style="text-align:left;">Other</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="step-body">
+        <p class="step-title"><span class="step-num">4</span> Tap Stop &rarr; one dropdown, five options</p>
+        <p>Replaces today's three separate actions (Complete / Pause / Couldn't get access) with a single control:</p>
+        <ul>
+          <li><b>Job Completed</b> &mdash; goes to the existing note + photo completion screen.</li>
+          <li><b>Waiting for Materials</b> / <b>Lunch Break</b> &mdash; job pauses, note optional.</li>
+          <li><b>Unable to Do the Job</b> &mdash; job pauses, note optional, flags the new manager metric (see Manager tab).</li>
+          <li><b>Other</b> &mdash; note becomes <b>required</b>, not optional.</li>
+        </ul>
+        <span class="callout new">New &mdash; replaces 3 existing actions</span>
+      </div>
+    </div>
+
+    <!-- Step 5 -->
+    <div class="step">
+      <div class="step-mock">
+        <div class="phone"><div class="notch"></div>
+          <div class="screen dark" style="min-height:420px;">
+            <div class="lock-screen">
+              <p class="estimate" style="color:#a78bfa;">On break &mdash; Waiting for Materials</p>
+              <div class="mock-timer small">00:12:44</div>
+              <div class="mock-timer-label">Time since you stopped</div>
+              <button class="mock-btn primary block" style="max-width:220px;">▶ Resume Job</button>
+              <p class="lock-note">The job's own timer is frozen. This second timer counts the break itself, and stops the moment "Resume Job" is tapped.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="step-body">
+        <p class="step-title"><span class="step-num">5</span> Waiting for Materials / Lunch Break &rarr; still locked, still running</p>
+        <p>Choosing either of these doesn't release the lock &mdash; it switches to a second, smaller timer counting exactly how long the break lasts, with one button: <b>Resume Job</b>. Tapping it un-freezes the original job timer and returns to step 3.</p>
+        <span class="callout new">New</span>
+      </div>
+    </div>
+
+    <!-- Step 6 -->
+    <div class="step reverse">
+      <div class="step-mock">
+        <div class="phone"><div class="notch"></div>
+          <div class="screen">
+            <div class="mock-header">
+              <div class="mock-logo"><div class="sq"></div>PMMS</div>
+              <div class="mock-icons">🔔 ☰</div>
+            </div>
+            <div style="padding:12px 14px;">
+              <div class="mock-card" style="border:1px solid #fca5a5;">
+                <p style="font-size:13px;font-weight:800;color:#7f1d1d;margin:0 0 8px 0;">🚫 Job flagged: Unable to Do</p>
+                <p style="font-size:11.5px;color:#64748b;margin:0 0 10px 0;">Logged to the office. This job is no longer running against your time.</p>
+                <div class="mock-btn dark block">Back to Job List</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="step-body">
+        <p class="step-title"><span class="step-num">6</span> Unable to Do the Job &rarr; lock releases</p>
+        <p>Unlike a break, this fully ends the lock &mdash; there's nothing to resume. The job stops counting against the builder, they're told it's been logged, and they're released back to the job list.</p>
+        <p>This is what feeds the new <b>"Unable to Do"</b> metric on the manager's dashboard (see Manager tab, step 1) so a manager can reassign it.</p>
+        <span class="callout new">New outcome</span>
+      </div>
+    </div>
+
+    <!-- Step 7 -->
+    <div class="step">
+      <div class="step-mock">
+        <div class="phone"><div class="notch"></div>
+          <div class="screen">
+            <div class="mock-header">
+              <div class="mock-logo"><div class="sq"></div>PMMS</div>
+              <div class="mock-icons">🔔 ☰</div>
+            </div>
+            <div style="padding:12px 14px;">
+              <div class="mock-kpi-row">
+                <div class="mock-kpi" style="background:#0d9488;"><span class="n">0</span><span class="l">Working Now</span></div>
+                <div class="mock-kpi" style="background:#3b82f6;"><span class="n">2</span><span class="l">To Do</span></div>
+              </div>
+              <div class="mock-ticket">
+                <div class="addr">4 Alpine Way, Luton</div>
+                <div class="meta">Electrical &middot; Socket not working</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="step-body">
+        <p class="step-title"><span class="step-num">7</span> Only now can they pick another job</p>
+        <p>The job list, and the rest of the app, only becomes reachable again once a Stop outcome has actually been resolved &mdash; either fully (Job Completed / Unable to Do) or paused (Materials / Lunch, waiting on Resume). There's no way to see or start a second job while one is still open.</p>
+      </div>
+    </div>
+
+    <!-- Step 8 -->
+    <div class="step reverse">
+      <div class="step-mock">
+        <div class="concept-card">
+          <p class="eyebrow2">End of day &mdash; runs automatically</p>
+          <div class="flow-step"><span class="dot2">1</span><p>17:00 passes and the builder is still clocked in for the day.</p></div>
+          <div class="flow-arrow">↓</div>
+          <div class="flow-step"><span class="dot2">2</span><p>A reminder push goes to the builder <b>and</b>, new, to their manager.</p></div>
+          <div class="flow-arrow">↓</div>
+          <div class="flow-step"><span class="dot2">3</span><p>Grace period elapses (setting, default 2 hours) with still no clock-out.</p></div>
+          <div class="flow-arrow">↓</div>
+          <div class="flow-step"><span class="dot2">4</span><p>System clocks them out automatically. The <b>timestamp saved is 17:00</b>, not the real moment it ran.</p></div>
+        </div>
+      </div>
+      <div class="step-body">
+        <p class="step-title"><span class="step-num">8</span> End-of-day clock-out escalation</p>
+        <p>Today, a builder still clocked in past 17:00 gets one reminder push and nothing else happens &mdash; the shift stays open until someone acts. This proposal adds two things:</p>
+        <ul>
+          <li>The manager gets told too, not just the builder.</li>
+          <li>If it's still ignored after a configurable grace period, the system closes the shift itself &mdash; backdated to the 17:00 deadline, not whenever the auto-close actually ran.</li>
+        </ul>
+        <span class="callout new">New &mdash; see Open Questions, this touches an existing rule</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================= MANAGER SIDE ============================= -->
+  <section class="track" id="track-manager">
+    <p class="track-intro">What changes for a manager watching this from the office.</p>
+
+    <!-- Step 1 -->
+    <div class="step">
+      <div class="step-mock">
+        <div class="browser">
+          <div class="bar"><span class="dot" style="background:#ef4444"></span><span class="dot" style="background:#f59e0b"></span><span class="dot" style="background:#22c55e"></span><span class="url">pmms.greenbridgehousing.com/dashboard</span></div>
+          <div class="screen">
+            <div class="browser-page-title"><h3>Dashboard</h3><p>One new red tile alongside the existing KPIs.</p></div>
+            <div style="padding:10px 16px 16px;">
+              <div class="mock-kpi-row">
+                <div class="mock-kpi" style="background:#dc2626;"><span class="n">4</span><span class="l">Unassigned</span></div>
+                <div class="mock-kpi" style="background:#dc2626;"><span class="n">2</span><span class="l">Unable to Do</span></div>
+                <div class="mock-kpi" style="background:#0d9488;"><span class="n">6</span><span class="l">In Progress</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="step-body">
+        <p class="step-title"><span class="step-num">1</span> New tile: "Unable to Do"</p>
+        <p>Counts every job currently sitting in the new Unable-to-Do state &mdash; same red-tile treatment as Unassigned or P1 Critical, and already part of the Daily Briefing's "any red tile gets surfaced" rule built earlier this year, so it would show up there too with no extra work.</p>
+        <p>Tapping it jumps to Pipeline filtered to just those jobs, ready to reassign.</p>
+        <span class="callout new">New KPI</span>
+      </div>
+    </div>
+
+    <!-- Step 2 -->
+    <div class="step reverse">
+      <div class="step-mock">
+        <div class="phone"><div class="notch"></div>
+          <div class="screen">
+            <div style="padding:16px 14px;">
+              <div class="mock-card" style="border:1px solid #fca5a5;">
+                <p style="font-size:9.5px;font-weight:700;color:#94a3b8;margin:0 0 4px 0;">🔔 Notification</p>
+                <p style="font-size:12.5px;font-weight:700;color:#0f172a;margin:0 0 4px 0;">Job #412 flagged: Unable to Do</p>
+                <p style="font-size:11.5px;color:#64748b;margin:0;">Daniel Smith &mdash; 12 Stanley Road &mdash; "No parts on the van and shop's shut"</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="step-body">
+        <p class="step-title"><span class="step-num">2</span> Instant notification, not just a tile</p>
+        <p>The moment a builder chooses "Unable to Do the Job", their manager gets a push straight away with the job, the builder, and their note &mdash; not something that has to be noticed on a dashboard later in the day.</p>
+      </div>
+    </div>
+
+    <!-- Step 3 -->
+    <div class="step">
+      <div class="step-mock">
+        <div class="phone"><div class="notch"></div>
+          <div class="screen">
+            <div style="padding:16px 14px; display:flex; flex-direction:column; gap:10px;">
+              <div class="mock-card">
+                <p style="font-size:9.5px;font-weight:700;color:#94a3b8;margin:0 0 4px 0;">🔔 17:04</p>
+                <p style="font-size:11.5px;color:#0f172a;">To Daniel: "Don't forget to clock out."</p>
+              </div>
+              <div class="mock-card" style="border:1px solid #fcd34d;">
+                <p style="font-size:9.5px;font-weight:700;color:#94a3b8;margin:0 0 4px 0;">🔔 19:04 &middot; to the manager</p>
+                <p style="font-size:11.5px;color:#0f172a;">"Daniel is still clocked in, 2 hours past his 17:00 deadline."</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="step-body">
+        <p class="step-title"><span class="step-num">3</span> Manager sees the escalation too</p>
+        <p>If the builder's own 17:00 reminder gets ignored, the manager gets their own notification once the grace period is about to expire &mdash; a chance to step in before the automatic clock-out fires.</p>
+      </div>
+    </div>
+
+    <!-- Step 4 -->
+    <div class="step reverse">
+      <div class="step-mock">
+        <div class="browser">
+          <div class="bar"><span class="dot" style="background:#ef4444"></span><span class="dot" style="background:#f59e0b"></span><span class="dot" style="background:#22c55e"></span><span class="url">pmms.greenbridgehousing.com/builders/daniel-smith</span></div>
+          <div class="screen">
+            <div class="browser-page-title"><h3>Daniel Smith &middot; Activity Log</h3></div>
+            <div style="padding:10px 16px 16px;">
+              <table class="mock-table">
+                <thead><tr><th>Time</th><th>Event</th></tr></thead>
+                <tbody>
+                  <tr><td>17:00</td><td>Auto clocked out &mdash; grace period expired (logged 19:00)</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="step-body">
+        <p class="step-title"><span class="step-num">4</span> The audit trail is explicit about it</p>
+        <p>So it's never mistaken for a real 17:00 clock-out later, the log entry says plainly that it was an automatic close and shows both times &mdash; the stamped 17:00, and when the system actually acted.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================= OPEN QUESTIONS ============================= -->
+  <section class="track" id="track-questions">
+    <p class="track-intro">Worth deciding before any of this is built &mdash; found while checking this proposal against what's already in PMMS today.</p>
+
+    <div class="qa-list">
+      <div class="qa-item flag">
+        <p class="qa-num">Flag &middot; touches an existing rule</p>
+        <h5>Auto clock-out reverses a documented decision</h5>
+        <p>The code that blocks a builder from clocking in the next day if yesterday's shift was never closed currently says, in so many words: <i>"Director-approved: no self-service way past this, and deliberately no automatic clock-out on the old shift either."</i></p>
+        <p>That was about a shift left open <i>overnight</i>, and this proposal is about auto-closing it the <i>same evening</i> &mdash; different scenario, but close enough that it's worth explicitly confirming this supersedes that earlier ruling, rather than the two rules quietly disagreeing with each other.</p>
+      </div>
+
+      <div class="qa-item">
+        <p class="qa-num">Question 2</p>
+        <h5>Does "Unable to Do the Job" unassign the ticket?</h5>
+        <p>Right now the mockup just flags it and releases the builder. Should the ticket also drop back to unassigned automatically so it shows up for reassignment, or does it stay assigned to the original builder until a manager manually reassigns it?</p>
+      </div>
+
+      <div class="qa-item">
+        <p class="qa-num">Question 3</p>
+        <h5>Is the lock truly total?</h5>
+        <p>As drafted, nothing else is reachable while a job or a break is running &mdash; no Team Chat, no notifications, no way back to the menu. Should there be any escape hatch at all (e.g. an emergency contact button, or a way to sign out), or is a hard lock genuinely the intent?</p>
+      </div>
+
+      <div class="qa-item">
+        <p class="qa-num">Question 4</p>
+        <h5>What about a multi-day materials wait?</h5>
+        <p>If "Waiting for Materials" genuinely takes 2&ndash;3 days (a special order, say), should the break timer really keep counting that whole time, or should a long-enough pause nudge the builder to clock out for the day instead and pick it back up tomorrow?</p>
+      </div>
+
+      <div class="qa-item">
+        <p class="qa-num">Question 5</p>
+        <h5>One grace period for everyone?</h5>
+        <p>Drafted as a single global setting (default 2 hours). Does it need to vary by division or role, or is one number for the whole company fine to start with?</p>
+      </div>
+    </div>
+  </section>
+
+  <footer class="end">GBCH PMMS &middot; Builder Workflow v2 &middot; Draft Proposal &middot; not yet built &middot; 2026-08-11</footer>
+</div>
+
+<script>
+  function showTrack(name, btn) {
+    document.querySelectorAll('.track').forEach(function(el) { el.classList.remove('active'); });
+    document.getElementById('track-' + name).classList.add('active');
+    document.querySelectorAll('.tab-btn').forEach(function(el) { el.classList.remove('active'); });
+    btn.classList.add('active');
+  }
+</script>
+</body>
+</html>
