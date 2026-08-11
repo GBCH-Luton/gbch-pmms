@@ -221,7 +221,7 @@
     </div>
     <div class="overview-card">
       <h4>🆕 What's actually new</h4>
-      <p>Full-screen lockdown while a job is active, one unified Stop button, a big live timer, a new "Unable to Do Job" manager metric, and a real auto-clock-out (not just a reminder).</p>
+      <p>Full-screen lockdown while a job is active, one unified Stop button, a big live timer, nearby-job nudges when the list reappears, a new "Unable to Do Job" manager metric, and a real auto-clock-out (not just a reminder).</p>
       <div class="tag-row"><span class="tag new">New</span></div>
     </div>
     <div class="overview-card warn">
@@ -487,6 +487,50 @@
     </div>
 
     <!-- Step 9 -->
+    <div class="step">
+      <div class="step-mock">
+        <div class="phone"><div class="notch"></div>
+          <div class="screen">
+            <div class="mock-header">
+              <div class="mock-logo"><div class="sq"></div>PMMS</div>
+              <div class="mock-icons">🔔 ☰</div>
+            </div>
+            <div style="padding:12px 14px;">
+              <p style="font-size:10px;font-weight:800;color:#0d9488;text-transform:uppercase;letter-spacing:0.05em;margin:0 0 6px 0;">📍 Closest to you</p>
+              <div class="mock-ticket" style="border-color:#0d9488; background:#f0fdfa;">
+                <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+                  <div>
+                    <div class="addr">14 Stanley Road, Luton</div>
+                    <div class="meta">Plumbing &middot; Blocked drain</div>
+                  </div>
+                  <span class="mock-pill" style="background:#0d9488;color:#fff; white-space:nowrap;">0.3 mi</span>
+                </div>
+              </div>
+              <p style="font-size:10px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;margin:16px 0 6px 0;">All jobs</p>
+              <div class="mock-ticket">
+                <div class="addr">27 Chalk Hill, Luton</div>
+                <div class="meta">🔴 P1 Critical &middot; Gas smell reported</div>
+              </div>
+              <div class="mock-ticket">
+                <div class="addr">4 Alpine Way, Luton</div>
+                <div class="meta">Electrical &middot; Socket not working</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="step-body">
+        <p class="step-title"><span class="step-num">9</span> The list reappears &mdash; nearby jobs get a nudge, not a takeover</p>
+        <p>Whenever the job list becomes reachable again (Job Completed, Unable to Do, or a materials wait dropped to On Hold), it's still ordered exactly like today &mdash; priority first. Nothing gets buried just for being far away.</p>
+        <ul>
+          <li>A small <b>"📍 Closest to you"</b> strip sits above the full list, showing the 1&ndash;2 assigned jobs nearest to wherever the builder just stopped, with a distance badge &mdash; worked out the same way the Clocking page already estimates travel mileage.</li>
+          <li>It's a nudge, not a reorder: in the example here, the P1 Critical three miles away still sits above the routine job next door once you look at the full list below it.</li>
+        </ul>
+        <span class="callout new">New</span>
+      </div>
+    </div>
+
+    <!-- Step 10 -->
     <div class="step reverse">
       <div class="step-mock">
         <div class="concept-card">
@@ -501,7 +545,7 @@
         </div>
       </div>
       <div class="step-body">
-        <p class="step-title"><span class="step-num">9</span> End-of-day clock-out escalation</p>
+        <p class="step-title"><span class="step-num">10</span> End-of-day clock-out escalation</p>
         <p>Today, a builder still clocked in past 17:00 gets one reminder push and nothing else happens &mdash; the shift stays open until a manager manually closes it, however long that takes. This proposal keeps that manual path exactly as it is, and adds a safety net on top:</p>
         <ul>
           <li>The manager gets told too, not just the builder &mdash; and can act on it themselves, same as today.</li>
