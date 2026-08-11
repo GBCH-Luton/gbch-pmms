@@ -2379,7 +2379,7 @@ export default function BuilderDashboard({ profile }) {
               style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '14px', fontFamily: 'inherit', boxSizing: 'border-box', resize: 'vertical' }}
             />
 
-            <input type="file" accept="image/*" capture="environment" id="complete-photo-input" onChange={handleCompletePhoto} style={{ display: 'none' }} />
+            <input type="file" accept="image/*" id="complete-photo-input" onChange={handleCompletePhoto} style={{ display: 'none' }} />
             <button
               onClick={() => document.getElementById('complete-photo-input').click()}
               style={{ width: '100%', height: '44px', borderRadius: '10px', border: `2px dashed ${COLORS.slate300}`, background: COLORS.white, color: COLORS.slate500, fontSize: '13px', fontWeight: 600, cursor: 'pointer', boxSizing: 'border-box' }}
@@ -2472,7 +2472,7 @@ export default function BuilderDashboard({ profile }) {
               style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '14px', fontFamily: 'inherit', boxSizing: 'border-box', resize: 'vertical' }}
             />
 
-            <input type="file" accept="image/*" capture="environment" id="no-access-photo-input" onChange={handleNoAccessPhoto} style={{ display: 'none' }} />
+            <input type="file" accept="image/*" id="no-access-photo-input" onChange={handleNoAccessPhoto} style={{ display: 'none' }} />
             <button
               onClick={() => document.getElementById('no-access-photo-input').click()}
               style={{ width: '100%', height: '44px', borderRadius: '10px', border: `2px dashed ${COLORS.slate300}`, background: COLORS.white, color: COLORS.slate500, fontSize: '13px', fontWeight: 600, cursor: 'pointer', boxSizing: 'border-box' }}
@@ -3728,7 +3728,6 @@ export default function BuilderDashboard({ profile }) {
                                 <input
                                   type="file"
                                   accept="image/*,video/*"
-                                  capture="environment"
                                   id={`compliance-media-${idx}`}
                                   onChange={(e) => handleComplianceMediaChange(idx, e)}
                                   style={{ display: 'none' }}
