@@ -911,7 +911,7 @@ export default function AdminClocking({ profile, onNavigate }) {
                               onClick={() => openPinMap(row.shift.clock_out_lat, row.shift.clock_out_lng)}
                               style={{ display: 'block', marginTop: '2px', background: 'none', border: 'none', padding: 0, fontSize: '10px', fontWeight: 700, color: COLORS.blue700, cursor: 'pointer', fontFamily: 'system-ui' }}
                             >
-                              📍 View location
+                              📍 {row.shift.auto_clocked_out ? 'View last known location' : 'View location'}
                             </button>
                           )}
                         </>

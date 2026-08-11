@@ -42,6 +42,30 @@ async function fetchAssignableStaffForRole(adminClient: any, roleName: string) {
   return staffRows || []
 }
 
+// The builder's last recorded position for this shift -- their most
+// recently started job's clock-out coordinates, or its clock-in
+// coordinates if that job was paused/still open when the shift got
+// auto-closed. Bounded to sessions started on/after this shift's own
+// clock-in so a previous day's last job is never picked up. Returns
+// { lat, lng } (both possibly null if nothing usable was ever recorded).
+async function resolveLastKnownLocation(adminClient: any, staffId: string, shiftClockInAt: string) {
+  const { data: session } = await adminClient
+    .schema('pmms')
+    .from('work_sessions')
+    .select('clock_in_lat, clock_in_lng, clock_out_lat, clock_out_lng')
+    .eq('builder_id', staffId)
+    .gte('started_at', shiftClockInAt)
+    .order('started_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (!session) return { lat: null, lng: null }
+  if (session.clock_out_lat != null && session.clock_out_lng != null) {
+    return { lat: session.clock_out_lat, lng: session.clock_out_lng }
+  }
+  return { lat: session.clock_in_lat ?? null, lng: session.clock_in_lng ?? null }
+}
+
 // Same helper as check-stale-shifts/index.ts, copied rather than shared --
 // attendance isn't a per-division concept for a builder (unlike tickets),
 // so every Admin + every manager-accessLevel custom role gets alerted.
@@ -84,7 +108,11 @@ async function fetchAllAdminsAndManagers(adminClient: any) {
 //      not an arbitrary cron-tick timestamp. auto_clocked_out marks it
 //      distinctly from clock_out_override (that column means a manager did
 //      it by hand -- AdminClocking.jsx already labels it "Manager
-//      override", which this must never be confused with).
+//      override", which this must never be confused with). There's no real
+//      GPS reading at a backdated instant, so clock_out_lat/lng are
+//      backfilled from the builder's own last recorded position that shift
+//      (their last job's clock-out, or clock-in if that job was never
+//      finished) rather than left blank -- see resolveLastKnownLocation.
 //
 // This only ever closes TODAY's still-open shift. It does not touch
 // check-stale-shifts.ts's separate next-morning lockout -- that remains
@@ -133,7 +161,7 @@ Deno.serve(async (req: Request) => {
     const { data: openShifts, error: shiftsError } = await adminClient
       .schema('pmms')
       .from('daily_attendance')
-      .select('id, staff_id, work_date, clock_out_reminder_sent_at, manager_clock_out_alert_sent_at')
+      .select('id, staff_id, work_date, clock_in_at, clock_out_reminder_sent_at, manager_clock_out_alert_sent_at')
       .is('clock_out_at', null)
 
     if (shiftsError) {
@@ -174,10 +202,11 @@ Deno.serve(async (req: Request) => {
       // date (not "now"), same UK-local rule ukTimeHHMM already applies.
       if (minutesPastDeadline >= graceMinutes) {
         const backdated = ukLocalToUtcIso(shift.work_date, reminderTime)
+        const lastKnown = await resolveLastKnownLocation(adminClient, shift.staff_id, shift.clock_in_at)
         await adminClient
           .schema('pmms')
           .from('daily_attendance')
-          .update({ clock_out_at: backdated, auto_clocked_out: true })
+          .update({ clock_out_at: backdated, auto_clocked_out: true, clock_out_lat: lastKnown.lat, clock_out_lng: lastKnown.lng })
           .eq('id', shift.id)
         autoClosed += 1
       }
