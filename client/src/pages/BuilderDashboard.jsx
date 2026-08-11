@@ -1025,7 +1025,11 @@ export default function BuilderDashboard({ profile }) {
     await supabase
       .schema('pmms')
       .from('tickets')
-      .update({ status: 'On Hold', status_changed_at: now, stuck_alert_sent_at: null, hold_reason: reason, hold_note: note })
+      // long_break_alert_sent_at reset here, not just on Resume -- every
+      // fresh pause starts its own break, so a repeat short trip gets its
+      // own alert window instead of being silently covered by a guard left
+      // over from days ago (see check-long-breaks Edge Function).
+      .update({ status: 'On Hold', status_changed_at: now, stuck_alert_sent_at: null, long_break_alert_sent_at: null, hold_reason: reason, hold_note: note })
       .eq('id', ticket.id)
 
     await supabase
@@ -2739,19 +2743,19 @@ export default function BuilderDashboard({ profile }) {
             <div style={{ padding: '20px' }}>
               <p style={{ margin: '0 0 2px 0', fontSize: '16px', fontWeight: 800, color: COLORS.slate900 }}>{stopReasonPicked}</p>
               <p style={{ margin: '0 0 12px 0', fontSize: '13px', fontWeight: 500, color: COLORS.slate500 }}>
-                {stopReasonPicked === 'Other' ? 'Please say what happened' : 'Add a note (optional)'}
+                {(stopReasonPicked === 'Other' || stopReasonPicked === 'Unable to Do the Job') ? 'Please say what happened' : 'Add a note (optional)'}
               </p>
               <textarea
                 value={stopNote}
                 onChange={(e) => setStopNote(e.target.value)}
-                placeholder={stopReasonPicked === 'Other' ? 'e.g. Ran out of a specific part, coming back tomorrow...' : 'Add a note...'}
+                placeholder={(stopReasonPicked === 'Other' || stopReasonPicked === 'Unable to Do the Job') ? 'e.g. Ran out of a specific part, coming back tomorrow...' : 'Add a note...'}
                 rows={3}
                 style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '14px', fontFamily: 'inherit', boxSizing: 'border-box', resize: 'vertical', marginBottom: '10px' }}
               />
               {stopError && <p style={{ margin: '0 0 10px 0', fontSize: '13px', color: COLORS.red500, fontWeight: 600 }}>{stopError}</p>}
               <button
                 onClick={() => {
-                  if (stopReasonPicked === 'Other' && !stopNote.trim()) { setStopError('Please add a note explaining what happened.'); return }
+                  if ((stopReasonPicked === 'Other' || stopReasonPicked === 'Unable to Do the Job') && !stopNote.trim()) { setStopError('Please add a note explaining what happened.'); return }
                   setStopError('')
                   handleStop(stopReasonPicked, stopNote.trim())
                 }}

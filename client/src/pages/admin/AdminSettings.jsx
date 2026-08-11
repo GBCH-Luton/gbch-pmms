@@ -114,6 +114,7 @@ export default function AdminSettings() {
   const [doneWindowHours, setDoneWindowHours] = useState(24)
   const [clockDistanceThresholdM, setClockDistanceThresholdM] = useState(250)
   const [clockFlagLookbackDays, setClockFlagLookbackDays] = useState(30)
+  const [longBreakAlertMinutes, setLongBreakAlertMinutes] = useState(45)
   const [clockingSaving, setClockingSaving] = useState(false)
   const [clockingSaved, setClockingSaved] = useState(false)
 
@@ -245,6 +246,7 @@ export default function AdminSettings() {
       if (map.done_window_hours != null) setDoneWindowHours(map.done_window_hours)
       if (map.clock_distance_threshold_meters != null) setClockDistanceThresholdM(map.clock_distance_threshold_meters)
       if (map.clock_flag_lookback_days != null) setClockFlagLookbackDays(map.clock_flag_lookback_days)
+      if (map.long_break_alert_minutes != null) setLongBreakAlertMinutes(Number(map.long_break_alert_minutes))
       if (map.daily_clock_in_deadline != null) setDailyClockInDeadline(map.daily_clock_in_deadline)
       if (map.daily_clock_out_reminder_time != null) setDailyClockOutReminderTime(map.daily_clock_out_reminder_time)
       if (map.daily_overtime_threshold_hours != null) setOvertimeThresholdHours(Number(map.daily_overtime_threshold_hours))
@@ -577,6 +579,7 @@ export default function AdminSettings() {
     await saveSetting('done_window_hours', Number(doneWindowHours))
     await saveSetting('clock_distance_threshold_meters', Number(clockDistanceThresholdM))
     await saveSetting('clock_flag_lookback_days', Number(clockFlagLookbackDays))
+    await saveSetting('long_break_alert_minutes', Number(longBreakAlertMinutes))
     setClockingSaving(false)
     setClockingSaved(true)
     setTimeout(() => setClockingSaved(false), 2000)
@@ -1208,6 +1211,18 @@ export default function AdminSettings() {
               style={inputStyle}
             />
             <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: COLORS.slate400 }}>How far back the Dashboard's "Flagged Locations" tile looks -- older flags age out on their own. The Clocking page itself still shows every flag, all-time.</p>
+          </div>
+          <div style={{ flex: '1 1 200px' }}>
+            <label style={fieldLabelStyle}>Long break alert (minutes)</label>
+            <input
+              type="number"
+              min="5"
+              step="5"
+              value={longBreakAlertMinutes}
+              onChange={(e) => setLongBreakAlertMinutes(e.target.value)}
+              style={inputStyle}
+            />
+            <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: COLORS.slate400 }}>A builder locked to a break timer (Going to the Office / Lunch Break / getting materials themselves) this long alerts their manager, once per break.</p>
           </div>
         </div>
 
