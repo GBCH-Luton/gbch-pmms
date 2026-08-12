@@ -170,7 +170,12 @@ function NewReportForm({ profile, onSubmitted }) {
     if (mediaFiles.length > 0) {
       try {
         const [firstUrl] = await uploadTicketAttachments(mediaFiles, data[0].id, profile.id, { onProgress: setUploadProgress })
-        await supabase.schema('pmms').from('tickets').update({ photo_url: firstUrl }).eq('id', data[0].id)
+        // A plain .update() here was silently blocked by RLS -- a
+        // submitter's only UPDATE policy on tickets is the Completed ->
+        // Archived sign-off one, so this never actually took effect (the
+        // photo itself uploaded fine, it just never got linked back onto
+        // the ticket). See scripts/add_submitter_set_report_photo.sql.
+        await supabase.schema('pmms').rpc('set_ticket_report_photo', { p_ticket_id: data[0].id, p_photo_url: firstUrl })
       } catch (uploadErr) {
         setSubmitting(false)
         setUploadProgress(null)
