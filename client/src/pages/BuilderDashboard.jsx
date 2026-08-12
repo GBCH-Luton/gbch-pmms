@@ -179,8 +179,13 @@ export default function BuilderDashboard({ profile }) {
   const [delayReasonSubmitting, setDelayReasonSubmitting] = useState(false)
   const [showCompleteConfirm, setShowCompleteConfirm] = useState(false)
   const [completeNote, setCompleteNote] = useState('')
-  const [completePhotoFile, setCompletePhotoFile] = useState(null)
-  const [completePhotoPreview, setCompletePhotoPreview] = useState(null)
+  // Was a single <input type="file"> capped at one photo -- found live
+  // 2026-08-12 (a Housekeeper normally attaches 4-5 photos/videos per job,
+  // tickets #135/#163) that this was a real limitation, not a design
+  // choice. Now the same multi-file/video TicketMediaPicker "raise a
+  // ticket" already uses.
+  const [completeMediaFiles, setCompleteMediaFiles] = useState([])
+  const [completeUploadProgress, setCompleteUploadProgress] = useState(null)
   const [completeSubmitting, setCompleteSubmitting] = useState(false)
   const [completeError, setCompleteError] = useState('')
   // Sandbox-only SIMS materials-used prototype (see simsMaterialsBridge.js).
@@ -408,8 +413,8 @@ export default function BuilderDashboard({ profile }) {
     setStopError('')
     setShowCompleteConfirm(false)
     setCompleteNote('')
-    setCompletePhotoFile(null)
-    setCompletePhotoPreview(null)
+    setCompleteMediaFiles([])
+    setCompleteUploadProgress(null)
     setCompleteError('')
   }, [selectedTicket?.id])
 
@@ -944,7 +949,7 @@ export default function BuilderDashboard({ profile }) {
     setMaterialRows(prev => prev.filter((_, i) => i !== index))
   }
 
-  async function handleComplete(note, photoFile, checklistResponses) {
+  async function handleComplete(note, mediaFiles, checklistResponses) {
     setCompleteError('')
 
     if (!note || !note.trim()) {
@@ -952,25 +957,31 @@ export default function BuilderDashboard({ profile }) {
       return
     }
 
-    if (!photoFile) {
-      setCompleteError('Please add a photo of the completed work before closing this ticket.')
+    if (!mediaFiles || mediaFiles.length === 0) {
+      setCompleteError('Please add at least one photo or video of the completed work before closing this ticket.')
       return
     }
 
     setCompleteSubmitting(true)
 
     let photoUrl = null
-    if (photoFile) {
-      const compressed = await compressImage(photoFile)
-      const path = `${profile.id}/${Date.now()}-${compressed.name}`
-      const { error: uploadError } = await supabase.storage.from('ticket-photos').upload(path, compressed)
-      if (uploadError) {
-        setCompleteSubmitting(false)
-        setCompleteError(`Photo upload failed: ${uploadError.message}`)
-        return
-      }
-      photoUrl = await getSignedUrl('ticket-photos', path)
+    try {
+      // stage: 'completed' keeps these apart from whatever the ticket was
+      // raised with -- same ticket_attachments table, filtered by stage on
+      // every reader (TicketAttachmentGallery), so "what he reported" and
+      // "what he did to fix it" never mix in the same gallery.
+      const urls = await uploadTicketAttachments(mediaFiles, selectedTicket.id, profile.id, {
+        onProgress: setCompleteUploadProgress,
+        attachmentStage: 'completed',
+      })
+      photoUrl = urls[0] ?? null
+    } catch (uploadErr) {
+      setCompleteSubmitting(false)
+      setCompleteUploadProgress(null)
+      setCompleteError(uploadErr.message)
+      return
     }
+    setCompleteUploadProgress(null)
 
     const now = new Date().toISOString()
     const previousStatus = selectedTicket.status
@@ -1321,15 +1332,6 @@ export default function BuilderDashboard({ profile }) {
     if (!error) setReportedTickets(await attachBuilderSafeProperties(data))
   }
 
-  function handleCompletePhoto(e) {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    setCompletePhotoFile(file)
-    const reader = new FileReader()
-    reader.onload = () => setCompletePhotoPreview(reader.result)
-    reader.readAsDataURL(file)
-  }
 
   function ticketRoomString() {
     if (ticketRoom === 'Other Area...') return ticketOtherArea
@@ -2582,15 +2584,9 @@ export default function BuilderDashboard({ profile }) {
               style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '14px', fontFamily: 'inherit', boxSizing: 'border-box', resize: 'vertical' }}
             />
 
-            <input type="file" accept="image/*" id="complete-photo-input" onChange={handleCompletePhoto} style={{ display: 'none' }} />
-            <button
-              onClick={() => document.getElementById('complete-photo-input').click()}
-              style={{ width: '100%', height: '44px', borderRadius: '10px', border: `2px dashed ${COLORS.slate300}`, background: COLORS.white, color: COLORS.slate500, fontSize: '13px', fontWeight: 600, cursor: 'pointer', boxSizing: 'border-box' }}
-            >
-              {completePhotoFile ? 'Change photo' : '📷 Add a photo (required)'}
-            </button>
-            {completePhotoPreview && (
-              <img src={completePhotoPreview} alt="Completed job preview" style={{ width: '100%', borderRadius: '10px', display: 'block' }} />
+            <TicketMediaPicker files={completeMediaFiles} onChange={setCompleteMediaFiles} inputId="complete-media-input" />
+            {completeUploadProgress && (
+              <p style={{ margin: 0, fontSize: '12px', color: COLORS.slate500, fontWeight: 600 }}>{formatUploadProgress(completeUploadProgress)}</p>
             )}
 
             {SIMS_MATERIALS_PROTOTYPE_ENABLED && (
@@ -2646,7 +2642,7 @@ export default function BuilderDashboard({ profile }) {
               <p style={{ margin: 0, fontSize: '12px', color: COLORS.amber600 }}>Complete every checklist item before confirming.</p>
             )}
             <button
-              onClick={() => handleComplete(completeNote, completePhotoFile, isRoutineVisit ? routineVisitChecklistTemplate.map(label => ({ label, checked: !!checklistChecked[label] })) : undefined)}
+              onClick={() => handleComplete(completeNote, completeMediaFiles, isRoutineVisit ? routineVisitChecklistTemplate.map(label => ({ label, checked: !!checklistChecked[label] })) : undefined)}
               disabled={completeSubmitting || checklistIncomplete}
               style={{ width: '100%', padding: '16px', background: COLORS.green600, color: COLORS.white, border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: 700, cursor: (completeSubmitting || checklistIncomplete) ? 'not-allowed' : 'pointer', opacity: (completeSubmitting || checklistIncomplete) ? 0.6 : 1 }}
             >

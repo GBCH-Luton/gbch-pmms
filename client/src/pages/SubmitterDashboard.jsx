@@ -28,10 +28,8 @@ import { statusColour, statusLabel, postSystemComment, postAuditEvent, KpiTiles,
 import { NavIcon } from '../lib/icons'
 import PropertySearchSelect from '../components/PropertySearchSelect'
 import VoiceInputButton from '../components/VoiceInputButton'
-import AttachmentMedia from '../components/AttachmentMedia'
 import TicketMediaPicker from '../components/TicketMediaPicker'
 import TicketAttachmentGallery from '../components/TicketAttachmentGallery'
-import PhotoLightbox from '../components/PhotoLightbox'
 import gbchLogo from '../assets/gbch-logo.svg'
 
 const ROOM_OPTIONS = ['Kitchen', 'Bathroom', 'Communal Area', 'Bedroom', 'Hallways / Stairs', 'Garden', 'Other Area...']
@@ -465,7 +463,6 @@ function PipelineList({ profile }) {
   const [statusFilter, setStatusFilter] = useState('All')
   const [viewingTicket, setViewingTicket] = useState(null)
   const [detailLoading, setDetailLoading] = useState(false)
-  const [completionLightboxOpen, setCompletionLightboxOpen] = useState(false)
 
   useEffect(() => {
     fetchMine()
@@ -550,19 +547,11 @@ function PipelineList({ profile }) {
                 <p style={{ margin: '0 0 6px 0', fontSize: '10px', fontWeight: 800, color: COLORS.green600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   Completed work{viewingTicket.completed_at ? ` · ${new Date(viewingTicket.completed_at).toLocaleDateString()}` : ''}
                 </p>
-                {viewingTicket.completion_photo_url && (
-                  <AttachmentMedia
-                    url={viewingTicket.completion_photo_url}
-                    alt="Completed work"
-                    style={{ width: '100%', height: '160px', objectFit: 'cover', borderRadius: '10px', marginBottom: '8px' }}
-                    onClick={() => setCompletionLightboxOpen(true)}
-                  />
-                )}
+                <div style={{ marginBottom: '8px' }}>
+                  <TicketAttachmentGallery ticketId={viewingTicket.id} fallbackUrl={viewingTicket.completion_photo_url} mediaHeight="160px" stage="completed" />
+                </div>
                 {viewingTicket.completion_note && (
                   <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate600, background: COLORS.slate50, borderRadius: '8px', padding: '10px 12px' }}>{viewingTicket.completion_note}</p>
-                )}
-                {completionLightboxOpen && (
-                  <PhotoLightbox url={viewingTicket.completion_photo_url} onClose={() => setCompletionLightboxOpen(false)} />
                 )}
               </>
             )}
@@ -643,10 +632,6 @@ function SignOffList({ profile, onChanged }) {
   const [confirmId, setConfirmId] = useState(null)
   const [archivingId, setArchivingId] = useState(null)
   const [archiveError, setArchiveError] = useState('')
-  // Only one lightbox can be open at once regardless of which card's
-  // completion photo triggered it -- the reported-photo side already gets
-  // its own lightbox for free from TicketAttachmentGallery below.
-  const [completionLightboxUrl, setCompletionLightboxUrl] = useState(null)
 
   useEffect(() => {
     fetchPending()
@@ -724,18 +709,7 @@ function SignOffList({ profile, onChanged }) {
               </div>
               <div>
                 <p style={{ margin: '0 0 6px 0', fontSize: '10px', fontWeight: 800, color: COLORS.green600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Completed work</p>
-                {t.completion_photo_url ? (
-                  <AttachmentMedia
-                    url={t.completion_photo_url}
-                    alt="Completed work"
-                    style={{ width: '100%', height: '110px', objectFit: 'cover', borderRadius: '8px' }}
-                    onClick={() => setCompletionLightboxUrl(t.completion_photo_url)}
-                  />
-                ) : (
-                  <div style={{ width: '100%', height: '110px', borderRadius: '8px', background: COLORS.slate50, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <span style={{ fontSize: '11px', color: COLORS.slate400, fontStyle: 'italic' }}>No photo</span>
-                  </div>
-                )}
+                <TicketAttachmentGallery ticketId={t.id} fallbackUrl={t.completion_photo_url} mediaHeight="110px" emptyLabel="No photo" stage="completed" />
               </div>
             </div>
 
@@ -764,9 +738,6 @@ function SignOffList({ profile, onChanged }) {
           </div>
         ))}
       </div>
-      {completionLightboxUrl && (
-        <PhotoLightbox url={completionLightboxUrl} onClose={() => setCompletionLightboxUrl(null)} />
-      )}
     </div>
   )
 }

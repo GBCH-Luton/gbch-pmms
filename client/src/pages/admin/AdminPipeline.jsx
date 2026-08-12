@@ -7,9 +7,7 @@ import PropertySearchSelect from '../../components/PropertySearchSelect'
 import { fetchAllMaintenanceCategoryNames } from '../../lib/maintenanceCategories'
 import { fetchDivisions } from '../../lib/divisions'
 import PrintableTicketReport from '../../components/PrintableTicketReport'
-import AttachmentMedia from '../../components/AttachmentMedia'
 import TicketAttachmentGallery from '../../components/TicketAttachmentGallery'
-import PhotoLightbox from '../../components/PhotoLightbox'
 import { compressImage } from '../../lib/imageCompression'
 import { getSignedUrl } from '../../lib/storage'
 import {
@@ -183,11 +181,6 @@ export default function AdminPipeline({
   const [addToEventSubmitting, setAddToEventSubmitting] = useState(false)
 
   const [builderProfileId, setBuilderProfileId] = useState(null)
-
-  // Completion photo has no gallery -- just the one image, so no
-  // next/prev needed, unlike TicketAttachmentGallery which manages its
-  // own lightbox internally for the (often multi-photo) reported set.
-  const [completionLightboxUrl, setCompletionLightboxUrl] = useState(null)
 
   useEffect(() => {
     fetchTickets()
@@ -1229,17 +1222,10 @@ export default function AdminPipeline({
                                   <p style={expandLabelStyle}>Reported Photos / Videos</p>
                                   <TicketAttachmentGallery ticketId={t.id} fallbackUrl={t.photo_url} mediaHeight="140px" emptyLabel="No photos or videos attached" />
                                 </div>
-                                {t.completion_photo_url && (
-                                  <div>
-                                    <p style={expandLabelStyle}>Completion Photo</p>
-                                    <AttachmentMedia
-                                      url={t.completion_photo_url}
-                                      alt="Completed job"
-                                      style={{ width: '140px', height: '140px', objectFit: 'cover', borderRadius: '10px', border: `1px solid ${COLORS.slate200}` }}
-                                      onClick={() => setCompletionLightboxUrl(t.completion_photo_url)}
-                                    />
-                                  </div>
-                                )}
+                                <div style={{ minWidth: '140px' }}>
+                                  <p style={expandLabelStyle}>Completion Photos / Videos</p>
+                                  <TicketAttachmentGallery ticketId={t.id} fallbackUrl={t.completion_photo_url} mediaHeight="140px" stage="completed" />
+                                </div>
                               </div>
                             </div>
 
@@ -1907,8 +1893,6 @@ export default function AdminPipeline({
       )}
 
       <BuilderProfileModal builderId={builderProfileId} onClose={() => setBuilderProfileId(null)} />
-
-      {completionLightboxUrl && <PhotoLightbox url={completionLightboxUrl} onClose={() => setCompletionLightboxUrl(null)} />}
 
     </div>
   )

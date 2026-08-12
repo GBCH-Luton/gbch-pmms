@@ -20,16 +20,16 @@ import { COLORS } from '../lib/colors'
 // fetch it). Always render this component instead; it decides for itself
 // whether there's anything to show. emptyLabel is optional so a caller
 // that wants an explicit "No photo" placeholder still gets one.
-export default function TicketAttachmentGallery({ ticketId, fallbackUrl, mediaHeight = '140px', emptyLabel }) {
+export default function TicketAttachmentGallery({ ticketId, fallbackUrl, mediaHeight = '140px', emptyLabel, stage = 'reported' }) {
   const [attachments, setAttachments] = useState(null) // null = loading
   const [lightboxIndex, setLightboxIndex] = useState(null) // index into imageUrls, or null
 
   useEffect(() => {
     let cancelled = false
     if (!ticketId) { setAttachments([]); return }
-    fetchTicketAttachments(ticketId).then(rows => { if (!cancelled) setAttachments(rows) })
+    fetchTicketAttachments(ticketId, stage).then(rows => { if (!cancelled) setAttachments(rows) })
     return () => { cancelled = true }
-  }, [ticketId])
+  }, [ticketId, stage])
 
   if (attachments === null) return null
 
