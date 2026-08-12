@@ -2012,12 +2012,34 @@ export default function BuilderDashboard({ profile }) {
         {/* Only when genuinely idle -- if they're on a logged break/materials
             run/travelling to the next job (openActivity), that's already
             accounted for and shouldn't also get flagged as "not working". */}
-        {inProgressTickets.length === 0 && !openActivity && (
-          <div style={{ background: COLORS.amber50, border: `1px solid ${COLORS.amber300}`, borderRadius: '12px', padding: '14px' }}>
-            <p style={{ margin: '0 0 2px 0', fontSize: '13px', fontWeight: 800, color: COLORS.amber800 }}>⚠ You're not working on a job right now</p>
-            <p style={{ margin: 0, fontSize: '12px', color: COLORS.amber900 }}>Pick up a job below, or contact your manager if you're not sure what to do next.</p>
-          </div>
-        )}
+        {inProgressTickets.length === 0 && !openActivity && (() => {
+          // Surfaces the builder's own highest-priority already-assigned job
+          // (tickets is sorted by priority_score desc) so finishing one job
+          // doesn't leave them staring at KPI tiles with no clear next step --
+          // previously this banner was purely informational even when a
+          // specific job was already sitting in their own queue waiting.
+          const nextJob = tickets.find(t => t.status === 'Assigned')
+          return (
+            <div style={{ background: COLORS.amber50, border: `1px solid ${COLORS.amber300}`, borderRadius: '12px', padding: '14px' }}>
+              <p style={{ margin: '0 0 2px 0', fontSize: '13px', fontWeight: 800, color: COLORS.amber800 }}>⚠ You're not working on a job right now</p>
+              {nextJob ? (
+                <>
+                  <p style={{ margin: '0 0 10px 0', fontSize: '12px', color: COLORS.amber900 }}>
+                    Your next job: Job #{nextJob.ticket_number} · {nextJob.category} — {nextJob.property?.address || 'address unknown'}
+                  </p>
+                  <button
+                    onClick={() => setSelectedTicket(nextJob)}
+                    style={{ width: '100%', padding: '10px', background: COLORS.amber800, color: COLORS.white, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}
+                  >
+                    Open This Job →
+                  </button>
+                </>
+              ) : (
+                <p style={{ margin: 0, fontSize: '12px', color: COLORS.amber900 }}>Pick up a job below, or contact your manager if you're not sure what to do next.</p>
+              )}
+            </div>
+          )
+        })()}
         <button
           onClick={() => setStatusFilter('WORKING')}
           style={{ width: '100%', padding: '14px', background: COLORS.teal600, color: COLORS.white, border: 'none', borderRadius: '12px', cursor: 'pointer', textAlign: 'center' }}
