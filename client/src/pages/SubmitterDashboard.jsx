@@ -43,7 +43,7 @@ const inputStyle = { width: '100%', height: '44px', padding: '0 12px', borderRad
 const cardStyle = { background: COLORS.white, borderRadius: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', padding: '20px', marginBottom: '16px' }
 
 export default function SubmitterDashboard({ profile }) {
-  const [tab, setTab] = useState('new') // 'new' | 'pipeline' | 'signoff'
+  const [tab, setTab] = useState('pipeline') // 'new' | 'pipeline' | 'signoff'
   const [signingOut, setSigningOut] = useState(false)
   const [signOffCount, setSignOffCount] = useState(0)
 
@@ -87,8 +87,8 @@ export default function SubmitterDashboard({ profile }) {
         <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: COLORS.slate500 }}>Signed in as {profile.name}</p>
 
         <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-          <button onClick={() => setTab('new')} style={{ ...choiceBtn(tab === 'new'), flex: 1 }}>Report an Issue</button>
           <button onClick={() => setTab('pipeline')} style={{ ...choiceBtn(tab === 'pipeline'), flex: 1 }}>Pipeline</button>
+          <button onClick={() => setTab('new')} style={{ ...choiceBtn(tab === 'new'), flex: 1 }}>Report an Issue</button>
           <button onClick={() => setTab('signoff')} style={{ ...choiceBtn(tab === 'signoff'), flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
             Sign Off
             {signOffCount > 0 && (
