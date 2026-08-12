@@ -882,11 +882,35 @@ export async function fetchAssignableStaffForRole(roleName) {
   }))
 }
 
-// Kept as a thin wrapper -- every existing call site asks for Builders
-// specifically, and this reads better at the call site than the generic
-// name.
+// The "unscoped" half of every call site's own
+// `profile.division ? fetchAssignableStaffForDivision(profile.division) : fetchAssignableBuilders()`
+// ternary (AdminDashboard's Where's the Team, AdminClocking, AdminPipeline,
+// AdminReports) -- for Admin or a manager with no division, this is meant
+// to be "every builder-level person across every division", the unscoped
+// mirror of what fetchAssignableStaffForDivision already returns for a
+// division-scoped manager. It used to just be the literal built-in
+// 'Builder' role, from before Housekeeping (or any other division) added
+// its own builder-accessLevel custom role -- so an Admin or an unscoped
+// manager silently never saw a Housekeeper anywhere in these 5 places
+// (found live 2026-08-12: Housekeeper missing from Where's the Team for
+// both Admin and Maintenance Manager). Now pulls every accessLevel:
+// 'builder' role, built-in and custom alike, same as
+// fetchAssignableStaffForDivision minus its division filter.
 export async function fetchAssignableBuilders() {
-  return fetchAssignableStaffForRole('Builder')
+  const { data: rolesRow } = await supabase
+    .schema('pmms')
+    .from('settings')
+    .select('setting_value')
+    .eq('setting_key', 'custom_roles')
+    .maybeSingle()
+
+  const normalizedCustomRoles = normalizeCustomRoles(rolesRow?.setting_value)
+  const roleNames = ['Builder', ...normalizedCustomRoles.filter(r => r.accessLevel === 'builder').map(r => r.name)]
+
+  const staffLists = await Promise.all(roleNames.map(fetchAssignableStaffForRole))
+  const byId = {}
+  staffLists.flat().forEach(s => { byId[s.id] = s })
+  return Object.values(byId).sort((a, b) => a.name.localeCompare(b.name))
 }
 
 // General "which staff can be assigned something" filter, keyed directly
