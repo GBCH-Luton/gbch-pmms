@@ -110,7 +110,7 @@ export default function SubmitterDashboard({ profile }) {
   const navButtonStyle = (active) => ({
     display: 'flex', alignItems: 'center', gap: '10px', width: '100%', textAlign: 'left', padding: '6px 12px', marginBottom: '1px',
     borderRadius: '8px', border: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: active ? 700 : 400,
-    background: active ? COLORS.greenDark : 'transparent', color: COLORS.white, fontFamily: 'inherit',
+    background: active ? COLORS.teal600 : 'transparent', color: COLORS.white, fontFamily: 'inherit',
   })
   const navIconStyle = { width: '18px', flexShrink: 0, textAlign: 'center', fontSize: '14px', lineHeight: 1 }
 
@@ -127,7 +127,7 @@ export default function SubmitterDashboard({ profile }) {
             title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             style={{
               position: 'absolute', top: '50%', right: '-12px', transform: 'translateY(-50%)', width: '24px', height: '24px', borderRadius: '50%',
-              background: COLORS.brandNavy, border: '1px solid rgba(255,255,255,0.18)', boxShadow: '0 2px 6px rgba(0,0,0,0.25)',
+              background: COLORS.tealDark, border: '1px solid rgba(255,255,255,0.18)', boxShadow: '0 2px 6px rgba(0,0,0,0.25)',
               display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: COLORS.white, zIndex: 10,
             }}
           >
@@ -142,7 +142,7 @@ export default function SubmitterDashboard({ profile }) {
           style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'none', border: 'none', padding: '16px 20px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.1)', width: '100%', textAlign: 'left', justifyContent: isCollapsed ? 'center' : 'flex-start' }}
         >
           <img src={gbchLogo} alt="GBCH" style={{ height: '32px', flexShrink: 0 }} />
-          {!isCollapsed && <span style={{ fontSize: '15px', fontWeight: 800, color: COLORS.white, whiteSpace: 'nowrap' }}>PMMS</span>}
+          {!isCollapsed && <span style={{ fontSize: '15px', fontWeight: 800, color: COLORS.white, whiteSpace: 'nowrap' }}>Support System</span>}
         </button>
 
         <nav className="pmms-sidebar-nav" style={{ flex: 1, padding: '8px 10px', overflowY: 'auto', overflowX: 'hidden' }}>
@@ -157,7 +157,7 @@ export default function SubmitterDashboard({ profile }) {
                 <span style={{ ...navIconStyle, position: 'relative' }}>
                   <NavIcon name={item.icon} />
                   {isCollapsed && alertCount > 0 && (
-                    <span style={{ position: 'absolute', top: '-3px', right: '-1px', width: '8px', height: '8px', borderRadius: '50%', background: COLORS.red600, border: `1.5px solid ${COLORS.brandNavy}` }} />
+                    <span style={{ position: 'absolute', top: '-3px', right: '-1px', width: '8px', height: '8px', borderRadius: '50%', background: COLORS.red600, border: `1.5px solid ${COLORS.tealDark}` }} />
                   )}
                 </span>
                 {!isCollapsed && (
@@ -212,7 +212,7 @@ export default function SubmitterDashboard({ profile }) {
         className="admin-sidebar-desktop"
         style={{
           width: sidebarCollapsed ? '64px' : '240px', minWidth: sidebarCollapsed ? '64px' : '240px',
-          background: COLORS.brandNavy, display: 'flex', flexDirection: 'column', position: 'sticky',
+          background: COLORS.tealDark, display: 'flex', flexDirection: 'column', position: 'sticky',
           top: 'var(--pmms-banner-offset, 0px)', height: 'calc(100vh - var(--pmms-banner-offset, 0px))',
           transition: 'width 0.2s ease, min-width 0.2s ease',
         }}
@@ -225,11 +225,11 @@ export default function SubmitterDashboard({ profile }) {
         {/* Mobile top bar */}
         <div
           className="admin-mobile-topbar"
-          style={{ alignItems: 'center', justifyContent: 'space-between', background: COLORS.brandNavy, padding: '14px 16px', position: 'sticky', top: 'var(--pmms-banner-offset, 0px)', zIndex: 20 }}
+          style={{ alignItems: 'center', justifyContent: 'space-between', background: COLORS.tealDark, padding: '14px 16px', position: 'sticky', top: 'var(--pmms-banner-offset, 0px)', zIndex: 20 }}
         >
           <button onClick={() => goToPage('pipeline')} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>
             <img src={gbchLogo} alt="GBCH" style={{ height: '28px' }} />
-            <span style={{ color: COLORS.white, fontWeight: 800, fontSize: '14px' }}>PMMS</span>
+            <span style={{ color: COLORS.white, fontWeight: 800, fontSize: '14px' }}>Support System</span>
           </button>
           <button
             onClick={() => setSidebarOpen(true)}
@@ -255,7 +255,7 @@ export default function SubmitterDashboard({ profile }) {
       {/* Mobile drawer */}
       {sidebarOpen && (
         <div style={{ position: 'fixed', top: 'var(--pmms-banner-offset, 0px)', left: 0, right: 0, bottom: 0, zIndex: 100, display: 'flex' }}>
-          <div style={{ width: '260px', maxWidth: '80vw', background: COLORS.brandNavy, height: '100%', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ width: '260px', maxWidth: '80vw', background: COLORS.tealDark, height: '100%', display: 'flex', flexDirection: 'column' }}>
             <SidebarContent />
           </div>
           <div onClick={() => setSidebarOpen(false)} style={{ flex: 1, background: 'rgba(15,23,42,0.5)' }} />

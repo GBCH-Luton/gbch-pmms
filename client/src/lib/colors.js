@@ -66,6 +66,10 @@ export const COLORS = {
   teal300: '#99f6e4',
   teal600: '#0d9488',
   teal700: '#0f766e',
+  // Deep teal, same role as brandNavy but for the Ticket Submitter
+  // dashboard's own sidebar -- a deliberately different colour scheme so
+  // it doesn't read as the Admin/Manager shell.
+  tealDark: '#0B4A44',
 
   // Amber (warning / due soon / procured)
   amber50: '#fffbeb',
