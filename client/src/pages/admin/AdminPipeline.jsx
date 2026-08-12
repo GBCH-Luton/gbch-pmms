@@ -85,6 +85,11 @@ export default function AdminPipeline({
   const [propertyFilter, setPropertyFilter] = useState('') // '' = All Properties -- PropertySearchSelect's own "cleared" state
   const [categoryFilter, setCategoryFilter] = useState('All')
   const [builderFilter, setBuilderFilter] = useState('All')
+  // Options derived straight from the loaded tickets (unique raised_by
+  // ids, sorted by name) rather than a separate staff fetch -- "who's
+  // ever raised a ticket" isn't one role/division, it's Admin, Manager,
+  // Builder, and Ticket Submitter alike.
+  const [submitterFilter, setSubmitterFilter] = useState('All')
   const [priorityFilter, setPriorityFilter] = useState('All')
   const [ticketNumberSearch, setTicketNumberSearch] = useState('')
   const [stuckOnlyFilter, setStuckOnlyFilter] = useState(false)
@@ -327,7 +332,7 @@ export default function AdminPipeline({
         id, ticket_number, status, category, description, room, priority_score, priority_override, mileage_logged,
         no_access_flag, no_access_note, hold_reason, hold_note, completion_note, photo_url, completion_photo_url,
         completed_at, created_at, status_changed_at, first_assigned_at, assigned_builder_id, estimated_minutes, assign_type, property_id, event_id,
-        raised_by_name, cancel_type, cancel_reason, cancel_duplicate_ref
+        raised_by, raised_by_name, cancel_type, cancel_reason, cancel_duplicate_ref
       `)
       .order('created_at', { ascending: false })
 
@@ -789,6 +794,7 @@ export default function AdminPipeline({
     if (categoryFilter !== 'All' && t.category !== categoryFilter) return false
     if (divisionFilter !== 'All' && resolveCategoryDivision(t.category, categoriesSettingsRow) !== divisionFilter) return false
     if (builderFilter !== 'All' && t.assigned_builder_id !== builderFilter) return false
+    if (submitterFilter !== 'All' && t.raised_by !== submitterFilter) return false
     if (assignTypeFilter !== 'All' && (t.assign_type || 'Manual') !== assignTypeFilter) return false
     if (priorityFilter !== 'All' && effectiveTier(t) !== priorityFilter) return false
     if (ticketNumberSearch.trim() && !String(t.ticket_number).includes(ticketNumberSearch.trim())) return false
@@ -805,6 +811,10 @@ export default function AdminPipeline({
     if (toDate && (!t[dateField] || new Date(t[dateField]).getTime() > new Date(toDate).getTime() + 86400000 - 1)) return false
     return true
   })
+
+  const submitterOptions = [...new Map(
+    tickets.filter(t => t.raised_by).map(t => [t.raised_by, t.raised_by_name || 'Unknown'])
+  ).entries()].sort((a, b) => a[1].localeCompare(b[1]))
 
   function sortValue(t, column) {
     switch (column) {
@@ -952,6 +962,12 @@ export default function AdminPipeline({
           <option value="All">All Builders</option>
           {builders.map(b => (
             <option key={b.id} value={b.id}>{b.name}</option>
+          ))}
+        </select>
+        <select value={submitterFilter} onChange={(e) => setSubmitterFilter(e.target.value)} style={filterSelectStyle}>
+          <option value="All">All Submitters</option>
+          {submitterOptions.map(([id, name]) => (
+            <option key={id} value={id}>{name}</option>
           ))}
         </select>
         <select value={priorityFilter} onChange={(e) => setPriorityFilter(e.target.value)} style={filterSelectStyle}>
