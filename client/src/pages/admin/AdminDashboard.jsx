@@ -147,10 +147,20 @@ function TeamWhereabouts({ profile, onNavigate }) {
   // page. isBackground skips the loading flip on repeat ticks so the whole
   // card doesn't flash back to "Loading..." every 45 seconds -- only the
   // very first load should ever show that.
+  // Also refetches on tab-visibility change: Chrome/Edge throttle or fully
+  // freeze setInterval in a backgrounded tab, so someone who leaves this
+  // tab open and idle for a while won't see the 45s timer fire at all --
+  // this catches it up the moment they switch back, without needing a
+  // manual reload.
   useEffect(() => {
     fetchData()
     const interval = setInterval(() => fetchData(true), 45000)
-    return () => clearInterval(interval)
+    const onVisible = () => { if (document.visibilityState === 'visible') fetchData(true) }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      clearInterval(interval)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
   }, [])
 
   async function fetchData(isBackground = false) {
@@ -406,10 +416,18 @@ export default function AdminDashboard({ profile, onNavigate }) {
   // reflects a change without a manual page reload. Doesn't re-flip
   // `loading` back to true on repeat ticks -- only fetchTickets ever sets
   // it, once, on the very first call.
+  // Also refetches on tab-visibility change -- see the matching comment in
+  // TeamWhereabouts above; a backgrounded/idle tab can silently miss every
+  // 45s tick, so this catches it up the moment the tab is looked at again.
   useEffect(() => {
     refreshDashboardData()
     const interval = setInterval(refreshDashboardData, 45000)
-    return () => clearInterval(interval)
+    const onVisible = () => { if (document.visibilityState === 'visible') refreshDashboardData() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      clearInterval(interval)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
   }, [])
 
   function refreshDashboardData() {
