@@ -140,10 +140,21 @@ function TeamWhereabouts({ profile, onNavigate }) {
   const [logEntries, setLogEntries] = useState([])
   const [filterStaffId, setFilterStaffId] = useState('All')
 
-  useEffect(() => { fetchData() }, [])
+  // Polled every 45s, same cadence and reasoning as BuilderDashboard.jsx's
+  // own notifications/available-jobs polling -- nothing here pushes, so
+  // this is the only way a manager sees a status change (a builder
+  // starting a break, clocking in, etc.) without manually reloading the
+  // page. isBackground skips the loading flip on repeat ticks so the whole
+  // card doesn't flash back to "Loading..." every 45 seconds -- only the
+  // very first load should ever show that.
+  useEffect(() => {
+    fetchData()
+    const interval = setInterval(() => fetchData(true), 45000)
+    return () => clearInterval(interval)
+  }, [])
 
-  async function fetchData() {
-    setLoading(true)
+  async function fetchData(isBackground = false) {
+    if (!isBackground) setLoading(true)
     const assignableBuilders = await (profile.division ? fetchAssignableStaffForDivision(profile.division) : fetchAssignableBuilders())
     setBuilders(assignableBuilders)
 
@@ -389,7 +400,19 @@ export default function AdminDashboard({ profile, onNavigate }) {
   const [totalTicketsPeriod, setTotalTicketsPeriod] = useState('all_time')
   const [loading, setLoading] = useState(true)
 
+  // Polled every 45s, same cadence and reasoning as BuilderDashboard.jsx's
+  // own notifications/available-jobs polling -- nothing here pushes, so
+  // this is the only way Daily Briefing (built entirely from this state)
+  // reflects a change without a manual page reload. Doesn't re-flip
+  // `loading` back to true on repeat ticks -- only fetchTickets ever sets
+  // it, once, on the very first call.
   useEffect(() => {
+    refreshDashboardData()
+    const interval = setInterval(refreshDashboardData, 45000)
+    return () => clearInterval(interval)
+  }, [])
+
+  function refreshDashboardData() {
     fetchTickets()
     fetchPropertiesMetrics()
     fetchTotalPropertiesCount()
@@ -403,7 +426,7 @@ export default function AdminDashboard({ profile, onNavigate }) {
     fetchGardenReviewAging().then(setGardenAgingCounts)
     fetchPriorityThresholds().then(({ p1, p2 }) => { setP1Threshold(p1); setP2Threshold(p2) })
     fetchTotalTicketsPeriod()
-  }, [])
+  }
 
   async function fetchTickets() {
     const { data, error } = await supabase
