@@ -764,7 +764,13 @@ export default function AdminPipeline({
   // so every tile stays a stable shortcut to that category regardless of
   // whatever filter combination happens to be applied right now.
   const kpis = [
-    { label: 'Total tickets', value: tickets.length, colour: COLORS.slate500, statusFilter: 'All' },
+    // Every other tile's count already matches exactly what clicking it
+    // shows -- this one didn't: it counted literally everything, Cancelled
+    // and Archived included, while its own "All" status filter deliberately
+    // hides both from the table (see filteredTickets above). Matches that
+    // same definition now, so the tile and the list it opens always agree
+    // (found live 2026-08-12: tile said 144, the list under it showed 136).
+    { label: 'Total tickets', value: tickets.filter(t => t.status !== 'Cancelled' && t.status !== 'Archived').length, colour: COLORS.slate500, statusFilter: 'All' },
     { label: 'Unassigned', value: tickets.filter(t => t.status === 'Pending').length, colour: COLORS.red600, statusFilter: 'Pending' },
     { label: 'In Progress', value: tickets.filter(t => t.status === 'In Progress').length, colour: COLORS.teal600, statusFilter: 'In Progress' },
     { label: 'On Hold', value: tickets.filter(t => t.status === 'On Hold').length, colour: COLORS.amber500, statusFilter: 'On Hold' },

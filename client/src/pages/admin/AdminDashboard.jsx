@@ -522,12 +522,18 @@ export default function AdminDashboard({ profile, onNavigate }) {
   // all-time number as the ticket history builds up -- see AdminSettings.jsx's
   // "Dashboard Metrics" section (dashboard_total_tickets_period).
   const TOTAL_TICKETS_PERIOD_LABELS = { today: 'Today', week: 'This Week', month: 'This Month', year: 'This Year', all_time: 'All Time' }
+  // Excludes Cancelled/Archived same as Pipeline's own "All" status filter
+  // does -- this tile's own statusFilter: 'All' below navigates straight
+  // into that same filtered view, so counting them here just meant the
+  // tile's number never matched what you landed on after clicking it
+  // (found live 2026-08-12, via the same mismatch on Pipeline's own tile).
+  const openTickets = tickets.filter(t => t.status !== 'Cancelled' && t.status !== 'Archived')
   const totalTicketsCount = (
-    totalTicketsPeriod === 'today' ? tickets.filter(t => isSameDay(new Date(t.created_at), now)) :
-    totalTicketsPeriod === 'week' ? tickets.filter(t => new Date(t.created_at) >= weekStart) :
-    totalTicketsPeriod === 'month' ? tickets.filter(t => new Date(t.created_at) >= monthStart) :
-    totalTicketsPeriod === 'year' ? tickets.filter(t => new Date(t.created_at) >= yearStart) :
-    tickets
+    totalTicketsPeriod === 'today' ? openTickets.filter(t => isSameDay(new Date(t.created_at), now)) :
+    totalTicketsPeriod === 'week' ? openTickets.filter(t => new Date(t.created_at) >= weekStart) :
+    totalTicketsPeriod === 'month' ? openTickets.filter(t => new Date(t.created_at) >= monthStart) :
+    totalTicketsPeriod === 'year' ? openTickets.filter(t => new Date(t.created_at) >= yearStart) :
+    openTickets
   ).length
 
   const kpis = [
