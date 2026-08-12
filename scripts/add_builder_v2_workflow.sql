@@ -9,6 +9,14 @@
 --    the address of every property they're assigned to; lat/lng is just a
 --    geocoded form of the same information, so adding it here is a
 --    targeted, low-risk extension, not a re-opening of that fix.
+--
+--    NOTE (2026-08-12 fix): this drop+recreate was copied from an older
+--    base version of the function and silently reverted the access check
+--    to 'builder' only, dropping 'submitter' -- which add_submitter_role.sql
+--    had already added so a Ticket Submitter's raise-ticket property
+--    dropdown (same RPC, see SubmitterDashboard.jsx) could see anything.
+--    That regression broke every submitter's property list in production
+--    until caught and fixed live. Both access levels must stay listed here.
 drop function if exists pmms.builder_properties(uuid[]);
 
 create function pmms.builder_properties(property_ids uuid[] default null)
@@ -31,7 +39,7 @@ as $$
   select p.id, p.address, p.high_vulnerability, p.layout_type, p.safeguards, p.electrical_shutoff, p.gas_shutoff,
          p.latitude, p.longitude
   from pmms.properties p
-  where pmms.current_access_level() = 'builder'
+  where pmms.current_access_level() in ('builder', 'submitter')
     and (property_ids is null or p.id = any(property_ids))
 $$;
 
