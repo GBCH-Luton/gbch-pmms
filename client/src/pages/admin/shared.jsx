@@ -905,11 +905,19 @@ export async function fetchAssignableBuilders() {
     .maybeSingle()
 
   const normalizedCustomRoles = normalizeCustomRoles(rolesRow?.setting_value)
-  const roleNames = ['Builder', ...normalizedCustomRoles.filter(r => r.accessLevel === 'builder').map(r => r.name)]
+  const roleEntries = [
+    { name: 'Builder', division: 'Maintenance' },
+    ...normalizedCustomRoles.filter(r => r.accessLevel === 'builder').map(r => ({ name: r.name, division: r.division || 'Maintenance' })),
+  ]
 
-  const staffLists = await Promise.all(roleNames.map(fetchAssignableStaffForRole))
+  const staffLists = await Promise.all(roleEntries.map(r => fetchAssignableStaffForRole(r.name)))
   const byId = {}
-  staffLists.flat().forEach(s => { byId[s.id] = s })
+  // Tags each person with the division of the role they were fetched under,
+  // so unscoped callers (Where's the Team) can offer a division filter on
+  // top of the individual-person one without a second query.
+  staffLists.forEach((list, i) => {
+    list.forEach(s => { byId[s.id] = { ...s, division: roleEntries[i].division } })
+  })
   return Object.values(byId).sort((a, b) => a.name.localeCompare(b.name))
 }
 

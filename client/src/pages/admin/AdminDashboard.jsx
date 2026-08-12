@@ -139,6 +139,7 @@ function TeamWhereabouts({ profile, onNavigate }) {
   const [statusByStaffId, setStatusByStaffId] = useState({})
   const [logEntries, setLogEntries] = useState([])
   const [filterStaffId, setFilterStaffId] = useState('All')
+  const [divisionFilter, setDivisionFilter] = useState('All')
 
   // Polled every 45s, same cadence and reasoning as BuilderDashboard.jsx's
   // own notifications/available-jobs polling -- nothing here pushes, so
@@ -305,8 +306,20 @@ function TeamWhereabouts({ profile, onNavigate }) {
   }
   const chipStyle = { off: { bg: COLORS.slate100, fg: COLORS.slate400 }, available: { bg: COLORS.blue50, fg: COLORS.blue700 }, job: { bg: COLORS.teal50, fg: COLORS.teal700 }, away: { bg: COLORS.violet100, fg: COLORS.violet600 } }
 
-  const visibleBuilders = filterStaffId === 'All' ? builders : builders.filter(b => b.id === filterStaffId)
-  const visibleEntries = filterStaffId === 'All' ? logEntries : logEntries.filter(e => e.staffId === filterStaffId)
+  // Division filter only makes sense for an unscoped viewer (Admin or a
+  // manager with no division) -- a division-scoped manager's `builders`
+  // list is already just their one division, same as Pipeline's own
+  // division filter being hidden for scoped viewers.
+  const divisionOptions = profile.division ? [] : [...new Set(builders.map(b => b.division).filter(Boolean))].sort()
+  const divisionScopedBuilders = (!profile.division && divisionFilter !== 'All')
+    ? builders.filter(b => b.division === divisionFilter)
+    : builders
+
+  const visibleBuilders = filterStaffId === 'All' ? divisionScopedBuilders : divisionScopedBuilders.filter(b => b.id === filterStaffId)
+  const divisionScopedStaffIds = new Set(divisionScopedBuilders.map(b => b.id))
+  const visibleEntries = filterStaffId === 'All'
+    ? logEntries.filter(e => divisionScopedStaffIds.has(e.staffId))
+    : logEntries.filter(e => e.staffId === filterStaffId)
 
   return (
     <div style={{
@@ -319,14 +332,26 @@ function TeamWhereabouts({ profile, onNavigate }) {
           <span style={{ color: COLORS.teal700 }}>📍</span>
           <span style={{ fontSize: '12px', fontWeight: 800, color: COLORS.teal700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Where's the Team</span>
         </div>
-        <select
-          value={filterStaffId}
-          onChange={(e) => setFilterStaffId(e.target.value)}
-          style={{ fontSize: '12px', fontWeight: 700, color: COLORS.slate900, background: COLORS.slate50, border: `1px solid ${COLORS.slate200}`, borderRadius: '8px', padding: '6px 10px', cursor: 'pointer' }}
-        >
-          <option value="All">All builders</option>
-          {builders.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-        </select>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          {!profile.division && (
+            <select
+              value={divisionFilter}
+              onChange={(e) => { setDivisionFilter(e.target.value); setFilterStaffId('All') }}
+              style={{ fontSize: '12px', fontWeight: 700, color: COLORS.slate900, background: COLORS.slate50, border: `1px solid ${COLORS.slate200}`, borderRadius: '8px', padding: '6px 10px', cursor: 'pointer' }}
+            >
+              <option value="All">All divisions</option>
+              {divisionOptions.map(d => <option key={d} value={d}>{d}</option>)}
+            </select>
+          )}
+          <select
+            value={filterStaffId}
+            onChange={(e) => setFilterStaffId(e.target.value)}
+            style={{ fontSize: '12px', fontWeight: 700, color: COLORS.slate900, background: COLORS.slate50, border: `1px solid ${COLORS.slate200}`, borderRadius: '8px', padding: '6px 10px', cursor: 'pointer' }}
+          >
+            <option value="All">All builders</option>
+            {divisionScopedBuilders.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+          </select>
+        </div>
       </div>
       <p style={{ margin: '4px 0 12px 0', fontSize: '11px', color: COLORS.slate500 }}>Live status and every trip logged today.</p>
 
