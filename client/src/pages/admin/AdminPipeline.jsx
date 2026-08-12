@@ -10,6 +10,8 @@ import PrintableTicketReport from '../../components/PrintableTicketReport'
 import AttachmentMedia from '../../components/AttachmentMedia'
 import TicketAttachmentGallery from '../../components/TicketAttachmentGallery'
 import PhotoLightbox from '../../components/PhotoLightbox'
+import { compressImage } from '../../lib/imageCompression'
+import { getSignedUrl } from '../../lib/storage'
 import {
   priorityTierLabel, priorityBadgeStyle, statusColour, statusLabel, formatUKDate, formatUKDateTime, formatDurationDays, formatDuration,
   filterSelectStyle, thStyle, tdStyle, actionBtnStyle,
@@ -130,6 +132,19 @@ export default function AdminPipeline({
   const [cancelReason, setCancelReason] = useState('')
   const [cancelDuplicateRef, setCancelDuplicateRef] = useState('')
   const [cancelError, setCancelError] = useState('')
+
+  // For jobs done by an external contractor with no PMMS login -- the
+  // normal Complete button only exists inside the assigned builder's own
+  // locked job view, so there was previously no way to close these out at
+  // all. Photo is optional here (unlike the builder's own completion flow,
+  // which requires one) since a manager acting on a contractor's behalf
+  // often won't have one to upload.
+  const [completeModalTicket, setCompleteModalTicket] = useState(null)
+  const [completeNote, setCompleteNote] = useState('')
+  const [completePhotoFile, setCompletePhotoFile] = useState(null)
+  const [completePhotoPreview, setCompletePhotoPreview] = useState(null)
+  const [completeError, setCompleteError] = useState('')
+  const [completeSubmitting, setCompleteSubmitting] = useState(false)
 
   const [priorityModalTicket, setPriorityModalTicket] = useState(null)
   const [priorityTier, setPriorityTier] = useState('')
@@ -536,6 +551,76 @@ export default function AdminPipeline({
     await postAuditEvent(t.id, profile, 'Status Changed', `${statusLabel(t.status)} → Cancelled (${cancelType}${dupNote}). Reason: ${cancelReason.trim()}`)
     await fetchTickets()
     closeCancelModal()
+  }
+
+  function openCompleteModal(ticket) {
+    setCompleteModalTicket(ticket)
+    setCompleteNote('')
+    setCompletePhotoFile(null)
+    setCompletePhotoPreview(null)
+    setCompleteError('')
+  }
+  function closeCompleteModal() {
+    setCompleteModalTicket(null)
+    if (completePhotoPreview) URL.revokeObjectURL(completePhotoPreview)
+  }
+
+  function handleCompletePhoto(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setCompletePhotoFile(file)
+    setCompletePhotoPreview(URL.createObjectURL(file))
+  }
+
+  async function submitComplete() {
+    if (!completeNote.trim()) { setCompleteError('Please describe the completed work.'); return }
+
+    const t = completeModalTicket
+    setCompleteSubmitting(true)
+    setCompleteError('')
+
+    let photoUrl = null
+    if (completePhotoFile) {
+      const compressed = await compressImage(completePhotoFile)
+      const path = `${profile.id}/${Date.now()}-${compressed.name}`
+      const { error: uploadError } = await supabase.storage.from('ticket-photos').upload(path, compressed)
+      if (uploadError) {
+        setCompleteSubmitting(false)
+        setCompleteError(`Photo upload failed: ${uploadError.message}`)
+        return
+      }
+      photoUrl = await getSignedUrl('ticket-photos', path)
+    }
+
+    const now = new Date().toISOString()
+    const previousStatus = t.status
+    const { error } = await supabase
+      .schema('pmms')
+      .from('tickets')
+      .update({
+        status: 'Completed', status_changed_at: now, stuck_alert_sent_at: null, completed_at: now,
+        completion_note: completeNote.trim(), ...(photoUrl ? { completion_photo_url: photoUrl } : {}),
+      })
+      .eq('id', t.id)
+
+    if (error) {
+      setCompleteSubmitting(false)
+      setCompleteError(error.message)
+      return
+    }
+
+    // Closes out any work_session left open under this ticket -- shouldn't
+    // normally exist for an external job nobody ever clocked into, but
+    // covers the case where an internal builder started it before handing
+    // off to a contractor.
+    await supabase.schema('pmms').from('work_sessions').update({ ended_at: now }).eq('ticket_id', t.id).is('ended_at', null)
+
+    await postSystemComment(t.id, profile, `Marked Completed by ${profile.name} on behalf of the assignee (no PMMS access -- e.g. an external contractor). Note: ${completeNote.trim()}`)
+    await postAuditEvent(t.id, profile, 'Status Changed', `${statusLabel(previousStatus)} → Completed (marked by ${profile.name} on behalf of the assignee)`)
+
+    setCompleteSubmitting(false)
+    await fetchTickets()
+    closeCompleteModal()
   }
 
   function openEditEstimateModal(ticket) { setEditEstimateModalTicket(ticket) }
@@ -1256,6 +1341,14 @@ export default function AdminPipeline({
                               {t.status !== 'Cancelled' && (
                                 <button onClick={() => openCancelModal(t)} style={{ ...actionBtnStyle, color: COLORS.red600, borderColor: COLORS.red200 }}>Cancel Ticket</button>
                               )}
+                              {/* For jobs done by an external contractor
+                                  with no PMMS login -- the normal Complete
+                                  button lives inside the assigned builder's
+                                  own locked job view, which they can never
+                                  reach. */}
+                              {!['Completed', 'Archived', 'Cancelled'].includes(t.status) && (
+                                <button onClick={() => openCompleteModal(t)} style={{ ...actionBtnStyle, color: COLORS.green600, borderColor: COLORS.green200 }}>Mark Complete</button>
+                              )}
                               {/* Archived tickets are locked (RLS: once
                                   signed off, only the raiser can still edit
                                   a ticket -- same rule behind raiser-only
@@ -1521,6 +1614,57 @@ export default function AdminPipeline({
             <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
               <button onClick={closeCancelModal} style={modalCancelBtnStyle}>Keep Ticket</button>
               <button onClick={submitCancel} style={{ ...modalConfirmBtnStyle, background: COLORS.red600 }}>Confirm Cancellation</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mark Complete modal -- manager-side completion for jobs done by
+          someone with no PMMS login (typically an external contractor). */}
+      {completeModalTicket && (
+        <div style={modalOverlayStyle}>
+          <div style={modalCardStyle}>
+            <p style={modalTitleStyle}>Mark Complete — Ticket #{completeModalTicket.ticket_number}</p>
+            <p style={modalSubtitleStyle}>{completeModalTicket.property?.address}</p>
+
+            <label style={modalLabelStyle}>What was done (required — mention the contractor if this was external)</label>
+            <textarea
+              value={completeNote}
+              onChange={(e) => setCompleteNote(e.target.value)}
+              rows={3}
+              placeholder="e.g. Completed by ABC Roofing on 12/08 -- replaced 3 broken tiles."
+              style={modalTextareaStyle}
+            />
+
+            <label style={modalLabelStyle}>Photo (optional)</label>
+            {completePhotoPreview
+              ? (
+                <div style={{ marginBottom: '10px' }}>
+                  <img src={completePhotoPreview} alt="" style={{ width: '100%', maxHeight: '200px', objectFit: 'cover', borderRadius: '10px', marginBottom: '6px' }} />
+                  <button
+                    type="button"
+                    onClick={() => { setCompletePhotoFile(null); if (completePhotoPreview) URL.revokeObjectURL(completePhotoPreview); setCompletePhotoPreview(null) }}
+                    style={{ background: 'none', border: 'none', padding: 0, fontSize: '12px', fontWeight: 700, color: COLORS.red600, cursor: 'pointer' }}
+                  >
+                    Remove photo
+                  </button>
+                </div>
+              )
+              : (
+                <input type="file" accept="image/*" onChange={handleCompletePhoto} style={{ marginBottom: '10px', fontSize: '13px' }} />
+              )}
+
+            {completeError && <p style={modalErrorStyle}>{completeError}</p>}
+
+            <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
+              <button onClick={closeCompleteModal} style={modalCancelBtnStyle} disabled={completeSubmitting}>Cancel</button>
+              <button
+                onClick={submitComplete}
+                disabled={completeSubmitting}
+                style={{ ...modalConfirmBtnStyle, background: COLORS.green600, opacity: completeSubmitting ? 0.6 : 1, cursor: completeSubmitting ? 'not-allowed' : 'pointer' }}
+              >
+                {completeSubmitting ? 'Saving...' : 'Mark Complete'}
+              </button>
             </div>
           </div>
         </div>
