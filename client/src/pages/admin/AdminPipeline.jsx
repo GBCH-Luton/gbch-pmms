@@ -940,6 +940,15 @@ export default function AdminPipeline({
         </div>
       )}
 
+      {/* KPI tiles above are deliberately always off the full, unfiltered
+          ticket list (see their own comment) -- so filtering (division or
+          otherwise) narrowed the table with no count anywhere reflecting
+          it, leaving "how many tickets is that" only answerable by
+          manually counting rows. */}
+      <p style={{ margin: '0 0 10px 0', fontSize: '13px', fontWeight: 700, color: COLORS.slate500 }}>
+        {sortedTickets.length} ticket{sortedTickets.length === 1 ? '' : 's'}{divisionFilter !== 'All' ? ` in ${divisionFilter}` : ''}
+      </p>
+
       {/* Pipeline table */}
       <div style={{ background: COLORS.white, borderRadius: '16px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', marginBottom: '20px' }}>
         <div style={{ overflowX: 'auto' }}>
