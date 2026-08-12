@@ -298,8 +298,8 @@ function PipelineList({ profile }) {
   const [tickets, setTickets] = useState([])
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('All')
-  const [expandedId, setExpandedId] = useState(null)
-  const [comments, setComments] = useState([])
+  const [viewingTicket, setViewingTicket] = useState(null)
+  const [detailLoading, setDetailLoading] = useState(false)
 
   useEffect(() => {
     fetchMine()
@@ -318,22 +318,82 @@ function PipelineList({ profile }) {
     setLoading(false)
   }
 
-  async function toggleExpand(ticket) {
-    if (expandedId === ticket.id) { setExpandedId(null); return }
-    setExpandedId(ticket.id)
+  // Opens a dedicated details screen instead of the old inline expand --
+  // that used to pull the raw comments thread, which showed manager/builder
+  // names (e.g. "Reassigned from X to Y") that have nothing to do with a
+  // submitter's own view of their report. This shows only what's actually
+  // his: what he reported, and (once done) the completed work -- no names,
+  // no internal handling detail.
+  async function openDetail(ticket) {
+    setDetailLoading(true)
+    setViewingTicket(ticket)
     const { data } = await supabase
       .schema('pmms')
-      .from('comments')
-      .select('id, body, author_name, created_at')
-      .eq('ticket_id', ticket.id)
-      .order('created_at', { ascending: true })
-    setComments(data || [])
+      .from('tickets')
+      .select('id, ticket_number, status, category, room, description, photo_url, completion_note, completion_photo_url, created_at, completed_at, property_id')
+      .eq('id', ticket.id)
+      .maybeSingle()
+
+    if (data) setViewingTicket((await attachBuilderSafeProperties([data]))[0])
+    setDetailLoading(false)
   }
 
   if (loading) {
     return (
       <div style={{ minHeight: '160px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <p style={{ color: COLORS.slate400, fontWeight: 600, fontFamily: 'system-ui' }}>Loading your reports...</p>
+      </div>
+    )
+  }
+
+  if (viewingTicket) {
+    return (
+      <div>
+        <button
+          onClick={() => setViewingTicket(null)}
+          style={{ background: 'none', border: 'none', color: COLORS.teal700, fontSize: '13px', fontWeight: 700, cursor: 'pointer', padding: 0, marginBottom: '16px' }}
+        >
+          ← Back to Pipeline
+        </button>
+        {detailLoading ? (
+          <div style={{ minHeight: '160px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <p style={{ color: COLORS.slate400, fontWeight: 600, fontFamily: 'system-ui' }}>Loading...</p>
+          </div>
+        ) : (
+          <div style={cardStyle}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', marginBottom: '4px' }}>
+              <p style={{ margin: 0, fontSize: '15px', fontWeight: 800, color: COLORS.slate900 }}>#{viewingTicket.ticket_number} · {viewingTicket.category}</p>
+              <span style={{ flexShrink: 0, fontSize: '11px', fontWeight: 800, color: COLORS.white, background: statusColour(viewingTicket.status), padding: '4px 10px', borderRadius: '999px' }}>
+                {statusLabel(viewingTicket.status)}
+              </span>
+            </div>
+            <p style={{ margin: '0 0 20px 0', fontSize: '12px', color: COLORS.slate500 }}>{viewingTicket.property?.address || 'Unknown property'} · {viewingTicket.room}</p>
+
+            <p style={{ margin: '0 0 6px 0', fontSize: '10px', fontWeight: 800, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              You reported · {new Date(viewingTicket.created_at).toLocaleDateString()}
+            </p>
+            {viewingTicket.photo_url && (
+              <AttachmentMedia url={viewingTicket.photo_url} alt="Reported issue" style={{ width: '100%', height: '160px', objectFit: 'cover', borderRadius: '10px', marginBottom: '8px' }} />
+            )}
+            {viewingTicket.description && (
+              <p style={{ margin: '0 0 20px 0', fontSize: '13px', color: COLORS.slate600, background: COLORS.slate50, borderRadius: '8px', padding: '10px 12px' }}>{viewingTicket.description}</p>
+            )}
+
+            {(viewingTicket.completion_note || viewingTicket.completion_photo_url) && (
+              <>
+                <p style={{ margin: '0 0 6px 0', fontSize: '10px', fontWeight: 800, color: COLORS.green600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Completed work{viewingTicket.completed_at ? ` · ${new Date(viewingTicket.completed_at).toLocaleDateString()}` : ''}
+                </p>
+                {viewingTicket.completion_photo_url && (
+                  <AttachmentMedia url={viewingTicket.completion_photo_url} alt="Completed work" style={{ width: '100%', height: '160px', objectFit: 'cover', borderRadius: '10px', marginBottom: '8px' }} />
+                )}
+                {viewingTicket.completion_note && (
+                  <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate600, background: COLORS.slate50, borderRadius: '8px', padding: '10px 12px' }}>{viewingTicket.completion_note}</p>
+                )}
+              </>
+            )}
+          </div>
+        )}
       </div>
     )
   }
@@ -377,7 +437,7 @@ function PipelineList({ profile }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {filteredTickets.map(t => (
             <div key={t.id} style={cardStyle}>
-              <div onClick={() => toggleExpand(t)} style={{ cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
+              <div onClick={() => openDetail(t)} style={{ cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
                 <div style={{ minWidth: 0 }}>
                   <p style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 700, color: COLORS.slate900 }}>#{t.ticket_number} · {t.category}</p>
                   <p style={{ margin: '0 0 4px 0', fontSize: '12px', color: COLORS.slate500 }}>{t.property?.address || 'Unknown property'} · {t.room}</p>
@@ -387,23 +447,6 @@ function PipelineList({ profile }) {
                   {statusLabel(t.status)}
                 </span>
               </div>
-
-              {expandedId === t.id && (
-                <div style={{ marginTop: '14px', paddingTop: '14px', borderTop: `1px solid ${COLORS.slate100}` }}>
-                  {comments.length === 0 ? (
-                    <p style={{ margin: 0, fontSize: '12px', color: COLORS.slate400, fontStyle: 'italic' }}>No updates yet.</p>
-                  ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      {comments.map(c => (
-                        <div key={c.id} style={{ fontSize: '12px' }}>
-                          <span style={{ fontWeight: 700, color: COLORS.slate900 }}>{c.author_name}: </span>
-                          <span style={{ color: COLORS.slate600 }}>{c.body}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
           ))}
         </div>
