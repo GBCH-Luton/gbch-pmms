@@ -109,6 +109,7 @@ export default function AdminPipeline({
   const [reassignEstimatedMinutes, setReassignEstimatedMinutes] = useState('')
   const [reassignError, setReassignError] = useState('')
   const [reassignSendPush, setReassignSendPush] = useState(false)
+  const [reassignIgnoreSkills, setReassignIgnoreSkills] = useState(false)
 
   // Bulk reassign -- selection persists across filter/sort changes, same
   // as ordinary multi-select table behaviour, so switching a filter never
@@ -122,6 +123,7 @@ export default function AdminPipeline({
   const [bulkReassignSubmitting, setBulkReassignSubmitting] = useState(false)
   const [bulkReassignSummary, setBulkReassignSummary] = useState(null)
   const [bulkReassignSendPush, setBulkReassignSendPush] = useState(false)
+  const [bulkReassignIgnoreSkills, setBulkReassignIgnoreSkills] = useState(false)
 
   const [cancelModalTicket, setCancelModalTicket] = useState(null)
   const [cancelType, setCancelType] = useState('Mistake / not a real fault')
@@ -226,10 +228,19 @@ export default function AdminPipeline({
       setReassignReason('')
       setReassignEstimatedMinutes(reassignModalTicket.estimated_minutes != null ? String(reassignModalTicket.estimated_minutes) : '')
       setReassignError('')
+      setReassignIgnoreSkills(false)
       setReassignOptions([])
       fetchAssignableStaffForCategory(reassignModalTicket.category).then(setReassignOptions)
     }
   }, [reassignModalTicket])
+
+  // Separate from the modal-open effect above -- toggling "show all
+  // builders" mid-modal should only refetch the option list, not wipe out
+  // a reason the manager already started typing.
+  useEffect(() => {
+    if (!reassignModalTicket) return
+    fetchAssignableStaffForCategory(reassignModalTicket.category, { ignoreSkills: reassignIgnoreSkills }).then(setReassignOptions)
+  }, [reassignIgnoreSkills])
 
   // Eligible builders for a bulk reassign = the intersection across every
   // distinct category among the selected tickets (a builder must be
@@ -243,19 +254,31 @@ export default function AdminPipeline({
       setBulkReassignReason('')
       setBulkReassignError('')
       setBulkReassignSummary(null)
+      setBulkReassignIgnoreSkills(false)
       setBulkReassignOptions([])
-
-      const selected = tickets.filter(t => selectedTicketIds.has(t.id))
-      const distinctCategories = [...new Set(selected.map(t => t.category))]
-
-      Promise.all(distinctCategories.map(cat => fetchAssignableStaffForCategory(cat))).then(lists => {
-        if (lists.length === 0) { setBulkReassignOptions([]); return }
-        const [first, ...rest] = lists
-        const intersected = first.filter(b => rest.every(list => list.some(x => x.id === b.id)))
-        setBulkReassignOptions(intersected)
-      })
+      fetchBulkReassignOptions(false)
     }
   }, [bulkReassignOpen])
+
+  // Separate from the modal-open effect above -- toggling "show all
+  // builders" mid-modal should only refetch the option list, not wipe out
+  // a reason the manager already started typing.
+  useEffect(() => {
+    if (!bulkReassignOpen) return
+    fetchBulkReassignOptions(bulkReassignIgnoreSkills)
+  }, [bulkReassignIgnoreSkills])
+
+  function fetchBulkReassignOptions(ignoreSkills) {
+    const selected = tickets.filter(t => selectedTicketIds.has(t.id))
+    const distinctCategories = [...new Set(selected.map(t => t.category))]
+
+    Promise.all(distinctCategories.map(cat => fetchAssignableStaffForCategory(cat, { ignoreSkills }))).then(lists => {
+      if (lists.length === 0) { setBulkReassignOptions([]); return }
+      const [first, ...rest] = lists
+      const intersected = first.filter(b => rest.every(list => list.some(x => x.id === b.id)))
+      setBulkReassignOptions(intersected)
+    })
+  }
 
   useEffect(() => {
     if (editEstimateModalTicket) {
@@ -1266,6 +1289,10 @@ export default function AdminPipeline({
             <p style={modalSubtitleStyle}>{reassignModalTicket.property?.address}</p>
 
             <label style={modalLabelStyle}>Builder</label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 10px 0', fontSize: '12px', fontWeight: 600, color: COLORS.slate500, cursor: 'pointer' }}>
+              <input type="checkbox" checked={reassignIgnoreSkills} onChange={(e) => setReassignIgnoreSkills(e.target.checked)} />
+              Show all builders (ignore skills)
+            </label>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {reassignOptions.length === 0 && (
                 <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>No one is assignable to this category yet.</p>
@@ -1372,6 +1399,10 @@ export default function AdminPipeline({
               ) : (
                 <>
                   <label style={modalLabelStyle}>Builder</label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 10px 0', fontSize: '12px', fontWeight: 600, color: COLORS.slate500, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={bulkReassignIgnoreSkills} onChange={(e) => setBulkReassignIgnoreSkills(e.target.checked)} />
+                    Show all builders (ignore skills)
+                  </label>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     {bulkReassignOptions.length === 0 && (
                       <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>

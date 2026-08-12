@@ -87,6 +87,7 @@ export default function AdminRaiseTicket({ profile, onNavigate }) {
   // Admin-only additions
   const [builders, setBuilders] = useState([])
   const [assignedBuilderId, setAssignedBuilderId] = useState('')
+  const [ignoreSkills, setIgnoreSkills] = useState(false)
   const [estimatedMinutes, setEstimatedMinutes] = useState('')
   const [sendPushOnAssign, setSendPushOnAssign] = useState(false)
   const [priorityOverride, setPriorityOverride] = useState('')
@@ -136,8 +137,8 @@ export default function AdminRaiseTicket({ profile, onNavigate }) {
     setEstimatedMinutes('')
 
     if (!category) { setBuilders([]); return }
-    fetchAssignableStaffForCategory(category).then(setBuilders)
-  }, [loggingMode, ticketCategory, complianceCheckType, complianceCheckTypes])
+    fetchAssignableStaffForCategory(category, { ignoreSkills }).then(setBuilders)
+  }, [loggingMode, ticketCategory, complianceCheckType, complianceCheckTypes, ignoreSkills])
 
   async function fetchTicketProperties() {
     const { data, error } = await supabase
@@ -677,13 +678,17 @@ export default function AdminRaiseTicket({ profile, onNavigate }) {
               <select
                 value={assignedBuilderId}
                 onChange={(e) => setAssignedBuilderId(e.target.value)}
-                style={{ ...fieldSelectStyle, marginBottom: '10px' }}
+                style={{ ...fieldSelectStyle, marginBottom: '6px' }}
               >
-                <option value="">Auto-assign based on skills</option>
+                <option value="">Leave unassigned</option>
                 {builders.map(b => (
                   <option key={b.id} value={b.id} style={b.availability !== 'Available' ? { color: COLORS.slate400 } : undefined}>{builderOptionLabel(b)}</option>
                 ))}
               </select>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 10px 0', fontSize: '12px', fontWeight: 600, color: COLORS.slate500, cursor: 'pointer' }}>
+                <input type="checkbox" checked={ignoreSkills} onChange={(e) => setIgnoreSkills(e.target.checked)} />
+                Show all builders (ignore skills)
+              </label>
               {assignedBuilderId && (
                 <>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 14px 0', fontSize: '13px', fontWeight: 600, color: COLORS.slate900, cursor: 'pointer' }}>
@@ -970,13 +975,17 @@ export default function AdminRaiseTicket({ profile, onNavigate }) {
               <select
                 value={assignedBuilderId}
                 onChange={(e) => setAssignedBuilderId(e.target.value)}
-                style={{ ...fieldSelectStyle, marginBottom: '10px' }}
+                style={{ ...fieldSelectStyle, marginBottom: '6px' }}
               >
-                <option value="">Auto-assign based on skills</option>
+                <option value="">Leave unassigned</option>
                 {builders.map(b => (
                   <option key={b.id} value={b.id} style={b.availability !== 'Available' ? { color: COLORS.slate400 } : undefined}>{builderOptionLabel(b)}</option>
                 ))}
               </select>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 10px 0', fontSize: '12px', fontWeight: 600, color: COLORS.slate500, cursor: 'pointer' }}>
+                <input type="checkbox" checked={ignoreSkills} onChange={(e) => setIgnoreSkills(e.target.checked)} />
+                Show all builders (ignore skills)
+              </label>
               {assignedBuilderId && (
                 <>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 14px 0', fontSize: '13px', fontWeight: 600, color: COLORS.slate900, cursor: 'pointer' }}>

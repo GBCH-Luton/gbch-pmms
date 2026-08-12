@@ -963,7 +963,13 @@ export function resolveCategoryDivision(category, categoriesSettingsRow) {
   return categoriesSettingsRow?.setting_value?.[category]?.division || 'Maintenance'
 }
 
-export async function fetchAssignableStaffForCategory(category) {
+// ignoreSkills: true bypasses the skill-narrowing below entirely -- the
+// override a manager reaches for when they need to assign outside a
+// builder's tagged skills (Raise Ticket, Pipeline's reassign/bulk-reassign)
+// rather than the skill filter just silently hiding that person as an
+// option with no way around it. Directors approved this 2026-08-12: the
+// filter itself stays as the default, only an explicit opt-in bypasses it.
+export async function fetchAssignableStaffForCategory(category, { ignoreSkills = false } = {}) {
   const { data: categoriesRow } = await supabase
     .schema('pmms')
     .from('settings')
@@ -998,7 +1004,7 @@ export async function fetchAssignableStaffForCategory(category) {
   // unchanged. A builder with no skills tagged at all is left untouched
   // (eligible for everything), so tagging is opt-in and nothing existing
   // breaks for anyone an admin hasn't gone and tagged.
-  const filtered = categoryDivision === 'Maintenance'
+  const filtered = (categoryDivision === 'Maintenance' && !ignoreSkills)
     ? eligible.filter(s => !s.skills?.length || s.skills.includes(category))
     : eligible
 
