@@ -795,10 +795,15 @@ export default function AdminPipeline({
       <KpiTiles kpis={kpis} onTileClick={applyKpiFilter} />
 
       {/* Pipeline filters -- the day-to-day triage filters a manager uses
-          constantly stay in their own row; Division/date range/export are a
-          distinct "generate a report" action, not something reached for on
-          every visit, so they get their own labeled section below rather
-          than being crammed into the same row. */}
+          constantly stay in their own row; date range/export are a distinct
+          "generate a report" action, not something reached for on every
+          visit, so they get their own labeled section below rather than
+          being crammed into the same row. Division moved up here (out of
+          that section) -- it's a real day-to-day triage filter for Admin
+          and an unscoped manager (e.g. Maintenance Manager) once more than
+          one division exists, not just a report parameter; a
+          division-scoped manager never needs it, since their own tickets
+          are already the only ones they can see. */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
         <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={filterSelectStyle}>
           <option value="All">All Statuses</option>
@@ -812,6 +817,14 @@ export default function AdminPipeline({
           <option value="CompletedAll">Completed (all, incl. signed off)</option>
           <option value="Cancelled">Cancelled</option>
         </select>
+        {!profile.division && (
+          <select value={divisionFilter} onChange={(e) => setDivisionFilter(e.target.value)} style={filterSelectStyle}>
+            <option value="All">All Divisions</option>
+            {divisionOptions.map(d => (
+              <option key={d} value={d}>{d}</option>
+            ))}
+          </select>
+        )}
         <div style={{ width: '220px' }}>
           <PropertySearchSelect properties={properties} value={propertyFilter} onChange={setPropertyFilter} placeholder="All Properties" />
         </div>
@@ -866,37 +879,33 @@ export default function AdminPipeline({
         </button>
       </div>
 
+      {/* Given its own accent colour (indigo) rather than the neutral
+          slate every other section on this page uses -- it was previously
+          easy to miss entirely sitting flush against the filter row above
+          it, both grey-on-grey. */}
       <div style={{ marginBottom: '16px' }}>
         <button
           onClick={() => setReportSectionOpen(prev => !prev)}
           style={{
             display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between', gap: '12px',
-            padding: '10px 16px', background: COLORS.slate100, border: `1px solid ${COLORS.slate200}`, borderRadius: '12px',
-            cursor: 'pointer', fontSize: '11px', fontWeight: 800, color: COLORS.slate500, textTransform: 'uppercase', letterSpacing: '0.05em',
+            padding: '12px 16px', background: COLORS.indigo100, border: `1px solid ${COLORS.indigo700}`, borderRadius: '12px',
+            cursor: 'pointer', fontSize: '12.5px', fontWeight: 800, color: COLORS.indigo700, textTransform: 'uppercase', letterSpacing: '0.05em',
+            boxShadow: '0 1px 3px rgba(67,56,202,0.15)',
           }}
         >
-          <span>📋 Generate a report</span>
-          <span style={{ fontSize: '13px', fontWeight: 700, color: COLORS.slate400, textTransform: 'none', letterSpacing: 0 }}>
+          <span>🖨️ Generate a Report</span>
+          <span style={{ fontSize: '13px', fontWeight: 700, color: COLORS.indigo700, textTransform: 'none', letterSpacing: 0 }}>
             {reportSectionOpen ? '▲ Collapse' : '▼ Expand'}
           </span>
         </button>
         {reportSectionOpen && (
           <div style={{
-            display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'flex-end',
+            display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center',
             marginTop: '8px', padding: '12px 16px', borderRadius: '12px',
-            border: `1px solid ${COLORS.slate200}`, background: COLORS.slate50,
+            border: `1px solid ${COLORS.indigo100}`, background: COLORS.white,
           }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, marginBottom: '4px' }}>Division</label>
-              <select value={divisionFilter} onChange={(e) => setDivisionFilter(e.target.value)} style={filterSelectStyle}>
-                <option value="All">All Divisions</option>
-                {divisionOptions.map(d => (
-                  <option key={d} value={d}>{d}</option>
-                ))}
-              </select>
-            </div>
-            <p style={{ margin: 0, fontSize: '12px', color: COLORS.slate400 }}>Uses the date range and other filters set above.</p>
-            <button onClick={() => setReportOpen(true)} style={{ padding: '9px 16px', borderRadius: '10px', border: 'none', background: COLORS.slate900, color: COLORS.white, fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
+            <p style={{ margin: 0, fontSize: '12px', color: COLORS.slate500 }}>Uses the status, division, date range, and other filters set above.</p>
+            <button onClick={() => setReportOpen(true)} style={{ padding: '9px 16px', borderRadius: '10px', border: 'none', background: COLORS.indigo700, color: COLORS.white, fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
               🖨️ Print / Export
             </button>
           </div>
