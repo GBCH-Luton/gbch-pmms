@@ -17,17 +17,21 @@
 // AdminRaiseTicket.jsx.
 
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { COLORS } from '../lib/colors'
 import { logLoginEvent } from '../lib/loginEvents'
 import { uploadTicketAttachments, formatUploadProgress } from '../lib/ticketAttachments'
 import { fetchMaintenanceCategories, sortedCategoryEntries, isUnlistedTag, unlistedTagFor, unlistedLabelFor, calculatePriorityScore } from '../lib/maintenanceCategories'
 import { attachBuilderSafeProperties } from '../lib/properties'
-import { statusColour, statusLabel, postSystemComment, postAuditEvent, KpiTiles } from './admin/shared'
+import { statusColour, statusLabel, postSystemComment, postAuditEvent, KpiTiles, resolveStaffPhotoUrl } from './admin/shared'
+import { NavIcon } from '../lib/icons'
 import PropertySearchSelect from '../components/PropertySearchSelect'
 import VoiceInputButton from '../components/VoiceInputButton'
 import AttachmentMedia from '../components/AttachmentMedia'
 import TicketMediaPicker from '../components/TicketMediaPicker'
+import TicketAttachmentGallery from '../components/TicketAttachmentGallery'
+import PhotoLightbox from '../components/PhotoLightbox'
 import gbchLogo from '../assets/gbch-logo.svg'
 
 const ROOM_OPTIONS = ['Kitchen', 'Bathroom', 'Communal Area', 'Bedroom', 'Hallways / Stairs', 'Garden', 'Other Area...']
@@ -42,8 +46,29 @@ const fieldLabelStyle = { margin: '0 0 8px 0', fontSize: '11px', fontWeight: 600
 const inputStyle = { width: '100%', height: '44px', padding: '0 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', boxSizing: 'border-box' }
 const cardStyle = { background: COLORS.white, borderRadius: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', padding: '20px', marginBottom: '16px' }
 
+// Same 3 things this dashboard has always done -- raise, track, sign off --
+// now presented as a left-nav shell instead of a top button row, matching
+// the Admin/Manager shell (pages/AdminDashboard.jsx) look for look: same
+// navy sidebar, same collapse rail, same avatar-and-name footer. Kept as
+// its own component rather than reusing that one directly -- it's deeply
+// wired to Admin/Manager-only concerns (18 nav items, Pipeline filter
+// hand-off props, Settings/Admin/View As popover) that don't apply here,
+// and a submitter's 3 items are simple enough not to need any of that.
+const NAV_ITEMS = [
+  { key: 'pipeline', label: 'Pipeline', icon: 'pipeline' },
+  { key: 'new', label: 'Report an Issue', icon: 'ticket' },
+  { key: 'signoff', label: 'Sign Off', icon: 'check' },
+]
+
 export default function SubmitterDashboard({ profile }) {
-  const [tab, setTab] = useState('pipeline') // 'new' | 'pipeline' | 'signoff'
+  // Same ?page= pattern as the Admin shell -- survives a browser refresh
+  // instead of always resetting to Pipeline.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const currentPage = searchParams.get('page') || 'pipeline'
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try { return localStorage.getItem('pmms_sidebar_collapsed') === 'true' } catch { return false }
+  })
   const [signingOut, setSigningOut] = useState(false)
   const [signOffCount, setSignOffCount] = useState(0)
 
@@ -61,48 +86,183 @@ export default function SubmitterDashboard({ profile }) {
     setSignOffCount(count || 0)
   }
 
+  function toggleSidebarCollapsed() {
+    setSidebarCollapsed(prev => {
+      const next = !prev
+      try { localStorage.setItem('pmms_sidebar_collapsed', String(next)) } catch { /* ignore */ }
+      return next
+    })
+  }
+
+  function goToPage(key) {
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev)
+      next.set('page', key)
+      return next
+    }, { replace: true })
+    setSidebarOpen(false)
+  }
+
   async function handleSignOut() {
     setSigningOut(true)
     await logLoginEvent(profile, profile.email, 'Signed Out')
     await supabase.auth.signOut()
   }
 
-  return (
-    <div style={{ minHeight: '100vh', background: COLORS.slate100, fontFamily: 'system-ui, sans-serif', paddingTop: 'var(--pmms-banner-offset, 0px)' }}>
-      <div style={{ background: COLORS.brandNavy, padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <img src={gbchLogo} alt="GBCH" style={{ height: '28px' }} />
-          <span style={{ color: COLORS.white, fontWeight: 800, fontSize: '14px' }}>PMMS · Ticket Submitter</span>
-        </div>
+  const navButtonStyle = (active) => ({
+    display: 'flex', alignItems: 'center', gap: '10px', width: '100%', textAlign: 'left', padding: '6px 12px', marginBottom: '1px',
+    borderRadius: '8px', border: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: active ? 700 : 400,
+    background: active ? COLORS.greenDark : 'transparent', color: COLORS.white, fontFamily: 'inherit',
+  })
+  const navIconStyle = { width: '18px', flexShrink: 0, textAlign: 'center', fontSize: '14px', lineHeight: 1 }
+
+  // Instantiated twice (desktop rail + mobile drawer), same as the Admin
+  // shell -- allowCollapse only true for the desktop one.
+  function SidebarContent({ allowCollapse = false }) {
+    const isCollapsed = allowCollapse && sidebarCollapsed
+
+    return (
+      <>
+        {allowCollapse && (
+          <button
+            onClick={toggleSidebarCollapsed}
+            title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            style={{
+              position: 'absolute', top: '50%', right: '-12px', transform: 'translateY(-50%)', width: '24px', height: '24px', borderRadius: '50%',
+              background: COLORS.brandNavy, border: '1px solid rgba(255,255,255,0.18)', boxShadow: '0 2px 6px rgba(0,0,0,0.25)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: COLORS.white, zIndex: 10,
+            }}
+          >
+            <span style={{ display: 'flex', transform: isCollapsed ? 'rotate(180deg)' : 'none' }}>
+              <NavIcon name="chevronLeft" size={13} />
+            </span>
+          </button>
+        )}
+
         <button
-          onClick={handleSignOut}
-          disabled={signingOut}
-          style={{ background: 'rgba(255,255,255,0.1)', color: COLORS.white, border: 'none', borderRadius: '8px', padding: '8px 14px', fontSize: '12px', fontWeight: 700, cursor: signingOut ? 'default' : 'pointer' }}
+          onClick={() => goToPage('pipeline')}
+          style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'none', border: 'none', padding: '16px 20px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.1)', width: '100%', textAlign: 'left', justifyContent: isCollapsed ? 'center' : 'flex-start' }}
         >
-          {signingOut ? 'Signing out...' : 'Sign out'}
+          <img src={gbchLogo} alt="GBCH" style={{ height: '32px', flexShrink: 0 }} />
+          {!isCollapsed && <span style={{ fontSize: '15px', fontWeight: 800, color: COLORS.white, whiteSpace: 'nowrap' }}>PMMS</span>}
         </button>
+
+        <nav className="pmms-sidebar-nav" style={{ flex: 1, padding: '8px 10px', overflowY: 'auto', overflowX: 'hidden' }}>
+          {NAV_ITEMS.map(item => {
+            const alertCount = item.key === 'signoff' ? signOffCount : 0
+            return (
+              <button
+                key={item.key}
+                onClick={() => goToPage(item.key)}
+                style={{ ...navButtonStyle(currentPage === item.key), justifyContent: isCollapsed ? 'center' : 'flex-start', padding: isCollapsed ? '8px 0' : '6px 12px' }}
+              >
+                <span style={{ ...navIconStyle, position: 'relative' }}>
+                  <NavIcon name={item.icon} />
+                  {isCollapsed && alertCount > 0 && (
+                    <span style={{ position: 'absolute', top: '-3px', right: '-1px', width: '8px', height: '8px', borderRadius: '50%', background: COLORS.red600, border: `1.5px solid ${COLORS.brandNavy}` }} />
+                  )}
+                </span>
+                {!isCollapsed && (
+                  <span style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label}</span>
+                    {alertCount > 0 && (
+                      <span style={{ background: COLORS.red600, color: COLORS.white, fontSize: '11px', fontWeight: 800, borderRadius: '999px', padding: '1px 8px', marginLeft: '8px', minWidth: '20px', textAlign: 'center', flexShrink: 0 }}>
+                        {alertCount}
+                      </span>
+                    )}
+                  </span>
+                )}
+              </button>
+            )
+          })}
+        </nav>
+
+        <div style={{ padding: '12px 16px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '4px', marginBottom: '10px', justifyContent: isCollapsed ? 'center' : 'flex-start' }}>
+            {resolveStaffPhotoUrl(profile.photo_url) ? (
+              <img src={resolveStaffPhotoUrl(profile.photo_url)} alt="" style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+            ) : (
+              <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'rgba(255,255,255,0.15)', color: COLORS.white, fontSize: '13px', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                {(profile.name || '?').split(' ').map(p => p[0]).slice(0, 2).join('').toUpperCase()}
+              </div>
+            )}
+            {!isCollapsed && (
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <p style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: COLORS.white, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{profile.name}</p>
+                <p style={{ margin: 0, fontSize: '12px', color: 'rgba(255,255,255,0.6)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Ticket Submitter</p>
+              </div>
+            )}
+          </div>
+          <button
+            onClick={handleSignOut}
+            disabled={signingOut}
+            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', justifyContent: isCollapsed ? 'center' : 'flex-start', padding: isCollapsed ? '8px 0' : '8px 12px', background: 'rgba(255,255,255,0.1)', color: COLORS.white, border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: signingOut ? 'default' : 'pointer' }}
+          >
+            <span style={navIconStyle}><NavIcon name="logout" /></span>
+            {!isCollapsed && <span>{signingOut ? 'Signing out...' : 'Sign out'}</span>}
+          </button>
+        </div>
+      </>
+    )
+  }
+
+  return (
+    <div style={{ display: 'flex', minHeight: '100vh', background: COLORS.slate100, fontFamily: 'system-ui, sans-serif' }}>
+
+      {/* Desktop sidebar */}
+      <div
+        className="admin-sidebar-desktop"
+        style={{
+          width: sidebarCollapsed ? '64px' : '240px', minWidth: sidebarCollapsed ? '64px' : '240px',
+          background: COLORS.brandNavy, display: 'flex', flexDirection: 'column', position: 'sticky',
+          top: 'var(--pmms-banner-offset, 0px)', height: 'calc(100vh - var(--pmms-banner-offset, 0px))',
+          transition: 'width 0.2s ease, min-width 0.2s ease',
+        }}
+      >
+        <SidebarContent allowCollapse />
       </div>
 
-      <div style={{ maxWidth: '640px', margin: '0 auto', padding: '20px' }}>
-        <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: COLORS.slate500 }}>Signed in as {profile.name}</p>
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', paddingTop: 'var(--pmms-banner-offset, 0px)' }}>
 
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-          <button onClick={() => setTab('pipeline')} style={{ ...choiceBtn(tab === 'pipeline'), flex: 1 }}>Pipeline</button>
-          <button onClick={() => setTab('new')} style={{ ...choiceBtn(tab === 'new'), flex: 1 }}>Report an Issue</button>
-          <button onClick={() => setTab('signoff')} style={{ ...choiceBtn(tab === 'signoff'), flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-            Sign Off
-            {signOffCount > 0 && (
-              <span style={{ background: tab === 'signoff' ? 'rgba(255,255,255,0.3)' : COLORS.red600, color: COLORS.white, fontSize: '10px', fontWeight: 800, borderRadius: '999px', minWidth: '17px', padding: '1px 5px' }}>
-                {signOffCount}
-              </span>
-            )}
+        {/* Mobile top bar */}
+        <div
+          className="admin-mobile-topbar"
+          style={{ alignItems: 'center', justifyContent: 'space-between', background: COLORS.brandNavy, padding: '14px 16px', position: 'sticky', top: 'var(--pmms-banner-offset, 0px)', zIndex: 20 }}
+        >
+          <button onClick={() => goToPage('pipeline')} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>
+            <img src={gbchLogo} alt="GBCH" style={{ height: '28px' }} />
+            <span style={{ color: COLORS.white, fontWeight: 800, fontSize: '14px' }}>PMMS</span>
+          </button>
+          <button
+            onClick={() => setSidebarOpen(true)}
+            aria-label="Menu"
+            style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '4px', background: 'none', border: 'none', padding: '8px', cursor: 'pointer' }}
+          >
+            <span style={{ width: '22px', height: '2px', background: COLORS.white, borderRadius: '2px' }} />
+            <span style={{ width: '22px', height: '2px', background: COLORS.white, borderRadius: '2px' }} />
+            <span style={{ width: '22px', height: '2px', background: COLORS.white, borderRadius: '2px' }} />
           </button>
         </div>
 
-        {tab === 'new' && <NewReportForm profile={profile} onSubmitted={() => setTab('pipeline')} />}
-        {tab === 'pipeline' && <PipelineList profile={profile} />}
-        {tab === 'signoff' && <SignOffList profile={profile} onChanged={fetchSignOffCount} />}
+        {/* Main content -- full width, matching the Admin shell (individual
+            forms below still cap their own width where that's genuinely
+            more readable, e.g. NewReportForm; list/detail views stretch). */}
+        <div style={{ flex: 1, padding: '20px', width: '100%', boxSizing: 'border-box' }}>
+          {currentPage === 'new' && <NewReportForm profile={profile} onSubmitted={() => goToPage('pipeline')} />}
+          {currentPage === 'pipeline' && <PipelineList profile={profile} />}
+          {currentPage === 'signoff' && <SignOffList profile={profile} onChanged={fetchSignOffCount} />}
+        </div>
       </div>
+
+      {/* Mobile drawer */}
+      {sidebarOpen && (
+        <div style={{ position: 'fixed', top: 'var(--pmms-banner-offset, 0px)', left: 0, right: 0, bottom: 0, zIndex: 100, display: 'flex' }}>
+          <div style={{ width: '260px', maxWidth: '80vw', background: COLORS.brandNavy, height: '100%', display: 'flex', flexDirection: 'column' }}>
+            <SidebarContent />
+          </div>
+          <div onClick={() => setSidebarOpen(false)} style={{ flex: 1, background: 'rgba(15,23,42,0.5)' }} />
+        </div>
+      )}
     </div>
   )
 }
@@ -196,7 +356,7 @@ function NewReportForm({ profile, onSubmitted }) {
 
   if (success) {
     return (
-      <div style={cardStyle}>
+      <div style={{ maxWidth: '640px', ...cardStyle }}>
         <p style={{ margin: '0 0 16px 0', fontSize: '14px', fontWeight: 600, color: COLORS.green700 }}>✓ {success}</p>
         <button onClick={() => setSuccess('')} style={{ ...choiceBtn(false), width: '100%' }}>Report Another Issue</button>
       </div>
@@ -204,7 +364,7 @@ function NewReportForm({ profile, onSubmitted }) {
   }
 
   return (
-    <div style={cardStyle}>
+    <div style={{ maxWidth: '640px', ...cardStyle }}>
       <p style={fieldLabelStyle}>1. Property</p>
       <PropertySearchSelect properties={properties} value={propertyId} onChange={(id) => { setPropertyId(id); setRoom(null); setCategory(null); setIssueTag(null) }} />
 
@@ -305,6 +465,7 @@ function PipelineList({ profile }) {
   const [statusFilter, setStatusFilter] = useState('All')
   const [viewingTicket, setViewingTicket] = useState(null)
   const [detailLoading, setDetailLoading] = useState(false)
+  const [completionLightboxOpen, setCompletionLightboxOpen] = useState(false)
 
   useEffect(() => {
     fetchMine()
@@ -377,9 +538,9 @@ function PipelineList({ profile }) {
             <p style={{ margin: '0 0 6px 0', fontSize: '10px', fontWeight: 800, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               You reported · {new Date(viewingTicket.created_at).toLocaleDateString()}
             </p>
-            {viewingTicket.photo_url && (
-              <AttachmentMedia url={viewingTicket.photo_url} alt="Reported issue" style={{ width: '100%', height: '160px', objectFit: 'cover', borderRadius: '10px', marginBottom: '8px' }} />
-            )}
+            <div style={{ marginBottom: '8px' }}>
+              <TicketAttachmentGallery ticketId={viewingTicket.id} fallbackUrl={viewingTicket.photo_url} mediaHeight="160px" />
+            </div>
             {viewingTicket.description && (
               <p style={{ margin: '0 0 20px 0', fontSize: '13px', color: COLORS.slate600, background: COLORS.slate50, borderRadius: '8px', padding: '10px 12px' }}>{viewingTicket.description}</p>
             )}
@@ -390,10 +551,18 @@ function PipelineList({ profile }) {
                   Completed work{viewingTicket.completed_at ? ` · ${new Date(viewingTicket.completed_at).toLocaleDateString()}` : ''}
                 </p>
                 {viewingTicket.completion_photo_url && (
-                  <AttachmentMedia url={viewingTicket.completion_photo_url} alt="Completed work" style={{ width: '100%', height: '160px', objectFit: 'cover', borderRadius: '10px', marginBottom: '8px' }} />
+                  <AttachmentMedia
+                    url={viewingTicket.completion_photo_url}
+                    alt="Completed work"
+                    style={{ width: '100%', height: '160px', objectFit: 'cover', borderRadius: '10px', marginBottom: '8px' }}
+                    onClick={() => setCompletionLightboxOpen(true)}
+                  />
                 )}
                 {viewingTicket.completion_note && (
                   <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate600, background: COLORS.slate50, borderRadius: '8px', padding: '10px 12px' }}>{viewingTicket.completion_note}</p>
+                )}
+                {completionLightboxOpen && (
+                  <PhotoLightbox url={viewingTicket.completion_photo_url} onClose={() => setCompletionLightboxOpen(false)} />
                 )}
               </>
             )}
@@ -474,6 +643,10 @@ function SignOffList({ profile, onChanged }) {
   const [confirmId, setConfirmId] = useState(null)
   const [archivingId, setArchivingId] = useState(null)
   const [archiveError, setArchiveError] = useState('')
+  // Only one lightbox can be open at once regardless of which card's
+  // completion photo triggered it -- the reported-photo side already gets
+  // its own lightbox for free from TicketAttachmentGallery below.
+  const [completionLightboxUrl, setCompletionLightboxUrl] = useState(null)
 
   useEffect(() => {
     fetchPending()
@@ -547,18 +720,17 @@ function SignOffList({ profile, onChanged }) {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
               <div>
                 <p style={{ margin: '0 0 6px 0', fontSize: '10px', fontWeight: 800, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.05em' }}>You reported</p>
-                {t.photo_url ? (
-                  <AttachmentMedia url={t.photo_url} alt="Reported issue" style={{ width: '100%', height: '110px', objectFit: 'cover', borderRadius: '8px' }} />
-                ) : (
-                  <div style={{ width: '100%', height: '110px', borderRadius: '8px', background: COLORS.slate50, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <span style={{ fontSize: '11px', color: COLORS.slate400, fontStyle: 'italic' }}>No photo</span>
-                  </div>
-                )}
+                <TicketAttachmentGallery ticketId={t.id} fallbackUrl={t.photo_url} mediaHeight="110px" emptyLabel="No photo" />
               </div>
               <div>
                 <p style={{ margin: '0 0 6px 0', fontSize: '10px', fontWeight: 800, color: COLORS.green600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Completed work</p>
                 {t.completion_photo_url ? (
-                  <AttachmentMedia url={t.completion_photo_url} alt="Completed work" style={{ width: '100%', height: '110px', objectFit: 'cover', borderRadius: '8px' }} />
+                  <AttachmentMedia
+                    url={t.completion_photo_url}
+                    alt="Completed work"
+                    style={{ width: '100%', height: '110px', objectFit: 'cover', borderRadius: '8px' }}
+                    onClick={() => setCompletionLightboxUrl(t.completion_photo_url)}
+                  />
                 ) : (
                   <div style={{ width: '100%', height: '110px', borderRadius: '8px', background: COLORS.slate50, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <span style={{ fontSize: '11px', color: COLORS.slate400, fontStyle: 'italic' }}>No photo</span>
@@ -592,6 +764,9 @@ function SignOffList({ profile, onChanged }) {
           </div>
         ))}
       </div>
+      {completionLightboxUrl && (
+        <PhotoLightbox url={completionLightboxUrl} onClose={() => setCompletionLightboxUrl(null)} />
+      )}
     </div>
   )
 }
