@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { COLORS } from '../../lib/colors'
-import { distanceMetres, googleMapsEmbedLink, googleMapsRouteEmbedLink, metresToMiles, formatDistanceMetres, ensurePropertyCoords, ensureStaffHomeCoords } from '../../lib/geo'
+import { distanceMetres, googleMapsLink, googleMapsEmbedLink, googleMapsRouteEmbedLink, metresToMiles, formatDistanceMetres, ensurePropertyCoords, ensureStaffHomeCoords } from '../../lib/geo'
 import { attachProperties } from '../../lib/properties'
 import {
   thStyle, tdStyle, actionBtnStyle, filterSelectStyle, formatUKDate, formatUKDateTime, toUkDateTimeInputValue, ukDateTimeInputValueToMs,
   ukDateKey, ukTimeHHMM, minutesLate, shiftDateKey,
   modalOverlayStyle, modalCardStyle, modalTitleStyle, modalLabelStyle,
-  modalErrorStyle, modalCancelBtnStyle, modalConfirmBtnStyle, fetchAssignableBuilders, fetchAssignableStaffForDivision, SHORT_TRIP_REASONS,
+  modalErrorStyle, modalCancelBtnStyle, modalConfirmBtnStyle, fetchAssignableBuilders, fetchAssignableStaffForDivision, fetchLastEndedSessionsToday, SHORT_TRIP_REASONS,
 } from './shared'
 
 const EIGHT_HOURS_MS = 8 * 60 * 60 * 1000
@@ -383,6 +383,11 @@ export default function AdminClocking({ profile, onNavigate }) {
     }
     setLiveSessions(live)
 
+    // "Available" on its own says nothing about how long, or where he was
+    // last -- this is the same clock_out_lat/lng already saved the moment
+    // any job ends (complete or pause), just not previously surfaced here.
+    const lastEndedByBuilder = await fetchLastEndedSessionsToday(assignableBuilders.map(b => b.id), todayKey)
+
     // Merge daily_attendance + activity_log + the live work_sessions just
     // fetched above into one row per builder: their shift, a derived
     // "where are they right now" status, and today's total hours (summed
@@ -408,13 +413,21 @@ export default function AdminClocking({ profile, onNavigate }) {
         }
       }
 
+      let idleSince = null, idleLat = null, idleLng = null
+      if (currentStatus === 'Available') {
+        const lastEnded = lastEndedByBuilder[b.id]
+        idleSince = lastEnded?.ended_at || shift?.clock_in_at || null
+        idleLat = lastEnded?.clock_out_lat ?? null
+        idleLng = lastEnded?.clock_out_lng ?? null
+      }
+
       const todaysShifts = (attendanceData || []).filter(a => a.staff_id === b.id && a.work_date === todayKey)
       const hoursTodayMs = todaysShifts.reduce((sum, s) => {
         const end = s.clock_out_at ? new Date(s.clock_out_at).getTime() : Date.now()
         return sum + (end - new Date(s.clock_in_at).getTime())
       }, 0)
 
-      return { staffId: b.id, staffName: b.name, shift, currentStatus, hoursTodayMs }
+      return { staffId: b.id, staffName: b.name, shift, currentStatus, idleSince, idleLat, idleLng, hoursTodayMs }
     }))
 
     let rows = []
@@ -952,6 +965,19 @@ export default function AdminClocking({ profile, onNavigate }) {
                     }}>
                       {row.currentStatus}
                     </span>
+                    {/* Same clock_out_lat/lng already saved the moment his
+                        last job ended (complete or pause) -- "Available"
+                        alone doesn't say how long or where he was last. */}
+                    {row.currentStatus === 'Available' && row.idleSince && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px', fontSize: '10.5px', fontWeight: 700, color: COLORS.blue700 }}>
+                        <span>idle {formatDuration(Date.now() - new Date(row.idleSince).getTime())}</span>
+                        {row.idleLat != null && row.idleLng != null && (
+                          <a href={googleMapsLink(row.idleLat, row.idleLng)} target="_blank" rel="noreferrer" style={{ color: COLORS.blue700 }}>
+                            📍 last seen
+                          </a>
+                        )}
+                      </div>
+                    )}
                   </td>
                   <td style={{ ...tdStyle, fontWeight: 700, fontFamily: 'monospace' }}>{formatDuration(row.hoursTodayMs)}</td>
                   <td style={{ ...tdStyle, textAlign: 'right' }}>

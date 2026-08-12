@@ -159,6 +159,11 @@ export default function BuilderDashboard({ profile }) {
   // Getting materials myself) was chosen, via status_changed_at, rather
   // than a work_session row (there isn't one while paused).
   const [breakElapsed, setBreakElapsed] = useState(0)
+  // Genuinely-idle timer -- not on a job and not on one of the 3 locked
+  // short trips (those already have breakElapsed above). Covers both
+  // "Away" (openActivity) and plain "nothing queued" idle. See isIdle /
+  // computeIdleSince further down.
+  const [idleElapsed, setIdleElapsed] = useState(0)
   // Unified "why are you stopping" flow -- replaces the old separate
   // Pause-reason-picker and "Couldn't get access" confirm screens (both
   // removed) with one Stop button and one 6-option sheet. See handleStop.
@@ -895,6 +900,15 @@ export default function BuilderDashboard({ profile }) {
       setOpenActivity(null)
     }
 
+    // idleSince is captured from the render that created this closure, i.e.
+    // the moment right before this job started -- see computeIdleSince.
+    if (idleSince) {
+      const idleSeconds = Math.max(0, Math.floor((Date.now() - new Date(idleSince).getTime()) / 1000))
+      if (idleSeconds >= 60) {
+        await postAuditEvent(selectedTicket.id, 'Status Changed', `Idle for ${formatElapsed(idleSeconds)} before starting this job`)
+      }
+    }
+
     await postAuditEvent(selectedTicket.id, 'Status Changed', `${previousStatus} → In Progress (clocked in)`)
 
     await fetchTickets()
@@ -979,6 +993,13 @@ export default function BuilderDashboard({ profile }) {
       .eq('ticket_id', selectedTicket.id)
       .is('ended_at', null)
 
+    // Completing a job always starts a fresh idle stretch -- reset the
+    // guard so check-idle-builders can alert again for this one, not stay
+    // silenced by a guard left over from earlier in the shift.
+    if (todayShift) {
+      await supabase.schema('pmms').from('daily_attendance').update({ idle_alert_sent_at: null }).eq('id', todayShift.id)
+    }
+
     // Gardens tracking: a completed garden-related job stamps the property's
     // "last attended" record automatically -- the only path for a staff visit,
     // since a contractor visit (no PMMS login) has to be entered by hand on
@@ -1042,6 +1063,13 @@ export default function BuilderDashboard({ profile }) {
       .update({ ended_at: now, clock_out_lat: position?.latitude ?? null, clock_out_lng: position?.longitude ?? null })
       .eq('ticket_id', ticket.id)
       .is('ended_at', null)
+
+    // Only for a genuine idle-causing pause -- the 3 short trips (keepLocked)
+    // already have their own break-alert guard (long_break_alert_sent_at
+    // above); this one is specifically for check-idle-builders.
+    if (todayShift && !SHORT_TRIP_REASONS.includes(reason)) {
+      await supabase.schema('pmms').from('daily_attendance').update({ idle_alert_sent_at: null }).eq('id', todayShift.id)
+    }
 
     await postAuditEvent(ticket.id, 'Status Changed', `${previousStatus} → On Hold (${reason}${note ? ' — ' + note : ''})`)
 
@@ -1150,6 +1178,16 @@ export default function BuilderDashboard({ profile }) {
 
     if (sessionError) {
       console.error('Failed to start work session:', sessionError)
+    }
+
+    // Only fires for a genuine idle resume -- computeIdleSince() already
+    // returns null while this ticket is one of the 3 locked short trips,
+    // since that already has its own breakElapsed clock and isn't "idle".
+    if (idleSince) {
+      const idleSeconds = Math.max(0, Math.floor((Date.now() - new Date(idleSince).getTime()) / 1000))
+      if (idleSeconds >= 60) {
+        await postAuditEvent(selectedTicket.id, 'Status Changed', `Idle for ${formatElapsed(idleSeconds)} before resuming`)
+      }
     }
 
     await postAuditEvent(selectedTicket.id, 'Status Changed', `${previousStatus} → In Progress (resumed)`)
@@ -1518,6 +1556,35 @@ export default function BuilderDashboard({ profile }) {
   const onBreakTicket = tickets.find(t => t.status === 'On Hold' && SHORT_TRIP_REASONS.includes(t.hold_reason)) || null
   const lockedTicket = activeTicket || onBreakTicket || null
 
+  const isIdle = inProgressTickets.length === 0 && !lockedTicket
+
+  // "Idle since" -- the moment he stopped actively working, if he's not on
+  // any job or (for the 3 short trips) locked to one. Reused for both the
+  // running clock below and the idle-duration line posted the moment he
+  // starts his next job (see handleClockIn/handleResumeWork), so what he
+  // sees live and what ends up in the log always agree. A plain function
+  // (not a hook) so those handlers, defined earlier in this file, can call
+  // it too -- closures don't care about textual order within the component.
+  function computeIdleSince() {
+    if (inProgressTickets.length > 0 || lockedTicket) return null
+    if (openActivity) return openActivity.started_at
+    const stopTimes = tickets
+      .filter(t => t.status === 'Completed' || (t.status === 'On Hold' && !SHORT_TRIP_REASONS.includes(t.hold_reason)))
+      .map(t => t.status_changed_at)
+      .filter(Boolean)
+      .sort()
+    return stopTimes.slice(-1)[0] || todayShift?.clock_in_at || null
+  }
+
+  const idleSince = computeIdleSince()
+
+  useEffect(() => {
+    if (!idleSince) { setIdleElapsed(0); return }
+    setIdleElapsed(Math.max(0, Math.floor((Date.now() - new Date(idleSince).getTime()) / 1000)))
+    const interval = setInterval(() => setIdleElapsed(prev => prev + 1), 1000)
+    return () => clearInterval(interval)
+  }, [idleSince])
+
   // Without this, the guards in openTicket/closeTicket only stop someone
   // *leaving* an already-open lock screen -- a fresh login or page refresh
   // with a job already running would land on the ordinary dashboard
@@ -1855,6 +1922,25 @@ export default function BuilderDashboard({ profile }) {
           </div>
         )}
       </div>
+
+      {/* Running idle clock -- deliberately at the very top, above the more
+          detailed Away/idle banners below (which still show their own
+          specifics and action buttons). The point of this one is just to
+          be big and unmissable: he shouldn't have to wonder whether not
+          working is being noticed -- see isIdle/computeIdleSince above,
+          and the matching audit log line posted the moment he starts his
+          next job. */}
+      {isIdle && (
+        <div style={{ maxWidth: '600px', margin: '10px auto 0 auto', padding: '0 16px' }}>
+          <div style={{ background: COLORS.slate900, borderRadius: '16px', padding: '18px 20px', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+            <p style={{ margin: '0 0 4px 0', fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.75)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              {openActivity ? `Away — ${openActivity.activity_type === 'Travel' ? 'Travelling' : 'On break'}` : 'Not working right now'}
+            </p>
+            <p style={{ margin: '0 0 4px 0', fontSize: '36px', fontWeight: 800, color: COLORS.white, fontFamily: 'monospace', letterSpacing: '0.02em' }}>{formatElapsed(idleElapsed)}</p>
+            <p style={{ margin: 0, fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.7)' }}>This is recorded, and your manager can see it.</p>
+          </div>
+        </div>
+      )}
 
       {/* Day shift banner -- only ever reachable once past the daily
           clock-in gate above, so todayShift is always set here. */}

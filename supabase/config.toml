@@ -26,3 +26,6 @@ verify_jwt = false
 
 [functions.check-long-running-jobs]
 verify_jwt = false
+
+[functions.check-idle-builders]
+verify_jwt = false

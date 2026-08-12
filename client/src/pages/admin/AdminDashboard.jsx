@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { COLORS } from '../../lib/colors'
-import { priorityTierLabel, fetchFlaggedClockingCount, isTicketStuck, KpiTiles, fetchComplianceAgingCounts, fetchVoidAgingCounts, fetchGardenReviewAging, computeAvgResponseMs, formatDuration, fetchPriorityThresholds, fetchAssignableBuilders, fetchAssignableStaffForDivision, ukDateKey, formatUKDateTime, minutesLate, SHORT_TRIP_REASONS } from './shared'
+import { priorityTierLabel, fetchFlaggedClockingCount, isTicketStuck, KpiTiles, fetchComplianceAgingCounts, fetchVoidAgingCounts, fetchGardenReviewAging, computeAvgResponseMs, formatDuration, fetchPriorityThresholds, fetchAssignableBuilders, fetchAssignableStaffForDivision, fetchLastEndedSessionsToday, ukDateKey, formatUKDateTime, minutesLate, SHORT_TRIP_REASONS } from './shared'
 import { NavIcon } from '../../lib/icons'
+import { googleMapsLink } from '../../lib/geo'
 
 const DEFAULT_NEW_PROPERTY_WINDOW_HOURS = 48
 
@@ -215,6 +216,11 @@ function TeamWhereabouts({ profile, onNavigate }) {
       ticketsById = Object.fromEntries((ticketRows || []).map(t => [t.id, t]))
     }
 
+    // "Available" on its own says nothing about how long, or where he was
+    // last -- this is the same clock_out_lat/lng already saved the moment
+    // any job ends (complete or pause), just not previously surfaced here.
+    const lastEndedByBuilder = await fetchLastEndedSessionsToday(assignableBuilders.map(b => b.id), todayKey)
+
     const statuses = {}
     assignableBuilders.forEach(b => {
       const shift = (attendanceData || [])
@@ -241,7 +247,15 @@ function TeamWhereabouts({ profile, onNavigate }) {
           tone = 'available'
         }
       }
-      statuses[b.id] = { status, tone }
+
+      let idleSince = null, idleLat = null, idleLng = null
+      if (tone === 'available') {
+        const lastEnded = lastEndedByBuilder[b.id]
+        idleSince = lastEnded?.ended_at || shift?.clock_in_at || null
+        idleLat = lastEnded?.clock_out_lat ?? null
+        idleLng = lastEnded?.clock_out_lng ?? null
+      }
+      statuses[b.id] = { status, tone, idleSince, idleLat, idleLng }
     })
     setStatusByStaffId(statuses)
 
@@ -363,16 +377,29 @@ function TeamWhereabouts({ profile, onNavigate }) {
             {visibleBuilders.map(b => {
               const s = statusByStaffId[b.id] || { status: 'Off shift', tone: 'off' }
               const c = chipStyle[s.tone]
+              const idleMs = s.idleSince ? Date.now() - new Date(s.idleSince).getTime() : null
               return (
-                <div key={b.id} style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: '7px', padding: '7px 12px', borderRadius: '999px', background: c.bg, fontSize: '12px', fontWeight: 700 }}>
-                  <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: c.fg }} />
-                  <span
-                    onClick={() => onNavigate?.('builders', { staffId: b.id })}
-                    style={{ color: COLORS.slate900, cursor: onNavigate ? 'pointer' : 'default' }}
-                  >
-                    {b.name.split(' ')[0]}
-                  </span>
-                  <span style={{ color: c.fg }}>{s.status}</span>
+                <div key={b.id} style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '2px', padding: '7px 12px', borderRadius: idleMs != null ? '14px' : '999px', background: c.bg, fontSize: '12px', fontWeight: 700 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                    <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: c.fg }} />
+                    <span
+                      onClick={() => onNavigate?.('builders', { staffId: b.id })}
+                      style={{ color: COLORS.slate900, cursor: onNavigate ? 'pointer' : 'default' }}
+                    >
+                      {b.name.split(' ')[0]}
+                    </span>
+                    <span style={{ color: c.fg }}>{s.status}</span>
+                  </div>
+                  {idleMs != null && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10.5px', fontWeight: 700, color: c.fg, opacity: 0.85 }}>
+                      <span>idle {formatDuration(idleMs)}</span>
+                      {s.idleLat != null && s.idleLng != null && (
+                        <a href={googleMapsLink(s.idleLat, s.idleLng)} target="_blank" rel="noreferrer" style={{ color: c.fg }}>
+                          📍 last seen
+                        </a>
+                      )}
+                    </div>
+                  )}
                 </div>
               )
             })}

@@ -950,6 +950,29 @@ export async function fetchAssignableStaffForDivision(division) {
   return Object.values(byId).sort((a, b) => a.name.localeCompare(b.name))
 }
 
+// For "who's idle right now and since when/where" (Where's the Team,
+// Clocking's Today's Attendance) -- the most recent ended work_sessions row
+// per builder today gives both. Deliberately reuses what
+// handleComplete/handlePause in BuilderDashboard.jsx already save
+// (clock_out_lat/lng the moment a job ends, whether by completing or
+// pausing it) rather than adding any new tracking -- that data just wasn't
+// being surfaced anywhere before.
+export async function fetchLastEndedSessionsToday(staffIds, todayKey) {
+  if (!staffIds?.length) return {}
+  const { data } = await supabase
+    .schema('pmms')
+    .from('work_sessions')
+    .select('builder_id, ticket_id, ended_at, clock_out_lat, clock_out_lng')
+    .in('builder_id', staffIds)
+    .not('ended_at', 'is', null)
+    .gte('ended_at', `${todayKey}T00:00:00`)
+    .order('ended_at', { ascending: false })
+
+  const byBuilder = {}
+  ;(data || []).forEach(s => { if (!byBuilder[s.builder_id]) byBuilder[s.builder_id] = s })
+  return byBuilder
+}
+
 // Staff eligible to be assigned a ticket in a given category, taking the
 // Divisions feature into account: looks up which division the category
 // belongs to (pmms.settings['maintenance_categories'][category].division,

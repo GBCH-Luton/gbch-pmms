@@ -116,6 +116,7 @@ export default function AdminSettings() {
   const [clockFlagLookbackDays, setClockFlagLookbackDays] = useState(30)
   const [longBreakAlertMinutes, setLongBreakAlertMinutes] = useState(45)
   const [longRunningJobAlertHours, setLongRunningJobAlertHours] = useState(6)
+  const [idleAlertMinutes, setIdleAlertMinutes] = useState(30)
   const [clockingSaving, setClockingSaving] = useState(false)
   const [clockingSaved, setClockingSaved] = useState(false)
 
@@ -249,6 +250,7 @@ export default function AdminSettings() {
       if (map.clock_flag_lookback_days != null) setClockFlagLookbackDays(map.clock_flag_lookback_days)
       if (map.long_break_alert_minutes != null) setLongBreakAlertMinutes(Number(map.long_break_alert_minutes))
       if (map.long_running_job_alert_hours != null) setLongRunningJobAlertHours(Number(map.long_running_job_alert_hours))
+      if (map.idle_alert_minutes != null) setIdleAlertMinutes(Number(map.idle_alert_minutes))
       if (map.daily_clock_in_deadline != null) setDailyClockInDeadline(map.daily_clock_in_deadline)
       if (map.daily_clock_out_reminder_time != null) setDailyClockOutReminderTime(map.daily_clock_out_reminder_time)
       if (map.daily_overtime_threshold_hours != null) setOvertimeThresholdHours(Number(map.daily_overtime_threshold_hours))
@@ -583,6 +585,7 @@ export default function AdminSettings() {
     await saveSetting('clock_flag_lookback_days', Number(clockFlagLookbackDays))
     await saveSetting('long_break_alert_minutes', Number(longBreakAlertMinutes))
     await saveSetting('long_running_job_alert_hours', Number(longRunningJobAlertHours))
+    await saveSetting('idle_alert_minutes', Number(idleAlertMinutes))
     setClockingSaving(false)
     setClockingSaved(true)
     setTimeout(() => setClockingSaved(false), 2000)
@@ -1238,6 +1241,18 @@ export default function AdminSettings() {
               style={inputStyle}
             />
             <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: COLORS.slate400 }}>A single job still "In Progress" this long alerts the builder's manager, once per stretch -- separate from the "Over 8h" row on the Clocking page, which only shows up if a manager happens to look.</p>
+          </div>
+          <div style={{ flex: '1 1 200px' }}>
+            <label style={fieldLabelStyle}>Idle alert (minutes)</label>
+            <input
+              type="number"
+              min="5"
+              step="5"
+              value={idleAlertMinutes}
+              onChange={(e) => setIdleAlertMinutes(e.target.value)}
+              style={inputStyle}
+            />
+            <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: COLORS.slate400 }}>A builder not working on anything this long, despite already having an Assigned job waiting, alerts their manager, once per idle stretch.</p>
           </div>
         </div>
 
