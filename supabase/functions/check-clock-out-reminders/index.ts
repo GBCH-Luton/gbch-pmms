@@ -66,6 +66,85 @@ async function resolveLastKnownLocation(adminClient: any, staffId: string, shift
   return { lat: session.clock_in_lat ?? null, lng: session.clock_in_lng ?? null }
 }
 
+// Matches BuilderDashboard.jsx's own SHORT_TRIP_REASONS -- kept in sync by
+// hand, same as check-long-breaks' own copy, since a Deno function can't
+// import the client bundle.
+const SHORT_TRIP_REASONS = ['Going to the Office', 'Lunch Break', 'Getting materials myself']
+
+// The whole point of Stage 3: closing daily_attendance alone leaves
+// whatever job the builder had open -- either genuinely In Progress, or
+// locked on a short-trip break (On Hold + a SHORT_TRIP_REASONS reason) --
+// running with no end in sight, sometimes into the next day, where Focus
+// Mode would silently re-lock the builder straight back onto it (found
+// live 2026-08-12: a job ran 19+ hours across that exact boundary). Pauses
+// it instead of completing it -- there's no way to know if the work was
+// actually finished -- tagged distinctly so it's obviously a system action,
+// not the builder's own choice, and released (not left on a short-trip
+// hold_reason) so it does NOT re-lock the builder tomorrow. At most one
+// such ticket should ever exist per builder, matching the app's own
+// single-active-job rule.
+async function pauseOpenJob(adminClient: any, staffId: string, backdated: string, lastKnown: { lat: number | null, lng: number | null }) {
+  // Two plain queries rather than one .or()/.in() filter -- simpler to get
+  // right than PostgREST's or-filter syntax for a value ("In Progress")
+  // that itself contains a space, on a function that runs unattended.
+  const { data: inProgressTicket } = await adminClient
+    .schema('pmms')
+    .from('tickets')
+    .select('id, ticket_number, status')
+    .eq('assigned_builder_id', staffId)
+    .eq('status', 'In Progress')
+    .limit(1)
+    .maybeSingle()
+
+  const { data: shortTripTicket } = inProgressTicket ? { data: null } : await adminClient
+    .schema('pmms')
+    .from('tickets')
+    .select('id, ticket_number, status')
+    .eq('assigned_builder_id', staffId)
+    .eq('status', 'On Hold')
+    .in('hold_reason', SHORT_TRIP_REASONS)
+    .limit(1)
+    .maybeSingle()
+
+  const openTicket = inProgressTicket || shortTripTicket
+  if (!openTicket) return false
+
+  const previousStatus = openTicket.status
+  await adminClient
+    .schema('pmms')
+    .from('tickets')
+    .update({
+      status: 'On Hold',
+      status_changed_at: backdated,
+      hold_reason: 'Auto-paused (Day Ended)',
+      hold_note: "System paused this job because the builder's day was auto-clocked-out without resolving it.",
+      stuck_alert_sent_at: null,
+      long_break_alert_sent_at: null,
+      long_running_job_alert_sent_at: null,
+    })
+    .eq('id', openTicket.id)
+
+  await adminClient
+    .schema('pmms')
+    .from('work_sessions')
+    .update({ ended_at: backdated, clock_out_lat: lastKnown.lat, clock_out_lng: lastKnown.lng })
+    .eq('ticket_id', openTicket.id)
+    .is('ended_at', null)
+
+  // actor_id is the builder's own id (not null) so this shows up in their
+  // own History/Where's the Team feed like any other status change --
+  // actor_name is what makes it read as a system action, not a real click.
+  await adminClient.schema('pmms').from('audit_events').insert({
+    ticket_id: openTicket.id,
+    actor_id: staffId,
+    actor_name: 'System (Day Auto-Clockout)',
+    action: 'Status Changed',
+    summary: `${previousStatus} → On Hold (Auto-paused (Day Ended) — builder's day was auto-clocked-out without resolving this job)`,
+  })
+
+  return true
+}
+
 // Same helper as check-stale-shifts/index.ts, copied rather than shared --
 // attendance isn't a per-division concept for a builder (unlike tickets),
 // so every Admin + every manager-accessLevel custom role gets alerted.
@@ -113,6 +192,10 @@ async function fetchAllAdminsAndManagers(adminClient: any) {
 //      backfilled from the builder's own last recorded position that shift
 //      (their last job's clock-out, or clock-in if that job was never
 //      finished) rather than left blank -- see resolveLastKnownLocation.
+//      Also pauses whatever job the builder still had open at that moment
+//      (see pauseOpenJob) -- directors approved this 2026-08-12, after a
+//      job was found still running 19+ hours past its builder's own
+//      auto-clockout, silently re-locking him into it the next morning.
 //
 // This only ever closes TODAY's still-open shift. It does not touch
 // check-stale-shifts.ts's separate next-morning lockout -- that remains
@@ -171,6 +254,7 @@ Deno.serve(async (req: Request) => {
     let reminded = 0
     let managerAlerted = 0
     let autoClosed = 0
+    let jobsPaused = 0
     let recipients: any[] | null = null
 
     for (const shift of openShifts || []) {
@@ -209,10 +293,11 @@ Deno.serve(async (req: Request) => {
           .update({ clock_out_at: backdated, auto_clocked_out: true, clock_out_lat: lastKnown.lat, clock_out_lng: lastKnown.lng })
           .eq('id', shift.id)
         autoClosed += 1
+        if (await pauseOpenJob(adminClient, shift.staff_id, backdated, lastKnown)) jobsPaused += 1
       }
     }
 
-    return new Response(JSON.stringify({ checked: (openShifts || []).length, reminded, managerAlerted, autoClosed }), { status: 200, headers: corsHeaders })
+    return new Response(JSON.stringify({ checked: (openShifts || []).length, reminded, managerAlerted, autoClosed, jobsPaused }), { status: 200, headers: corsHeaders })
   } catch (err) {
     if (err instanceof Response) return err
     return new Response(JSON.stringify({ error: String(err) }), { status: 500, headers: corsHeaders })

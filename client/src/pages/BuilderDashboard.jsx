@@ -853,10 +853,14 @@ export default function BuilderDashboard({ profile }) {
     const now = new Date().toISOString()
     const previousStatus = selectedTicket.status
 
+    // long_running_job_alert_sent_at reset here and on resume (see
+    // handleResumeWork) -- every fresh In Progress stretch starts its own
+    // check-long-running-jobs window, same reasoning as
+    // long_break_alert_sent_at in handlePause.
     const { error: ticketError } = await supabase
       .schema('pmms')
       .from('tickets')
-      .update({ status: 'In Progress', status_changed_at: now, stuck_alert_sent_at: null, mileage_logged: milesLogged, transit_start: transitStart, mileage_logged_at: now })
+      .update({ status: 'In Progress', status_changed_at: now, stuck_alert_sent_at: null, long_running_job_alert_sent_at: null, mileage_logged: milesLogged, transit_start: transitStart, mileage_logged_at: now })
       .eq('id', selectedTicket.id)
 
     if (ticketError) {
@@ -1127,7 +1131,7 @@ export default function BuilderDashboard({ profile }) {
     const { error: ticketError } = await supabase
       .schema('pmms')
       .from('tickets')
-      .update({ status: 'In Progress', status_changed_at: now, stuck_alert_sent_at: null, hold_reason: null, hold_note: null })
+      .update({ status: 'In Progress', status_changed_at: now, stuck_alert_sent_at: null, long_running_job_alert_sent_at: null, hold_reason: null, hold_note: null })
       .eq('id', selectedTicket.id)
 
     if (ticketError) {
