@@ -3,6 +3,14 @@ import { authorizeAdmin } from '../_shared/authorizeAdmin.ts'
 import { generateTempPassword } from '../_shared/tempPassword.ts'
 import { findAuthUserByEmail } from '../_shared/findAuthUserByEmail.ts'
 
+// ILIKE treats _ and % as wildcards -- both are legal characters in a real
+// email's local part, so an unescaped ILIKE lookup could match more than
+// just the intended address. Escaping them keeps this a case-insensitive
+// exact match, not a search.
+function escapeLikePattern(value: string) {
+  return value.replace(/[\\%_]/g, '\\$&')
+}
+
 // Creates a brand-new person: a Supabase Auth login (with a one-time temp
 // password) + their public.staff row + their pmms.staff_roles assignment.
 // Only for people who don't already have a staff record -- re-adding an
@@ -36,10 +44,17 @@ Deno.serve(async (req: Request) => {
     // -- if a duplicate-email row ever exists, .maybeSingle() would return
     // an (ignored) error and null data, letting this silently create a third
     // duplicate instead of refusing.
+    //
+    // .ilike (not .eq) -- `email` here is already lowercased above, but an
+    // existing row could still have capitals in it (free-typed on a table
+    // PMMS doesn't fully control) -- a case-sensitive check would miss it
+    // and let a real duplicate through instead of refusing (found live
+    // 2026-08-12: this is exactly how a second "Arunan Anandarajah" record
+    // could happen).
     const { data: existingStaffRows } = await adminClient
       .from('staff')
       .select('id')
-      .eq('email', email)
+      .ilike('email', escapeLikePattern(email))
       .limit(1)
     if (existingStaffRows?.length) {
       return new Response(JSON.stringify({ error: 'A staff record already exists for this email. Use the existing-staff assignment flow instead.' }), { status: 400, headers: corsHeaders })

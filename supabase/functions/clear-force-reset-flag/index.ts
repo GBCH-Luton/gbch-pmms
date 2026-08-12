@@ -1,6 +1,14 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { corsHeaders } from '../_shared/cors.ts'
 
+// ILIKE treats _ and % as wildcards -- both are legal characters in a real
+// email's local part, so an unescaped ILIKE lookup could match more than
+// just the intended address. Escaping them keeps this a case-insensitive
+// exact match, not a search.
+function escapeLikePattern(value: string) {
+  return value.replace(/[\\%_]/g, '\\$&')
+}
+
 // Clears the caller's OWN must_reset_password flag, right after they've set
 // a new password. Resolves which staff row is "theirs" only from their own
 // verified session token -- never from a client-supplied id -- so a user
@@ -36,10 +44,16 @@ Deno.serve(async (req: Request) => {
     // this app -- without it, this function could clear one duplicate row's
     // flag while App.jsx's next login check reads a *different* row whose
     // flag is still true, permanently stuck on the set-password screen.
+    //
+    // .ilike (not .eq) -- Supabase Auth always lowercases the session email,
+    // but staff.email is free-typed and has landed with capitals before,
+    // which silently failed this lookup right after a brand new staff
+    // member sets their password, leaving them stuck on this same screen
+    // forever (found live 2026-08-12, via App.jsx's matching login-side bug).
     const { data: staffRows, error: staffError } = await adminClient
       .from('staff')
       .select('id')
-      .eq('email', userData.user.email)
+      .ilike('email', escapeLikePattern(userData.user.email))
       .order('id')
       .limit(2)
     if (staffError || !staffRows?.length) {

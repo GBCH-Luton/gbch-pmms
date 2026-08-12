@@ -18,6 +18,14 @@ const AdminDashboard = lazy(() => import('./pages/AdminDashboard'))
 const BuilderDashboard = lazy(() => import('./pages/BuilderDashboard'))
 const SubmitterDashboard = lazy(() => import('./pages/SubmitterDashboard'))
 
+// ILIKE treats _ and % as wildcards -- both are legal characters in a real
+// email's local part, so an unescaped ILIKE lookup could match more than
+// just the intended address. Escaping them keeps this a case-insensitive
+// exact match, not a search.
+function escapeLikePattern(value) {
+  return value.replace(/[\\%_]/g, '\\$&')
+}
+
 export default function App() {
   const [session, setSession]   = useState(null)
   const [profile, setProfile]   = useState(null)
@@ -89,10 +97,19 @@ export default function App() {
     // match" deterministic -- every other email lookup in this app (Edge
     // Functions included) orders the same way, so they all resolve to the
     // same row instead of potentially disagreeing with each other.
+    //
+    // .ilike (not .eq) -- Supabase Auth always lowercases session.user.email,
+    // but public.staff.email is free-typed on a table PMMS doesn't fully
+    // control and has landed with capitals before (e.g. "Arunan.A@..."). A
+    // case-sensitive .eq() against that silently finds nothing, profile
+    // never resolves, and the app is stuck rendering nothing at all -- found
+    // live 2026-08-12. escapeLikePattern keeps this an exact match rather
+    // than a real wildcard search, since email addresses can legally contain
+    // ILIKE's own special characters (_, %).
     const { data: rows } = await supabase
       .from('staff')
       .select('id, name, email, job_title, photo_url, must_reset_password, active, skills')
-      .eq('email', email)
+      .ilike('email', escapeLikePattern(email))
       .order('id')
       .limit(2)
 

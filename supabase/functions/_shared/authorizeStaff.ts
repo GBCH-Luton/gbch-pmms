@@ -1,5 +1,13 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
+// ILIKE treats _ and % as wildcards -- both are legal characters in a real
+// email's local part, so an unescaped ILIKE lookup could match more than
+// just the intended address. Escaping them keeps this a case-insensitive
+// exact match, not a search.
+function escapeLikePattern(value: string) {
+  return value.replace(/[\\%_]/g, '\\$&')
+}
+
 // ── Verify caller + resolve their staff_id, no role requirement ─────────────
 // Same identity resolution as authorizeAdmin.ts (verify the bearer token,
 // resolve the public.staff row deterministically), minus the "must be
@@ -27,10 +35,15 @@ export async function authorizeStaff(req: Request) {
 
   const adminClient = createClient(supabaseUrl, serviceRoleKey)
 
+  // .ilike (not .eq) -- Supabase Auth always lowercases the session email,
+  // but staff.email is free-typed and has landed with capitals before,
+  // which silently failed this lookup and denied a real staff member every
+  // action gated by this check (found live 2026-08-12, via App.jsx's
+  // matching login-side bug).
   const { data: staffRows, error: staffError } = await adminClient
     .from('staff')
     .select('id')
-    .eq('email', userData.user.email)
+    .ilike('email', escapeLikePattern(userData.user.email))
     .order('id')
     .limit(2)
 
