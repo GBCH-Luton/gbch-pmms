@@ -24,7 +24,7 @@ import { logLoginEvent } from '../lib/loginEvents'
 import { uploadTicketAttachments, formatUploadProgress } from '../lib/ticketAttachments'
 import { fetchMaintenanceCategories, sortedCategoryEntries, isUnlistedTag, unlistedTagFor, unlistedLabelFor, calculatePriorityScore } from '../lib/maintenanceCategories'
 import { attachBuilderSafeProperties } from '../lib/properties'
-import { statusColour, statusLabel, postSystemComment, postAuditEvent, KpiTiles, resolveStaffPhotoUrl } from './admin/shared'
+import { statusColour, statusLabel, postSystemComment, postAuditEvent, KpiTiles, resolveStaffPhotoUrl, suggestAutoAssignBuilder, createNotification } from './admin/shared'
 import { NavIcon } from '../lib/icons'
 import PropertySearchSelect from '../components/PropertySearchSelect'
 import VoiceInputButton from '../components/VoiceInputButton'
@@ -301,6 +301,12 @@ function NewReportForm({ profile, onSubmitted }) {
     const description = notes.trim() ? `${finalIssueTag} — ${notes.trim()}` : finalIssueTag
     const priorityScore = calculatePriorityScore(maintenanceCategories, category, issueTag)
 
+    // No assignment picker here (submitters never got one) -- routing
+    // happens silently instead, same least-loaded-eligible-builder logic
+    // as the admin raise-ticket form, just without the option to see or
+    // override it before submitting.
+    const suggested = await suggestAutoAssignBuilder(category)
+
     const { data, error: insertError } = await supabase
       .schema('pmms')
       .from('tickets')
@@ -311,7 +317,10 @@ function NewReportForm({ profile, onSubmitted }) {
         issue_tag: finalIssueTag,
         description,
         priority_score: priorityScore,
-        status: 'Pending',
+        assigned_builder_id: suggested?.id || null,
+        assign_type: suggested ? 'Auto' : 'Manual',
+        status: suggested ? 'Assigned' : 'Pending',
+        first_assigned_at: suggested ? new Date().toISOString() : null,
         raised_by: profile.id,
         raised_by_name: profile.name,
         created_at: new Date().toISOString(),
@@ -323,6 +332,12 @@ function NewReportForm({ profile, onSubmitted }) {
       setSubmitting(false)
       setError(insertError.message)
       return
+    }
+
+    if (suggested) {
+      await createNotification(suggested.id, data[0].id, `You've been assigned Job #${data[0].ticket_number}.`)
+    } else {
+      await postSystemComment(data[0].id, profile, 'No eligible builder was found for this category at the time this ticket was raised. Needs manual assignment.')
     }
 
     if (mediaFiles.length > 0) {

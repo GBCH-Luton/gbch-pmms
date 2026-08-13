@@ -1287,6 +1287,35 @@ export async function autoReassignDepartingStaffTickets(staffId, staffName, prof
   return { reassignedCount, failures }
 }
 
+// Same eligibility + least-open-tickets logic as
+// autoReassignDepartingStaffTickets above, but for a single not-yet-created
+// ticket rather than bulk-reassigning an existing one -- returns the
+// suggested builder (or null if nobody's eligible) and leaves the actual
+// insert/update to the caller, since AdminRaiseTicket needs to show the
+// suggestion before submitting while SubmitterDashboard applies it silently.
+// Accepts an already-fetched eligible list via `candidates` so callers that
+// already called fetchAssignableStaffForCategory for their own dropdown
+// (AdminRaiseTicket) don't have to fetch it a second time.
+export async function suggestAutoAssignBuilder(category, { candidates: preFetched } = {}) {
+  const candidates = preFetched ?? await fetchAssignableStaffForCategory(category)
+  if (candidates.length === 0) return null
+
+  const { data: allOpenRows } = await supabase
+    .schema('pmms')
+    .from('tickets')
+    .select('assigned_builder_id')
+    .not('status', 'in', OPEN_TICKET_STATUS_EXCLUSION)
+
+  const openCountByBuilder = {}
+  ;(allOpenRows || []).forEach(t => {
+    if (t.assigned_builder_id) openCountByBuilder[t.assigned_builder_id] = (openCountByBuilder[t.assigned_builder_id] || 0) + 1
+  })
+
+  return candidates.reduce((best, c) =>
+    (openCountByBuilder[c.id] || 0) < (openCountByBuilder[best.id] || 0) ? c : best
+  , candidates[0])
+}
+
 // Fire-and-forget, matching createNotification's style -- a push failing
 // (no VAPID keys configured yet, a stale subscription, etc.) must never
 // block the underlying assignment/ticket action.

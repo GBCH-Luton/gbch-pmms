@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { COLORS } from '../../lib/colors'
-import { fetchAssignableStaffForCategory, builderOptionLabel, createNotification, sendPushNotification, pushEmergencyAlert, priorityTierLabel, fetchPriorityThresholds, EVENTS_FEATURE_ENABLED } from './shared'
+import { fetchAssignableStaffForCategory, suggestAutoAssignBuilder, builderOptionLabel, createNotification, sendPushNotification, pushEmergencyAlert, priorityTierLabel, fetchPriorityThresholds, EVENTS_FEATURE_ENABLED, postSystemComment } from './shared'
 import { fetchComplianceCheckTypes } from '../../lib/compliance'
 import { fetchMaintenanceCategories, sortedCategoryEntries, UNLISTED_MARKER_PREFIX, isUnlistedTag, unlistedTagFor, unlistedLabelFor, calculatePriorityScore } from '../../lib/maintenanceCategories'
 import { fetchDivisions } from '../../lib/divisions'
@@ -87,6 +87,12 @@ export default function AdminRaiseTicket({ profile, onNavigate }) {
   // Admin-only additions
   const [builders, setBuilders] = useState([])
   const [assignedBuilderId, setAssignedBuilderId] = useState('')
+  // Tracks whichever builder was auto-suggested (least-loaded eligible
+  // candidate), separately from assignedBuilderId -- lets submit tell apart
+  // "admin left the suggestion as-is" (assign_type: Auto) from "admin picked
+  // someone else" (assign_type: Manual), since the dropdown value alone
+  // can't distinguish those two cases once it's populated either way.
+  const [autoSuggestedBuilderId, setAutoSuggestedBuilderId] = useState(null)
   const [ignoreSkills, setIgnoreSkills] = useState(false)
   const [estimatedMinutes, setEstimatedMinutes] = useState('')
   const [sendPushOnAssign, setSendPushOnAssign] = useState(false)
@@ -128,16 +134,31 @@ export default function AdminRaiseTicket({ profile, onNavigate }) {
   // fetchAssignableStaffForCategory in shared.js. Refetches whenever the
   // relevant category changes in either mode, and clears any previously
   // picked assignee since they may not be eligible for the new category.
+  //
+  // Auto-suggests the least-loaded eligible builder as soon as the list
+  // comes back, rather than leaving the picker blank -- the admin can still
+  // change it before submitting (see submit handlers for how the choice
+  // between assign_type Auto/Manual is derived from whether they did).
   useEffect(() => {
     const category = loggingMode === 'compliance'
       ? complianceCheckTypes.find(t => t.name === complianceCheckType)?.category
       : ticketCategory
 
     setAssignedBuilderId('')
+    setAutoSuggestedBuilderId(null)
     setEstimatedMinutes('')
 
     if (!category) { setBuilders([]); return }
-    fetchAssignableStaffForCategory(category, { ignoreSkills }).then(setBuilders)
+    let cancelled = false
+    fetchAssignableStaffForCategory(category, { ignoreSkills }).then(async (list) => {
+      if (cancelled) return
+      setBuilders(list)
+      const suggested = await suggestAutoAssignBuilder(category, { candidates: list })
+      if (cancelled) return
+      setAssignedBuilderId(suggested?.id || '')
+      setAutoSuggestedBuilderId(suggested?.id || null)
+    })
+    return () => { cancelled = true }
   }, [loggingMode, ticketCategory, complianceCheckType, complianceCheckTypes, ignoreSkills])
 
   async function fetchTicketProperties() {
@@ -177,6 +198,7 @@ export default function AdminRaiseTicket({ profile, onNavigate }) {
     setComplianceSubmitting(false)
     setComplianceSuccess('')
     setAssignedBuilderId('')
+    setAutoSuggestedBuilderId(null)
     setPriorityOverride('')
     setDepartment('')
     setSelectedEventId('')
@@ -238,6 +260,11 @@ export default function AdminRaiseTicket({ profile, onNavigate }) {
         priority_score: priorityScore,
         priority_override: priorityOverride || null,
         assigned_builder_id: assignedBuilderId || null,
+        // Auto only when the admin left the auto-suggested builder in
+        // place -- picking anyone else (or clearing it) makes this a
+        // deliberate manual choice, same distinction AdminPipeline's
+        // Assign Type filter already relies on elsewhere.
+        assign_type: assignedBuilderId && assignedBuilderId === autoSuggestedBuilderId ? 'Auto' : 'Manual',
         estimated_minutes: assignedBuilderId && estimatedMinutes !== '' ? Number(estimatedMinutes) : null,
         department: department || null,
         event_id: selectedEventId || null,
@@ -276,6 +303,11 @@ export default function AdminRaiseTicket({ profile, onNavigate }) {
       if (sendPushOnAssign) {
         await sendPushNotification([assignedBuilderId], 'New job assigned', `Job #${data[0].ticket_number} at ${selectedTicketProperty?.address || 'a property'}.`)
       }
+    } else if (!autoSuggestedBuilderId) {
+      // Nobody eligible for this category at all (not just "admin chose to
+      // leave it blank") -- worth a visible note on the ticket itself,
+      // since an empty picker alone is easy to miss in hindsight.
+      await postSystemComment(data[0].id, profile, 'No eligible builder was found for this category at the time this ticket was raised. Needs manual assignment.')
     }
 
     const effectiveTier = priorityOverride || priorityTierLabel(priorityScore, p1Threshold, p2Threshold)
@@ -371,6 +403,7 @@ export default function AdminRaiseTicket({ profile, onNavigate }) {
           photo_url: photoUrl,
           priority_override: priorityOverride || null,
           assigned_builder_id: assignedBuilderId || null,
+          assign_type: assignedBuilderId && assignedBuilderId === autoSuggestedBuilderId ? 'Auto' : 'Manual',
           estimated_minutes: assignedBuilderId && estimatedMinutes !== '' ? Number(estimatedMinutes) : null,
           department: department || null,
           status: assignedBuilderId ? 'Assigned' : 'Pending',
@@ -393,6 +426,8 @@ export default function AdminRaiseTicket({ profile, onNavigate }) {
         if (sendPushOnAssign) {
           await sendPushNotification([assignedBuilderId], 'New job assigned', `Job #${data[0].ticket_number} at ${selectedTicketProperty?.address || 'a property'}.`)
         }
+      } else if (!autoSuggestedBuilderId) {
+        await postSystemComment(data[0].id, profile, 'No eligible builder was found for this category at the time this ticket was raised. Needs manual assignment.')
       }
 
       const effectiveTier = priorityOverride || priorityTierLabel(score, p1Threshold, p2Threshold)
@@ -678,13 +713,18 @@ export default function AdminRaiseTicket({ profile, onNavigate }) {
               <select
                 value={assignedBuilderId}
                 onChange={(e) => setAssignedBuilderId(e.target.value)}
-                style={{ ...fieldSelectStyle, marginBottom: '6px' }}
+                style={{ ...fieldSelectStyle, marginBottom: '4px' }}
               >
                 <option value="">Leave unassigned</option>
                 {builders.map(b => (
                   <option key={b.id} value={b.id} style={b.availability !== 'Available' ? { color: COLORS.slate400 } : undefined}>{builderOptionLabel(b)}</option>
                 ))}
               </select>
+              {assignedBuilderId && assignedBuilderId === autoSuggestedBuilderId && (
+                <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 600, color: COLORS.slate500 }}>
+                  Auto-suggested (least-busy eligible builder) — change or clear to assign manually.
+                </p>
+              )}
               <label style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 10px 0', fontSize: '12px', fontWeight: 600, color: COLORS.slate500, cursor: 'pointer' }}>
                 <input type="checkbox" checked={ignoreSkills} onChange={(e) => setIgnoreSkills(e.target.checked)} />
                 Show all builders (ignore skills)
@@ -975,13 +1015,18 @@ export default function AdminRaiseTicket({ profile, onNavigate }) {
               <select
                 value={assignedBuilderId}
                 onChange={(e) => setAssignedBuilderId(e.target.value)}
-                style={{ ...fieldSelectStyle, marginBottom: '6px' }}
+                style={{ ...fieldSelectStyle, marginBottom: '4px' }}
               >
                 <option value="">Leave unassigned</option>
                 {builders.map(b => (
                   <option key={b.id} value={b.id} style={b.availability !== 'Available' ? { color: COLORS.slate400 } : undefined}>{builderOptionLabel(b)}</option>
                 ))}
               </select>
+              {assignedBuilderId && assignedBuilderId === autoSuggestedBuilderId && (
+                <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 600, color: COLORS.slate500 }}>
+                  Auto-suggested (least-busy eligible builder) — change or clear to assign manually.
+                </p>
+              )}
               <label style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 10px 0', fontSize: '12px', fontWeight: 600, color: COLORS.slate500, cursor: 'pointer' }}>
                 <input type="checkbox" checked={ignoreSkills} onChange={(e) => setIgnoreSkills(e.target.checked)} />
                 Show all builders (ignore skills)
