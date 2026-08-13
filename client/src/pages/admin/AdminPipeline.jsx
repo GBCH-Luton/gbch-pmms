@@ -836,6 +836,7 @@ export default function AdminPipeline({
       case 'room': return (t.room || '').toLowerCase()
       case 'priority': return t.priority_score || 0
       case 'status': return (t.status || '').toLowerCase()
+      case 'builder': return (t.builderName || '').toLowerCase()
       case 'assignType': return (t.assign_type || 'Manual').toLowerCase()
       // -1 groups "no estimate set" together at one end of the sort,
       // never mixed in among real minute values (which are always >= 0).
@@ -1111,6 +1112,7 @@ export default function AdminPipeline({
                 <th style={{ ...thStyle, cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('room')}>Area{sortArrow('room')}</th>
                 <th style={{ ...thStyle, cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('priority')}>Priority{sortArrow('priority')}</th>
                 <th style={{ ...thStyle, cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('status')}>Status{sortArrow('status')}</th>
+                <th style={{ ...thStyle, cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('builder')}>Builder{sortArrow('builder')}</th>
                 <th style={{ ...thStyle, cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('assignType')}>Assign Type{sortArrow('assignType')}</th>
                 <th style={{ ...thStyle, cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('estimatedMinutes')}>Est. Time{sortArrow('estimatedMinutes')}</th>
                 <th style={{ ...thStyle, cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('logDate')}>Log Date{sortArrow('logDate')}</th>
@@ -1120,7 +1122,7 @@ export default function AdminPipeline({
             <tbody>
               {sortedTickets.length === 0 && (
                 <tr>
-                  <td colSpan={10} style={{ padding: '32px', textAlign: 'center', color: COLORS.slate400, fontWeight: 600 }}>
+                  <td colSpan={11} style={{ padding: '32px', textAlign: 'center', color: COLORS.slate400, fontWeight: 600 }}>
                     No tickets match these filters.
                   </td>
                 </tr>
@@ -1194,6 +1196,18 @@ export default function AdminPipeline({
                       </td>
                       <td style={tdStyle}>
                         {t.assigned_builder_id ? (
+                          <span
+                            onClick={(e) => { e.stopPropagation(); setBuilderProfileId(t.assigned_builder_id) }}
+                            style={{ color: COLORS.blue700, fontWeight: 600, cursor: 'pointer' }}
+                          >
+                            {t.builderName || 'Unknown'}
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: '11px', color: COLORS.slate300 }}>—</span>
+                        )}
+                      </td>
+                      <td style={tdStyle}>
+                        {t.assigned_builder_id ? (
                           <span style={{
                             display: 'inline-block', fontSize: '11px', fontWeight: 700,
                             color: t.assign_type === 'Auto' ? COLORS.teal700 : COLORS.slate500,
@@ -1222,7 +1236,7 @@ export default function AdminPipeline({
                     </tr>
                     {isExpanded && (
                       <tr style={{ borderBottom: `2px solid ${COLORS.red600}` }}>
-                        <td colSpan={10} style={{ padding: 0, background: COLORS.red50, boxShadow: `inset 4px 0 0 ${COLORS.red600}` }}>
+                        <td colSpan={11} style={{ padding: 0, background: COLORS.red50, boxShadow: `inset 4px 0 0 ${COLORS.red600}` }}>
                           <div style={{ padding: '18px 20px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
 
                             <div style={expandSectionStyle}>
