@@ -512,6 +512,47 @@
         <span class="callout new">Built &mdash; safety net on top of the existing manual close, unchanged</span>
       </div>
     </div>
+
+    <!-- Step 11 -->
+    <div class="step">
+      <div class="step-mock">
+        <div class="phone"><div class="notch"></div>
+          <div class="screen">
+            <div class="mock-header">
+              <div class="mock-logo"><div class="sq"></div>PMMS</div>
+              <div class="mock-icons">🔔 ☰</div>
+            </div>
+            <div style="padding:12px 14px;">
+              <div class="mock-banner ok" style="flex-direction:column; align-items:stretch; gap:10px;">
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+                  <span>🟢 Clocked in since 08:02</span>
+                  <button class="mock-btn ghost" style="padding:8px 14px; font-size:12px;">Leaving Site</button>
+                </div>
+                <div style="border-top:1px solid #e2e8f0; padding-top:10px; text-align:right;">
+                  <span style="font-size:12px; font-weight:700; color:#64748b; text-decoration:underline;">Clock Out for the Day</span>
+                </div>
+              </div>
+              <div style="margin-top:8px; background:#fff; border:1px solid #cbd5e1; border-radius:12px; padding:14px;">
+                <p style="margin:0 0 10px 0; font-size:12.5px; font-weight:700; color:#0f172a;">Clock out for the day? This ends your whole shift, not just this job.</p>
+                <div style="display:flex; gap:8px;">
+                  <button class="mock-btn ghost" style="flex:1; padding:9px; font-size:12px;">Cancel</button>
+                  <button class="mock-btn dark" style="flex:2; padding:9px; font-size:12px;">Yes, Clock Out</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="step-body">
+        <p class="step-title"><span class="step-num">11</span> Clock Out for the Day &mdash; now asks first</p>
+        <p>Found live, 2026-08-14: "Leaving Site" and "Clock Out for the Day" sat as same-row, same-size buttons &mdash; a mis-tap between them ended someone's whole day by accident, clocked back in seconds later to fix it. Two changes on top of the existing early-leave reason prompt (unchanged, still asks why if it's before the daily deadline):</p>
+        <ul>
+          <li>Clock Out for the Day moved to its own row, set apart by a divider and lighter weight &mdash; it's the rarer, bigger action, so it no longer looks like an equal choice next to a short trip out.</li>
+          <li>A plain "are you sure" confirmation now fires every time, including after the deadline &mdash; before this, clocking out past the deadline had no confirmation at all.</li>
+        </ul>
+        <span class="callout new">Built &mdash; post-launch gap fix, same day it was found</span>
+      </div>
+    </div>
   </section>
 
   <!-- ============================= MANAGER SIDE ============================= -->
