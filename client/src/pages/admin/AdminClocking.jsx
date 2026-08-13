@@ -7,7 +7,7 @@ import {
   thStyle, tdStyle, actionBtnStyle, filterSelectStyle, formatUKDate, formatUKDateTime, toUkDateTimeInputValue, ukDateTimeInputValueToMs,
   ukDateKey, ukTimeHHMM, minutesLate, shiftDateKey,
   modalOverlayStyle, modalCardStyle, modalTitleStyle, modalLabelStyle,
-  modalErrorStyle, modalCancelBtnStyle, modalConfirmBtnStyle, fetchAssignableBuilders, fetchAssignableStaffForDivision, fetchLastEndedSessionsToday, SHORT_TRIP_REASONS,
+  modalErrorStyle, modalCancelBtnStyle, modalConfirmBtnStyle, fetchAssignableBuilders, fetchAssignableStaffForDivision, fetchLastEndedSessionsToday, SHORT_TRIP_REASONS, STAFF_AVAILABILITY_STYLES,
 } from './shared'
 
 const EIGHT_HOURS_MS = 8 * 60 * 60 * 1000
@@ -401,7 +401,13 @@ export default function AdminClocking({ profile, onNavigate }) {
       const shortTripTicket = (onHoldShortTrips || []).find(t => t.assigned_builder_id === b.id)
 
       let currentStatus = 'Off shift'
-      if (shift && !shift.clock_out_at) {
+      // Availability overrides everything below, same reasoning as
+      // computeDutyStatus (shared.jsx) -- someone marked On Leave/Sick
+      // can't actually be working, even if an old shift/session is still
+      // sitting open because nobody closed it out before they went off.
+      if (b.availability === 'On Leave' || b.availability === 'Sick') {
+        currentStatus = b.availability
+      } else if (shift && !shift.clock_out_at) {
         if (openActivityForBuilder) {
           currentStatus = `${openActivityForBuilder.activity_type === 'Travel' ? 'Travelling' : 'On break'}${openActivityForBuilder.note ? `: ${openActivityForBuilder.note}` : ''}`
         } else if (shortTripTicket) {
@@ -960,8 +966,16 @@ export default function AdminClocking({ profile, onNavigate }) {
                   <td style={tdStyle}>
                     <span style={{
                       fontSize: '11px', fontWeight: 700, padding: '3px 10px', borderRadius: '999px',
-                      color: row.currentStatus === 'Off shift' ? COLORS.slate400 : row.currentStatus.startsWith('On Job') ? COLORS.teal700 : row.currentStatus === 'Available' ? COLORS.blue700 : COLORS.violet600,
-                      background: row.currentStatus === 'Off shift' ? COLORS.slate100 : row.currentStatus.startsWith('On Job') ? COLORS.teal50 : row.currentStatus === 'Available' ? COLORS.blue50 : COLORS.violet100,
+                      // 'On Leave'/'Sick' reuse the same colours as the
+                      // availability badge on the Staff page -- everything
+                      // else keeps its existing colouring untouched (note
+                      // STAFF_AVAILABILITY_STYLES also has an 'Available'
+                      // key, which would collide with this column's own
+                      // unrelated "clocked in, idle" meaning of that word).
+                      ...((row.currentStatus === 'On Leave' || row.currentStatus === 'Sick') ? STAFF_AVAILABILITY_STYLES[row.currentStatus] : {
+                        color: row.currentStatus === 'Off shift' ? COLORS.slate400 : row.currentStatus.startsWith('On Job') ? COLORS.teal700 : row.currentStatus === 'Available' ? COLORS.blue700 : COLORS.violet600,
+                        background: row.currentStatus === 'Off shift' ? COLORS.slate100 : row.currentStatus.startsWith('On Job') ? COLORS.teal50 : row.currentStatus === 'Available' ? COLORS.blue50 : COLORS.violet100,
+                      }),
                     }}>
                       {row.currentStatus}
                     </span>

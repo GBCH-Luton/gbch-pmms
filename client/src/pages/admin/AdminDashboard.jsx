@@ -232,7 +232,14 @@ function TeamWhereabouts({ profile, onNavigate }) {
 
       let status = 'Off shift'
       let tone = 'off'
-      if (shift && !shift.clock_out_at) {
+      // Availability overrides everything below, same reasoning as
+      // computeDutyStatus (shared.jsx) -- someone marked On Leave/Sick
+      // can't actually be working, even if an old shift/session is still
+      // sitting open because nobody closed it out before they went off.
+      if (b.availability === 'On Leave' || b.availability === 'Sick') {
+        status = b.availability
+        tone = 'leave'
+      } else if (shift && !shift.clock_out_at) {
         if (openActivity) {
           status = `${openActivity.activity_type === 'Travel' ? 'Travelling' : 'On break'}${openActivity.note ? `: ${openActivity.note}` : ''}`
           tone = 'away'
@@ -318,7 +325,7 @@ function TeamWhereabouts({ profile, onNavigate }) {
     in: COLORS.green600, out: COLORS.slate900, away: COLORS.violet600, back: COLORS.slate900, early: COLORS.amber700,
     job: COLORS.teal600, done: COLORS.green600, hold: COLORS.amber700, noAccess: COLORS.red600,
   }
-  const chipStyle = { off: { bg: COLORS.slate100, fg: COLORS.slate400 }, available: { bg: COLORS.blue50, fg: COLORS.blue700 }, job: { bg: COLORS.teal50, fg: COLORS.teal700 }, away: { bg: COLORS.violet100, fg: COLORS.violet600 } }
+  const chipStyle = { off: { bg: COLORS.slate100, fg: COLORS.slate400 }, available: { bg: COLORS.blue50, fg: COLORS.blue700 }, job: { bg: COLORS.teal50, fg: COLORS.teal700 }, away: { bg: COLORS.violet100, fg: COLORS.violet600 }, leave: { bg: COLORS.amber100, fg: COLORS.amber600 } }
 
   // Division filter only makes sense for an unscoped viewer (Admin or a
   // manager with no division) -- a division-scoped manager's `builders`
