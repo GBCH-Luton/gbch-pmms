@@ -576,12 +576,20 @@ function PipelineList({ profile }) {
     )
   }
 
+  // Labels are deliberately reworded from the raw status names for a
+  // submitter's point of view -- "Pending"/"Active"/"Archived" are internal
+  // staff vocabulary that either mismatched the per-ticket badge wording
+  // (statusLabel already shows "Unassigned", not "Pending") or overclaimed
+  // things a submitter can't actually tell from a status alone (see
+  // PIPELINE_FILTERS.Active's own comment). Auto-routing means sitting
+  // unassigned should now be the rare exception, not a normal first stage,
+  // so that tile is worded as a flag rather than an expected step.
   const kpis = [
     { label: 'Total', value: tickets.filter(PIPELINE_FILTERS.All).length, colour: COLORS.slate500, key: 'All' },
-    { label: 'Pending', value: tickets.filter(PIPELINE_FILTERS.Pending).length, colour: COLORS.red600, key: 'Pending' },
-    { label: 'Active', value: tickets.filter(PIPELINE_FILTERS.Active).length, colour: COLORS.teal600, key: 'Active' },
-    { label: 'Completed', value: tickets.filter(PIPELINE_FILTERS.Completed).length, colour: COLORS.purple600, key: 'Completed' },
-    { label: 'Archived', value: tickets.filter(PIPELINE_FILTERS.Archived).length, colour: COLORS.green600, key: 'Archived' },
+    { label: 'Not Picked Up Yet', value: tickets.filter(PIPELINE_FILTERS.Pending).length, colour: COLORS.red600, key: 'Pending' },
+    { label: 'Being Handled', value: tickets.filter(PIPELINE_FILTERS.Active).length, colour: COLORS.teal600, key: 'Active' },
+    { label: 'Needs Your Confirmation', value: tickets.filter(PIPELINE_FILTERS.Completed).length, colour: COLORS.purple600, key: 'Completed' },
+    { label: 'Closed', value: tickets.filter(PIPELINE_FILTERS.Archived).length, colour: COLORS.green600, key: 'Archived' },
   ]
 
   const filteredTickets = tickets.filter(PIPELINE_FILTERS[statusFilter])
