@@ -123,6 +123,14 @@ export default function BuilderDashboard({ profile }) {
   // clock-out actually goes through.
   const [earlyLeavePromptOpen, setEarlyLeavePromptOpen] = useState(false)
   const [earlyLeaveReason, setEarlyLeaveReason] = useState('')
+  // Plain "are you sure" gate for clocking out AFTER the deadline --
+  // before this, a clock-out past dailyClockOutDeadline had zero
+  // confirmation of any kind (only the early-leave case above asked for
+  // anything). Found live: "Leaving Site" and "Clock Out for the Day"
+  // sitting as same-row, same-size buttons led to a mis-tap that ended
+  // someone's whole day by accident. This doesn't replace the early-leave
+  // reason prompt -- that already serves as its own confirm step.
+  const [clockOutConfirmOpen, setClockOutConfirmOpen] = useState(false)
 
   // My Metrics' own Attendance section -- fetched only while that page is
   // open (unlike everything else on this dashboard, nothing else needs a
@@ -726,7 +734,7 @@ export default function BuilderDashboard({ profile }) {
       setEarlyLeavePromptOpen(true)
       return
     }
-    submitClockOutForDay(null)
+    setClockOutConfirmOpen(true)
   }
 
   function submitEarlyLeave() {
@@ -1974,22 +1982,30 @@ export default function BuilderDashboard({ profile }) {
           </div>
           )
         })() : (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap', background: todayShift.late_flag ? COLORS.amber50 : COLORS.slate50, border: `1px solid ${todayShift.late_flag ? COLORS.amber300 : COLORS.slate200}`, borderRadius: '12px', padding: '10px 14px' }}>
-            <span style={{ fontSize: '13px', fontWeight: 600, color: todayShift.late_flag ? COLORS.amber900 : COLORS.slate600 }}>
-              {todayShift.late_flag ? '⚠ ' : '🟢 '}Clocked in since {formatUKDateTime(todayShift.clock_in_at).split(' ').slice(-1)[0]}
-              {todayShift.late_flag && ` (${minutesLate(todayShift.clock_in_at, dailyClockInDeadline)}m late)`}
-            </span>
-            <div style={{ display: 'flex', gap: '8px' }}>
+          <div style={{ background: todayShift.late_flag ? COLORS.amber50 : COLORS.slate50, border: `1px solid ${todayShift.late_flag ? COLORS.amber300 : COLORS.slate200}`, borderRadius: '12px', padding: '10px 14px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '13px', fontWeight: 600, color: todayShift.late_flag ? COLORS.amber900 : COLORS.slate600 }}>
+                {todayShift.late_flag ? '⚠ ' : '🟢 '}Clocked in since {formatUKDateTime(todayShift.clock_in_at).split(' ').slice(-1)[0]}
+                {todayShift.late_flag && ` (${minutesLate(todayShift.clock_in_at, dailyClockInDeadline)}m late)`}
+              </span>
               <button
                 onClick={openActivityPicker}
                 style={{ padding: '8px 14px', background: COLORS.white, color: COLORS.slate600, border: `1px solid ${COLORS.slate200}`, borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
               >
                 Leaving Site
               </button>
+            </div>
+            {/* Deliberately its own row, set apart with a divider and
+                lighter weight -- found live that this sitting as a
+                same-size button right next to "Leaving Site" above led to
+                a mis-tap that ended someone's whole day by accident.
+                Clocking out is the rarer, bigger action, so it shouldn't
+                look like an equal, casual choice next to a short trip. */}
+            <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: `1px solid ${todayShift.late_flag ? COLORS.amber200 : COLORS.slate200}`, textAlign: 'right' }}>
               <button
                 onClick={attemptClockOutForDay}
                 disabled={clockingOutForDay}
-                style={{ padding: '8px 14px', background: COLORS.slate900, color: COLORS.white, border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: clockingOutForDay ? 'not-allowed' : 'pointer', opacity: clockingOutForDay ? 0.7 : 1 }}
+                style={{ padding: '6px 4px', background: 'none', color: COLORS.slate500, border: 'none', fontSize: '12px', fontWeight: 700, textDecoration: 'underline', cursor: clockingOutForDay ? 'not-allowed' : 'pointer', opacity: clockingOutForDay ? 0.7 : 1 }}
               >
                 {clockingOutForDay ? 'Clocking out…' : 'Clock Out for the Day'}
               </button>
@@ -1997,6 +2013,24 @@ export default function BuilderDashboard({ profile }) {
           </div>
         )}
         {clockOutForDayError && <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: COLORS.red500, fontWeight: 600 }}>{clockOutForDayError}</p>}
+
+        {clockOutConfirmOpen && (
+          <div style={{ marginTop: '8px', background: COLORS.white, border: `1px solid ${COLORS.slate300}`, borderRadius: '12px', padding: '14px' }}>
+            <p style={{ margin: '0 0 10px 0', fontSize: '13px', fontWeight: 700, color: COLORS.slate900 }}>Clock out for the day? This ends your whole shift, not just this job.</p>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button onClick={() => setClockOutConfirmOpen(false)} style={{ flex: 1, padding: '10px', background: COLORS.slate100, color: COLORS.slate600, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
+                Cancel
+              </button>
+              <button
+                onClick={() => { setClockOutConfirmOpen(false); submitClockOutForDay(null) }}
+                disabled={clockingOutForDay}
+                style={{ flex: 2, padding: '10px', background: COLORS.slate900, color: COLORS.white, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: clockingOutForDay ? 'not-allowed' : 'pointer', opacity: clockingOutForDay ? 0.7 : 1 }}
+              >
+                {clockingOutForDay ? 'Clocking out…' : 'Yes, Clock Out'}
+              </button>
+            </div>
+          </div>
+        )}
 
         {activityPickerOpen && (() => {
           const assignedJobs = tickets.filter(t => t.status === 'Assigned')
