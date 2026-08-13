@@ -1936,7 +1936,7 @@ export default function BuilderDashboard({ profile }) {
         <div style={{ maxWidth: '600px', margin: '10px auto 0 auto', padding: '0 16px' }}>
           <div style={{ background: COLORS.slate900, borderRadius: '16px', padding: '18px 20px', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
             <p style={{ margin: '0 0 4px 0', fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.75)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-              {openActivity ? `Away — ${openActivity.activity_type === 'Travel' ? 'Travelling' : 'On break'}` : 'Not working right now'}
+              {openActivity ? `Away — ${openActivity.activity_type === 'Travel' ? 'Travelling' : 'On break'}` : 'You have been doing nothing for:'}
             </p>
             <p style={{ margin: '0 0 4px 0', fontSize: '36px', fontWeight: 800, color: COLORS.white, fontFamily: 'monospace', letterSpacing: '0.02em' }}>{formatElapsed(idleElapsed)}</p>
             <p style={{ margin: 0, fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.7)' }}>This is recorded, and your manager can see it.</p>
