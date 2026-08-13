@@ -456,17 +456,23 @@ function NewReportForm({ profile, onSubmitted }) {
   )
 }
 
-// Groups the real ticket lifecycle into 4 tiles a single submitter's
-// volume actually warrants -- Assigned/In Progress/On Hold all read as
-// "someone's on it" from a reporter's point of view, not 3 separate
-// numbers to parse. Cancelled is deliberately excluded from "Total" and
-// hidden from the default list, same convention AdminPipeline.jsx uses
-// for its own list -- a mistaken/duplicate cancel shouldn't clutter the
-// view, but it's still one tap away.
+// Assigned/In Progress/On Hold used to be lumped into one "Active" tile,
+// on the theory they all read as "someone's on it" from a reporter's point
+// of view -- found live that this wasn't true: Assigned only means a
+// builder's been designated, not that work has started, and On Hold means
+// it's paused. Only In Progress is actually backed by a live work session
+// (see BuilderDashboard's clock-in/Stop-button flow). Kept as 3 separate,
+// honest filters rather than one reassuring-but-inaccurate bucket.
+// Cancelled is deliberately excluded from "Total" and hidden from the
+// default list, same convention AdminPipeline.jsx uses for its own list --
+// a mistaken/duplicate cancel shouldn't clutter the view, but it's still
+// one tap away.
 const PIPELINE_FILTERS = {
   All: (t) => t.status !== 'Cancelled',
   Pending: (t) => t.status === 'Pending',
-  Active: (t) => ['Assigned', 'In Progress', 'On Hold'].includes(t.status),
+  Assigned: (t) => t.status === 'Assigned',
+  InProgress: (t) => t.status === 'In Progress',
+  OnHold: (t) => t.status === 'On Hold',
   Completed: (t) => t.status === 'Completed',
   Archived: (t) => t.status === 'Archived',
   Cancelled: (t) => t.status === 'Cancelled',
@@ -587,7 +593,9 @@ function PipelineList({ profile }) {
   const kpis = [
     { label: 'Total', value: tickets.filter(PIPELINE_FILTERS.All).length, colour: COLORS.slate500, key: 'All' },
     { label: 'Not Picked Up Yet', value: tickets.filter(PIPELINE_FILTERS.Pending).length, colour: COLORS.red600, key: 'Pending' },
-    { label: 'Being Handled', value: tickets.filter(PIPELINE_FILTERS.Active).length, colour: COLORS.teal600, key: 'Active' },
+    { label: 'Assigned, Not Started', value: tickets.filter(PIPELINE_FILTERS.Assigned).length, colour: COLORS.blue500, key: 'Assigned' },
+    { label: 'In Progress', value: tickets.filter(PIPELINE_FILTERS.InProgress).length, colour: COLORS.teal600, key: 'InProgress' },
+    { label: 'On Hold', value: tickets.filter(PIPELINE_FILTERS.OnHold).length, colour: COLORS.amber600, key: 'OnHold' },
     { label: 'Needs Your Confirmation', value: tickets.filter(PIPELINE_FILTERS.Completed).length, colour: COLORS.purple600, key: 'Completed' },
     { label: 'Closed', value: tickets.filter(PIPELINE_FILTERS.Archived).length, colour: COLORS.green600, key: 'Archived' },
   ]
