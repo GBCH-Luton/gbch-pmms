@@ -247,7 +247,7 @@ export default function SubmitterDashboard({ profile }) {
             more readable, e.g. NewReportForm; list/detail views stretch). */}
         <div style={{ flex: 1, padding: '20px', width: '100%', boxSizing: 'border-box' }}>
           {currentPage === 'new' && <NewReportForm profile={profile} onSubmitted={() => goToPage('pipeline')} />}
-          {currentPage === 'pipeline' && <PipelineList profile={profile} />}
+          {currentPage === 'pipeline' && <PipelineList profile={profile} onGoToSignOff={() => goToPage('signoff')} />}
           {currentPage === 'signoff' && <SignOffList profile={profile} onChanged={fetchSignOffCount} />}
         </div>
       </div>
@@ -478,7 +478,7 @@ const PIPELINE_FILTERS = {
   Cancelled: (t) => t.status === 'Cancelled',
 }
 
-function PipelineList({ profile }) {
+function PipelineList({ profile, onGoToSignOff }) {
   const [tickets, setTickets] = useState([])
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('All')
@@ -612,7 +612,10 @@ function PipelineList({ profile }) {
 
   return (
     <div>
-      <KpiTiles kpis={kpis} onTileClick={(kpi) => setStatusFilter(kpi.key)} />
+      <KpiTiles
+        kpis={kpis}
+        onTileClick={(kpi) => (kpi.key === 'Completed' ? onGoToSignOff?.() : setStatusFilter(kpi.key))}
+      />
 
       {statusFilter !== 'All' && (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', background: COLORS.teal50, border: `1px solid ${COLORS.teal300}`, borderRadius: '10px', padding: '10px 16px', marginBottom: '16px' }}>
