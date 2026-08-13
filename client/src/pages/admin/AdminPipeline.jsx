@@ -875,6 +875,7 @@ export default function AdminPipeline({
     setCategoryFilter('All')
     setDivisionFilter('All')
     setBuilderFilter('All')
+    setSubmitterFilter('All')
     setAssignTypeFilter('All')
     setPriorityFilter('All')
     setTicketNumberSearch('')
