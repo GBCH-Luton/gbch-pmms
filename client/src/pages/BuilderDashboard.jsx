@@ -1934,7 +1934,7 @@ export default function BuilderDashboard({ profile }) {
           next job. */}
       {isIdle && (
         <div style={{ maxWidth: '600px', margin: '10px auto 0 auto', padding: '0 16px' }}>
-          <div style={{ background: COLORS.slate900, borderRadius: '16px', padding: '18px 20px', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+          <div style={{ background: openActivity ? COLORS.slate900 : COLORS.red600, borderRadius: '16px', padding: '18px 20px', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
             <p style={{ margin: '0 0 4px 0', fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.75)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
               {openActivity ? `Away — ${openActivity.activity_type === 'Travel' ? 'Travelling' : 'On break'}` : 'You have been doing nothing for:'}
             </p>
