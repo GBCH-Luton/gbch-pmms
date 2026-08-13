@@ -221,7 +221,16 @@ export default function AdminPipeline({
   useEffect(() => {
     if (pendingExpandTicketNumber == null || tickets.length === 0) return
     const match = tickets.find(t => String(t.ticket_number) === String(pendingExpandTicketNumber))
-    if (match) setExpandedTicketId(match.id)
+    if (match) {
+      setExpandedTicketId(match.id)
+      // Row is in a filtered/sorted table that hasn't necessarily rendered
+      // this row into the viewport yet -- wait a tick for that render, then
+      // bring it into view so the highlight isn't buried off-screen among
+      // whatever else is on the page.
+      setTimeout(() => {
+        document.getElementById(`ticket-row-${match.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }, 0)
+    }
     setPendingExpandTicketNumber(null)
   }, [tickets, pendingExpandTicketNumber])
 
@@ -797,7 +806,11 @@ export default function AdminPipeline({
     if (submitterFilter !== 'All' && t.raised_by !== submitterFilter) return false
     if (assignTypeFilter !== 'All' && (t.assign_type || 'Manual') !== assignTypeFilter) return false
     if (priorityFilter !== 'All' && effectiveTier(t) !== priorityFilter) return false
-    if (ticketNumberSearch.trim() && !String(t.ticket_number).includes(ticketNumberSearch.trim())) return false
+    // Exact match, not substring -- ticket_number is an ID, not free text.
+    // A substring match against "3" used to pull in every ticket numbered
+    // 13, 23, 30-39 etc., which is exactly the kind of noise this search
+    // exists to cut through when jumping to one specific job.
+    if (ticketNumberSearch.trim() && String(t.ticket_number) !== ticketNumberSearch.trim()) return false
     if (stuckOnlyFilter && !isTicketStuck(t, stuckThresholds, Date.now(), p1Threshold, p2Threshold)) return false
     // Reports' date range means two different things depending which set
     // you're looking at -- "raised in range" (created_at) vs "completed in
@@ -1121,6 +1134,7 @@ export default function AdminPipeline({
                 return (
                   <Fragment key={t.id}>
                     <tr
+                      id={`ticket-row-${t.id}`}
                       onClick={() => setExpandedTicketId(isExpanded ? null : t.id)}
                       style={{
                         borderBottom: isExpanded ? 'none' : `1px solid ${COLORS.slate100}`, cursor: 'pointer',
