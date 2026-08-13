@@ -29,3 +29,6 @@ verify_jwt = false
 
 [functions.check-idle-builders]
 verify_jwt = false
+
+[functions.check-office-cleaning-due]
+verify_jwt = false

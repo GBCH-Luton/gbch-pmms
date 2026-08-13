@@ -407,10 +407,15 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
     // every other view (including the default "all") so they don't clutter
     // normal browsing, only reachable via the dedicated Inactive tile.
     if (filterMode !== 'inactive' && p.status === 'Inactive') return false
+    // Same treatment for Internal (GBCH's own non-rental locations, e.g.
+    // the office) -- not part of the rental portfolio this page is really
+    // about, only reachable via its own tile.
+    if (filterMode !== 'internal' && p.status === 'Internal') return false
     if (filterMode === 'newProperties' && !isNewProperty(p)) return false
     if (filterMode === 'procured' && p.status !== 'Procured') return false
     if (filterMode === 'live' && p.status !== 'Live') return false
     if (filterMode === 'inactive' && p.status !== 'Inactive') return false
+    if (filterMode === 'internal' && p.status !== 'Internal') return false
     if (filterMode === 'gardensOverdue' && !p.has_garden) return false
     if (filterMode === 'openTickets' && !((openTicketCounts[p.id] || 0) > 0)) return false
     return true
@@ -421,6 +426,7 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
     filterMode === 'procured' ? 'Procured' :
     filterMode === 'live' ? 'Live' :
     filterMode === 'inactive' ? 'Inactive' :
+    filterMode === 'internal' ? 'Internal' :
     filterMode === 'gardensOverdue' ? 'Gardens' :
     filterMode === 'openTickets' ? 'With Open Tickets' :
     null
@@ -435,13 +441,16 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
   // dashboard). Total deliberately excludes Inactive so the headline
   // number reflects only properties still actively managed -- Inactive
   // ones are no longer with the company (returned to landlord etc.) and
-  // are only reachable via their own tile/filter.
+  // are only reachable via their own tile/filter. Also excludes Internal
+  // (GBCH's own non-rental locations, e.g. the office) -- not a property
+  // being let out, so it shouldn't inflate a rental-portfolio headline.
   const propertyKpis = [
-    { label: 'Total Properties', value: properties.filter(p => p.status !== 'Inactive').length, colour: COLORS.blue600, mode: 'all' },
+    { label: 'Total Properties', value: properties.filter(p => p.status !== 'Inactive' && p.status !== 'Internal').length, colour: COLORS.blue600, mode: 'all' },
     { label: 'New Properties', value: properties.filter(isNewProperty).length, colour: COLORS.teal700, mode: 'newProperties' },
     { label: 'Procured', value: properties.filter(p => p.status === 'Procured').length, colour: COLORS.slate500, mode: 'procured' },
     { label: 'Live', value: properties.filter(p => p.status === 'Live').length, colour: COLORS.green600, mode: 'live' },
     { label: 'Inactive', value: properties.filter(p => p.status === 'Inactive').length, colour: COLORS.stone600, mode: 'inactive' },
+    { label: 'Internal', value: properties.filter(p => p.status === 'Internal').length, colour: COLORS.violet600, mode: 'internal' },
     { label: 'With Open Tickets', value: properties.filter(p => p.status !== 'Inactive' && (openTicketCounts[p.id] || 0) > 0).length, colour: COLORS.red600, mode: 'openTickets' },
   ]
 
@@ -451,6 +460,7 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
     if (status === 'Void') return { fontSize: '11px', fontWeight: 700, padding: '3px 10px', borderRadius: '20px', color: COLORS.red600, background: COLORS.red100 }
     if (status === 'Procured') return { fontSize: '11px', fontWeight: 700, padding: '3px 10px', borderRadius: '20px', color: COLORS.slate500, background: COLORS.slate100 }
     if (status === 'Inactive') return { fontSize: '11px', fontWeight: 700, padding: '3px 10px', borderRadius: '20px', color: COLORS.stone600, background: COLORS.stone200 }
+    if (status === 'Internal') return { fontSize: '11px', fontWeight: 700, padding: '3px 10px', borderRadius: '20px', color: COLORS.violet600, background: COLORS.violet100 }
     return { fontSize: '11px', fontWeight: 700, padding: '3px 10px', borderRadius: '20px', color: COLORS.green600, background: COLORS.green100 } // Occupied / Live
   }
 

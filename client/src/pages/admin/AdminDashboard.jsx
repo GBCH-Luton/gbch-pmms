@@ -556,10 +556,13 @@ export default function AdminDashboard({ profile, onNavigate }) {
   }
 
   async function fetchTotalPropertiesCount() {
+    // Excludes Internal (GBCH's own non-rental locations, e.g. the office)
+    // -- not part of the rental portfolio this headline number represents.
     const { count } = await supabase
       .schema('pmms')
       .from('properties')
       .select('id', { count: 'exact', head: true })
+      .neq('status', 'Internal')
 
     setTotalPropertiesCount(count || 0)
   }

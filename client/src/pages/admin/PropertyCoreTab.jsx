@@ -23,7 +23,11 @@ import { getSignedUrl } from '../../lib/storage'
 
 const PROPERTY_TYPES = ['House', 'Flat', 'HMO', 'Specialist Supported Living', 'Commercial', 'Other']
 const TENURE_TYPES = ['Freehold', 'Leasehold', 'Rented']
-const PROPERTY_STATUSES = ['Occupied', 'Void', 'Procured', 'Live']
+// 'Internal' is for GBCH's own non-rental locations (e.g. the office) --
+// deliberately excluded from rental-scoped counts/reports (see
+// AdminProperties.jsx's Total Properties tile) since it isn't a property
+// being let out, just a real address tickets can be raised against.
+const PROPERTY_STATUSES = ['Occupied', 'Void', 'Procured', 'Live', 'Internal']
 const UNIT_LAYOUT_TYPES = ['Studio', '1-Bed', '2-Bed', '3-Bed', '4-Bed', '5-Bed', 'HMO', 'Other']
 // Drives the floor/area choices a submitter or builder sees when logging a
 // ticket against this property (see floorContextOptions() in

@@ -20,9 +20,101 @@ import { COLORS } from '../../lib/colors'
 import { normalizeCustomRoles } from '../../lib/roles'
 import { attachProperties } from '../../lib/properties'
 import BuilderProfilePage from './BuilderProfilePage'
-import { thStyle, tdStyle, actionBtnStyle, STAFF_AVAILABILITY_OPTIONS, STAFF_AVAILABILITY_STYLES, Avatar, computeDutyStatus } from './shared'
+import { thStyle, tdStyle, actionBtnStyle, STAFF_AVAILABILITY_OPTIONS, STAFF_AVAILABILITY_STYLES, Avatar, computeDutyStatus, fetchAssignableStaffForCategory } from './shared'
 
 const BUILT_IN_ROLES = ['Admin', 'Builder', 'Cleaner', 'Support Worker']
+
+const OFFICE_ROTA_DAYS = [
+  { key: 'monday', label: 'Monday' },
+  { key: 'tuesday', label: 'Tuesday' },
+  { key: 'wednesday', label: 'Wednesday' },
+  { key: 'thursday', label: 'Thursday' },
+  { key: 'friday', label: 'Friday' },
+]
+
+// Lives here rather than Settings -- managers can have Settings hidden
+// per-role (see profile.hideSettings, AdminDashboard.jsx), but this page
+// has no such gate, and a Housekeeping Manager overriding who covers a day
+// is exactly the kind of thing they need reachable without an admin's help.
+// Reuses fetchAssignableStaffForCategory('Cleaning Rota') -- the same
+// Housekeeping-division routing already used for the per-property cleaner
+// picker (PropertyCoreTab.jsx) -- so this list of eligible housekeepers
+// never drifts out of sync with who's actually eligible elsewhere.
+// Auto-generation itself is a separate daily scheduled job (see
+// supabase/functions/check-office-cleaning-due) that reads this same
+// setting -- this panel only edits pmms.settings.office_cleaning_rota,
+// it doesn't create tickets itself.
+function OfficeCleaningRotaSection() {
+  const [housekeepers, setHousekeepers] = useState([])
+  const [rota, setRota] = useState({})
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
+
+  useEffect(() => {
+    fetchAssignableStaffForCategory('Cleaning Rota').then(setHousekeepers)
+    supabase.schema('pmms').from('settings').select('setting_value').eq('setting_key', 'office_cleaning_rota').maybeSingle()
+      .then(({ data }) => { setRota(data?.setting_value || {}); setLoading(false) })
+  }, [])
+
+  async function handleSave() {
+    setSaving(true)
+    setError('')
+    setSuccess('')
+    const { error: saveError } = await supabase
+      .schema('pmms')
+      .from('settings')
+      .upsert({ setting_key: 'office_cleaning_rota', setting_value: rota, updated_at: new Date().toISOString() }, { onConflict: 'setting_key' })
+
+    setSaving(false)
+    if (saveError) { setError(saveError.message); return }
+    setSuccess('Saved.')
+    setTimeout(() => setSuccess(''), 2500)
+  }
+
+  return (
+    <div style={{ background: COLORS.white, borderRadius: '16px', padding: '20px', marginBottom: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+      <h2 style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: 800, color: COLORS.slate900 }}>Office Cleaning Rota</h2>
+      <p style={{ margin: '0 0 14px 0', fontSize: '12.5px', color: COLORS.slate500 }}>
+        Who covers the office each weekday -- a ticket is created and assigned to that person automatically every morning.
+        If someone's off, reassign that day's ticket from Pipeline, or raise a one-off ticket for whoever's covering instead.
+      </p>
+      {loading ? (
+        <p style={{ color: COLORS.slate400, fontSize: '13px' }}>Loading...</p>
+      ) : (
+        <>
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '14px' }}>
+            {OFFICE_ROTA_DAYS.map(d => (
+              <div key={d.key} style={{ flex: '1 1 150px' }}>
+                <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: COLORS.slate500, marginBottom: '4px' }}>{d.label}</label>
+                <select
+                  value={rota[d.key] || ''}
+                  onChange={(e) => setRota(prev => ({ ...prev, [d.key]: e.target.value || null }))}
+                  style={{ width: '100%', padding: '8px 10px', borderRadius: '8px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', boxSizing: 'border-box' }}
+                >
+                  <option value="">Nobody assigned</option>
+                  {housekeepers.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
+                </select>
+              </div>
+            ))}
+          </div>
+          {error && <p style={{ margin: '0 0 10px 0', fontSize: '12px', color: COLORS.red600, fontWeight: 600 }}>{error}</p>}
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            style={{
+              padding: '8px 16px', borderRadius: '10px', border: 'none', background: COLORS.teal700, color: COLORS.white,
+              fontSize: '13px', fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.6 : 1,
+            }}
+          >
+            {saving ? 'Saving...' : success || 'Save Rota'}
+          </button>
+        </>
+      )}
+    </div>
+  )
+}
 
 export default function AdminBuilders({ profile, initialStaffId, onInitialStaffIdConsumed }) {
   const [staffList, setStaffList] = useState([])
@@ -185,6 +277,15 @@ export default function AdminBuilders({ profile, initialStaffId, onInitialStaffI
         <h1 style={{ margin: '0 0 4px 0', fontSize: '18px', fontWeight: 800, color: COLORS.slate900 }}>Live Field Radar</h1>
         <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate500 }}>Real-time duty status and current assignment for every active staff member.</p>
       </div>
+
+      {/* Hidden only for a manager explicitly scoped to a division other
+          than Housekeeping -- same allow-list convention as the nav item
+          gating in AdminDashboard.jsx (isNavItemVisible's `divisions`
+          shape), applied inline here since this is a section within a
+          page rather than a whole page. */}
+      {(profile.role === 'admin' || !profile.division || profile.division === 'Housekeeping') && (
+        <OfficeCleaningRotaSection />
+      )}
 
       {/* KPI tiles */}
       <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
