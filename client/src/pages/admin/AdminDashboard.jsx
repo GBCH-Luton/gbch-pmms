@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import { COLORS } from '../../lib/colors'
 import { priorityTierLabel, fetchFlaggedClockingCount, isTicketStuck, KpiTiles, fetchComplianceAgingCounts, fetchVoidAgingCounts, fetchGardenReviewAging, computeAvgResponseMs, formatDuration, fetchPriorityThresholds, fetchAssignableBuilders, fetchAssignableStaffForDivision, fetchLastEndedSessionsToday, ukDateKey, formatUKDateTime, minutesLate, SHORT_TRIP_REASONS } from './shared'
@@ -469,6 +469,45 @@ export default function AdminDashboard({ profile, onNavigate }) {
   const [totalTicketsPeriod, setTotalTicketsPeriod] = useState('all_time')
   const [loading, setLoading] = useState(true)
 
+  // Daily Briefing / Where's the Team split, dragged via the handle
+  // between them below -- persisted the same way the sidebar's collapsed
+  // state already is (see client/src/pages/AdminDashboard.jsx), per
+  // browser rather than per profile since it's a screen-layout preference,
+  // not something that should follow someone between devices.
+  const [briefingSplitPct, setBriefingSplitPct] = useState(() => {
+    try { return Number(localStorage.getItem('pmms_dashboard_split_pct')) || 50 } catch { return 50 }
+  })
+  const [splitDragging, setSplitDragging] = useState(false)
+  const splitContainerRef = useRef(null)
+
+  function applySplitPct(pct) {
+    const clamped = Math.max(30, Math.min(70, pct))
+    setBriefingSplitPct(clamped)
+    try { localStorage.setItem('pmms_dashboard_split_pct', String(clamped)) } catch { /* ignore */ }
+  }
+
+  useEffect(() => {
+    if (!splitDragging) return
+    function onMove(clientX) {
+      const rect = splitContainerRef.current?.getBoundingClientRect()
+      if (!rect) return
+      applySplitPct(((clientX - rect.left) / rect.width) * 100)
+    }
+    function onMouseMove(e) { onMove(e.clientX) }
+    function onTouchMove(e) { if (e.touches[0]) onMove(e.touches[0].clientX) }
+    function onUp() { setSplitDragging(false) }
+    window.addEventListener('mousemove', onMouseMove)
+    window.addEventListener('touchmove', onTouchMove)
+    window.addEventListener('mouseup', onUp)
+    window.addEventListener('touchend', onUp)
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove)
+      window.removeEventListener('touchmove', onTouchMove)
+      window.removeEventListener('mouseup', onUp)
+      window.removeEventListener('touchend', onUp)
+    }
+  }, [splitDragging])
+
   // Polled every 45s, same cadence and reasoning as BuilderDashboard.jsx's
   // own notifications/available-jobs polling -- nothing here pushes, so
   // this is the only way Daily Briefing (built entirely from this state)
@@ -769,9 +808,29 @@ export default function AdminDashboard({ profile, onNavigate }) {
 
   return (
     <div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', gap: '16px', alignItems: 'stretch', marginBottom: '16px' }}>
-        <DailyBriefing lines={briefingLines} />
-        <TeamWhereabouts profile={profile} onNavigate={onNavigate} />
+      {/* Below 900px there's no meaningful side-by-side left to adjust --
+          dashboard-split-panel/-handle in index.css switch this to a
+          stacked, full-width, un-draggable layout instead (same convention
+          as admin-sidebar-desktop/admin-mobile-topbar there: plain inline
+          styles can't express a breakpoint, so this one responsive toggle
+          lives in that stylesheet). */}
+      <div ref={splitContainerRef} className="dashboard-split" style={{ display: 'flex', alignItems: 'stretch', gap: 0, marginBottom: '16px' }}>
+        <div className="dashboard-split-panel" style={{ flex: `0 0 ${briefingSplitPct}%`, minWidth: 0 }}>
+          <DailyBriefing lines={briefingLines} />
+        </div>
+        <div
+          className="dashboard-split-handle"
+          onMouseDown={() => setSplitDragging(true)}
+          onTouchStart={() => setSplitDragging(true)}
+          onDoubleClick={() => applySplitPct(50)}
+          title="Drag to resize -- double-click to reset"
+          style={{ flexShrink: 0, width: '14px', cursor: 'col-resize', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        >
+          <div style={{ width: '4px', height: '40px', borderRadius: '999px', background: splitDragging ? COLORS.teal700 : COLORS.slate200 }} />
+        </div>
+        <div className="dashboard-split-panel" style={{ flex: `1 1 ${100 - briefingSplitPct}%`, minWidth: 0 }}>
+          <TeamWhereabouts profile={profile} onNavigate={onNavigate} />
+        </div>
       </div>
 
       <DashboardSection id="pipeline" title="Ticket Pipeline" background={COLORS.white} alertCount={kpis.find(k => k.label === 'Stuck')?.value || 0}>

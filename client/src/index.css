@@ -58,6 +58,24 @@ body {
   }
 }
 
+/* Dashboard home: Daily Briefing / Where's the Team resizable split.
+   Below 900px there's no meaningful side-by-side left to drag between --
+   goes full-width stacked instead, handle removed rather than left
+   sitting there with nothing to do. */
+@media (max-width: 900px) {
+  .dashboard-split {
+    flex-direction: column !important;
+    gap: 16px !important;
+  }
+  .dashboard-split-handle {
+    display: none !important;
+  }
+  .dashboard-split-panel {
+    flex: none !important;
+    width: 100% !important;
+  }
+}
+
 /* Slim, unobtrusive scrollbars app-wide -- Windows Chrome falls back to a
    wide, classic arrow-button scrollbar wherever an accessibility setting
    ("always show scrollbars") is on, which reads as broken/ugly against
