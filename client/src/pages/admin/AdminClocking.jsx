@@ -90,6 +90,22 @@ function dailyStatusFor(shift) {
   return { label: 'On Time', color: COLORS.green600, bg: COLORS.green100 }
 }
 
+// This page stacks five same-shaped white cards with nothing else to tell
+// them apart at a glance -- a colour-coded strip along the top of each
+// fixes that. It's a full-width child div rather than a side border, since
+// a full-height border would either run past the card's own rounded
+// corners or need to stop short and float oddly in the middle. Sitting
+// flush along the top and letting the card's own overflow: hidden (see
+// sectionCardStyle) clip it to the same 16px radius means it always
+// follows the corner exactly, at any card height.
+function SectionAccent({ color }) {
+  return <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '4px', background: color }} />
+}
+
+function sectionCardStyle(extra) {
+  return { position: 'relative', overflow: 'hidden', background: COLORS.white, borderRadius: '16px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', ...extra }
+}
+
 export default function AdminClocking({ profile, onNavigate }) {
   const [loading, setLoading] = useState(true)
   const [liveSessions, setLiveSessions] = useState([])
@@ -808,7 +824,8 @@ export default function AdminClocking({ profile, onNavigate }) {
     <div>
 
       {/* Section 0: Average Time by Job Type */}
-      <div style={{ background: COLORS.white, borderRadius: '16px', padding: '20px', marginBottom: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+      <div style={sectionCardStyle({ marginBottom: '20px' })}>
+        <SectionAccent color={COLORS.purple600} />
         <h2 style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: 800, color: COLORS.slate900 }}>Average Time by Job Type</h2>
         <p style={{ margin: '0 0 14px 0', fontSize: '13px', color: COLORS.slate500 }}>Based on completed jobs with recorded clock times. {onNavigate ? 'Click a job type to see those jobs in Pipeline.' : ''}</p>
 
@@ -837,7 +854,8 @@ export default function AdminClocking({ profile, onNavigate }) {
       </div>
 
       {/* Section 1: Currently Clocked In */}
-      <div style={{ background: COLORS.white, borderRadius: '16px', padding: '20px', marginBottom: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+      <div style={sectionCardStyle({ marginBottom: '20px' })}>
+        <SectionAccent color={COLORS.green600} />
         <h2 style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: 800, color: COLORS.slate900 }}>Currently Clocked In</h2>
         <p style={{ margin: '0 0 14px 0', fontSize: '13px', color: COLORS.slate500 }}>Live running timers. A red row means the job has been running past 8 hours — the builder may have forgotten to clock out.</p>
 
@@ -913,7 +931,8 @@ export default function AdminClocking({ profile, onNavigate }) {
 
       {/* Section 2: Today's Attendance -- the day-level shift, separate
           from the per-job sessions in Section 1 above. */}
-      <div style={{ background: COLORS.white, borderRadius: '16px', padding: '20px', marginBottom: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+      <div style={sectionCardStyle({ marginBottom: '20px' })}>
+        <SectionAccent color={COLORS.blue600} />
         <h2 style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: 800, color: COLORS.slate900 }}>Today's Attendance</h2>
         <p style={{ margin: '0 0 14px 0', fontSize: '13px', color: COLORS.slate500 }}>Day-level clock in/out. Builders can't see their jobs at all until they clock in for the day.</p>
 
@@ -1047,7 +1066,8 @@ export default function AdminClocking({ profile, onNavigate }) {
       </div>
 
       {/* Section 3: Completed Job Timesheet */}
-      <div style={{ background: COLORS.white, borderRadius: '16px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+      <div style={sectionCardStyle()}>
+        <SectionAccent color={COLORS.teal600} />
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px', marginBottom: '14px' }}>
           <div>
             <h2 style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: 800, color: COLORS.slate900 }}>Completed Job Timesheet</h2>
@@ -1234,7 +1254,8 @@ export default function AdminClocking({ profile, onNavigate }) {
 
       {/* Section 4: Monthly Hours -- payroll-style rollup, summed from
           daily_attendance across the whole selected month. */}
-      <div style={{ background: COLORS.white, borderRadius: '16px', padding: '20px', marginTop: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+      <div style={sectionCardStyle({ marginTop: '20px' })}>
+        <SectionAccent color={COLORS.pink600} />
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px', marginBottom: '14px' }}>
           <div>
             <h2 style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: 800, color: COLORS.slate900 }}>Monthly Hours</h2>
