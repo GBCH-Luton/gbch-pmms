@@ -21,6 +21,10 @@ export default function PrintableTicketReport({ tickets, categoriesSettingsRow, 
   const COLUMN_DEFS = [
     { key: 'ticketNumber', label: 'Ticket #', value: t => t.ticket_number },
     { key: 'property', label: 'Property', value: t => t.property?.address || '' },
+    // Same field Pipeline's own expanded ticket view labels "Issue" (the
+    // free-text description of what's actually wrong) -- not a separate
+    // taxonomy, just this column reusing that label for consistency.
+    { key: 'issue', label: 'Issue', value: t => t.description || '' },
     { key: 'category', label: 'Category', value: t => t.category || '' },
     { key: 'division', label: 'Division', value: t => resolveCategoryDivision(t.category, categoriesSettingsRow) },
     { key: 'status', label: 'Status', value: t => statusLabel(t.status) },
