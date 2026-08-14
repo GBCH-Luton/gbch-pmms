@@ -94,6 +94,14 @@ export default function AdminClocking({ profile, onNavigate }) {
   const [loading, setLoading] = useState(true)
   const [liveSessions, setLiveSessions] = useState([])
   const [completedRows, setCompletedRows] = useState([])
+  const [completedDate, setCompletedDate] = useState(ukDateKey())
+  const [completedLoading, setCompletedLoading] = useState(true)
+  // Raw staff rows (id/name/home postcode+coords) for name resolution and
+  // home-origin mileage estimates -- kept in state rather than a local var
+  // inside fetchAll() so fetchCompletedRowsForDate() can use it too, on its
+  // own schedule (whenever completedDate changes) without re-running
+  // everything else fetchAll() does.
+  const [allStaff, setAllStaff] = useState([])
   const [builders, setBuilders] = useState([])
   const [builderFilter, setBuilderFilter] = useState('All')
   const [completedSortColumn, setCompletedSortColumn] = useState(null)
@@ -219,6 +227,13 @@ export default function AdminClocking({ profile, onNavigate }) {
     if (builders.length > 0) fetchMonthlyHours()
   }, [monthlyMonth, builders])
 
+  // Waits on `allStaff` (populated by fetchAll) for the same reason as
+  // fetchMonthlyHours above -- refires whenever that list first loads in,
+  // and again whenever the day picker changes.
+  useEffect(() => {
+    if (allStaff.length > 0) fetchCompletedRowsForDate(completedDate)
+  }, [completedDate, allStaff])
+
   async function fetchMonthlyHours() {
     setMonthlyLoading(true)
     const [year, month] = monthlyMonth.split('-').map(Number)
@@ -284,6 +299,7 @@ export default function AdminClocking({ profile, onNavigate }) {
     const { data: builderData } = await supabase
       .from('staff')
       .select('id, name, home_postcode, home_latitude, home_longitude')
+    setAllStaff(builderData || [])
     const assignableBuilders = await (profile.division ? fetchAssignableStaffForDivision(profile.division) : fetchAssignableBuilders())
     setBuilders(assignableBuilders)
 
@@ -348,18 +364,11 @@ export default function AdminClocking({ profile, onNavigate }) {
       liveTicketData = await attachProperties(data || [], 'address, postcode, latitude, longitude')
     }
 
-    // --- Sections 2 & 3: completed tickets with recorded work sessions ---
-    const { data: completedTicketsRaw } = await supabase
-      .schema('pmms')
-      .from('tickets')
-      .select('id, ticket_number, category, description, room, mileage_logged, estimated_minutes, assigned_builder_id, property_id')
-      .in('status', ['Completed', 'Archived'])
-    const completedTickets = await attachProperties(completedTicketsRaw || [], 'address, postcode, latitude, longitude')
-
-    // Geocode every property involved (live + completed) in one batch,
-    // caching results so this only ever hits postcodes.io for properties
-    // that don't already have coordinates saved.
-    const allProperties = [...liveTicketData, ...completedTickets].map(t => t.property).filter(Boolean)
+    // Geocode live-job properties, caching results so this only ever hits
+    // postcodes.io for properties that don't already have coordinates
+    // saved. Completed-job properties are geocoded separately, scoped to
+    // whichever day's timesheet is on screen -- see fetchCompletedRowsForDate.
+    const allProperties = liveTicketData.map(t => t.property).filter(Boolean)
     const coordsByPropertyId = await ensurePropertyCoords(allProperties)
 
     let live = []
@@ -436,6 +445,31 @@ export default function AdminClocking({ profile, onNavigate }) {
       return { staffId: b.id, staffName: b.name, shift, currentStatus, idleSince, idleLat, idleLng, hoursTodayMs }
     }))
 
+    setLoading(false)
+  }
+
+  // Section 3 (Completed Job Timesheet) is fetched separately from the rest
+  // of fetchAll(), scoped to a single UK calendar day at a time via
+  // tickets.completed_at -- rather than pulling in every completed/archived
+  // ticket the system has ever had, which only grows over time. Runs again
+  // whenever completedDate changes (see the effect above), independent of
+  // Sections 1/2/4.
+  async function fetchCompletedRowsForDate(dateKey) {
+    setCompletedLoading(true)
+
+    const fromMs = ukDateTimeInputValueToMs(`${dateKey}T00:00`)
+    const toExclusiveMs = ukDateTimeInputValueToMs(`${shiftDateKey(dateKey, 1)}T00:00`)
+
+    const { data: completedTicketsRaw } = await supabase
+      .schema('pmms')
+      .from('tickets')
+      .select('id, ticket_number, category, description, room, mileage_logged, estimated_minutes, assigned_builder_id, property_id')
+      .in('status', ['Completed', 'Archived'])
+      .gte('completed_at', new Date(fromMs).toISOString())
+      .lt('completed_at', new Date(toExclusiveMs).toISOString())
+    const completedTickets = await attachProperties(completedTicketsRaw || [], 'address, postcode, latitude, longitude')
+    const coordsByPropertyId = await ensurePropertyCoords(completedTickets.map(t => t.property).filter(Boolean))
+
     let rows = []
     if (completedTickets.length > 0) {
       const ids = completedTickets.map(t => t.id)
@@ -471,7 +505,7 @@ export default function AdminClocking({ profile, onNavigate }) {
             firstIn,
             lastOut,
             totalMs,
-            builderName: builderData?.find(b => b.id === t.assigned_builder_id)?.name || 'Unassigned',
+            builderName: allStaff.find(b => b.id === t.assigned_builder_id)?.name || 'Unassigned',
             firstSession,
             lastSession,
             clockInDistance,
@@ -481,49 +515,50 @@ export default function AdminClocking({ profile, onNavigate }) {
         })
         .filter(Boolean)
         .sort((a, b) => new Date(b.lastOut) - new Date(a.lastOut))
+
+      // Estimated mileage: straight-line distance (times a road-distance
+      // multiplier, see ROAD_DISTANCE_MULTIPLIER above) from wherever the
+      // builder plausibly started their trip -- home for their first job of
+      // the day, otherwise their own previous job that same day -- to this
+      // job's property. Nothing in the system records an actual trip
+      // origin, so this is deliberately an approximation to compare the
+      // builder's self-reported figure against, not a claim to reproduce
+      // Google's real route mileage. Every row here already shares the
+      // same UK calendar day (that's what the query above scoped to), so
+      // "previous job today" only ever needs to look within this one batch.
+      const homeCoordsByStaffId = await ensureStaffHomeCoords(allStaff.filter(b => b.home_postcode))
+      const rowsByBuilder = {}
+      rows.forEach(r => {
+        const id = r.ticket.assigned_builder_id
+        if (!id) return
+        ;(rowsByBuilder[id] ||= []).push(r)
+      })
+      Object.values(rowsByBuilder).forEach(builderRows => {
+        builderRows.sort((a, b) => new Date(a.firstIn) - new Date(b.firstIn))
+        let prevRow = null
+        let prevDateStr = null
+        builderRows.forEach(r => {
+          const dateStr = formatUKDate(r.firstIn)
+          const cameFromPrevJob = prevRow && prevDateStr === dateStr
+          const origin = cameFromPrevJob ? prevRow.propertyCoords : homeCoordsByStaffId[r.ticket.assigned_builder_id]
+          r.estimatedMiles = (origin && r.propertyCoords)
+            ? metresToMiles(distanceMetres(origin.latitude, origin.longitude, r.propertyCoords.latitude, r.propertyCoords.longitude)) * ROAD_DISTANCE_MULTIPLIER
+            : null
+          // Kept alongside estimatedMiles so the Route button can draw the
+          // exact same origin -> this job the estimate was calculated from,
+          // instead of clock-in -> clock-out (nearly always ~0, since
+          // builders clock in/out right at the property, not a meaningful
+          // route -- found live on ticket #17).
+          r.estimatedOrigin = origin || null
+          r.estimatedOriginLabel = cameFromPrevJob ? (prevRow.ticket.property?.address || 'Previous job') : 'Home'
+          prevRow = r
+          prevDateStr = dateStr
+        })
+      })
     }
 
-    // Estimated mileage: straight-line distance (times a road-distance
-    // multiplier, see ROAD_DISTANCE_MULTIPLIER above) from wherever the
-    // builder plausibly started their trip -- home for their first job of
-    // a given UK calendar day, otherwise their own previous job that same
-    // day -- to this job's property. Nothing in the system records an
-    // actual trip origin, so this is deliberately an approximation to
-    // compare the builder's self-reported figure against, not a claim to
-    // reproduce Google's real route mileage.
-    const homeCoordsByStaffId = await ensureStaffHomeCoords((builderData || []).filter(b => b.home_postcode))
-    const rowsByBuilder = {}
-    rows.forEach(r => {
-      const id = r.ticket.assigned_builder_id
-      if (!id) return
-      ;(rowsByBuilder[id] ||= []).push(r)
-    })
-    Object.values(rowsByBuilder).forEach(builderRows => {
-      builderRows.sort((a, b) => new Date(a.firstIn) - new Date(b.firstIn))
-      let prevRow = null
-      let prevDateStr = null
-      builderRows.forEach(r => {
-        const dateStr = formatUKDate(r.firstIn)
-        const cameFromPrevJob = prevRow && prevDateStr === dateStr
-        const origin = cameFromPrevJob ? prevRow.propertyCoords : homeCoordsByStaffId[r.ticket.assigned_builder_id]
-        r.estimatedMiles = (origin && r.propertyCoords)
-          ? metresToMiles(distanceMetres(origin.latitude, origin.longitude, r.propertyCoords.latitude, r.propertyCoords.longitude)) * ROAD_DISTANCE_MULTIPLIER
-          : null
-        // Kept alongside estimatedMiles so the Route button can draw the
-        // exact same origin -> this job the estimate was calculated from,
-        // instead of clock-in -> clock-out (nearly always ~0, since
-        // builders clock in/out right at the property, not a meaningful
-        // route -- found live on ticket #17).
-        r.estimatedOrigin = origin || null
-        r.estimatedOriginLabel = cameFromPrevJob ? (prevRow.ticket.property?.address || 'Previous job') : 'Home'
-        prevRow = r
-        prevDateStr = dateStr
-      })
-    })
-
     setCompletedRows(rows)
-
-    setLoading(false)
+    setCompletedLoading(false)
   }
 
   function openEditModal(row) { setEditRow(row) }
@@ -1018,12 +1053,35 @@ export default function AdminClocking({ profile, onNavigate }) {
             <h2 style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: 800, color: COLORS.slate900 }}>Completed Job Timesheet</h2>
             <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate500 }}>Clock-in, clock-out, total worked time and mileage per finished job. "Est." mileage is an approximate straight-line estimate (home, or the builder's previous job that day, to the property) -- not an exact route match.</p>
           </div>
-          <select value={builderFilter} onChange={(e) => setBuilderFilter(e.target.value)} style={filterSelectStyle}>
-            <option value="All">All builders</option>
-            {builders.map(b => (
-              <option key={b.id} value={b.id}>{b.name}</option>
-            ))}
-          </select>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <button onClick={() => setCompletedDate(d => shiftDateKey(d, -1))} style={actionBtnStyle} aria-label="Previous day">◀</button>
+              <input
+                type="date"
+                value={completedDate}
+                max={ukDateKey()}
+                onChange={(e) => { if (e.target.value) setCompletedDate(e.target.value) }}
+                style={{ ...filterSelectStyle, cursor: 'pointer' }}
+              />
+              <button
+                onClick={() => setCompletedDate(d => shiftDateKey(d, 1))}
+                disabled={completedDate >= ukDateKey()}
+                style={{ ...actionBtnStyle, opacity: completedDate >= ukDateKey() ? 0.4 : 1, cursor: completedDate >= ukDateKey() ? 'not-allowed' : 'pointer' }}
+                aria-label="Next day"
+              >
+                ▶
+              </button>
+              {completedDate !== ukDateKey() && (
+                <button onClick={() => setCompletedDate(ukDateKey())} style={actionBtnStyle}>Today</button>
+              )}
+            </div>
+            <select value={builderFilter} onChange={(e) => setBuilderFilter(e.target.value)} style={filterSelectStyle}>
+              <option value="All">All builders</option>
+              {builders.map(b => (
+                <option key={b.id} value={b.id}>{b.name}</option>
+              ))}
+            </select>
+          </div>
         </div>
 
         <div style={{ overflowX: 'auto' }}>
@@ -1054,14 +1112,21 @@ export default function AdminClocking({ profile, onNavigate }) {
               </tr>
             </thead>
             <tbody>
-              {sortedCompletedRows.length === 0 && (
+              {completedLoading && (
                 <tr>
                   <td colSpan={8} style={{ padding: '32px', textAlign: 'center', color: COLORS.slate400, fontWeight: 600 }}>
-                    No completed jobs to show.
+                    Loading...
                   </td>
                 </tr>
               )}
-              {sortedCompletedRows.map(row => {
+              {!completedLoading && sortedCompletedRows.length === 0 && (
+                <tr>
+                  <td colSpan={8} style={{ padding: '32px', textAlign: 'center', color: COLORS.slate400, fontWeight: 600 }}>
+                    No completed jobs on {completedDate === ukDateKey() ? 'today' : formatUKDate(new Date(`${completedDate}T12:00:00Z`))}.
+                  </td>
+                </tr>
+              )}
+              {!completedLoading && sortedCompletedRows.map(row => {
                 const flaggedKinds = [
                   row.clockInDistance != null && row.clockInDistance > distanceThresholdM && 'clock_in',
                   row.clockOutDistance != null && row.clockOutDistance > distanceThresholdM && 'clock_out',
