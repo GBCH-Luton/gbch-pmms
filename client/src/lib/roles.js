@@ -64,7 +64,7 @@ export function normalizeCustomRoles(raw) {
 export function accessLevelForRole(roleName, normalizedCustomRoles) {
   if (roleName === 'Admin') return 'admin'
   if (roleName === 'Builder') return 'builder'
-  if (roleName === 'Cleaner' || roleName === 'Support Worker') return null
+  if (roleName === 'Support Worker') return null
   const custom = normalizedCustomRoles.find(r => r.name === roleName)
   if (custom?.accessLevel === 'manager') return 'manager'
   if (custom?.accessLevel === 'builder') return 'builder'
@@ -74,7 +74,7 @@ export function accessLevelForRole(roleName, normalizedCustomRoles) {
 
 // UI-only: does this specific named role hide the Settings nav item? Only
 // ever true for a custom role explicitly configured that way -- built-in
-// roles (Admin/Builder/Cleaner/Support Worker) never hide it.
+// roles (Admin/Builder/Support Worker) never hide it.
 export function hideSettingsForRole(roleName, normalizedCustomRoles) {
   return !!normalizedCustomRoles.find(r => r.name === roleName)?.hideSettings
 }

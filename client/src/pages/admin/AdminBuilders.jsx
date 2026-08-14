@@ -22,7 +22,9 @@ import { attachProperties } from '../../lib/properties'
 import BuilderProfilePage from './BuilderProfilePage'
 import { thStyle, tdStyle, actionBtnStyle, STAFF_AVAILABILITY_OPTIONS, STAFF_AVAILABILITY_STYLES, Avatar, computeDutyStatus, fetchAssignableStaffForCategory } from './shared'
 
-const BUILT_IN_ROLES = ['Admin', 'Builder', 'Cleaner', 'Support Worker']
+// Kept in sync with AdminAccess.jsx's own BUILT_IN_ROLES -- 'Cleaner' was
+// removed from both 2026-08-14 (superseded by the 'Housekeeper' custom role).
+const BUILT_IN_ROLES = ['Admin', 'Builder', 'Support Worker']
 
 const OFFICE_ROTA_DAYS = [
   { key: 'monday', label: 'Monday' },

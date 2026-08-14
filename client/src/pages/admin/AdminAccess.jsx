@@ -10,8 +10,8 @@
 // component also refuses to render its content if profile.role isn't
 // 'admin' as a defense-in-depth check, in case it's ever reached another way.
 //
-// IMPORTANT DESIGN NOTE: the "Role" managed here (Admin/Builder/Cleaner/
-// Support Worker + custom) is primarily an ORGANIZATIONAL label for this
+// IMPORTANT DESIGN NOTE: the "Role" managed here (Admin/Builder/Support
+// Worker + custom) is primarily an ORGANIZATIONAL label for this
 // staff directory. Login/access is normally governed by Job Title matching
 // one of the lists in client/src/lib/roles.js (ADMIN_JOB_TITLES/
 // MANAGER_JOB_TITLES/BUILDER_JOB_TITLES), read in App.jsx via
@@ -70,12 +70,17 @@ const ERROR_TYPE_LABELS = {
   supabase_query: 'Failed Query',
 }
 
-const BUILT_IN_ROLES = ['Admin', 'Builder', 'Cleaner', 'Support Worker']
+// 'Cleaner' used to be here too -- removed 2026-08-14, superseded by the
+// 'Housekeeper' custom role (Housekeeping division, real login access).
+// Unlike Housekeeper, Cleaner granted no access and no division at all, so
+// picking it for a new starter silently left them unable to log in and
+// unrouted for Housekeeping jobs. Nobody held the role in production at
+// removal time.
+const BUILT_IN_ROLES = ['Admin', 'Builder', 'Support Worker']
 
 const ROLE_STYLES = {
   'Admin': { bg: COLORS.blue100, color: COLORS.blue900 },
   'Builder': { bg: COLORS.teal100, color: COLORS.teal600 },
-  'Cleaner': { bg: COLORS.purple100, color: COLORS.purple600 },
   'Support Worker': { bg: COLORS.amber100, color: COLORS.amber600 },
 }
 const CUSTOM_ROLE_STYLE = { bg: COLORS.slate100, color: COLORS.slate500 }
