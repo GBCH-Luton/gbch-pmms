@@ -407,7 +407,18 @@ function StaffFormModal({ staff, roleOptions, staffDirectory, onClose, onSaved }
         <p style={modalLabelStyle}>Home Postcode <span style={{ fontWeight: 500, color: COLORS.slate400 }}>(optional -- used by Clocking to estimate expected mileage on someone's first job of the day)</span></p>
         <input type="text" value={form.home_postcode} onChange={(e) => set('home_postcode', e.target.value)} placeholder="e.g. LU1 2AB" style={inputStyle} />
 
-        <p style={modalLabelStyle}>Skills</p>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '16px 0 6px 0' }}>
+          <p style={{ ...modalLabelStyle, margin: 0 }}>Skills</p>
+          {skillOptions.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setForm(prev => ({ ...prev, skills: prev.skills.length === skillOptions.length ? [] : skillOptions }))}
+              style={{ background: 'none', border: 'none', padding: 0, fontSize: '11px', fontWeight: 700, color: COLORS.teal700, cursor: 'pointer' }}
+            >
+              {form.skills.length === skillOptions.length ? 'Deselect all' : 'Select all'}
+            </button>
+          )}
+        </div>
         <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: COLORS.slate400 }}>
           Only affects which maintenance tickets get routed to them. Leave all unchecked if they can do any maintenance job.
         </p>
