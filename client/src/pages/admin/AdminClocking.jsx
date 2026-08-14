@@ -118,6 +118,11 @@ export default function AdminClocking({ profile, onNavigate }) {
   // own schedule (whenever completedDate changes) without re-running
   // everything else fetchAll() does.
   const [allStaff, setAllStaff] = useState([])
+  // All-time per-category average, deliberately NOT scoped to
+  // completedDate -- a single day's sample is too small for "plumbing
+  // jobs average 1h 42m" to mean anything. Independent of completedRows
+  // for the same reason (see fetchCategoryStats).
+  const [categoryStats, setCategoryStats] = useState({})
   const [builders, setBuilders] = useState([])
   const [builderFilter, setBuilderFilter] = useState('All')
   const [completedSortColumn, setCompletedSortColumn] = useState(null)
@@ -228,6 +233,7 @@ export default function AdminClocking({ profile, onNavigate }) {
 
   useEffect(() => {
     fetchAll()
+    fetchCategoryStats()
   }, [])
 
   useEffect(() => {
@@ -577,6 +583,46 @@ export default function AdminClocking({ profile, onNavigate }) {
     setCompletedLoading(false)
   }
 
+  // Average Time by Job Type: an all-time benchmark ("plumbing jobs
+  // average 1h 42m"), not a day-level view -- fetched independently of
+  // fetchCompletedRowsForDate so it isn't limited to whatever single day
+  // the timesheet below happens to be showing. Only needs category +
+  // total worked time per ticket, not the mileage/GPS detail that section
+  // carries, so this stays a lean query of its own.
+  async function fetchCategoryStats() {
+    const { data: allCompletedTickets } = await supabase
+      .schema('pmms')
+      .from('tickets')
+      .select('id, category')
+      .in('status', ['Completed', 'Archived'])
+
+    const stats = {}
+    if (allCompletedTickets && allCompletedTickets.length > 0) {
+      const ids = allCompletedTickets.map(t => t.id)
+      const { data: allSessions } = await supabase
+        .schema('pmms')
+        .from('work_sessions')
+        .select('ticket_id, started_at, ended_at')
+        .in('ticket_id', ids)
+        .not('ended_at', 'is', null)
+
+      const msByTicket = {}
+      ;(allSessions || []).forEach(s => {
+        msByTicket[s.ticket_id] = (msByTicket[s.ticket_id] || 0) + (new Date(s.ended_at) - new Date(s.started_at))
+      })
+
+      allCompletedTickets.forEach(t => {
+        const ms = msByTicket[t.id]
+        if (!ms) return
+        const cat = t.category || 'Other'
+        if (!stats[cat]) stats[cat] = { totalMs: 0, count: 0 }
+        stats[cat].totalMs += ms
+        stats[cat].count += 1
+      })
+    }
+    setCategoryStats(stats)
+  }
+
   function openEditModal(row) { setEditRow(row) }
   function closeEditModal() { setEditRow(null) }
 
@@ -768,13 +814,6 @@ export default function AdminClocking({ profile, onNavigate }) {
     await fetchAll()
   }
 
-  const categoryStats = {}
-  completedRows.forEach(r => {
-    const cat = r.ticket.category || 'Other'
-    if (!categoryStats[cat]) categoryStats[cat] = { totalMs: 0, count: 0 }
-    categoryStats[cat].totalMs += r.totalMs
-    categoryStats[cat].count += 1
-  })
   const categoryEntries = Object.entries(categoryStats)
 
   const filteredCompletedRows = builderFilter === 'All'
