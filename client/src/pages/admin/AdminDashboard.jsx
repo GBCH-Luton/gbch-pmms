@@ -354,6 +354,16 @@ function TeamWhereabouts({ profile, onNavigate }) {
     ? logEntries.filter(e => divisionScopedStaffIds.has(e.staffId))
     : logEntries.filter(e => e.staffId === filterStaffId)
 
+  // The status-chip row is meant as "who's actually on shift right now" --
+  // Off shift (never clocked in / already clocked out) and On Leave/Sick
+  // clutter that with people who aren't part of today's picture. Only
+  // applied to the passive "All builders" view -- explicitly picking one
+  // person from the filter still shows them even if they're off/sick,
+  // since that's a deliberate lookup, not the ambient overview.
+  const chipBuilders = filterStaffId === 'All'
+    ? visibleBuilders.filter(b => { const tone = (statusByStaffId[b.id] || {}).tone; return tone !== 'off' && tone !== 'leave' })
+    : visibleBuilders
+
   return (
     <div style={{
       borderRadius: '16px', padding: '18px 20px', background: COLORS.white,
@@ -393,7 +403,10 @@ function TeamWhereabouts({ profile, onNavigate }) {
       ) : (
         <>
           <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px', marginBottom: '10px' }}>
-            {visibleBuilders.map(b => {
+            {chipBuilders.length === 0 && (
+              <p style={{ margin: 0, fontSize: '12.5px', color: COLORS.slate400, fontStyle: 'italic' }}>No one currently on shift.</p>
+            )}
+            {chipBuilders.map(b => {
               const s = statusByStaffId[b.id] || { status: 'Off shift', tone: 'off' }
               const c = chipStyle[s.tone]
               const idleMs = s.idleSince ? Date.now() - new Date(s.idleSince).getTime() : null
