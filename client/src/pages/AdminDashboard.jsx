@@ -61,7 +61,12 @@ const NAV_ITEMS = [
   // Division dashboards, grouped together in this order.
   { key: 'compliance', label: 'Compliance', icon: 'shield', Component: AdminCompliance, divisions: ['Maintenance', 'Compliance'] },
   ...(LANDLORD_LIAISON_PAGE_ENABLED ? [{ key: 'landlord-liaison', label: 'Landlord Liaison', icon: 'building', Component: AdminLandlordLiaison, divisions: ['Maintenance', 'Landlord Liaison'] }] : []),
-  { key: 'housekeeping', label: 'Housekeeping', icon: 'broom', Component: AdminHousekeeping, divisionOnly: 'Housekeeping' },
+  // Was divisionOnly (Housekeeping Manager/Admin only) until the main
+  // dashboard grew its own Housekeeping KPI section for Admin/unscoped
+  // Maintenance Manager oversight -- broadened to match Compliance's own
+  // `divisions` gating so those tiles' click-through actually opens
+  // something instead of silently landing on nothing.
+  { key: 'housekeeping', label: 'Housekeeping', icon: 'broom', Component: AdminHousekeeping, divisions: ['Maintenance', 'Housekeeping'] },
   { key: 'builders', label: 'Staff', icon: 'users', Component: AdminBuilders },
   { key: 'clocking', label: 'Clocking', icon: 'clock', Component: AdminClocking },
   { key: 'stock', label: 'Stock', icon: 'box', Component: AdminStock, divisions: ['Maintenance'] },

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import { COLORS } from '../../lib/colors'
-import { priorityTierLabel, fetchFlaggedClockingCount, isTicketStuck, KpiTiles, fetchComplianceAgingCounts, fetchVoidAgingCounts, fetchGardenReviewAging, computeAvgResponseMs, formatDuration, fetchPriorityThresholds, fetchAssignableBuilders, fetchAssignableStaffForDivision, fetchLastEndedSessionsToday, ukDateKey, formatUKDateTime, minutesLate, SHORT_TRIP_REASONS, activityCategoryMeta, ACTIVITY_CATEGORY_META, LANDLORD_LIAISON_PAGE_ENABLED } from './shared'
+import { priorityTierLabel, fetchFlaggedClockingCount, isTicketStuck, KpiTiles, fetchComplianceAgingCounts, fetchVoidAgingCounts, fetchGardenReviewAging, fetchHousekeepingCounts, computeAvgResponseMs, formatDuration, fetchPriorityThresholds, fetchAssignableBuilders, fetchAssignableStaffForDivision, fetchLastEndedSessionsToday, ukDateKey, formatUKDateTime, minutesLate, SHORT_TRIP_REASONS, activityCategoryMeta, ACTIVITY_CATEGORY_META, LANDLORD_LIAISON_PAGE_ENABLED } from './shared'
 import { NavIcon } from '../../lib/icons'
 import { googleMapsLink } from '../../lib/geo'
 
@@ -513,6 +513,7 @@ export default function AdminDashboard({ profile, onNavigate }) {
   const [complianceCounts, setComplianceCounts] = useState({ expired: 0, dueSoon: 0, noRecord: 0, valid: 0 })
   const [voidAgingCounts, setVoidAgingCounts] = useState({ overdue: 0, aging: 0, recent: 0 })
   const [gardenAgingCounts, setGardenAgingCounts] = useState({ overdue: 0, aging: 0, recent: 0 })
+  const [housekeepingCounts, setHousekeepingCounts] = useState({ overdue: 0, dueSoon: 0, ok: 0, pendingDelays: 0 })
   const [p1Threshold, setP1Threshold] = useState(70)
   const [p2Threshold, setP2Threshold] = useState(40)
   const [totalTicketsPeriod, setTotalTicketsPeriod] = useState('all_time')
@@ -589,6 +590,7 @@ export default function AdminDashboard({ profile, onNavigate }) {
     fetchComplianceAgingCounts().then(setComplianceCounts)
     fetchVoidAgingCounts().then(setVoidAgingCounts)
     fetchGardenReviewAging().then(setGardenAgingCounts)
+    fetchHousekeepingCounts().then(setHousekeepingCounts)
     fetchPriorityThresholds().then(({ p1, p2 }) => { setP1Threshold(p1); setP2Threshold(p2) })
     fetchTotalTicketsPeriod()
   }
@@ -799,6 +801,12 @@ export default function AdminDashboard({ profile, onNavigate }) {
     { label: 'Recently Attended', value: gardenAgingCounts.recent, colour: COLORS.green600 },
   ]
 
+  const housekeepingKpis = [
+    { label: 'Overdue Visits', value: housekeepingCounts.overdue, colour: COLORS.red600 },
+    { label: 'Due Soon', value: housekeepingCounts.dueSoon, colour: COLORS.amber600 },
+    { label: 'Pending Delay Reasons', value: housekeepingCounts.pendingDelays, colour: COLORS.amber600 },
+  ]
+
   const landlordLiaisonTickets = tickets.filter(t => t.category === 'Landlord Liaison')
   const landlordLiaisonOpenCount = landlordLiaisonTickets.filter(t => t.status !== 'Completed' && t.status !== 'Archived' && t.status !== 'Cancelled').length
   const landlordLiaisonUnassignedCount = landlordLiaisonTickets.filter(t => t.status === 'Pending').length
@@ -822,6 +830,11 @@ export default function AdminDashboard({ profile, onNavigate }) {
   const complianceVisible = !profile.division || profile.division === 'Compliance'
   const landlordLiaisonVisible = LANDLORD_LIAISON_PAGE_ENABLED && (!profile.division || profile.division === 'Landlord Liaison')
   const voidGardensVisible = !profile.division
+  // Admin/unscoped Maintenance Manager oversight only -- the Housekeeping
+  // Manager already gets this same information (plus much more detail) on
+  // her own dedicated page, so it isn't repeated on her own dashboard,
+  // same reasoning as Void Aging/Gardens being Maintenance-only.
+  const housekeepingVisible = !profile.division
 
   // Mirrors every red-coloured Pipeline KPI tile exactly (see kpis above)
   // rather than a narrower hand-picked metric -- a tile showing red on the
@@ -862,6 +875,12 @@ export default function AdminDashboard({ profile, onNavigate }) {
 
     if (gardenAgingCounts.overdue > 0) flaggedLines.push({ target: 'gardens', tone: 'warning', text: <><b>{gardenAgingCounts.overdue} garden{gardenAgingCounts.overdue === 1 ? '' : 's'}</b> {gardenAgingCounts.overdue === 1 ? 'is' : 'are'} overdue for attention.</> })
     else quietLines.push({ target: 'gardens', tone: 'quiet', text: <>Gardens — no updates. {gardenAgingCounts.aging} due soon, nothing overdue.</> })
+  }
+
+  if (housekeepingVisible) {
+    if (housekeepingCounts.overdue > 0) flaggedLines.push({ target: 'housekeeping-summary', tone: 'warning', text: <><b>{housekeepingCounts.overdue} routine visit{housekeepingCounts.overdue === 1 ? '' : 's'}</b> {housekeepingCounts.overdue === 1 ? 'is' : 'are'} overdue.</> })
+    else if (housekeepingCounts.pendingDelays > 0) flaggedLines.push({ target: 'housekeeping-summary', tone: 'warning', text: <><b>{housekeepingCounts.pendingDelays} delay reason{housekeepingCounts.pendingDelays === 1 ? '' : 's'}</b> {housekeepingCounts.pendingDelays === 1 ? 'needs' : 'need'} review.</> })
+    else quietLines.push({ target: 'housekeeping-summary', tone: 'quiet', text: <>Housekeeping — no updates. {housekeepingCounts.dueSoon} due soon.</> })
   }
 
   quietLines.push({ target: 'properties', tone: 'quiet', text: <>Properties — no updates. {totalPropertiesCount} total, {newPropertiesCount} new recently.</> })
@@ -1018,6 +1037,17 @@ export default function AdminDashboard({ profile, onNavigate }) {
             <KpiTiles
               kpis={gardenAgingKpis}
               onTileClick={() => onNavigate?.('properties', { filterMode: 'gardensOverdue' })}
+            />
+          </div>
+        </DashboardSection>
+      )}
+
+      {housekeepingVisible && (
+        <DashboardSection id="housekeeping-summary" title="Housekeeping" background={COLORS.white} alertCount={housekeepingCounts.overdue} defaultCollapsed>
+          <div style={{ width: '100%' }}>
+            <KpiTiles
+              kpis={housekeepingKpis}
+              onTileClick={() => onNavigate?.('housekeeping')}
             />
           </div>
         </DashboardSection>

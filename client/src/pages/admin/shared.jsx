@@ -399,6 +399,31 @@ export async function fetchVoidAgingCounts() {
   return counts
 }
 
+// Portfolio-wide "how is Housekeeping doing" counts, for the dashboard's
+// Housekeeping KPI tiles -- same shape as fetchVoidAgingCounts/
+// fetchGardenReviewAging. Reuses fetchRoutineVisitAging below (already
+// AdminHousekeeping.jsx's own source of truth for per-property visit
+// aging) rather than recomputing that logic a second time, and adds a
+// pending-delay-reasons count on top, since that's the other thing
+// AdminHousekeeping.jsx surfaces as needing manager attention.
+export async function fetchHousekeepingCounts() {
+  const visits = await fetchRoutineVisitAging()
+  const counts = { overdue: 0, dueSoon: 0, ok: 0 }
+  visits.forEach(v => {
+    if (v.tier === 'red') counts.overdue += 1
+    else if (v.tier === 'amber') counts.dueSoon += 1
+    else if (v.tier === 'green') counts.ok += 1
+  })
+
+  const { data: pendingDelays } = await supabase
+    .schema('pmms')
+    .from('tickets')
+    .select('id')
+    .eq('delay_reason_status', 'pending')
+
+  return { ...counts, pendingDelays: pendingDelays?.length || 0 }
+}
+
 // Per-property "when is this cleaner's next routine visit due" view, for
 // the Housekeeping manager screen (walkthrough: "which properties are
 // coming up for their two-week visit, and which are overdue"). Mirrors
