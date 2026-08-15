@@ -32,6 +32,7 @@ export default function PrintableTicketReport({ tickets, categoriesSettingsRow, 
     { key: 'raised', label: 'Raised', value: t => t.created_at ? formatUKDate(t.created_at) : '' },
     { key: 'completed', label: 'Completed', value: t => t.completed_at ? formatUKDate(t.completed_at) : '' },
     { key: 'builder', label: 'Assigned Builder', value: t => t.builderName || '' },
+    { key: 'followup', label: 'Follow-up', value: t => t.needs_followup ? (t.followup_note || 'Yes') : '' },
   ]
 
   const [visibleKeys, setVisibleKeys] = useState(() => COLUMN_DEFS.map(c => c.key))

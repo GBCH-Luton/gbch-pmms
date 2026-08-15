@@ -170,6 +170,7 @@ export default function AdminDashboard({ profile }) {
   const [pipelineInitialFilter, setPipelineInitialFilter] = useState(null)
   const [pipelineInitialPriorityFilter, setPipelineInitialPriorityFilter] = useState(null)
   const [pipelineInitialStuckFilter, setPipelineInitialStuckFilter] = useState(null)
+  const [pipelineInitialNeedsFollowupFilter, setPipelineInitialNeedsFollowupFilter] = useState(null)
   const [pipelineInitialTicketNumber, setPipelineInitialTicketNumber] = useState(null)
   // Reports/Clocking's "jump to Pipeline with this filter already applied"
   // links (see AdminReports.jsx's KPI tiles, chart bars, and table rows)
@@ -269,6 +270,9 @@ export default function AdminDashboard({ profile }) {
     }
     if (key === 'pipeline' && opts.stuckOnly) {
       setPipelineInitialStuckFilter(true)
+    }
+    if (key === 'pipeline' && opts.needsFollowupOnly) {
+      setPipelineInitialNeedsFollowupFilter(true)
     }
     if (key === 'pipeline' && opts.ticketNumber) {
       setPipelineInitialTicketNumber(opts.ticketNumber)
@@ -675,6 +679,7 @@ export default function AdminDashboard({ profile }) {
               initialStatusFilter={currentPage === 'pipeline' ? pipelineInitialFilter : null}
               initialPriorityFilter={currentPage === 'pipeline' ? pipelineInitialPriorityFilter : null}
               initialStuckFilter={currentPage === 'pipeline' ? pipelineInitialStuckFilter : null}
+              initialNeedsFollowupFilter={currentPage === 'pipeline' ? pipelineInitialNeedsFollowupFilter : null}
               initialTicketNumberSearch={currentPage === 'pipeline' ? pipelineInitialTicketNumber : null}
               initialCategoryFilter={currentPage === 'pipeline' ? pipelineInitialCategory : null}
               initialDivisionFilter={currentPage === 'pipeline' ? pipelineInitialDivision : null}
@@ -683,7 +688,7 @@ export default function AdminDashboard({ profile }) {
               initialFromDate={currentPage === 'pipeline' ? pipelineInitialFromDate : null}
               initialToDate={currentPage === 'pipeline' ? pipelineInitialToDate : null}
               onInitialFilterConsumed={() => {
-                setPipelineInitialFilter(null); setPipelineInitialPriorityFilter(null); setPipelineInitialStuckFilter(null); setPipelineInitialTicketNumber(null)
+                setPipelineInitialFilter(null); setPipelineInitialPriorityFilter(null); setPipelineInitialStuckFilter(null); setPipelineInitialNeedsFollowupFilter(null); setPipelineInitialTicketNumber(null)
                 setPipelineInitialCategory(null); setPipelineInitialDivision(null); setPipelineInitialBuilder(null); setPipelineInitialProperty(null)
                 setPipelineInitialFromDate(null); setPipelineInitialToDate(null)
               }}

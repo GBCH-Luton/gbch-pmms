@@ -90,7 +90,7 @@ function DailyBriefing({ lines }) {
     }, 260)
   }
 
-  const toneColour = { critical: COLORS.red600, warning: COLORS.amber600, quiet: COLORS.slate400 }
+  const toneColour = { critical: COLORS.red600, warning: COLORS.amber600, followup: COLORS.violet600, quiet: COLORS.slate400 }
 
   return (
     <div style={{
@@ -548,7 +548,7 @@ export default function AdminDashboard({ profile, onNavigate }) {
     const { data, error } = await supabase
       .schema('pmms')
       .from('tickets')
-      .select('id, status, created_at, completed_at, status_changed_at, first_assigned_at, priority_score, priority_override, mileage_logged, hold_reason')
+      .select('id, status, created_at, completed_at, status_changed_at, first_assigned_at, priority_score, priority_override, mileage_logged, hold_reason, needs_followup')
 
     if (!error) setTickets(data)
     setLoading(false)
@@ -715,6 +715,13 @@ export default function AdminDashboard({ profile, onNavigate }) {
       statusFilter: 'All',
       stuckOnly: true,
     },
+    {
+      label: 'Needs Follow-up',
+      value: tickets.filter(t => t.needs_followup).length,
+      colour: COLORS.violet500,
+      statusFilter: 'All',
+      needsFollowupOnly: true,
+    },
   ]
 
   const completedTickets = tickets.filter(t => (t.status === 'Completed' || t.status === 'Archived') && t.completed_at)
@@ -766,6 +773,7 @@ export default function AdminDashboard({ profile, onNavigate }) {
   const p1CriticalCount = kpis.find(k => k.label === 'P1 Critical')?.value || 0
   const unableToDoCount = kpis.find(k => k.label === 'Unable to Do')?.value || 0
   const stuckCount = kpis.find(k => k.label === 'Stuck')?.value || 0
+  const needsFollowupCount = kpis.find(k => k.label === 'Needs Follow-up')?.value || 0
   const completedToday = completionKpis.find(k => k.label === 'Today')?.value || 0
   const completedThisMonth = completionKpis.find(k => k.label === 'This Month')?.value || 0
 
@@ -776,7 +784,8 @@ export default function AdminDashboard({ profile, onNavigate }) {
   if (unassignedCount > 0) flaggedLines.push({ target: 'pipeline', tone: 'critical', text: <><b>{unassignedCount} ticket{unassignedCount === 1 ? '' : 's'}</b> {unassignedCount === 1 ? 'is' : 'are'} still unassigned.</> })
   if (p1CriticalCount > 0) flaggedLines.push({ target: 'pipeline', tone: 'critical', text: <><b>{p1CriticalCount} P1 Critical ticket{p1CriticalCount === 1 ? '' : 's'}</b> {p1CriticalCount === 1 ? 'needs' : 'need'} attention.</> })
   if (unableToDoCount > 0) flaggedLines.push({ target: 'pipeline', tone: 'warning', text: <><b>{unableToDoCount} job{unableToDoCount === 1 ? '' : 's'}</b> {unableToDoCount === 1 ? 'was' : 'were'} flagged as unable to do — needs reassigning.</> })
-  if (stuckCount === 0 && unassignedCount === 0 && p1CriticalCount === 0 && unableToDoCount === 0) quietLines.push({ target: 'pipeline', tone: 'quiet', text: <>Ticket Pipeline — no updates. {totalTicketsCount} total, {completedToday} completed today.</> })
+  if (needsFollowupCount > 0) flaggedLines.push({ target: 'pipeline', tone: 'followup', text: <><b>{needsFollowupCount} completed job{needsFollowupCount === 1 ? '' : 's'}</b> {needsFollowupCount === 1 ? 'needs' : 'need'} a follow-up.</> })
+  if (stuckCount === 0 && unassignedCount === 0 && p1CriticalCount === 0 && unableToDoCount === 0 && needsFollowupCount === 0) quietLines.push({ target: 'pipeline', tone: 'quiet', text: <>Ticket Pipeline — no updates. {totalTicketsCount} total, {completedToday} completed today.</> })
 
   if (complianceVisible) {
     if (complianceCounts.expired > 0) flaggedLines.push({ target: 'compliance', tone: 'warning', text: <><b>{complianceCounts.expired} compliance certificate{complianceCounts.expired === 1 ? '' : 's'}</b> {complianceCounts.expired === 1 ? 'has' : 'have'} expired.</> })
@@ -837,7 +846,7 @@ export default function AdminDashboard({ profile, onNavigate }) {
         <div style={{ width: '100%' }}>
           <KpiTiles
             kpis={kpis}
-            onTileClick={(kpi) => onNavigate?.('pipeline', { statusFilter: kpi.statusFilter, priorityFilter: kpi.priorityFilter, stuckOnly: kpi.stuckOnly })}
+            onTileClick={(kpi) => onNavigate?.('pipeline', { statusFilter: kpi.statusFilter, priorityFilter: kpi.priorityFilter, stuckOnly: kpi.stuckOnly, needsFollowupOnly: kpi.needsFollowupOnly })}
           />
         </div>
       </DashboardSection>

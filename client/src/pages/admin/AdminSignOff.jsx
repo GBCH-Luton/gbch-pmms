@@ -86,7 +86,7 @@ function MySignOffs({ profile, onTicketsChanged }) {
       .schema('pmms')
       .from('tickets')
       .select(`
-        id, ticket_number, category, description, room, issue_tag, completion_note, completion_photo_url, photo_url, assigned_builder_id, property_id, raised_by, raised_by_name, checklist_responses
+        id, ticket_number, category, description, room, issue_tag, completion_note, completion_photo_url, photo_url, needs_followup, followup_note, assigned_builder_id, property_id, raised_by, raised_by_name, checklist_responses
       `)
       .eq('status', 'Completed')
       .eq('raised_by', profile.id)
@@ -285,6 +285,12 @@ function MySignOffs({ profile, onTicketsChanged }) {
                     </div>
                   )}
                   <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate600 }}>{t.completion_note || 'No completion note recorded.'}</p>
+                  {t.needs_followup && (
+                    <div style={{ marginTop: '8px', padding: '8px 10px', borderRadius: '8px', background: `${COLORS.violet500}14`, border: `1px solid ${COLORS.violet500}` }}>
+                      <p style={{ margin: 0, fontSize: '11.5px', fontWeight: 700, color: COLORS.violet600 }}>⚑ Needs a follow-up</p>
+                      {t.followup_note && <p style={{ margin: '2px 0 0 0', fontSize: '12.5px', color: COLORS.violet600 }}>{t.followup_note}</p>}
+                    </div>
+                  )}
                 </div>
               </div>
 

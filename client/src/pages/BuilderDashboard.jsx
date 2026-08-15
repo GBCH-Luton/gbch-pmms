@@ -294,6 +294,12 @@ export default function BuilderDashboard({ profile }) {
   const [completeUploadProgress, setCompleteUploadProgress] = useState(null)
   const [completeSubmitting, setCompleteSubmitting] = useState(false)
   const [completeError, setCompleteError] = useState('')
+  // A job can be genuinely done and still need something picked up later --
+  // e.g. "fixed the fridge, but it should really be replaced." Was part of
+  // the approved Builder v2 design but missed when the Leaving Site rework
+  // shipped 2026-08-15; added back here on 2026-08-15.
+  const [followUpNeeded, setFollowUpNeeded] = useState(false)
+  const [followUpNote, setFollowUpNote] = useState('')
   // Sandbox-only SIMS materials-used prototype (see simsMaterialsBridge.js).
   const [availableMaterials, setAvailableMaterials] = useState([])
   const [materialsLoading, setMaterialsLoading] = useState(false)
@@ -515,6 +521,8 @@ export default function BuilderDashboard({ profile }) {
     setCompleteMediaFiles([])
     setCompleteUploadProgress(null)
     setCompleteError('')
+    setFollowUpNeeded(false)
+    setFollowUpNote('')
   }, [selectedTicket?.id])
 
   useEffect(() => {
@@ -1059,7 +1067,7 @@ export default function BuilderDashboard({ profile }) {
     setMaterialRows(prev => prev.filter((_, i) => i !== index))
   }
 
-  async function handleComplete(note, mediaFiles, checklistResponses) {
+  async function handleComplete(note, mediaFiles, checklistResponses, needsFollowup, followupNote) {
     setCompleteError('')
 
     if (!note || !note.trim()) {
@@ -1103,6 +1111,7 @@ export default function BuilderDashboard({ profile }) {
       .update({
         status: 'Completed', status_changed_at: now, stuck_alert_sent_at: null, completed_at: now,
         completion_note: note.trim(), completion_photo_url: photoUrl,
+        needs_followup: !!needsFollowup, followup_note: needsFollowup ? (followupNote || null) : null,
         ...(checklistResponses ? { checklist_responses: checklistResponses } : {}),
       })
       .eq('id', selectedTicket.id)
@@ -1719,11 +1728,6 @@ export default function BuilderDashboard({ profile }) {
     setSelectedTicket(lockedTicket || null)
   }
 
-  // True when the job he's about to start is exactly the destination he
-  // named when he left the last one -- see "Going to Another Job" on the
-  // Leaving Site picker. Skips the "Coming from" question for that one
-  // arrival (see the reset useEffect and the Actions section below).
-  const isMatchedArrival = openActivity?.activity_type === 'Travel' && openActivity.destination_ticket_id === selectedTicket?.id
   const isRoutineVisit = selectedTicket?.category === 'Cleaning Rota' && selectedTicket?.issue_tag === 'Routine 2-Week Visit'
   const checklistIncomplete = isRoutineVisit && routineVisitChecklistTemplate.some(item => !checklistChecked[item])
   const urgentTickets = tickets.filter(t => t.status === 'Assigned' && t.priority_score >= p1Threshold)
@@ -2445,7 +2449,6 @@ export default function BuilderDashboard({ profile }) {
 
       {/* Actions */}
       <div style={{ background: COLORS.white, borderRadius: '16px', padding: '20px', marginBottom: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-        <p style={{ margin: '0 0 14px 0', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Actions</p>
         {selectedTicket.status === 'Assigned' && (activeTicket ? (
           <div style={{ padding: '14px', borderRadius: '10px', background: COLORS.amber50, border: `1px solid ${COLORS.amber300}` }}>
             <p style={{ margin: '0 0 4px 0', fontSize: '11px', fontWeight: 700, color: COLORS.amber800, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Job in progress</p>
@@ -2455,12 +2458,6 @@ export default function BuilderDashboard({ profile }) {
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            {isMatchedArrival && (
-              <div style={{ padding: '12px 14px', borderRadius: '10px', background: COLORS.teal600 + '14', border: `1px solid ${COLORS.teal600}` }}>
-                <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate900, fontWeight: 600 }}>🚗 On your way here — logged when you left your last job.</p>
-              </div>
-            )}
-
             <div>
               <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: COLORS.slate500, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Mileage</p>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', overflow: 'hidden' }}>
@@ -2653,6 +2650,30 @@ export default function BuilderDashboard({ profile }) {
               </div>
             )}
 
+            <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '12px 14px', borderRadius: '10px', background: COLORS.amber50, border: `1px solid ${COLORS.amber300}`, cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={followUpNeeded}
+                onChange={(e) => setFollowUpNeeded(e.target.checked)}
+                style={{ marginTop: '3px', flexShrink: 0, width: '16px', height: '16px' }}
+              />
+              <span>
+                <span style={{ display: 'block', fontSize: '13.5px', fontWeight: 700, color: COLORS.amber900 }}>Needs a follow-up</span>
+                <span style={{ display: 'block', fontSize: '12px', color: COLORS.amber800, marginTop: '2px', lineHeight: 1.4 }}>
+                  Job's done, but something here needs picking up later — e.g. "fixed the fridge, but it should really be replaced."
+                </span>
+              </span>
+            </label>
+            {followUpNeeded && (
+              <textarea
+                value={followUpNote}
+                onChange={(e) => setFollowUpNote(e.target.value)}
+                placeholder="What needs following up..."
+                rows={2}
+                style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '14px', fontFamily: 'inherit', boxSizing: 'border-box', resize: 'vertical' }}
+              />
+            )}
+
             {completeError && (
               <p style={{ margin: 0, fontSize: '13px', color: COLORS.red500 }}>{completeError}</p>
             )}
@@ -2661,7 +2682,7 @@ export default function BuilderDashboard({ profile }) {
               <p style={{ margin: 0, fontSize: '12px', color: COLORS.amber600 }}>Complete every checklist item before confirming.</p>
             )}
             <button
-              onClick={() => handleComplete(completeNote, completeMediaFiles, isRoutineVisit ? routineVisitChecklistTemplate.map(label => ({ label, checked: !!checklistChecked[label] })) : undefined)}
+              onClick={() => handleComplete(completeNote, completeMediaFiles, isRoutineVisit ? routineVisitChecklistTemplate.map(label => ({ label, checked: !!checklistChecked[label] })) : undefined, followUpNeeded, followUpNote.trim())}
               disabled={completeSubmitting || checklistIncomplete}
               style={{ width: '100%', padding: '16px', background: COLORS.green600, color: COLORS.white, border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: 700, cursor: (completeSubmitting || checklistIncomplete) ? 'not-allowed' : 'pointer', opacity: (completeSubmitting || checklistIncomplete) ? 0.6 : 1 }}
             >
@@ -2802,7 +2823,7 @@ export default function BuilderDashboard({ profile }) {
               <p style={{ margin: '0 0 16px 0', fontSize: '13px', fontWeight: 500, color: COLORS.slate500 }}>This is logged and shown to the office</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <button
-                  onClick={() => { setChecklistChecked({}); setMaterialRows([]); setStopSheetOpen(false); setShowCompleteConfirm(true) }}
+                  onClick={() => { setChecklistChecked({}); setMaterialRows([]); setFollowUpNeeded(false); setFollowUpNote(''); setStopSheetOpen(false); setShowCompleteConfirm(true) }}
                   style={{ width: '100%', padding: '14px', borderRadius: '10px', border: 'none', background: COLORS.green600, color: COLORS.white, fontSize: '14px', fontWeight: 700, cursor: 'pointer', textAlign: 'left' }}
                 >
                   ✓ Job Completed
@@ -2847,7 +2868,7 @@ export default function BuilderDashboard({ profile }) {
                   onClick={() => { setMaterialsAskOpen(false); setStopReasonPicked('Waiting for materials (ordered)') }}
                   style={{ width: '100%', padding: '14px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, background: COLORS.slate50, color: COLORS.slate900, fontSize: '14px', fontWeight: 700, cursor: 'pointer', textAlign: 'left' }}
                 >
-                  📬 It's on order / being delivered
+                  📬 Already ordered / awaiting delivery
                 </button>
               </div>
               <button
@@ -2906,16 +2927,16 @@ export default function BuilderDashboard({ profile }) {
             <p style={{ margin: '0 0 12px 0', fontSize: '12px', fontWeight: 700, color: COLORS.slate500, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Where are you going?</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <button
-                onClick={() => { setActivityType('Travel'); setTravelMode('shop'); setActivityNote(''); setActivityError(''); setPage('leaving-materials') }}
-                style={{ width: '100%', padding: '16px', borderRadius: '12px', fontSize: '15px', fontWeight: 700, cursor: 'pointer', border: `1px solid ${COLORS.slate200}`, background: COLORS.slate50, color: COLORS.slate900, textAlign: 'center' }}
-              >
-                🛒 Buying Materials
-              </button>
-              <button
                 onClick={() => { setActivityType('Travel'); setTravelMode('job'); setDestinationTicketId(''); setJobSearchQuery(''); setActivityError(''); setPage('leaving-job') }}
                 style={{ width: '100%', padding: '16px', borderRadius: '12px', fontSize: '15px', fontWeight: 700, cursor: 'pointer', border: 'none', background: COLORS.green600, color: COLORS.white, textAlign: 'center' }}
               >
                 🚗 Going to Another Job
+              </button>
+              <button
+                onClick={() => { setActivityType('Travel'); setTravelMode('shop'); setActivityNote(''); setActivityError(''); setPage('leaving-materials') }}
+                style={{ width: '100%', padding: '16px', borderRadius: '12px', fontSize: '15px', fontWeight: 700, cursor: 'pointer', border: `1px solid ${COLORS.slate200}`, background: COLORS.slate50, color: COLORS.slate900, textAlign: 'center' }}
+              >
+                🛒 Buying Materials
               </button>
               <button
                 onClick={() => { setActivityType('Travel'); setTravelMode('office'); setActivityError(''); setPage('leaving-office') }}

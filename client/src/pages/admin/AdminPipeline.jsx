@@ -56,7 +56,7 @@ function TicketWorkedTime({ ticketId }) {
 }
 
 export default function AdminPipeline({
-  profile, onTicketsChanged, initialStatusFilter, initialPriorityFilter, initialStuckFilter, initialTicketNumberSearch,
+  profile, onTicketsChanged, initialStatusFilter, initialPriorityFilter, initialStuckFilter, initialNeedsFollowupFilter, initialTicketNumberSearch,
   initialCategoryFilter, initialDivisionFilter, initialBuilderFilter, initialPropertyFilter, initialFromDate, initialToDate,
   onInitialFilterConsumed,
 }) {
@@ -93,6 +93,7 @@ export default function AdminPipeline({
   const [priorityFilter, setPriorityFilter] = useState('All')
   const [ticketNumberSearch, setTicketNumberSearch] = useState('')
   const [stuckOnlyFilter, setStuckOnlyFilter] = useState(false)
+  const [needsFollowupFilter, setNeedsFollowupFilter] = useState(false)
   const [stuckThresholds, setStuckThresholds] = useState(null)
   // Division filter/print-export additions -- default 'All'/'' (not a
   // 30-day default like AdminReports.jsx) since Pipeline is a live
@@ -200,6 +201,7 @@ export default function AdminPipeline({
     if (initialStatusFilter) setStatusFilter(initialStatusFilter)
     if (initialPriorityFilter) setPriorityFilter(initialPriorityFilter)
     if (initialStuckFilter) setStuckOnlyFilter(true)
+    if (initialNeedsFollowupFilter) setNeedsFollowupFilter(true)
     if (initialTicketNumberSearch) {
       setTicketNumberSearch(String(initialTicketNumberSearch))
       setPendingExpandTicketNumber(initialTicketNumberSearch)
@@ -211,7 +213,7 @@ export default function AdminPipeline({
     if (initialFromDate) setFromDate(initialFromDate)
     if (initialToDate) setToDate(initialToDate)
     if (
-      initialStatusFilter || initialPriorityFilter || initialStuckFilter || initialTicketNumberSearch
+      initialStatusFilter || initialPriorityFilter || initialStuckFilter || initialNeedsFollowupFilter || initialTicketNumberSearch
       || initialCategoryFilter || initialDivisionFilter || initialBuilderFilter || initialPropertyFilter || initialFromDate || initialToDate
     ) onInitialFilterConsumed?.()
   }, [])
@@ -340,6 +342,7 @@ export default function AdminPipeline({
       .select(`
         id, ticket_number, status, category, description, room, priority_score, priority_override, mileage_logged,
         no_access_flag, no_access_note, hold_reason, hold_note, completion_note, photo_url, completion_photo_url,
+        needs_followup, followup_note,
         completed_at, created_at, status_changed_at, first_assigned_at, assigned_builder_id, estimated_minutes, assign_type, property_id, event_id,
         raised_by, raised_by_name, cancel_type, cancel_reason, cancel_duplicate_ref
       `)
@@ -812,6 +815,7 @@ export default function AdminPipeline({
     // exists to cut through when jumping to one specific job.
     if (ticketNumberSearch.trim() && String(t.ticket_number) !== ticketNumberSearch.trim()) return false
     if (stuckOnlyFilter && !isTicketStuck(t, stuckThresholds, Date.now(), p1Threshold, p2Threshold)) return false
+    if (needsFollowupFilter && !t.needs_followup) return false
     // Reports' date range means two different things depending which set
     // you're looking at -- "raised in range" (created_at) vs "completed in
     // range" (completed_at). Once the status filter has narrowed down to
@@ -881,6 +885,7 @@ export default function AdminPipeline({
     setPriorityFilter('All')
     setTicketNumberSearch('')
     setStuckOnlyFilter(false)
+    setNeedsFollowupFilter(false)
     setFromDate('')
     setToDate('')
   }
@@ -903,6 +908,7 @@ export default function AdminPipeline({
     { label: 'Completed', value: tickets.filter(t => t.status === 'Completed' || t.status === 'Archived').length, colour: COLORS.green600, statusFilter: 'CompletedAll' },
     { label: 'P1 Critical', value: tickets.filter(t => effectiveTier(t) === 'P1 Critical').length, colour: COLORS.red600, statusFilter: 'All', priorityFilter: 'P1 Critical' },
     { label: 'Stuck', value: tickets.filter(t => isTicketStuck(t, stuckThresholds, Date.now(), p1Threshold, p2Threshold)).length, colour: COLORS.red600, statusFilter: 'All', stuckOnly: true },
+    { label: 'Needs Follow-up', value: tickets.filter(t => t.needs_followup).length, colour: COLORS.violet500, statusFilter: 'All', needsFollowupOnly: true },
   ]
 
   // Clicking a tile is a "jump to this category" shortcut, same as
@@ -913,6 +919,7 @@ export default function AdminPipeline({
     setStatusFilter(kpi.statusFilter || 'All')
     if (kpi.priorityFilter) setPriorityFilter(kpi.priorityFilter)
     if (kpi.stuckOnly) setStuckOnlyFilter(true)
+    if (kpi.needsFollowupOnly) setNeedsFollowupFilter(true)
   }
 
   if (loading) return (
@@ -1011,6 +1018,10 @@ export default function AdminPipeline({
         <label style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 12px', borderRadius: '10px', border: `1px solid ${COLORS.amber200}`, background: COLORS.amber50, color: COLORS.amber800, fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
           <input type="checkbox" checked={stuckOnlyFilter} onChange={(e) => setStuckOnlyFilter(e.target.checked)} />
           ⚠ Stuck only
+        </label>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 12px', borderRadius: '10px', border: `1px solid ${COLORS.violet500}`, background: `${COLORS.violet500}14`, color: COLORS.violet600, fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
+          <input type="checkbox" checked={needsFollowupFilter} onChange={(e) => setNeedsFollowupFilter(e.target.checked)} />
+          ⚑ Needs follow-up only
         </label>
         <button onClick={clearFilters} style={{ padding: '8px 14px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, background: COLORS.white, color: COLORS.slate500, fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
           Clear filters
