@@ -828,7 +828,9 @@ export default function AdminDashboard({ profile, onNavigate }) {
   // section this profile can't see (and couldn't click through to) would
   // just be confusing.
   const complianceVisible = !profile.division || profile.division === 'Compliance'
-  const landlordLiaisonVisible = LANDLORD_LIAISON_PAGE_ENABLED && (!profile.division || profile.division === 'Landlord Liaison')
+  // Admin/unscoped Maintenance Manager oversight only, not the Landlord
+  // Liaison Manager herself -- same reasoning as housekeepingVisible below.
+  const landlordLiaisonVisible = LANDLORD_LIAISON_PAGE_ENABLED && !profile.division
   const voidGardensVisible = !profile.division
   // Admin/unscoped Maintenance Manager oversight only -- the Housekeeping
   // Manager already gets this same information (plus much more detail) on
