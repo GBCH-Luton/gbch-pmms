@@ -72,6 +72,15 @@ function DashboardSection({ id, title, background, alertCount = 0, defaultCollap
 // stretch) to actually scroll internally instead of growing the row.
 const DASHBOARD_TOP_CARD_HEIGHT = '420px'
 
+// Shared fixed height for both cards' grey header band. Without this, the
+// two bands render different heights (Where's the Team's header row also
+// holds two <select> filters, which are taller than Daily Briefing's plain
+// title text), so the border line under each header sits at a different
+// vertical position even though the padding values match -- a fixed height
+// plus centering the content inside it is what actually keeps the two
+// borders level with each other.
+const DASHBOARD_CARD_HEADER_HEIGHT = '76px'
+
 // `height` defaults to matching TeamWhereabouts's fixed card height for the
 // normal side-by-side split. When TeamWhereabouts is hidden entirely (see
 // its Landlord Liaison gating below), there's nothing to match anymore --
@@ -103,7 +112,7 @@ function DailyBriefing({ lines, height = DASHBOARD_TOP_CARD_HEIGHT }) {
       border: `1px solid ${COLORS.slate200}`, boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
       height, display: 'flex', flexDirection: 'column',
     }}>
-      <div style={{ padding: '14px 20px 12px', background: COLORS.slate50, borderBottom: `1px solid ${COLORS.slate200}` }}>
+      <div style={{ height: DASHBOARD_CARD_HEADER_HEIGHT, boxSizing: 'border-box', padding: '0 20px', display: 'flex', flexDirection: 'column', justifyContent: 'center', background: COLORS.slate50, borderBottom: `1px solid ${COLORS.slate200}` }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
           <span style={{ color: COLORS.indigo700, display: 'flex' }}><NavIcon name="sunrise" size={16} /></span>
           <span style={{ fontSize: '12px', fontWeight: 800, color: COLORS.indigo700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Daily Briefing</span>
@@ -372,8 +381,8 @@ function TeamWhereabouts({ profile, onNavigate }) {
       border: `1px solid ${COLORS.slate200}`, boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
       height: DASHBOARD_TOP_CARD_HEIGHT, display: 'flex', flexDirection: 'column',
     }}>
-      <div style={{ padding: '14px 20px 12px', background: COLORS.slate50, borderBottom: `1px solid ${COLORS.slate200}` }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap', marginBottom: '4px' }}>
+      <div style={{ height: DASHBOARD_CARD_HEADER_HEIGHT, boxSizing: 'border-box', padding: '0 20px', display: 'flex', flexDirection: 'column', justifyContent: 'center', background: COLORS.slate50, borderBottom: `1px solid ${COLORS.slate200}` }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap', marginBottom: '4px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ color: COLORS.teal700 }}>📍</span>
             <span style={{ fontSize: '12px', fontWeight: 800, color: COLORS.teal700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Where's the Team</span>
