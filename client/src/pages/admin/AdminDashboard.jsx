@@ -99,18 +99,20 @@ function DailyBriefing({ lines, height = DASHBOARD_TOP_CARD_HEIGHT }) {
 
   return (
     <div style={{
-      borderRadius: '16px', padding: '18px 20px', background: COLORS.white,
+      borderRadius: '16px', background: COLORS.white, overflow: 'hidden',
       border: `1px solid ${COLORS.slate200}`, boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
       height, display: 'flex', flexDirection: 'column',
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-        <span style={{ color: COLORS.indigo700, display: 'flex' }}><NavIcon name="sunrise" size={16} /></span>
-        <span style={{ fontSize: '12px', fontWeight: 800, color: COLORS.indigo700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Daily Briefing</span>
+      <div style={{ padding: '14px 20px 12px', background: COLORS.slate50, borderBottom: `1px solid ${COLORS.slate200}` }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+          <span style={{ color: COLORS.indigo700, display: 'flex' }}><NavIcon name="sunrise" size={16} /></span>
+          <span style={{ fontSize: '12px', fontWeight: 800, color: COLORS.indigo700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Daily Briefing</span>
+        </div>
+        <p style={{ margin: 0, fontSize: '11px', color: COLORS.slate500 }}>
+          What's worth a look across the dashboard this morning.
+        </p>
       </div>
-      <p style={{ margin: '0 0 10px', fontSize: '11px', color: COLORS.slate500 }}>
-        What's worth a look across the dashboard this morning.
-      </p>
-      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 20px 12px' }}>
         {lines.map((line, i) => (
           <div
             key={i}
@@ -366,38 +368,41 @@ function TeamWhereabouts({ profile, onNavigate }) {
 
   return (
     <div style={{
-      borderRadius: '16px', padding: '18px 20px', background: COLORS.white,
+      borderRadius: '16px', background: COLORS.white, overflow: 'hidden',
       border: `1px solid ${COLORS.slate200}`, boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
       height: DASHBOARD_TOP_CARD_HEIGHT, display: 'flex', flexDirection: 'column',
     }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ color: COLORS.teal700 }}>📍</span>
-          <span style={{ fontSize: '12px', fontWeight: 800, color: COLORS.teal700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Where's the Team</span>
-        </div>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          {!profile.division && (
+      <div style={{ padding: '14px 20px 12px', background: COLORS.slate50, borderBottom: `1px solid ${COLORS.slate200}` }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap', marginBottom: '4px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ color: COLORS.teal700 }}>📍</span>
+            <span style={{ fontSize: '12px', fontWeight: 800, color: COLORS.teal700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Where's the Team</span>
+          </div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            {!profile.division && (
+              <select
+                value={divisionFilter}
+                onChange={(e) => { setDivisionFilter(e.target.value); setFilterStaffId('All') }}
+                style={{ fontSize: '12px', fontWeight: 700, color: COLORS.slate900, background: COLORS.white, border: `1px solid ${COLORS.slate200}`, borderRadius: '8px', padding: '6px 10px', cursor: 'pointer' }}
+              >
+                <option value="All">All divisions</option>
+                {divisionOptions.map(d => <option key={d} value={d}>{d}</option>)}
+              </select>
+            )}
             <select
-              value={divisionFilter}
-              onChange={(e) => { setDivisionFilter(e.target.value); setFilterStaffId('All') }}
-              style={{ fontSize: '12px', fontWeight: 700, color: COLORS.slate900, background: COLORS.slate50, border: `1px solid ${COLORS.slate200}`, borderRadius: '8px', padding: '6px 10px', cursor: 'pointer' }}
+              value={filterStaffId}
+              onChange={(e) => setFilterStaffId(e.target.value)}
+              style={{ fontSize: '12px', fontWeight: 700, color: COLORS.slate900, background: COLORS.white, border: `1px solid ${COLORS.slate200}`, borderRadius: '8px', padding: '6px 10px', cursor: 'pointer' }}
             >
-              <option value="All">All divisions</option>
-              {divisionOptions.map(d => <option key={d} value={d}>{d}</option>)}
+              <option value="All">All builders</option>
+              {divisionScopedBuilders.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
             </select>
-          )}
-          <select
-            value={filterStaffId}
-            onChange={(e) => setFilterStaffId(e.target.value)}
-            style={{ fontSize: '12px', fontWeight: 700, color: COLORS.slate900, background: COLORS.slate50, border: `1px solid ${COLORS.slate200}`, borderRadius: '8px', padding: '6px 10px', cursor: 'pointer' }}
-          >
-            <option value="All">All builders</option>
-            {divisionScopedBuilders.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-          </select>
+          </div>
         </div>
+        <p style={{ margin: 0, fontSize: '11px', color: COLORS.slate500 }}>Live status and every trip logged today.</p>
       </div>
-      <p style={{ margin: '4px 0 12px 0', fontSize: '11px', color: COLORS.slate500 }}>Live status and every trip logged today.</p>
 
+      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', padding: '12px 20px 0' }}>
       {loading ? (
         <p style={{ color: COLORS.slate400, fontWeight: 600, fontSize: '13px' }}>Loading...</p>
       ) : (
@@ -437,7 +442,7 @@ function TeamWhereabouts({ profile, onNavigate }) {
             })}
           </div>
 
-          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+          <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', paddingBottom: '12px' }}>
             {visibleEntries.length === 0 && (
               <p style={{ fontSize: '12.5px', color: COLORS.slate400, fontStyle: 'italic', textAlign: 'center', marginTop: '20px' }}>Nothing logged yet today.</p>
             )}
@@ -473,6 +478,7 @@ function TeamWhereabouts({ profile, onNavigate }) {
           </div>
         </>
       )}
+      </div>
     </div>
   )
 }
