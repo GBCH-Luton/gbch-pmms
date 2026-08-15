@@ -79,7 +79,7 @@ const DASHBOARD_TOP_CARD_HEIGHT = '420px'
 // vertical position even though the padding values match -- a fixed height
 // plus centering the content inside it is what actually keeps the two
 // borders level with each other.
-const DASHBOARD_CARD_HEADER_HEIGHT = '76px'
+const DASHBOARD_CARD_HEADER_HEIGHT = '58px'
 
 // `height` defaults to matching TeamWhereabouts's fixed card height for the
 // normal side-by-side split. When TeamWhereabouts is hidden entirely (see
