@@ -1,0 +1,1045 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PMMS Builder Workflow v0.3 — Leaving Site Redesign</title>
+<style>
+  :root {
+    --bg: #eef1f6;
+    --panel: #ffffff;
+    --text: #0f172a;
+    --text-muted: #64748b;
+    --border: #e2e8f0;
+    --accent: #0d9488;
+  }
+
+  /* Fixed app colours -- this simulates PMMS's real (always-light) builder
+     UI. Matches client/src/lib/colors.js. */
+  :root {
+    --app-white: #ffffff;
+    --app-slate50: #f8fafc;
+    --app-slate100: #f1f5f9;
+    --app-slate200: #e2e8f0;
+    --app-slate300: #cbd5e1;
+    --app-slate400: #94a3b8;
+    --app-slate500: #64748b;
+    --app-slate600: #475569;
+    --app-slate900: #0f172a;
+    --app-red50: #fef2f2;
+    --app-red100: #fee2e2;
+    --app-red200: #fecaca;
+    --app-red500: #ef4444;
+    --app-red600: #dc2626;
+    --app-green50: #f0fdf4;
+    --app-green600: #16a34a;
+    --app-teal50: #f0fdfa;
+    --app-teal600: #0d9488;
+    --app-teal700: #0f766e;
+    --app-blue500: #3b82f6;
+    --app-amber50: #fffbeb;
+    --app-amber300: #fcd34d;
+    --app-amber500: #f59e0b;
+    --app-amber600: #d97706;
+    --app-amber800: #92400e;
+    --app-amber900: #78350f;
+    --app-violet100: #ede9fe;
+    --app-violet500: #8b5cf6;
+    --app-violet600: #7c3aed;
+    --app-purple600: #9333ea;
+    --app-indigo700: #4338ca;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+
+  .wrap {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+  }
+
+  /* ---------------- Phone frame ---------------- */
+  .phone-shell {
+    position: relative;
+    flex: none;
+    width: 390px;
+    max-width: 100%;
+    margin: 0 auto;
+  }
+  .phone {
+    background: #050810;
+    border-radius: 40px;
+    padding: 12px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.35);
+  }
+  .phone-notch {
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .phone-notch::before {
+    content: '';
+    width: 90px;
+    height: 8px;
+    border-radius: 999px;
+    background: #1a2030;
+  }
+  .phone-screen {
+    background: var(--app-slate100);
+    border-radius: 28px;
+    overflow: hidden;
+    height: 760px;
+    overflow-y: auto;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    letter-spacing: 0.012em;
+    line-height: 1.45;
+    position: relative;
+    scrollbar-width: thin;
+  }
+
+  .reset-btn {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    z-index: 30;
+    appearance: none;
+    border: 1px solid var(--border);
+    background: var(--panel);
+    color: var(--text);
+    font-size: 16px;
+    width: 34px;
+    height: 34px;
+    border-radius: 999px;
+    cursor: pointer;
+    font-family: inherit;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  }
+  .reset-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .caption {
+    max-width: 390px;
+    margin: 14px auto 0 auto;
+    text-align: center;
+    font-size: 12.5px;
+    color: var(--text-muted);
+  }
+
+  /* ---------------- Simulated app internals ---------------- */
+  .app-hdr {
+    background: var(--app-white);
+    border-bottom: 1px solid var(--app-slate200);
+    padding: 12px 16px;
+    display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; z-index: 5;
+  }
+  .app-hdr .brand-btn { display: flex; align-items: center; gap: 8px; background: none; border: none; padding: 0; cursor: pointer; }
+  .app-hdr .brand { font-size: 13px; font-weight: 800; color: var(--app-slate900); }
+  .back-header-btn {
+    background: var(--app-slate100); border: none; border-radius: 8px; padding: 8px 14px; margin: 0;
+    font-size: 12.5px; font-weight: 700; color: var(--app-slate500); cursor: pointer;
+  }
+  .app-hdr .menu-dots { display: flex; flex-direction: column; gap: 4px; padding: 8px; background: none; border: none; cursor: pointer; }
+  .app-hdr .menu-dots span { width: 20px; height: 2px; background: var(--app-slate900); border-radius: 2px; }
+
+  .nav-menu { background: #0f5c3d; padding: 20px; }
+  .nav-menu .name { margin: 0 0 2px 0; font-size: 15px; font-weight: 800; color: #fff; }
+  .nav-menu .title { margin: 0 0 16px 0; font-size: 12.5px; color: rgba(255,255,255,0.8); }
+  .nav-menu button {
+    display: flex; align-items: center; justify-content: space-between; width: 100%;
+    background: none; border: none; border-top: 1px solid rgba(255,255,255,0.15);
+    padding: 13px 4px; font-size: 13.5px; font-weight: 600; color: #fff; cursor: pointer; text-align: left;
+  }
+  .nav-menu button:first-of-type { border-top: none; }
+  .nav-menu .badge { background: var(--app-red600); color: #fff; font-size: 10.5px; font-weight: 800; padding: 2px 7px; border-radius: 999px; }
+
+  .app-pad { padding: 14px 14px 16px 14px; }
+
+  /* ---------------- Clock-in gate ---------------- */
+  .gate-wrap { min-height: 760px; display: flex; align-items: center; justify-content: center; padding: 20px; }
+  .gate-card { width: 100%; background: var(--app-white); border-radius: 20px; padding: 28px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); text-align: center; }
+  .gate-card .brand-mark { font-size: 13px; font-weight: 800; color: var(--app-teal700); letter-spacing: 0.08em; text-transform: uppercase; margin: 0 0 16px; }
+  .gate-card h1 { margin: 0 0 6px 0; font-size: 18px; font-weight: 800; color: var(--app-slate900); }
+  .gate-card p { margin: 0 0 22px 0; font-size: 13px; color: var(--app-slate500); line-height: 1.5; }
+
+  /* ---------------- Dashboard bits ---------------- */
+  .idle-banner {
+    border-radius: 16px; padding: 18px 20px; text-align: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06); margin-bottom: 10px;
+  }
+  .idle-banner .eyebrow { margin: 0 0 4px 0; font-size: 10.5px; font-weight: 700; color: rgba(255,255,255,0.75); text-transform: uppercase; letter-spacing: 0.06em; }
+  .idle-banner .clock { margin: 0 0 4px 0; font-size: 34px; font-weight: 800; color: #fff; font-family: monospace; letter-spacing: 0.02em; }
+  .idle-banner .foot { margin: 0; font-size: 10.5px; font-weight: 600; color: rgba(255,255,255,0.7); }
+
+  .dot-green { display:inline-block; width:8px; height:8px; border-radius:50%; background:#22c55e; margin-right:5px; }
+
+  .shift-status-row { background: var(--app-slate50); border: 1px solid var(--app-slate200); border-radius: 12px; padding: 10px 14px; margin-bottom: 10px; }
+  .shift-status-row.late { background: var(--app-amber50); border-color: var(--app-amber300); }
+  .shift-status-row .line { font-size: 13px; font-weight: 600; color: var(--app-slate600); }
+  .shift-status-row.late .line { color: var(--app-amber900); }
+  .shift-status-row .cout-row { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--app-slate200); text-align: right; }
+  .shift-status-row.late .cout-row { border-top-color: var(--app-amber200, #fde68a); }
+  .clockout-link { background: none; border: none; padding: 0; font-size: 12px; font-weight: 700; color: var(--app-slate500); text-decoration: underline; cursor: pointer; }
+
+  .btn-leaving-site {
+    width: 100%; padding: 22px 20px; margin-bottom: 10px;
+    background: var(--app-indigo700); color: #fff; border: none; border-radius: 16px;
+    font-size: 17px; font-weight: 800; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+    box-shadow: 0 6px 16px rgba(67,56,202,0.35);
+  }
+  .btn-leaving-site .sub { display: block; font-size: 12px; font-weight: 600; opacity: 0.85; }
+
+  .away-strip {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+    background: var(--app-violet100); border: 1px solid var(--app-violet500); border-radius: 12px;
+    padding: 10px 14px; margin-bottom: 10px; font-size: 12.5px; font-weight: 600; color: var(--app-violet600);
+  }
+  .away-strip .btns { display: flex; gap: 8px; }
+  .away-strip button {
+    padding: 7px 12px; border: none; border-radius: 8px; font-size: 11.5px; font-weight: 700; cursor: pointer;
+  }
+  .away-strip .arrive-btn { background: var(--app-teal600); color: #fff; }
+  .away-strip .back-btn { background: var(--app-white); color: var(--app-slate600); border: 1px solid var(--app-slate200); }
+
+  .inline-box { margin-top: 8px; background: var(--app-white); border: 1px solid var(--app-slate200); border-radius: 12px; padding: 14px; }
+  .inline-box.warn { border-color: var(--app-amber300); }
+  .inline-box.confirm { border-color: var(--app-slate300); }
+  .inline-box p.title { margin: 0 0 4px 0; font-size: 13px; font-weight: 800; color: var(--app-amber800); }
+  .inline-box p.sub { margin: 0 0 10px 0; font-size: 12px; color: var(--app-slate500); }
+  .inline-box .btn-row { display: flex; gap: 8px; }
+  .inline-box .btn-row .cancel { flex: 1; padding: 10px; background: var(--app-slate100); color: var(--app-slate600); border: none; border-radius: 10px; font-size: 13px; font-weight: 700; cursor: pointer; }
+  .inline-box .btn-row .confirm { flex: 2; padding: 10px; background: var(--app-slate900); color: #fff; border: none; border-radius: 10px; font-size: 13px; font-weight: 700; cursor: pointer; }
+
+  .tiles { display: flex; flex-direction: column; gap: 9px; margin: 16px 0 4px; }
+  .tile { width: 100%; padding: 13px; border-radius: 12px; text-align: center; color: #fff; }
+  .tile .n { font-size: 26px; font-weight: 800; }
+  .tile .l { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
+
+  /* ---------------- Search / lists ---------------- */
+  .search-wrap { position: relative; margin-bottom: 14px; }
+  .search-input {
+    width: 100%; padding: 13px 14px; border-radius: 12px; border: 1px solid var(--app-slate200);
+    background: var(--app-white); font-size: 14px; box-sizing: border-box; color: var(--app-slate900);
+  }
+  .search-input:focus { outline: 2px solid var(--app-teal600); outline-offset: 1px; }
+  .search-empty { padding: 16px; font-size: 12.5px; color: var(--app-slate400); text-align: center; font-style: italic; }
+
+  .job-pick-list { border: 1px solid var(--app-slate200); border-radius: 12px; overflow: hidden; background: var(--app-white); }
+  .job-pick-list .search-result { display: block; width: 100%; text-align: left; padding: 12px 14px; border: none; border-bottom: 1px solid var(--app-slate300); background: var(--app-white); cursor: pointer; font-family: inherit; }
+  .job-pick-list .search-result:last-child { border-bottom: none; }
+  .job-pick-list .search-result:disabled { cursor: not-allowed; opacity: 0.6; }
+  .result-top-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 2px; }
+  .result-top-row .num { margin: 0; font-size: 10.5px; font-weight: 800; color: var(--app-slate400); text-transform: uppercase; letter-spacing: 0.05em; }
+  .mi-pill { flex-shrink: 0; font-size: 10.5px; font-weight: 800; color: #fff; background: var(--app-teal600); padding: 2px 8px; border-radius: 20px; white-space: nowrap; }
+  .result-addr { margin: 0 0 2px 0; font-size: 13.5px; font-weight: 800; color: #000; }
+  .result-desc { margin: 0; font-size: 12px; color: var(--app-slate500); }
+
+  .store-suggestion { display: block; width: 100%; text-align: left; padding: 10px 14px; margin-bottom: 6px; border: 1px solid var(--app-slate100); border-radius: 10px; background: var(--app-white); font-size: 14px; font-weight: 600; color: var(--app-slate900); cursor: pointer; font-family: inherit; }
+
+  .hold-card { display: block; width: 100%; text-align: left; border: 1px solid var(--app-slate200); border-radius: 12px; padding: 14px; margin-bottom: 10px; background: var(--app-white); cursor: pointer; font-family: inherit; }
+  .hold-card .num { margin: 0 0 2px; font-size: 10.5px; font-weight: 700; color: var(--app-slate400); text-transform: uppercase; letter-spacing: 0.05em; }
+  .hold-card .addr { font-size: 14.5px; font-weight: 700; color: var(--app-slate900); margin: 0 0 4px; }
+  .hold-card .desc { font-size: 12.5px; color: var(--app-slate500); margin: 0 0 8px; }
+  .hold-reason { font-size: 12px; font-weight: 700; color: var(--app-amber800); background: var(--app-amber50); border: 1px solid var(--app-amber300); border-radius: 8px; padding: 6px 10px; margin: 0; }
+
+  .empty-list { background: var(--app-white); border-radius: 16px; padding: 34px 20px; text-align: center; color: var(--app-slate400); font-weight: 600; font-size: 13px; }
+
+  /* ---------------- Leaving choices ---------------- */
+  .sheet-title { margin: 0 0 12px 0; font-size: 12px; font-weight: 700; color: var(--app-slate500); text-transform: uppercase; letter-spacing: 0.06em; }
+  .choice-row { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+  .choice-pill {
+    width: 100%; padding: 16px; border-radius: 12px; font-size: 15px; font-weight: 700; cursor: pointer;
+    border: 1px solid var(--app-slate200); background: var(--app-slate50); color: var(--app-slate900);
+    text-align: center; box-sizing: border-box; font-family: inherit;
+  }
+  .choice-pill.resume-pill { background: var(--app-amber500); border-color: var(--app-amber500); color: #fff; }
+  .choice-pill.job-pill { background: var(--app-green600); border-color: var(--app-green600); color: #fff; }
+
+  /* ---------------- Ticket overlay ---------------- */
+  .selected-job-card { background: var(--app-white); border-radius: 16px; overflow: hidden; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+  .selected-job-card .stripe { height: 4px; }
+  .selected-job-card .body { padding: 20px; }
+  .selected-job-card .cat { margin: 0 0 4px 0; font-size: 10.5px; font-weight: 700; color: var(--app-slate400); text-transform: uppercase; letter-spacing: 0.06em; }
+  .selected-job-card .addr { margin: 0 0 6px 0; font-size: 18px; font-weight: 800; color: var(--app-slate900); }
+  .selected-job-card .desc { margin: 0; font-size: 14px; color: var(--app-slate500); }
+  .badge-vuln { background: var(--app-red50); border: 1px solid var(--app-red200); border-radius: 10px; padding: 10px 14px; margin-bottom: 8px; font-size: 13px; font-weight: 700; color: var(--app-red600); }
+  .badge-urgent { background: var(--app-amber50); border: 1px solid var(--app-amber300); border-radius: 10px; padding: 10px 14px; margin-bottom: 8px; font-size: 13px; font-weight: 700; color: var(--app-amber800); }
+
+  .section-card { background: var(--app-white); border-radius: 16px; padding: 20px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+  .section-label { margin: 0 0 14px 0; font-size: 11px; font-weight: 700; color: var(--app-slate400); text-transform: uppercase; letter-spacing: 0.06em; }
+
+  .timer-box { border-radius: 16px; padding: 24px 20px; margin-bottom: 12px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+  .timer-box .eyebrow { margin: 0 0 4px 0; font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.75); text-transform: uppercase; letter-spacing: 0.06em; }
+  .timer-box .n { margin: 0 0 6px 0; font-size: 38px; font-weight: 800; color: #fff; font-family: monospace; letter-spacing: 0.02em; }
+  .timer-box .l { margin: 0; font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.85); text-transform: uppercase; letter-spacing: 0.06em; }
+
+  .miles-label { margin: 0 0 8px 0; font-size: 12px; font-weight: 700; color: var(--app-slate500); text-transform: uppercase; letter-spacing: 0.06em; }
+  .miles-row { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+  .miles-row input { flex: 1; min-width: 0; text-align: center; padding: 10px; border-radius: 10px; border: 1px solid var(--app-slate200); font-size: 16px; font-weight: 700; background: var(--app-white); }
+  .miles-btn { width: 40px; height: 40px; border-radius: 50%; background: var(--app-slate500); color: #fff; border: none; font-size: 18px; font-weight: 700; cursor: pointer; flex-shrink: 0; }
+
+  .info-note { padding: 12px 14px; border-radius: 10px; background: rgba(13,148,136,0.08); border: 1px solid var(--app-teal600); margin-bottom: 16px; font-size: 13px; color: var(--app-slate900); font-weight: 600; }
+  .paused-note { padding: 14px; border-radius: 10px; background: var(--app-amber50); border: 1px solid var(--app-amber300); margin-bottom: 16px; }
+  .paused-note .lbl { margin: 0 0 4px 0; font-size: 11px; font-weight: 700; color: var(--app-amber800); text-transform: uppercase; letter-spacing: 0.06em; }
+  .paused-note .txt { margin: 0; font-size: 14px; color: var(--app-amber900); }
+
+  .btn-primary {
+    width: 100%; padding: 16px; background: var(--app-teal600); color: #fff; border: none; border-radius: 12px;
+    font-size: 15px; font-weight: 700; cursor: pointer; font-family: inherit;
+  }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-stop { width: 100%; padding: 18px; background: var(--app-red600); color: #fff; border: none; border-radius: 12px; font-size: 16px; font-weight: 800; cursor: pointer; font-family: inherit; }
+  .btn-resume-short { width: 100%; padding: 18px; background: var(--app-teal600); color: #fff; border: none; border-radius: 12px; font-size: 16px; font-weight: 800; cursor: pointer; font-family: inherit; }
+  .btn-ghost { width: 100%; padding: 10px; background: none; border: none; color: var(--app-slate500); font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; margin-top: 8px; }
+
+  /* ---------------- Stop bottom sheet ---------------- */
+  .sheet-backdrop { position: absolute; inset: 0; background: rgba(15,23,42,0.45); display: flex; align-items: flex-end; z-index: 60; }
+  .sheet-panel { width: 100%; max-height: 80%; overflow-y: auto; background: var(--app-white); border-radius: 18px 18px 0 0; padding: 20px; box-sizing: border-box; }
+  .sheet-panel .stop-title { margin: 0 0 2px 0; font-size: 16px; font-weight: 800; color: var(--app-slate900); }
+  .sheet-panel .stop-sub { margin: 0 0 16px 0; font-size: 13px; font-weight: 500; color: var(--app-slate500); }
+  .stop-opt { width: 100%; padding: 14px; border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer; text-align: left; margin-bottom: 8px; font-family: inherit; border: 1px solid var(--app-slate200); background: var(--app-slate50); color: var(--app-slate900); }
+  .stop-opt.green { border: none; background: var(--app-green600); color: #fff; }
+  .stop-opt.danger { border: 1px solid var(--app-red200); background: var(--app-white); color: var(--app-red600); }
+  .sheet-note { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--app-slate200); font-size: 14px; font-family: inherit; box-sizing: border-box; resize: vertical; margin-bottom: 10px; }
+  .sheet-confirm { width: 100%; padding: 16px; background: var(--app-amber600); color: #fff; border: none; border-radius: 12px; font-size: 15px; font-weight: 700; cursor: pointer; font-family: inherit; }
+
+  /* ---------------- Complete ---------------- */
+  .checklist-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--app-slate200); cursor: pointer; margin-bottom: 8px; }
+  .checklist-item.checked { background: var(--app-green50); }
+  .checklist-item input { width: 16px; height: 16px; flex-shrink: 0; }
+  .checklist-item span { font-size: 13px; font-weight: 600; color: var(--app-slate900); }
+  .photo-btn { width: 100%; padding: 14px; border: 1px dashed var(--app-slate300); border-radius: 10px; background: var(--app-slate50); color: var(--app-slate500); font-size: 13px; font-weight: 700; cursor: pointer; margin-bottom: 14px; font-family: inherit; }
+  .photo-btn.attached { border-style: solid; border-color: var(--app-green600); background: var(--app-green50); color: var(--app-green600); }
+  .followup-check { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border-radius: 10px; background: var(--app-amber50); border: 1px solid var(--app-amber300); cursor: pointer; margin-bottom: 10px; }
+  .followup-check input { margin-top: 3px; flex-shrink: 0; width: 16px; height: 16px; }
+  .followup-title { display: block; font-size: 13.5px; font-weight: 700; color: var(--app-amber900); }
+  .followup-sub { display: block; font-size: 12px; color: var(--app-amber800); margin-top: 2px; line-height: 1.4; }
+  .complete-note { width: 100%; min-height: 80px; padding: 12px; border-radius: 10px; border: 1px solid var(--app-slate200); font-size: 13.5px; font-family: inherit; box-sizing: border-box; resize: vertical; margin-bottom: 14px; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="phone-shell">
+    <button class="reset-btn" id="resetBtn" onclick="resetSim()" title="Reset simulation">&#8634;</button>
+    <div class="phone">
+      <div class="phone-notch"></div>
+      <div class="phone-screen" id="screen"></div>
+    </div>
+  </div>
+</div>
+<p class="caption">Interactive walkthrough of the Builder v0.3 "Leaving Site" redesign -- clock-in through clock-out, matching the live BuilderDashboard.jsx code. Photo/material rows are decorative stand-ins; everything else runs the same logic as the real code.</p>
+
+<script>
+  // ================= Fake data (mirrors real tickets/jobs shape) =================
+  const SHORT_TRIP_REASONS = ['Going to the Office', 'Lunch Break', 'Getting materials myself'];
+  const ROUTINE_CHECKLIST = ['Communal hallway hoovered/mopped', 'Bins area tidied', 'Windows in communal area checked', 'Any hazards reported'];
+  const STORE_SUGGESTIONS = ['Screwfix Luton', 'Screwfix Bedford', 'B&Q Luton', 'B&Q Bedford', 'Wickes Luton', 'Toolstation Luton', 'Jewson Bedford', 'Travis Perkins Luton'];
+  const DAILY_CLOCK_IN_DEADLINE = '09:00';
+  const DAILY_CLOCK_OUT_DEADLINE = '17:00';
+
+  const STATUS_COLOR = { 'Assigned': 'var(--app-blue500)', 'In Progress': 'var(--app-teal600)', 'On Hold': 'var(--app-amber500)', 'Completed': 'var(--app-green600)' };
+
+  let jobs = [
+    { id: 1, number: 214, category: 'Interior Painting', address: '25 Copenhagen Close, Luton LU3 3TE', room: 'Bathroom', desc: 'Area around the pool cord in the bathroom ceiling needs filling and painting.', status: 'Assigned', vulnerable: false, urgent: true, miles: 0.6 },
+    { id: 2, number: 198, category: 'Plumbing', address: '12 Stanley Road, Luton LU2 7HG', room: 'Kitchen', desc: 'Tap dripping constantly under the sink, needs a washer replaced.', status: 'Assigned', vulnerable: true, urgent: true, miles: 2.3 },
+    { id: 3, number: 201, category: 'General Repairs', address: '4 Mead House, Chapel Langley, Luton LU1 5DF', room: 'Office', desc: 'Door handle in the main office has come loose.', status: 'Assigned', vulnerable: false, urgent: false, miles: 4.8 },
+    { id: 4, number: 189, category: 'Doors/Locks', address: '7 Ashcroft Road, Luton LU2 0EF', room: 'Front Door', desc: "Lock is sticking, key hard to turn.", status: 'On Hold', holdReason: 'Waiting for materials (ordered)', holdNote: 'Lock ordered from Screwfix, due Thursday', vulnerable: false, urgent: false, miles: 1.1 },
+    { id: 5, number: 230, category: 'Cleaning Rota', address: '9 Farley Hill, Luton LU1 5EX', room: null, desc: 'Fortnightly communal area clean.', status: 'Assigned', vulnerable: false, urgent: false, miles: 1.4, routineVisit: true },
+    { id: 6, number: 220, category: 'Interior Painting', address: '2 Havelock Road, Luton LU1 1SG', room: 'Hallway', desc: 'Scuff marks and small holes need filling and touch-up paint.', status: 'Completed', vulnerable: false, urgent: false, miles: 0.9 },
+  ];
+
+  function job(id) { return jobs.find(j => j.id === id) || null; }
+  function freshJobsState() {
+    return jobs.map(j => {
+      const { holdReason, holdNote, ...rest } = j;
+      if (j.id === 4) return { ...rest, status: 'On Hold', holdReason: 'Waiting for materials (ordered)', holdNote: 'Lock ordered from Screwfix, due Thursday' };
+      return { ...rest, status: j.id === 6 ? 'Completed' : 'Assigned' };
+    });
+  }
+
+  // ================= State =================
+  const state = {
+    todayShift: null,          // { clockInAt: Date, lateFlag }
+    page: 'dashboard',         // dashboard | leaving-choices | leaving-job | leaving-materials | leaving-office | leaving-lunch | leaving-resume
+    openActivity: null,        // { kind: 'Travel'|'Break', label, note, destinationTicketId }
+    awaySince: null,
+    selectedTicketId: null,
+    miles: null,
+    jobSearchQuery: '',
+    materialsQuery: '',
+    idleSince: null,
+    idleSeconds: 0,
+    inProgressSeconds: 0,
+    breakSeconds: 0,
+    stopSheetOpen: false,
+    materialsAskOpen: false,
+    stopReasonPicked: null,
+    stopNote: '',
+    showCompleteConfirm: false,
+    completeNote: '',
+    completePhotoAttached: false,
+    checklistChecked: {},
+    followUpNeeded: false,
+    followUpNote: '',
+    clockOutConfirmOpen: false,
+    earlyLeavePromptOpen: false,
+    earlyLeaveReason: '',
+    clockOutForDayError: '',
+    menuOpen: false,
+  };
+
+  let clockTimer = null;
+
+  function fmtElapsed(s) {
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+    if (h > 0) return `${h}h ${m}m ${sec}s`;
+    if (m > 0) return `${m}m ${sec}s`;
+    return `${sec}s`;
+  }
+  function fmtTime(d) { return d.toTimeString().slice(0, 5); }
+  function nowHHMM() { return fmtTime(new Date()); }
+
+  // ================= Derived (mirrors real component's computed values) =================
+  function lockedTicket() {
+    return jobs.find(j => j.status === 'In Progress') ||
+      jobs.find(j => j.status === 'On Hold' && SHORT_TRIP_REASONS.includes(j.holdReason)) || null;
+  }
+  function isIdle() { return !lockedTicket(); }
+
+  // ================= Navigation / dashboard actions =================
+  function goHome() {
+    if (lockedTicket()) return; // locked -- header brand tap does nothing, matches goHome() -> closeTicket() staying on the locked ticket
+    state.selectedTicketId = null;
+    state.page = 'dashboard';
+    render();
+  }
+  function toggleMenu() { state.menuOpen = !state.menuOpen; render(); }
+
+  function handleClockInForDay() {
+    const now = new Date();
+    state.todayShift = { clockInAt: now, lateFlag: nowHHMM() > DAILY_CLOCK_IN_DEADLINE };
+    startIdleClock();
+    render();
+  }
+
+  function openResumeJobsFromTile() {
+    if (state.openActivity) return;
+    state.page = 'leaving-resume';
+    render();
+  }
+  function openActivityPicker() {
+    if (lockedTicket() || state.openActivity) return;
+    state.jobSearchQuery = '';
+    state.materialsQuery = '';
+    state.page = 'leaving-choices';
+    render();
+  }
+  function goToLeavingPage(p) { state.page = p; state.jobSearchQuery = ''; state.materialsQuery = ''; render(); }
+  function backToChoices() { state.page = 'leaving-choices'; render(); }
+  function backToDashboard() { state.page = 'dashboard'; render(); }
+
+  function pickTravelJob(id) {
+    const j = job(id);
+    state.openActivity = { kind: 'Travel', label: 'Travelling', note: `Job #${j.number} — ${j.address}`, destinationTicketId: id };
+    state.awaySince = nowHHMM();
+    state.selectedTicketId = id;
+    state.miles = null;
+    state.page = 'dashboard';
+    render();
+  }
+  function confirmMaterials() {
+    if (!state.materialsQuery.trim()) return;
+    state.openActivity = { kind: 'Travel', label: 'Travelling', note: state.materialsQuery.trim(), destinationTicketId: null };
+    state.awaySince = nowHHMM();
+    state.page = 'dashboard';
+    render();
+  }
+  function pickStoreSuggestion(name) { state.materialsQuery = name; render(); }
+  function confirmOffice() {
+    state.openActivity = { kind: 'Travel', label: 'Travelling', note: 'Going to the office', destinationTicketId: null };
+    state.awaySince = nowHHMM();
+    state.page = 'dashboard';
+    render();
+  }
+  function confirmLunch() {
+    state.openActivity = { kind: 'Break', label: 'On break', note: state.materialsQuery.trim() || 'Lunch', destinationTicketId: null };
+    state.awaySince = nowHHMM();
+    state.page = 'dashboard';
+    render();
+  }
+  function endActivity() { state.openActivity = null; state.awaySince = null; render(); }
+  function arriveAtDestination() {
+    if (!state.openActivity || !state.openActivity.destinationTicketId) return;
+    state.selectedTicketId = state.openActivity.destinationTicketId;
+    state.miles = null;
+    render();
+  }
+  function selectResumeJob(id) {
+    state.selectedTicketId = id;
+    state.miles = null;
+    render();
+  }
+
+  function bumpMiles(d) { state.miles = Math.max(0, Math.round(((state.miles ?? 0) + d) * 2) / 2); render(); }
+
+  // ================= Ticket overlay actions =================
+  function closeTicket() {
+    if (lockedTicket()) return; // Back hidden while locked, matches real closeTicket()
+    // Backing out of a "going to this job" screen before actually starting
+    // it means the trip didn't happen (wrong tap, changed their mind) --
+    // end the still-open activity now, rather than leaving a stray
+    // "travelling to Job #N" record behind with no way to correct it later.
+    const j = job(state.selectedTicketId);
+    if (j && j.status === 'Assigned' && state.openActivity && state.openActivity.destinationTicketId === j.id) {
+      state.openActivity = null;
+      state.awaySince = null;
+    }
+    state.selectedTicketId = null;
+    render();
+  }
+
+  function startWork() {
+    const j = job(state.selectedTicketId);
+    const matched = state.openActivity && state.openActivity.destinationTicketId === j.id;
+    if (matched) state.openActivity = null;
+    j.status = 'In Progress';
+    j.mileageLogged = state.miles;
+    state.inProgressSeconds = 0;
+    startWorkClock();
+    render();
+  }
+  function resumeShortBreak() {
+    const j = job(state.selectedTicketId);
+    j.status = 'In Progress';
+    j.holdReason = null; j.holdNote = null;
+    state.inProgressSeconds = 0;
+    startWorkClock();
+    render();
+  }
+  function restartAfterHold() {
+    const j = job(state.selectedTicketId);
+    j.status = 'In Progress';
+    j.mileageLogged = state.miles;
+    j.holdReason = null; j.holdNote = null;
+    state.inProgressSeconds = 0;
+    startWorkClock();
+    render();
+  }
+
+  // ---- Stop sheet (mirrors the real bottom-sheet exactly) ----
+  function openStopSheet() { state.stopSheetOpen = true; state.materialsAskOpen = false; state.stopReasonPicked = null; state.stopNote = ''; render(); }
+  function closeStopSheet() { state.stopSheetOpen = false; state.materialsAskOpen = false; state.stopReasonPicked = null; state.stopNote = ''; render(); }
+  function openMaterialsAsk() { state.materialsAskOpen = true; render(); }
+  function pickStopReason(reason) { state.materialsAskOpen = false; state.stopReasonPicked = reason; render(); }
+  function stopReasonBack() { state.stopReasonPicked = null; render(); }
+  function markJobCompletedFromStop() {
+    state.checklistChecked = {};
+    state.followUpNeeded = false;
+    state.followUpNote = '';
+    state.stopSheetOpen = false;
+    state.showCompleteConfirm = true;
+    render();
+  }
+  function toggleFollowUp() { state.followUpNeeded = !state.followUpNeeded; render(); }
+  function confirmStop() {
+    const reason = state.stopReasonPicked;
+    const needsNote = reason === 'Other' || reason === 'Unable to Do the Job';
+    if (needsNote && !state.stopNote.trim()) { return; }
+    const j = job(state.selectedTicketId);
+    j.status = 'On Hold';
+    j.holdReason = reason;
+    j.holdNote = state.stopNote.trim();
+    const shortTrip = SHORT_TRIP_REASONS.includes(reason);
+    state.stopSheetOpen = false; state.materialsAskOpen = false; state.stopReasonPicked = null; state.stopNote = '';
+    if (shortTrip) {
+      state.breakSeconds = 0;
+      startBreakClock();
+    } else {
+      state.selectedTicketId = null;
+      startIdleClock();
+    }
+    render();
+  }
+
+  // ---- Complete flow ----
+  function toggleChecklist(item) { state.checklistChecked[item] = !state.checklistChecked[item]; render(); }
+  function togglePhoto() { state.completePhotoAttached = !state.completePhotoAttached; render(); }
+  function cancelComplete() { state.showCompleteConfirm = false; render(); }
+  function confirmComplete() {
+    const j = job(state.selectedTicketId);
+    const checklistOk = !j.routineVisit || ROUTINE_CHECKLIST.every(i => state.checklistChecked[i]);
+    if (!state.completeNote.trim() || !state.completePhotoAttached || !checklistOk) return;
+    j.status = 'Completed';
+    j.needsFollowup = state.followUpNeeded;
+    j.followupNote = state.followUpNeeded ? state.followUpNote.trim() : null;
+    clearInterval(clockTimer);
+    state.selectedTicketId = null;
+    state.showCompleteConfirm = false;
+    startIdleClock();
+    render();
+  }
+
+  // ---- Clock out for the day ----
+  function attemptClockOutForDay() {
+    state.clockOutForDayError = '';
+    const stillWorking = jobs.find(j => j.status === 'In Progress');
+    if (stillWorking) {
+      state.clockOutForDayError = `Job #${stillWorking.number} is still in progress — pause or complete it before clocking out for the day.`;
+      render();
+      return;
+    }
+    if (state.openActivity) {
+      state.clockOutForDayError = 'You\'re still logged as away — tap "I\'m Back" before clocking out for the day.';
+      render();
+      return;
+    }
+    if (nowHHMM() < DAILY_CLOCK_OUT_DEADLINE) {
+      state.earlyLeaveReason = '';
+      state.earlyLeavePromptOpen = true;
+    } else {
+      state.clockOutConfirmOpen = true;
+    }
+    render();
+  }
+  function cancelEarlyLeave() { state.earlyLeavePromptOpen = false; render(); }
+  function submitEarlyLeave() {
+    if (!state.earlyLeaveReason.trim()) { state.clockOutForDayError = 'Please give a reason for finishing early.'; render(); return; }
+    finishClockOutForDay();
+  }
+  function cancelClockOutConfirm() { state.clockOutConfirmOpen = false; render(); }
+  function finishClockOutForDay() {
+    clearInterval(clockTimer);
+    state.todayShift = null;
+    state.earlyLeavePromptOpen = false;
+    state.clockOutConfirmOpen = false;
+    state.clockOutForDayError = '';
+    render();
+  }
+
+  function resetSim() {
+    jobs = freshJobsState();
+    clearInterval(clockTimer);
+    Object.assign(state, {
+      todayShift: null, page: 'dashboard', openActivity: null, awaySince: null, selectedTicketId: null, miles: null,
+      jobSearchQuery: '', materialsQuery: '', idleSince: null, idleSeconds: 0, inProgressSeconds: 0, breakSeconds: 0,
+      stopSheetOpen: false, materialsAskOpen: false, stopReasonPicked: null, stopNote: '',
+      showCompleteConfirm: false, completeNote: '', completePhotoAttached: false, checklistChecked: {},
+      followUpNeeded: false, followUpNote: '',
+      clockOutConfirmOpen: false, earlyLeavePromptOpen: false, earlyLeaveReason: '', clockOutForDayError: '', menuOpen: false,
+    });
+    render();
+  }
+
+  // ================= Clocks =================
+  function startIdleClock() {
+    clearInterval(clockTimer);
+    state.idleSeconds = 0;
+    clockTimer = setInterval(() => {
+      if (!isIdle()) return;
+      state.idleSeconds++;
+      const el = document.getElementById('idleClock');
+      if (el) el.textContent = fmtElapsed(state.idleSeconds);
+    }, 1000);
+  }
+  function startWorkClock() {
+    clearInterval(clockTimer);
+    clockTimer = setInterval(() => {
+      state.inProgressSeconds++;
+      const el = document.getElementById('workClock');
+      if (el) el.textContent = fmtElapsed(state.inProgressSeconds);
+    }, 1000);
+  }
+  function startBreakClock() {
+    clearInterval(clockTimer);
+    clockTimer = setInterval(() => {
+      state.breakSeconds++;
+      const el = document.getElementById('breakClock');
+      if (el) el.textContent = fmtElapsed(state.breakSeconds);
+    }, 1000);
+  }
+
+  // ================= Nav menu (shared) =================
+  function navMenuHtml() {
+    return `
+      <div class="nav-menu">
+        <p class="name">Dan Whitfield</p>
+        <p class="title">Builder</p>
+        <button onclick="alert('My Reports (not part of this simulation)')">📋 My Reports</button>
+        <button onclick="alert('My Mileage (not part of this simulation)')">🕐 My Mileage</button>
+        <button onclick="alert('My Metrics (not part of this simulation)')">📊 My Metrics</button>
+        <button onclick="alert('Team Chat (not part of this simulation)')"><span>💬 Team Chat</span><span class="badge">2</span></button>
+        <button onclick="alert('Signed out (not part of this simulation)')">🚪 Sign out</button>
+      </div>`;
+  }
+  function headerHtml(showBack, onBack) {
+    return `
+      <div class="app-hdr">
+        ${showBack
+          ? `<button class="back-header-btn" onclick="${onBack}">← Back</button>`
+          : `<button class="brand-btn" onclick="goHome()"><span class="brand">GBCH PMMS · Builder</span></button>`}
+        <button class="menu-dots" onclick="toggleMenu()" aria-label="Menu"><span></span><span></span><span></span></button>
+      </div>
+      ${state.menuOpen ? navMenuHtml() : ''}
+    `;
+  }
+
+  // ================= Pages =================
+  function gatePageHtml() {
+    const hour = new Date().getHours();
+    return `
+      <div class="gate-wrap">
+        <div class="gate-card">
+          <p class="brand-mark">GBCH PMMS</p>
+          <h1>Good ${hour < 12 ? 'morning' : 'afternoon'}, Dan</h1>
+          <p>Clock in to start your working day and see your jobs.</p>
+          <button class="btn-primary" onclick="handleClockInForDay()">✓ Clock In for the Day</button>
+        </div>
+      </div>`;
+  }
+
+  function dashboardBodyHtml() {
+    const away = state.openActivity;
+    const assigned = jobs.filter(j => j.status === 'Assigned');
+    const urgent = assigned.filter(j => j.urgent);
+    const inProgress = jobs.filter(j => j.status === 'In Progress');
+    const onHold = jobs.filter(j => j.status === 'On Hold');
+    const done = jobs.filter(j => j.status === 'Completed');
+    const todo = assigned.filter(j => !j.urgent);
+
+    let html = `
+      <div class="idle-banner" style="background:${away ? 'var(--app-slate900)' : 'var(--app-red600)'}">
+        <p class="eyebrow">${away ? `Away — ${away.label}` : 'You have been doing nothing for:'}</p>
+        <p class="clock" id="idleClock">${fmtElapsed(state.idleSeconds)}</p>
+        <p class="foot">This is recorded, and your manager can see it.</p>
+      </div>
+    `;
+
+    if (away) {
+      const destJob = away.destinationTicketId ? job(away.destinationTicketId) : null;
+      html += `
+        <div class="away-strip">
+          <span>🚶 Away — ${away.label}${away.note ? ': ' + away.note : ''} since ${state.awaySince || nowHHMM()}</span>
+          <div class="btns">
+            ${destJob ? `<button class="arrive-btn" onclick="arriveAtDestination()">✓ Arrived — Start Job #${destJob.number}</button>` : ''}
+            <button class="back-btn" onclick="endActivity()">✓ I'm Back</button>
+          </div>
+        </div>`;
+    } else {
+      html += `
+        <div class="shift-status-row${state.todayShift.lateFlag ? ' late' : ''}">
+          <span class="line">${state.todayShift.lateFlag ? '⚠ ' : '🟢 '}Clocked in since ${fmtTime(state.todayShift.clockInAt)}</span>
+          <div class="cout-row">
+            <button class="clockout-link" onclick="attemptClockOutForDay()">Clock Out for the Day</button>
+          </div>
+        </div>
+        ${state.clockOutForDayError ? `<p style="margin:0 0 10px;font-size:12px;color:var(--app-red500);font-weight:600">${state.clockOutForDayError}</p>` : ''}
+        ${state.earlyLeavePromptOpen ? `
+          <div class="inline-box warn">
+            <p class="title">⚠ You're finishing before ${DAILY_CLOCK_OUT_DEADLINE}</p>
+            <p class="sub">Just so your manager knows why — e.g. "all jobs done", "doctor's appointment".</p>
+            <input class="search-input" style="margin-bottom:10px" placeholder="Reason for finishing early..." value="${state.earlyLeaveReason}" oninput="state.earlyLeaveReason=this.value" />
+            <div class="btn-row">
+              <button class="cancel" onclick="cancelEarlyLeave()">Cancel</button>
+              <button class="confirm" onclick="submitEarlyLeave()">Confirm Clock Out</button>
+            </div>
+          </div>` : ''}
+        ${state.clockOutConfirmOpen ? `
+          <div class="inline-box confirm">
+            <p style="margin:0 0 10px;font-size:13px;font-weight:700;color:var(--app-slate900)">Clock out for the day? This ends your whole shift, not just this job.</p>
+            <div class="btn-row">
+              <button class="cancel" onclick="cancelClockOutConfirm()">Cancel</button>
+              <button class="confirm" onclick="finishClockOutForDay()">Yes, Clock Out</button>
+            </div>
+          </div>` : ''}
+        <button class="btn-leaving-site" onclick="openActivityPicker()">
+          🚶 Leaving Site
+          <span class="sub">Log a trip, break, or head to your next job</span>
+        </button>`;
+    }
+
+    html += `
+      <div class="tiles">
+        <div class="tile" style="background:var(--app-teal600)"><div class="n">${inProgress.length}</div><div class="l">Working On Now</div></div>
+        <div class="tile" style="background:var(--app-red500)"><div class="n">${urgent.length}</div><div class="l">Urgent</div></div>
+        <div class="tile" style="background:var(--app-blue500)"><div class="n">${todo.length}</div><div class="l">To do</div></div>
+        <button class="tile" style="background:var(--app-amber500);border:none;cursor:${away ? 'default' : 'pointer'};font-family:inherit" ${away ? 'disabled' : ''} onclick="openResumeJobsFromTile()"><div class="n">${onHold.length}</div><div class="l">On hold</div></button>
+        <div class="tile" style="background:var(--app-slate500)"><div class="n">${done.length}</div><div class="l">Done</div></div>
+      </div>
+    `;
+    return html;
+  }
+
+  const LEAVING_CHOICES = [
+    { page: 'leaving-job', label: '🚗 Going to Another Job', cls: 'job-pill' },
+    { page: 'leaving-materials', label: '🛒 Buying Materials', cls: '' },
+    { page: 'leaving-office', label: '🏢 Going to the Office', cls: '' },
+    { page: 'leaving-lunch', label: '🍽️ Lunch Break', cls: '' },
+    { page: 'leaving-resume', label: '▶ Resume Jobs', cls: 'resume-pill' },
+  ];
+  function leavingChoicesPageHtml() {
+    return `
+      <p class="sheet-title">Where are you going?</p>
+      <div class="choice-row">
+        ${LEAVING_CHOICES.map(o => `<button class="choice-pill ${o.cls}" onclick="goToLeavingPage('${o.page}')">${o.label}</button>`).join('')}
+      </div>`;
+  }
+
+  function leavingJobPageHtml() {
+    const assigned = jobs.filter(j => j.status === 'Assigned');
+    const q = state.jobSearchQuery.trim().toLowerCase();
+    const results = (q
+      ? assigned.filter(j => String(j.number).startsWith(q) || j.address.toLowerCase().includes(q) || j.category.toLowerCase().includes(q) || j.desc.toLowerCase().includes(q))
+      : assigned
+    ).slice(0, 8);
+    return `
+      <p class="sheet-title">Going to Another Job</p>
+      <input class="search-input" autofocus placeholder="Type a job number or address..." value="${state.jobSearchQuery}" oninput="state.jobSearchQuery=this.value; render()" style="margin-bottom:14px" />
+      ${assigned.length === 0 ? `<p class="search-empty">No other assigned jobs to head to right now.</p>`
+        : results.length === 0 ? `<p class="search-empty">No jobs match "${state.jobSearchQuery}".</p>`
+        : `<div class="job-pick-list">${results.map(j => `
+            <button class="search-result" onclick="pickTravelJob(${j.id})">
+              <div class="result-top-row">
+                <span class="num">#${j.number} · ${j.category}</span>
+                <span class="mi-pill">${j.miles.toFixed(1)} mi</span>
+              </div>
+              <p class="result-addr">${j.address}</p>
+              <p class="result-desc">${j.desc.slice(0, 60)}${j.desc.length > 60 ? '…' : ''}</p>
+            </button>`).join('')}</div>`
+      }`;
+  }
+
+  function leavingMaterialsPageHtml() {
+    const q = state.materialsQuery.trim().toLowerCase();
+    const matches = q ? STORE_SUGGESTIONS.filter(s => s.toLowerCase().includes(q)) : [];
+    return `
+      <p class="sheet-title">Buying Materials</p>
+      <input class="search-input" autofocus placeholder="Type a store name, or your own..." value="${state.materialsQuery}" oninput="state.materialsQuery=this.value; render()" style="margin-bottom:10px" />
+      ${matches.length > 0
+        ? matches.map(s => `<button class="store-suggestion" onclick="pickStoreSuggestion('${s.replace(/'/g, "\\'")}')">${s}</button>`).join('')
+        : q ? `<p class="search-empty" style="text-align:left;padding:0 0 10px">Not listed — "${state.materialsQuery}" will be used as typed.</p>` : ''
+      }
+      <button class="btn-primary" ${state.materialsQuery.trim() ? '' : 'disabled'} onclick="confirmMaterials()">Start</button>
+    `;
+  }
+
+  function leavingOfficePageHtml() {
+    return `
+      <p class="sheet-title">Going to the Office</p>
+      <div class="inline-box" style="margin:0 0 12px">
+        <p style="margin:0;font-size:13px;font-weight:600;color:var(--app-slate600)">You're heading to the office — no address needed.</p>
+      </div>
+      <button class="btn-primary" onclick="confirmOffice()">Start</button>
+    `;
+  }
+
+  function leavingLunchPageHtml() {
+    return `
+      <p class="sheet-title">Lunch Break</p>
+      <input class="search-input" placeholder="Note (optional)" value="${state.materialsQuery}" oninput="state.materialsQuery=this.value" style="margin-bottom:12px" />
+      <button class="btn-primary" onclick="confirmLunch()">Start</button>
+    `;
+  }
+
+  function leavingResumePageHtml() {
+    const onHold = jobs.filter(j => j.status === 'On Hold' && !SHORT_TRIP_REASONS.includes(j.holdReason));
+    return `
+      <p class="sheet-title">Resume Jobs</p>
+      ${onHold.length === 0 ? `<div class="empty-list">Nothing on hold.</div>`
+        : onHold.map(j => `
+          <button class="hold-card" onclick="selectResumeJob(${j.id})">
+            <p class="num">Job #${j.number} · ${j.category}</p>
+            <p class="addr">${j.address}</p>
+            <p class="desc">${j.desc}${j.room ? ' — ' + j.room : ''}</p>
+            <p class="hold-reason">⏸ ${j.holdReason}${j.holdNote ? ' — ' + j.holdNote : ''}</p>
+          </button>`).join('')
+      }`;
+  }
+
+  // ---- Ticket overlay (mirrors the real selectedTicket screen, unified across Assigned / In Progress / On Hold) ----
+  function ticketOverlayHtml(j) {
+    const locked = lockedTicket() && lockedTicket().id === j.id;
+    let body = `
+      <div class="selected-job-card">
+        <div class="stripe" style="background:${STATUS_COLOR[j.status]}"></div>
+        <div class="body">
+          <p class="cat">${j.category}</p>
+          <p class="addr">${j.address}</p>
+          ${j.vulnerable ? '<div class="badge-vuln">⚠ Vulnerable Occupant — handle with care</div>' : ''}
+          ${j.urgent ? '<div class="badge-urgent">🔴 Urgent Priority</div>' : ''}
+          <p class="desc">${j.desc}${j.room ? ' — ' + j.room : ''}</p>
+        </div>
+      </div>`;
+
+    if (j.status === 'In Progress' && !state.showCompleteConfirm) {
+      body += `
+        <div class="timer-box" style="background:var(--app-teal600)">
+          <p class="n" id="workClock">${fmtElapsed(state.inProgressSeconds)}</p>
+          <p class="l">Time on this job</p>
+        </div>
+        <div class="section-card">
+          <button class="btn-stop" onclick="openStopSheet()">⏹ Stop</button>
+        </div>`;
+    } else if (j.status === 'On Hold' && SHORT_TRIP_REASONS.includes(j.holdReason)) {
+      body += `
+        <div class="timer-box" style="background:var(--app-purple600)">
+          <p class="eyebrow">Away — ${j.holdReason}</p>
+          <p class="n" id="breakClock">${fmtElapsed(state.breakSeconds)}</p>
+          <p class="l">Time since you left</p>
+        </div>
+        <div class="section-card">
+          <button class="btn-resume-short" onclick="resumeShortBreak()">▶ Resume Job</button>
+        </div>`;
+    } else if (j.status === 'On Hold') {
+      body += `
+        <div class="section-card">
+          <div class="paused-note">
+            <p class="lbl">Why this job is paused</p>
+            <p class="txt">${j.holdReason}${j.holdNote ? ' — ' + j.holdNote : ''}</p>
+          </div>
+          <p class="miles-label">Mileage</p>
+          <div class="miles-row">
+            <button class="miles-btn" onclick="bumpMiles(-0.5)">−</button>
+            <input type="number" step="0.5" value="${state.miles ?? ''}" oninput="state.miles=this.value===''?null:(parseFloat(this.value)||0); render()" />
+            <button class="miles-btn" onclick="bumpMiles(0.5)">+</button>
+          </div>
+          ${state.miles === null ? `<p style="margin:-10px 0 16px;font-size:11.5px;font-weight:800;color:var(--app-red500)">Enter miles driven, or 0 if you're already at this property.</p>` : ''}
+          <button class="btn-primary" ${state.miles === null ? 'disabled' : ''} onclick="restartAfterHold()">✓ Arrived — restart work</button>
+        </div>`;
+    } else if (j.status === 'Assigned') {
+      body += `
+        <div class="section-card">
+          <p class="miles-label">Mileage</p>
+          <div class="miles-row">
+            <button class="miles-btn" onclick="bumpMiles(-0.5)">−</button>
+            <input type="number" step="0.5" value="${state.miles ?? ''}" oninput="state.miles=this.value===''?null:(parseFloat(this.value)||0); render()" />
+            <button class="miles-btn" onclick="bumpMiles(0.5)">+</button>
+          </div>
+          ${state.miles === null ? `<p style="margin:-10px 0 16px;font-size:11.5px;font-weight:800;color:var(--app-red500)">Enter miles driven, or 0 if you're already at this property.</p>` : ''}
+          <button class="btn-primary" ${state.miles === null ? 'disabled' : ''} onclick="startWork()">✓ Arrived — start work</button>
+        </div>`;
+    }
+
+    if (state.showCompleteConfirm) {
+      const checklistOk = !j.routineVisit || ROUTINE_CHECKLIST.every(i => state.checklistChecked[i]);
+      const canSubmit = state.completeNote.trim() && state.completePhotoAttached && checklistOk;
+      body += `
+        <div class="section-card">
+          <p class="section-label">Confirm job complete</p>
+          ${j.routineVisit ? `
+            <p style="margin:0 0 10px;font-size:12px;font-weight:700;color:var(--app-slate500);text-transform:uppercase;letter-spacing:0.06em">Checklist</p>
+            ${ROUTINE_CHECKLIST.map(item => `
+              <label class="checklist-item ${state.checklistChecked[item] ? 'checked' : ''}">
+                <input type="checkbox" ${state.checklistChecked[item] ? 'checked' : ''} onchange="toggleChecklist('${item.replace(/'/g, "\\'")}')" />
+                <span>${item}</span>
+              </label>`).join('')}
+          ` : ''}
+          <textarea class="complete-note" placeholder="Describe the work completed..." oninput="state.completeNote=this.value">${state.completeNote}</textarea>
+          <button class="photo-btn ${state.completePhotoAttached ? 'attached' : ''}" onclick="togglePhoto()">${state.completePhotoAttached ? '✓ Photo attached' : '📷 Attach Photo'}</button>
+          <label class="followup-check">
+            <input type="checkbox" ${state.followUpNeeded ? 'checked' : ''} onchange="toggleFollowUp()" />
+            <span>
+              <span class="followup-title">Needs a follow-up</span>
+              <span class="followup-sub">Job's done, but something here needs picking up later — e.g. "fixed the fridge, but it should really be replaced."</span>
+            </span>
+          </label>
+          ${state.followUpNeeded ? `<textarea class="complete-note" placeholder="What needs following up..." oninput="state.followUpNote=this.value">${state.followUpNote}</textarea>` : ''}
+          <button class="btn-primary" ${canSubmit ? '' : 'disabled'} onclick="confirmComplete()">✓ Confirm complete</button>
+          <button class="btn-ghost" onclick="cancelComplete()">Cancel</button>
+        </div>`;
+    }
+
+    let screen = `
+      <div class="phone-screen-inner" style="position:relative">
+        ${headerHtml(!locked, 'closeTicket()')}
+        <div class="app-pad">${body}</div>
+      </div>`;
+
+    if (state.stopSheetOpen) {
+      screen += `<div class="sheet-backdrop" onclick="closeStopSheet()"><div class="sheet-panel" onclick="event.stopPropagation()">${stopSheetBodyHtml()}</div></div>`;
+    }
+    return screen;
+  }
+
+  function stopSheetBodyHtml() {
+    if (state.materialsAskOpen) {
+      return `
+        <p class="stop-title">Waiting for Materials</p>
+        <p class="stop-sub">Are you going yourself, or is it on order?</p>
+        <button class="stop-opt" onclick="pickStopReason('Getting materials myself')">🚗 I'm going myself</button>
+        <button class="stop-opt" onclick="pickStopReason('Waiting for materials (ordered)')">📬 Already ordered / awaiting delivery</button>
+        <button class="btn-ghost" onclick="state.materialsAskOpen=false; render()">Back</button>
+      `;
+    }
+    if (state.stopReasonPicked) {
+      const r = state.stopReasonPicked;
+      const needsNote = r === 'Other' || r === 'Unable to Do the Job';
+      return `
+        <p class="stop-title">${r}</p>
+        <p class="stop-sub">${needsNote ? 'Please say what happened' : 'Add a note (optional)'}</p>
+        <textarea class="sheet-note" rows="3" placeholder="${needsNote ? 'e.g. Ran out of a specific part, coming back tomorrow...' : 'Add a note...'}" oninput="state.stopNote=this.value">${state.stopNote}</textarea>
+        <button class="sheet-confirm" onclick="confirmStop()">Confirm</button>
+        <button class="btn-ghost" onclick="stopReasonBack()">Back</button>
+      `;
+    }
+    return `
+      <p class="stop-title">Why are you stopping?</p>
+      <p class="stop-sub">This is logged and shown to the office</p>
+      <button class="stop-opt green" onclick="markJobCompletedFromStop()">✓ Job Completed</button>
+      <button class="stop-opt" onclick="openMaterialsAsk()">📦 Waiting for Materials</button>
+      <button class="stop-opt" onclick="pickStopReason('Going to the Office')">🏢 Going to the Office</button>
+      <button class="stop-opt" onclick="pickStopReason('Lunch Break')">🍽 Lunch Break</button>
+      <button class="stop-opt danger" onclick="pickStopReason('Unable to Do the Job')">🚫 Unable to Do the Job</button>
+      <button class="stop-opt" onclick="pickStopReason('Other')">Other</button>
+      <button class="btn-ghost" onclick="closeStopSheet()">Cancel</button>
+    `;
+  }
+
+  // ================= Render =================
+  function render() {
+    const screen = document.getElementById('screen');
+
+    if (!state.todayShift) {
+      screen.innerHTML = gatePageHtml();
+      return;
+    }
+
+    // A locked ticket (In Progress, or a short-trip break) always forces the
+    // ticket overlay open, same as the real app's lockedTicket effect --
+    // there is no way back to the dashboard until Stop resolves it.
+    const forced = lockedTicket();
+    const activeTicket = forced || (state.selectedTicketId ? job(state.selectedTicketId) : null);
+
+    if (activeTicket) {
+      screen.innerHTML = ticketOverlayHtml(activeTicket);
+      return;
+    }
+
+    let bodyHtml, showBack = false, onBack = '';
+    switch (state.page) {
+      case 'leaving-choices': bodyHtml = leavingChoicesPageHtml(); showBack = true; onBack = 'backToDashboard()'; break;
+      case 'leaving-job': bodyHtml = leavingJobPageHtml(); showBack = true; onBack = 'backToChoices()'; break;
+      case 'leaving-materials': bodyHtml = leavingMaterialsPageHtml(); showBack = true; onBack = 'backToChoices()'; break;
+      case 'leaving-office': bodyHtml = leavingOfficePageHtml(); showBack = true; onBack = 'backToChoices()'; break;
+      case 'leaving-lunch': bodyHtml = leavingLunchPageHtml(); showBack = true; onBack = 'backToChoices()'; break;
+      case 'leaving-resume': bodyHtml = leavingResumePageHtml(); showBack = true; onBack = 'backToChoices()'; break;
+      default: bodyHtml = dashboardBodyHtml(); showBack = false;
+    }
+
+    screen.innerHTML = `${headerHtml(showBack, onBack)}<div class="app-pad">${bodyHtml}</div>`;
+  }
+
+  render();
+</script>
+</body>
+</html>

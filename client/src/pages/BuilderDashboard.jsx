@@ -63,13 +63,6 @@ const ROAD_DISTANCE_MULTIPLIER = 1.3
 const SHOW_JOB_LIST = false
 const SHOW_NEARBY_JOBS = false
 
-// Suggestions only, for the "Buying Materials" leaving-site page's
-// type-ahead -- typing anything not on this list is still accepted as
-// free text, same as before.
-const STORE_SUGGESTIONS = [
-  'Screwfix Luton', 'Screwfix Bedford', 'B&Q Luton', 'B&Q Bedford',
-  'Wickes Luton', 'Toolstation Luton', 'Jewson Bedford', 'Travis Perkins Luton',
-]
 
 // Shared by every Leaving Site sub-page below -- same header (Back + logo +
 // hamburger, with the full nav menu behind it) every other full-screen
@@ -185,7 +178,10 @@ export default function BuilderDashboard({ profile }) {
   const [dmSending, setDmSending] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [contactSearch, setContactSearch] = useState('')
-  const [miles, setMiles] = useState(0)
+  // null (not 0) until the builder actually touches the stepper/input --
+  // lets 0 be a deliberate "already at this property" answer instead of
+  // being indistinguishable from never having entered anything.
+  const [miles, setMiles] = useState(null)
   // A GPS fix is now required to clock in/resume -- directors' call: a
   // builder can step outside for signal, so "no signal" shouldn't be an
   // acceptable reason to start work with no location on record. Shared
@@ -253,6 +249,11 @@ export default function BuilderDashboard({ profile }) {
   const [destinationTicketId, setDestinationTicketId] = useState('')
   const [activityNote, setActivityNote] = useState('')
   const [jobSearchQuery, setJobSearchQuery] = useState('')
+  // Admin-configurable (AdminSettings.jsx "Material Stores") -- only the
+  // active ones are offered as suggestions; inactive ones are kept so past
+  // trips that named them still read fine, just not resurfaced going
+  // forward.
+  const [materialStores, setMaterialStores] = useState([])
   const [startingActivity, setStartingActivity] = useState(false)
   const [endingActivity, setEndingActivity] = useState(false)
   const [activityError, setActivityError] = useState('')
@@ -358,6 +359,8 @@ export default function BuilderDashboard({ profile }) {
     fetchOpenActivity()
     fetchPriorityThresholds().then(({ p1, p2 }) => { setP1Threshold(p1); setP2Threshold(p2) })
     fetchRoutineVisitChecklistTemplate()
+    supabase.schema('pmms').from('settings').select('setting_value').eq('setting_key', 'material_stores').maybeSingle()
+      .then(({ data }) => { if (Array.isArray(data?.setting_value)) setMaterialStores(data.setting_value) })
     supabase.schema('pmms').from('settings').select('setting_value').eq('setting_key', 'daily_clock_in_deadline').maybeSingle()
       .then(({ data }) => { if (data?.setting_value) setDailyClockInDeadline(data.setting_value) })
     supabase.schema('pmms').from('settings').select('setting_value').eq('setting_key', 'daily_clock_out_reminder_time').maybeSingle()
@@ -508,7 +511,7 @@ export default function BuilderDashboard({ profile }) {
   }
 
   useEffect(() => {
-    setMiles(0)
+    setMiles(null)
     setClockingIn(false)
     setClockInError('')
     setStopSheetOpen(false)
@@ -748,7 +751,7 @@ export default function BuilderDashboard({ profile }) {
     const { data } = await supabase
       .schema('pmms')
       .from('daily_attendance')
-      .select('id, work_date, clock_in_at, late_flag')
+      .select('id, work_date, clock_in_at, late_flag, clock_in_lat, clock_in_lng')
       .eq('staff_id', profile.id)
       .is('clock_out_at', null)
       .order('clock_in_at', { ascending: false })
@@ -1725,6 +1728,14 @@ export default function BuilderDashboard({ profile }) {
     setSelectedTicket(lockedTicket || t)
   }
   function closeTicket() {
+    // Backing out of a "going to this job" screen before actually starting
+    // it means the trip didn't happen (wrong tap, changed their mind) --
+    // end the still-open activity_log entry now, rather than leaving a
+    // stray "travelling to Job #N" record behind with no way for the
+    // builder to correct it later.
+    if (!lockedTicket && selectedTicket?.status === 'Assigned' && openActivity?.activity_type === 'Travel' && openActivity.destination_ticket_id === selectedTicket.id) {
+      handleEndActivity()
+    }
     setSelectedTicket(lockedTicket || null)
   }
 
@@ -1775,11 +1786,20 @@ export default function BuilderDashboard({ profile }) {
   // Same estimate as nearbyJobs above, reused for the mileage pill shown
   // against each result on the "Going to Another Job" search page --
   // origin is wherever the builder most recently stopped, not a live GPS
-  // read, matching the existing convention.
+  // read, matching the existing convention. Before their first
+  // completed/held job of the day there's no "recently left" property to
+  // measure from -- falls back to where they clocked in this morning
+  // (already captured, see handleClockInForDay) rather than showing no
+  // estimate at all for the whole first half of the day.
   function estimateMilesTo(ticket) {
-    if (!recentlyLeftTicket || ticket.property?.latitude == null || ticket.property?.longitude == null) return null
+    if (ticket.property?.latitude == null || ticket.property?.longitude == null) return null
+    const origin = recentlyLeftTicket?.property
+      ?? (todayShift?.clock_in_lat != null && todayShift?.clock_in_lng != null
+        ? { latitude: todayShift.clock_in_lat, longitude: todayShift.clock_in_lng }
+        : null)
+    if (!origin) return null
     return metresToMiles(distanceMetres(
-      recentlyLeftTicket.property.latitude, recentlyLeftTicket.property.longitude,
+      origin.latitude, origin.longitude,
       ticket.property.latitude, ticket.property.longitude,
     )) * ROAD_DISTANCE_MULTIPLIER
   }
@@ -2212,10 +2232,19 @@ export default function BuilderDashboard({ profile }) {
           <div style={{ fontSize: '28px', fontWeight: 800 }}>{toDoTickets.length}</div>
           <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>To do</div>
         </div>
-        <div style={{ width: '100%', padding: '14px', background: COLORS.amber500, color: COLORS.white, border: 'none', borderRadius: '12px', textAlign: 'center', boxSizing: 'border-box' }}>
+        <button
+          // The one live tile -- jumps straight to the same Resume Jobs
+          // screen the Leaving Site pill opens, since On Hold jobs are
+          // exactly what that screen lists. Disabled while away, matching
+          // Leaving Site's own gating (there's no path into Resume Jobs at
+          // all while an activity is open).
+          onClick={() => { if (!openActivity) setPage('leaving-resume') }}
+          disabled={!!openActivity}
+          style={{ width: '100%', padding: '14px', background: COLORS.amber500, color: COLORS.white, border: 'none', borderRadius: '12px', textAlign: 'center', boxSizing: 'border-box', cursor: openActivity ? 'default' : 'pointer' }}
+        >
           <div style={{ fontSize: '28px', fontWeight: 800 }}>{onHoldTickets.length}</div>
           <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>On hold</div>
-        </div>
+        </button>
         <div style={{ width: '100%', padding: '14px', background: COLORS.slate500, color: COLORS.white, border: 'none', borderRadius: '12px', textAlign: 'center', boxSizing: 'border-box' }}>
           <div style={{ fontSize: '28px', fontWeight: 800 }}>{doneTickets.length}</div>
           <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Done</div>
@@ -2462,7 +2491,7 @@ export default function BuilderDashboard({ profile }) {
               <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: COLORS.slate500, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Mileage</p>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', overflow: 'hidden' }}>
                 <button
-                  onClick={() => setMiles(m => Math.max(0, m - 0.5))}
+                  onClick={() => setMiles(m => Math.max(0, (m ?? 0) - 0.5))}
                   style={{ width: '40px', height: '40px', borderRadius: '50%', background: COLORS.slate500, color: COLORS.white, border: 'none', fontSize: '18px', fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
                 >
                   −
@@ -2470,23 +2499,26 @@ export default function BuilderDashboard({ profile }) {
                 <input
                   type="number"
                   step="0.5"
-                  value={miles}
-                  onChange={(e) => setMiles(parseFloat(e.target.value) || 0)}
+                  value={miles ?? ''}
+                  onChange={(e) => setMiles(e.target.value === '' ? null : (parseFloat(e.target.value) || 0))}
                   style={{ flex: 1, minWidth: 0, textAlign: 'center', padding: '10px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '16px', fontWeight: 700, boxSizing: 'border-box' }}
                 />
                 <button
-                  onClick={() => setMiles(m => m + 0.5)}
+                  onClick={() => setMiles(m => (m ?? 0) + 0.5)}
                   style={{ width: '40px', height: '40px', borderRadius: '50%', background: COLORS.slate500, color: COLORS.white, border: 'none', fontSize: '18px', fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
                 >
                   +
                 </button>
               </div>
+              {miles === null && (
+                <p style={{ margin: '6px 0 0 0', fontSize: '11.5px', fontWeight: 700, color: COLORS.red500 }}>Enter miles driven, or 0 if you're already at this property.</p>
+              )}
             </div>
 
             <button
               onClick={() => { setClockInError(''); handleClockIn(null, miles) }}
-              disabled={clockingIn}
-              style={{ width: '100%', padding: '16px', background: COLORS.teal600, color: COLORS.white, border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: 700, cursor: clockingIn ? 'not-allowed' : 'pointer', opacity: clockingIn ? 0.7 : 1 }}
+              disabled={clockingIn || miles === null}
+              style={{ width: '100%', padding: '16px', background: COLORS.teal600, color: COLORS.white, border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: 700, cursor: (clockingIn || miles === null) ? 'not-allowed' : 'pointer', opacity: (clockingIn || miles === null) ? 0.6 : 1 }}
             >
               {clockingIn ? 'Getting your location…' : "✓ Arrived — start work"}
             </button>
@@ -2719,7 +2751,7 @@ export default function BuilderDashboard({ profile }) {
                   <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: COLORS.slate500, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Mileage</p>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', overflow: 'hidden' }}>
                     <button
-                      onClick={() => setMiles(m => Math.max(0, m - 0.5))}
+                      onClick={() => setMiles(m => Math.max(0, (m ?? 0) - 0.5))}
                       style={{ width: '40px', height: '40px', borderRadius: '50%', background: COLORS.slate500, color: COLORS.white, border: 'none', fontSize: '18px', fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
                     >
                       −
@@ -2727,22 +2759,26 @@ export default function BuilderDashboard({ profile }) {
                     <input
                       type="number"
                       step="0.5"
-                      value={miles}
-                      onChange={(e) => setMiles(parseFloat(e.target.value) || 0)}
+                      placeholder="0"
+                      value={miles ?? ''}
+                      onChange={(e) => setMiles(e.target.value === '' ? null : (parseFloat(e.target.value) || 0))}
                       style={{ flex: 1, minWidth: 0, textAlign: 'center', padding: '10px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '16px', fontWeight: 700, boxSizing: 'border-box' }}
                     />
                     <button
-                      onClick={() => setMiles(m => m + 0.5)}
+                      onClick={() => setMiles(m => (m ?? 0) + 0.5)}
                       style={{ width: '40px', height: '40px', borderRadius: '50%', background: COLORS.slate500, color: COLORS.white, border: 'none', fontSize: '18px', fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
                     >
                       +
                     </button>
                   </div>
+                  {miles === null && (
+                    <p style={{ margin: '6px 0 0 0', fontSize: '11.5px', fontWeight: 700, color: COLORS.red500 }}>Enter miles driven, or 0 if you're already at this property.</p>
+                  )}
                 </div>
                 <button
                   onClick={() => handleResumeWork(miles)}
-                  disabled={clockingIn}
-                  style={{ width: '100%', padding: '16px', background: COLORS.teal600, color: COLORS.white, border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: 700, cursor: clockingIn ? 'not-allowed' : 'pointer', opacity: clockingIn ? 0.7 : 1 }}
+                  disabled={clockingIn || miles === null}
+                  style={{ width: '100%', padding: '16px', background: COLORS.teal600, color: COLORS.white, border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: 700, cursor: (clockingIn || miles === null) ? 'not-allowed' : 'pointer', opacity: (clockingIn || miles === null) ? 0.6 : 1 }}
                 >
                   {clockingIn ? 'Getting your location…' : '✓ Arrived — restart work'}
                 </button>
@@ -3024,7 +3060,8 @@ export default function BuilderDashboard({ profile }) {
       {/* Leaving Site -- Buying Materials */}
       {page === 'leaving-materials' && (() => {
         const q = activityNote.trim().toLowerCase()
-        const matches = q ? STORE_SUGGESTIONS.filter(s => s.toLowerCase().includes(q)) : []
+        const activeStoreNames = materialStores.filter(s => s.active).map(s => s.name)
+        const matches = q ? activeStoreNames.filter(s => s.toLowerCase().includes(q)) : []
         return (
         <div style={{ position: 'fixed', top: 'var(--pmms-banner-offset, 0px)', left: 0, right: 0, bottom: 0, background: COLORS.slate100, zIndex: 50, overflowY: 'auto', fontFamily: 'system-ui, sans-serif' }}>
           <BuilderNavHeader onBack={() => setPage('leaving-choices')} goHome={goHome} menuOpen={menuOpen} setMenuOpen={setMenuOpen} profile={profile} unreadMentions={unreadMentions} setPage={setPage} handleSignOut={handleSignOut} />

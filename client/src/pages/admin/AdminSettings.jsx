@@ -167,6 +167,15 @@ export default function AdminSettings() {
   const [newChecklistItem, setNewChecklistItem] = useState('')
   const [checklistError, setChecklistError] = useState('')
   const [checklistSaving, setChecklistSaving] = useState(false)
+  // Suggestions offered on the builder's "Buying Materials" Leaving Site
+  // page -- typing anything not on this list is still accepted as free
+  // text there, this is just the type-ahead. { name, active } so a store
+  // that's closed down can be turned off without losing the history of
+  // past trips that named it.
+  const [materialStores, setMaterialStores] = useState([])
+  const [newMaterialStore, setNewMaterialStore] = useState('')
+  const [materialStoreError, setMaterialStoreError] = useState('')
+  const [materialStoreSaving, setMaterialStoreSaving] = useState(false)
   const [towns, setTowns] = useState(DEFAULT_TOWNS)
   const [newTownName, setNewTownName] = useState('')
   const [townError, setTownError] = useState('')
@@ -243,6 +252,7 @@ export default function AdminSettings() {
       if (map.garden_service_days_winter != null) setGardenServiceDaysWinter(map.garden_service_days_winter)
       if (map.garden_auto_ticket_enabled != null) setGardenAutoTicketEnabled(map.garden_auto_ticket_enabled)
       if (Array.isArray(map.routine_visit_checklist)) setRoutineVisitChecklist(map.routine_visit_checklist)
+      if (Array.isArray(map.material_stores)) setMaterialStores(map.material_stores)
       if (Array.isArray(map.towns) && map.towns.length > 0) setTowns(map.towns)
       if (map.clock_overrun_hours != null) setClockOverrunHours(map.clock_overrun_hours)
       if (map.done_window_hours != null) setDoneWindowHours(map.done_window_hours)
@@ -690,6 +700,32 @@ export default function AdminSettings() {
     const next = routineVisitChecklist.filter(i => i !== label)
     await saveSetting('routine_visit_checklist', next)
     setRoutineVisitChecklist(next)
+  }
+
+  async function handleAddMaterialStore() {
+    setMaterialStoreError('')
+    const name = newMaterialStore.trim()
+    if (!name) { setMaterialStoreError('Enter a store name.'); return }
+    if (materialStores.some(s => s.name.toLowerCase() === name.toLowerCase())) { setMaterialStoreError('That store already exists.'); return }
+
+    setMaterialStoreSaving(true)
+    const next = [...materialStores, { name, active: true }]
+    await saveSetting('material_stores', next)
+    setMaterialStores(next)
+    setMaterialStoreSaving(false)
+    setNewMaterialStore('')
+  }
+
+  async function handleToggleMaterialStoreActive(name) {
+    const next = materialStores.map(s => s.name === name ? { ...s, active: !s.active } : s)
+    await saveSetting('material_stores', next)
+    setMaterialStores(next)
+  }
+
+  async function handleDeleteMaterialStore(name) {
+    const next = materialStores.filter(s => s.name !== name)
+    await saveSetting('material_stores', next)
+    setMaterialStores(next)
   }
 
   async function handleAddTown() {
@@ -1604,6 +1640,53 @@ export default function AdminSettings() {
           </button>
         </div>
         {checklistError && <p style={modalErrorStyle}>{checklistError}</p>}
+      </SettingsSection>
+
+      {/* Section 4f-2: Material Stores (Builder Leaving Site -- Buying Materials) */}
+      <SettingsSection
+        title="Material Stores"
+        subtitle="Suggestions offered on the builder's Buying Materials page. Typing anything not on this list is still accepted as free text -- this is just the type-ahead. Turn a store off rather than deleting it to keep past trips readable."
+        open={!!openSections['material-stores']}
+        onToggle={() => toggleSection('material-stores')}
+      >
+        {materialStores.length === 0 && (
+          <p style={{ margin: '0 0 10px 0', fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>No stores added yet.</p>
+        )}
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '12px' }}>
+          {materialStores.map(store => (
+            <div key={store.name} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', padding: '8px 12px', background: COLORS.slate50, border: `1px solid ${COLORS.slate200}`, borderRadius: '10px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', flex: 1, minWidth: 0 }}>
+                <input type="checkbox" checked={store.active} onChange={() => handleToggleMaterialStoreActive(store.name)} />
+                <span style={{ fontSize: '13px', fontWeight: 600, color: store.active ? COLORS.slate900 : COLORS.slate400 }}>{store.name}{!store.active ? ' (inactive)' : ''}</span>
+              </label>
+              <button
+                onClick={() => handleDeleteMaterialStore(store.name)}
+                style={{ background: 'none', border: 'none', color: COLORS.red600, fontSize: '12px', fontWeight: 800, cursor: 'pointer', padding: '0 2px', flexShrink: 0 }}
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <input
+            type="text"
+            value={newMaterialStore}
+            onChange={(e) => setNewMaterialStore(e.target.value)}
+            placeholder="New store name..."
+            style={{ ...inputStyle, flex: '1 1 220px' }}
+          />
+          <button
+            onClick={handleAddMaterialStore}
+            disabled={materialStoreSaving}
+            style={{ padding: '10px 20px', background: COLORS.blue900, color: COLORS.white, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: materialStoreSaving ? 'not-allowed' : 'pointer', opacity: materialStoreSaving ? 0.6 : 1 }}
+          >
+            {materialStoreSaving ? 'Saving...' : '+ Add Store'}
+          </button>
+        </div>
+        {materialStoreError && <p style={modalErrorStyle}>{materialStoreError}</p>}
       </SettingsSection>
 
       {/* Section 4g: Towns / Areas */}
