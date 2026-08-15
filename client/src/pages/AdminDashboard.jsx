@@ -7,7 +7,7 @@ import { COLORS } from '../lib/colors'
 import { logLoginEvent } from '../lib/loginEvents'
 import { pushNotificationsSupported, hasActivePushSubscription, enablePushNotifications } from '../lib/pushNotifications'
 import gbchLogo from '../assets/gbch-logo.svg'
-import { EVENTS_FEATURE_ENABLED, AI_TRIAL_FEATURE_ENABLED, resolveStaffPhotoUrl } from './admin/shared'
+import { EVENTS_FEATURE_ENABLED, AI_TRIAL_FEATURE_ENABLED, LANDLORD_LIAISON_PAGE_ENABLED, resolveStaffPhotoUrl } from './admin/shared'
 import { getImpersonationMarker, returnToAdmin } from '../lib/impersonation'
 import { countUnreadMessages } from '../lib/chat'
 import { countUnreadDms } from '../lib/dm'
@@ -60,25 +60,27 @@ const NAV_ITEMS = [
   { key: 'voids', label: 'Voids', icon: 'key', Component: AdminVoids, divisions: ['Maintenance'] },
   // Division dashboards, grouped together in this order.
   { key: 'compliance', label: 'Compliance', icon: 'shield', Component: AdminCompliance, divisions: ['Maintenance', 'Compliance'] },
-  { key: 'landlord-liaison', label: 'Landlord Liaison', icon: 'building', Component: AdminLandlordLiaison, divisions: ['Maintenance', 'Landlord Liaison'] },
+  ...(LANDLORD_LIAISON_PAGE_ENABLED ? [{ key: 'landlord-liaison', label: 'Landlord Liaison', icon: 'building', Component: AdminLandlordLiaison, divisions: ['Maintenance', 'Landlord Liaison'] }] : []),
   { key: 'housekeeping', label: 'Housekeeping', icon: 'broom', Component: AdminHousekeeping, divisionOnly: 'Housekeeping' },
   { key: 'builders', label: 'Staff', icon: 'users', Component: AdminBuilders },
   { key: 'clocking', label: 'Clocking', icon: 'clock', Component: AdminClocking },
   { key: 'stock', label: 'Stock', icon: 'box', Component: AdminStock, divisions: ['Maintenance'] },
   { key: 'reports', label: 'Reports', icon: 'chart', Component: AdminReports },
   // Sits in AI Trial's old slot (see AI_TRIAL_FEATURE_ENABLED, hidden
-  // 2026-08-09) -- read-only for admin AND manager, deliberately not
-  // adminOnly, unlike Help & Guide below. No divisions/divisionOnly
-  // gating either: a division-scoped manager (e.g. Housekeeping) still
-  // benefits from being able to open the other division's guide for
-  // context.
+  // 2026-08-09). Made adminOnly 2026-08-15 -- was originally open to any
+  // manager on the theory that a division-scoped manager might want to
+  // browse another division's guide for context, but in practice this is
+  // training material for onboarding, not something a working manager
+  // needs in their own nav (a Landlord Liaison Manager, for instance, has
+  // no use for it at all). Each child also carries adminOnly itself, same
+  // defense-in-depth pattern as AI Trial below.
   {
-    key: 'quick-guide', label: 'Quick Guide', icon: 'phone',
+    key: 'quick-guide', label: 'Quick Guide', icon: 'phone', adminOnly: true,
     children: [
-      { key: 'builder-guide', label: 'Builder', Component: AdminBuilderGuide },
-      { key: 'builder-guide-v2', label: 'Builder v.2', Component: AdminBuilderGuideV2 },
-      { key: 'builder-guide-v03', label: 'Builder v0.3', Component: AdminBuilderGuideV03 },
-      { key: 'housekeeper-guide', label: 'Housekeeper', Component: AdminHousekeepingGuide },
+      { key: 'builder-guide', label: 'Builder', Component: AdminBuilderGuide, adminOnly: true },
+      { key: 'builder-guide-v2', label: 'Builder v.2', Component: AdminBuilderGuideV2, adminOnly: true },
+      { key: 'builder-guide-v03', label: 'Builder v0.3', Component: AdminBuilderGuideV03, adminOnly: true },
+      { key: 'housekeeper-guide', label: 'Housekeeper', Component: AdminHousekeepingGuide, adminOnly: true },
     ],
   },
   // Trial section, admin-only while it's being tried out and shown to

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import { COLORS } from '../../lib/colors'
-import { priorityTierLabel, fetchFlaggedClockingCount, isTicketStuck, KpiTiles, fetchComplianceAgingCounts, fetchVoidAgingCounts, fetchGardenReviewAging, computeAvgResponseMs, formatDuration, fetchPriorityThresholds, fetchAssignableBuilders, fetchAssignableStaffForDivision, fetchLastEndedSessionsToday, ukDateKey, formatUKDateTime, minutesLate, SHORT_TRIP_REASONS, activityCategoryMeta, ACTIVITY_CATEGORY_META } from './shared'
+import { priorityTierLabel, fetchFlaggedClockingCount, isTicketStuck, KpiTiles, fetchComplianceAgingCounts, fetchVoidAgingCounts, fetchGardenReviewAging, computeAvgResponseMs, formatDuration, fetchPriorityThresholds, fetchAssignableBuilders, fetchAssignableStaffForDivision, fetchLastEndedSessionsToday, ukDateKey, formatUKDateTime, minutesLate, SHORT_TRIP_REASONS, activityCategoryMeta, ACTIVITY_CATEGORY_META, LANDLORD_LIAISON_PAGE_ENABLED } from './shared'
 import { NavIcon } from '../../lib/icons'
 import { googleMapsLink } from '../../lib/geo'
 
@@ -72,7 +72,12 @@ function DashboardSection({ id, title, background, alertCount = 0, defaultCollap
 // stretch) to actually scroll internally instead of growing the row.
 const DASHBOARD_TOP_CARD_HEIGHT = '420px'
 
-function DailyBriefing({ lines }) {
+// `height` defaults to matching TeamWhereabouts's fixed card height for the
+// normal side-by-side split. When TeamWhereabouts is hidden entirely (see
+// its Landlord Liaison gating below), there's nothing to match anymore --
+// callers pass height="auto" instead so the card shrinks to fit its own
+// content rather than staying stretched to a now-meaningless fixed height.
+function DailyBriefing({ lines, height = DASHBOARD_TOP_CARD_HEIGHT }) {
   function handleLineClick(target) {
     const header = document.querySelector(`[data-dashboard-section="${target}"]`)
     if (!header) return
@@ -96,7 +101,7 @@ function DailyBriefing({ lines }) {
     <div style={{
       borderRadius: '16px', padding: '18px 20px', background: COLORS.white,
       border: `1px solid ${COLORS.slate200}`, boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
-      height: DASHBOARD_TOP_CARD_HEIGHT, display: 'flex', flexDirection: 'column',
+      height, display: 'flex', flexDirection: 'column',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
         <span style={{ color: COLORS.indigo700, display: 'flex' }}><NavIcon name="sunrise" size={16} /></span>
@@ -778,7 +783,7 @@ export default function AdminDashboard({ profile, onNavigate }) {
   // section this profile can't see (and couldn't click through to) would
   // just be confusing.
   const complianceVisible = !profile.division || profile.division === 'Compliance'
-  const landlordLiaisonVisible = !profile.division || profile.division === 'Landlord Liaison'
+  const landlordLiaisonVisible = LANDLORD_LIAISON_PAGE_ENABLED && (!profile.division || profile.division === 'Landlord Liaison')
   const voidGardensVisible = !profile.division
 
   // Mirrors every red-coloured Pipeline KPI tile exactly (see kpis above)
@@ -839,30 +844,44 @@ export default function AdminDashboard({ profile, onNavigate }) {
 
   return (
     <div>
-      {/* Below 900px there's no meaningful side-by-side left to adjust --
-          dashboard-split-panel/-handle in index.css switch this to a
-          stacked, full-width, un-draggable layout instead (same convention
-          as admin-sidebar-desktop/admin-mobile-topbar there: plain inline
-          styles can't express a breakpoint, so this one responsive toggle
-          lives in that stylesheet). */}
-      <div ref={splitContainerRef} className="dashboard-split" style={{ display: 'flex', alignItems: 'stretch', gap: 0, marginBottom: '16px' }}>
-        <div className="dashboard-split-panel" style={{ flex: `0 0 ${briefingSplitPct}%`, minWidth: 0 }}>
-          <DailyBriefing lines={briefingLines} />
+      {/* Where's the Team is builder-clocking/activity focused -- nothing
+          Landlord Liaison manages, so it's hidden (not removed) for that
+          division alone. A single-person division today; if a second
+          Landlord Liaison hire ever needs it, drop this condition. With
+          nothing to split against, Daily Briefing runs standalone and
+          height="auto" so it shrinks to its own content instead of
+          staying stretched to the fixed height it used to share with
+          TeamWhereabouts. */}
+      {profile.division === 'Landlord Liaison' ? (
+        <div style={{ marginBottom: '16px' }}>
+          <DailyBriefing lines={briefingLines} height="auto" />
         </div>
-        <div
-          className="dashboard-split-handle"
-          onMouseDown={() => setSplitDragging(true)}
-          onTouchStart={() => setSplitDragging(true)}
-          onDoubleClick={() => applySplitPct(50)}
-          title="Drag to resize -- double-click to reset"
-          style={{ flexShrink: 0, width: '14px', cursor: 'col-resize', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-        >
-          <div style={{ width: '4px', height: '40px', borderRadius: '999px', background: splitDragging ? COLORS.teal700 : COLORS.slate200 }} />
+      ) : (
+        // Below 900px there's no meaningful side-by-side left to adjust --
+        // dashboard-split-panel/-handle in index.css switch this to a
+        // stacked, full-width, un-draggable layout instead (same convention
+        // as admin-sidebar-desktop/admin-mobile-topbar there: plain inline
+        // styles can't express a breakpoint, so this one responsive toggle
+        // lives in that stylesheet).
+        <div ref={splitContainerRef} className="dashboard-split" style={{ display: 'flex', alignItems: 'stretch', gap: 0, marginBottom: '16px' }}>
+          <div className="dashboard-split-panel" style={{ flex: `0 0 ${briefingSplitPct}%`, minWidth: 0 }}>
+            <DailyBriefing lines={briefingLines} />
+          </div>
+          <div
+            className="dashboard-split-handle"
+            onMouseDown={() => setSplitDragging(true)}
+            onTouchStart={() => setSplitDragging(true)}
+            onDoubleClick={() => applySplitPct(50)}
+            title="Drag to resize -- double-click to reset"
+            style={{ flexShrink: 0, width: '14px', cursor: 'col-resize', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          >
+            <div style={{ width: '4px', height: '40px', borderRadius: '999px', background: splitDragging ? COLORS.teal700 : COLORS.slate200 }} />
+          </div>
+          <div className="dashboard-split-panel" style={{ flex: `1 1 ${100 - briefingSplitPct}%`, minWidth: 0 }}>
+            <TeamWhereabouts profile={profile} onNavigate={onNavigate} />
+          </div>
         </div>
-        <div className="dashboard-split-panel" style={{ flex: `1 1 ${100 - briefingSplitPct}%`, minWidth: 0 }}>
-          <TeamWhereabouts profile={profile} onNavigate={onNavigate} />
-        </div>
-      </div>
+      )}
 
       <DashboardSection id="pipeline" title="Ticket Pipeline" background={COLORS.white} alertCount={kpis.find(k => k.label === 'Stuck')?.value || 0}>
         <div style={{ width: '100%' }}>

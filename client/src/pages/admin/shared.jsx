@@ -37,6 +37,15 @@ export const EVENTS_FEATURE_ENABLED = false
 // back with no rebuilding.
 export const AI_TRIAL_FEATURE_ENABLED = false
 
+// Hidden 2026-08-15, same day it was built -- once live, the dedicated
+// division page (AdminLandlordLiaison.jsx: open ticket queue + landlord
+// directory) turned out to duplicate what Pipeline already gives every
+// manager, and the Landlord Liaison Manager is a single person with no
+// need for a second place to look. The page, its nav item, and the main
+// Dashboard's KPI section all still exist -- this just pulls them out of
+// view. Flip back to true to bring it all back with no rebuilding.
+export const LANDLORD_LIAISON_PAGE_ENABLED = false
+
 export const GLOBAL_TRIAGE_THRESHOLD = 70
 export const P2_URGENT_THRESHOLD = 40
 
