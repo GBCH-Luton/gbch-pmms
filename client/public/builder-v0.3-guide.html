@@ -51,6 +51,10 @@
   }
 
   * { box-sizing: border-box; }
+  html, body {
+    height: 100%;
+    overflow: hidden;
+  }
   body {
     margin: 0;
     background: var(--bg);
@@ -59,11 +63,11 @@
   }
 
   .wrap {
-    min-height: 100vh;
+    height: 100vh;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 40px 20px;
+    padding: 12px;
   }
 
   /* ---------------- Phone frame ---------------- */
@@ -73,6 +77,11 @@
     width: 390px;
     max-width: 100%;
     margin: 0 auto;
+    /* Scaled down by JS (see fitPhoneToViewport) to fit whatever height
+       the guide is embedded at -- this frame is naturally taller than the
+       Quick Guide iframe, so without this the only options were shrinking
+       to illegibility or scrolling to see the rest of the phone. */
+    transform-origin: top center;
   }
   .phone {
     background: #050810;
@@ -330,7 +339,7 @@
 <body>
 
 <div class="wrap">
-  <div class="phone-shell">
+  <div class="phone-shell" id="phoneShell">
     <button class="reset-btn" id="resetBtn" onclick="resetSim()" title="Reset simulation">&#8634;</button>
     <div class="phone">
       <div class="phone-notch"></div>
@@ -338,9 +347,23 @@
     </div>
   </div>
 </div>
-<p class="caption">Interactive walkthrough of the Builder v0.3 "Leaving Site" redesign -- clock-in through clock-out, matching the live BuilderDashboard.jsx code. Photo/material rows are decorative stand-ins; everything else runs the same logic as the real code.</p>
 
 <script>
+  // Scales the whole phone mockup down to fit whatever height this page is
+  // embedded at (the Quick Guide iframe is shorter than the phone frame's
+  // natural size) -- without this, the bottom of the phone was cut off and
+  // the only way to see it was scrolling the guide page itself.
+  function fitPhoneToViewport() {
+    const shell = document.getElementById('phoneShell');
+    if (!shell) return;
+    shell.style.transform = 'scale(1)';
+    const naturalHeight = shell.offsetHeight;
+    const available = window.innerHeight - 24;
+    const scale = Math.min(1, available / naturalHeight);
+    shell.style.transform = `scale(${scale})`;
+  }
+  window.addEventListener('resize', fitPhoneToViewport);
+
   // ================= Fake data (mirrors real tickets/jobs shape) =================
   const SHORT_TRIP_REASONS = ['Going to the Office', 'Lunch Break', 'Getting materials myself'];
   const ROUTINE_CHECKLIST = ['Communal hallway hoovered/mopped', 'Bins area tidied', 'Windows in communal area checked', 'Any hazards reported'];
@@ -1040,6 +1063,7 @@
   }
 
   render();
+  fitPhoneToViewport();
 </script>
 </body>
 </html>
