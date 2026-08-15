@@ -23,7 +23,8 @@ const readRowStyle = { display: 'flex', justifyContent: 'space-between', gap: '1
 const readLabelStyle = { fontSize: '12px', fontWeight: 700, color: COLORS.slate400 }
 const uploadBtnStyle = { width: '100%', height: '44px', borderRadius: '10px', border: `2px dashed ${COLORS.slate300}`, background: COLORS.white, color: COLORS.slate500, fontSize: '13px', fontWeight: 600, cursor: 'pointer', boxSizing: 'border-box' }
 
-export default function PropertyGardensTab({ property, onFieldsSaved }) {
+export default function PropertyGardensTab({ property, onFieldsSaved, profile }) {
+  const readOnly = profile?.division === 'Landlord Liaison'
   const [editing, setEditing] = useState(false)
   const [state, setState] = useState(property.garden_state || '')
   const [lastAttendedDate, setLastAttendedDate] = useState(property.garden_last_attended_date || '')
@@ -107,12 +108,14 @@ export default function PropertyGardensTab({ property, onFieldsSaved }) {
         <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: COLORS.slate500 }}>
           This property isn't currently marked as having a garden. Turn tracking on if it does.
         </p>
-        <button
-          onClick={() => toggleHasGarden(true)}
-          style={{ padding: '10px 16px', background: COLORS.green600, color: COLORS.white, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}
-        >
-          This property has a garden
-        </button>
+        {!readOnly && (
+          <button
+            onClick={() => toggleHasGarden(true)}
+            style={{ padding: '10px 16px', background: COLORS.green600, color: COLORS.white, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}
+          >
+            This property has a garden
+          </button>
+        )}
         {error && <p style={modalErrorStyle}>{error}</p>}
       </div>
     )
@@ -124,7 +127,7 @@ export default function PropertyGardensTab({ property, onFieldsSaved }) {
     <div style={{ background: COLORS.white, borderRadius: '16px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
         <p style={{ margin: 0, fontSize: '14px', fontWeight: 800, color: COLORS.slate900 }}>Gardens</p>
-        {!editing && (
+        {!editing && !readOnly && (
           <button
             onClick={startEdit}
             style={{ padding: '6px 14px', background: COLORS.blue700, color: COLORS.white, border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
@@ -154,14 +157,16 @@ export default function PropertyGardensTab({ property, onFieldsSaved }) {
                 : 'Never recorded'}
             </span>
           </div>
-          <div style={{ ...readRowStyle, justifyContent: 'flex-start' }}>
-            <button
-              onClick={() => toggleHasGarden(false)}
-              style={{ background: 'none', border: 'none', padding: 0, fontSize: '12px', color: COLORS.slate400, cursor: 'pointer', textDecoration: 'underline' }}
-            >
-              This property no longer has a garden
-            </button>
-          </div>
+          {!readOnly && (
+            <div style={{ ...readRowStyle, justifyContent: 'flex-start' }}>
+              <button
+                onClick={() => toggleHasGarden(false)}
+                style={{ background: 'none', border: 'none', padding: 0, fontSize: '12px', color: COLORS.slate400, cursor: 'pointer', textDecoration: 'underline' }}
+              >
+                This property no longer has a garden
+              </button>
+            </div>
+          )}
         </div>
       ) : (
         <div style={{ marginBottom: '20px' }}>
@@ -206,10 +211,14 @@ export default function PropertyGardensTab({ property, onFieldsSaved }) {
           {property.garden_front_photo_url && (
             <img src={property.garden_front_photo_url} alt="Front garden" style={{ width: '100%', maxHeight: '180px', objectFit: 'cover', borderRadius: '10px', display: 'block', marginBottom: '8px' }} />
           )}
-          <input type="file" accept="image/*" id="garden-front-photo-input" onChange={(e) => handlePhotoUpload(e, 'front')} style={{ display: 'none' }} />
-          <button onClick={() => document.getElementById('garden-front-photo-input').click()} disabled={frontUploading} style={{ ...uploadBtnStyle, cursor: frontUploading ? 'not-allowed' : 'pointer' }}>
-            {frontUploading ? 'Uploading...' : property.garden_front_photo_url ? 'Change front photo' : 'Upload front photo'}
-          </button>
+          {!readOnly && (
+            <>
+              <input type="file" accept="image/*" id="garden-front-photo-input" onChange={(e) => handlePhotoUpload(e, 'front')} style={{ display: 'none' }} />
+              <button onClick={() => document.getElementById('garden-front-photo-input').click()} disabled={frontUploading} style={{ ...uploadBtnStyle, cursor: frontUploading ? 'not-allowed' : 'pointer' }}>
+                {frontUploading ? 'Uploading...' : property.garden_front_photo_url ? 'Change front photo' : 'Upload front photo'}
+              </button>
+            </>
+          )}
         </div>
 
         <div style={{ flex: '1 1 220px' }}>
@@ -217,10 +226,14 @@ export default function PropertyGardensTab({ property, onFieldsSaved }) {
           {property.garden_back_photo_url && (
             <img src={property.garden_back_photo_url} alt="Back garden" style={{ width: '100%', maxHeight: '180px', objectFit: 'cover', borderRadius: '10px', display: 'block', marginBottom: '8px' }} />
           )}
-          <input type="file" accept="image/*" id="garden-back-photo-input" onChange={(e) => handlePhotoUpload(e, 'back')} style={{ display: 'none' }} />
-          <button onClick={() => document.getElementById('garden-back-photo-input').click()} disabled={backUploading} style={{ ...uploadBtnStyle, cursor: backUploading ? 'not-allowed' : 'pointer' }}>
-            {backUploading ? 'Uploading...' : property.garden_back_photo_url ? 'Change back photo' : 'Upload back photo'}
-          </button>
+          {!readOnly && (
+            <>
+              <input type="file" accept="image/*" id="garden-back-photo-input" onChange={(e) => handlePhotoUpload(e, 'back')} style={{ display: 'none' }} />
+              <button onClick={() => document.getElementById('garden-back-photo-input').click()} disabled={backUploading} style={{ ...uploadBtnStyle, cursor: backUploading ? 'not-allowed' : 'pointer' }}>
+                {backUploading ? 'Uploading...' : property.garden_back_photo_url ? 'Change back photo' : 'Upload back photo'}
+              </button>
+            </>
+          )}
         </div>
       </div>
       {photoError && <p style={modalErrorStyle}>{photoError}</p>}

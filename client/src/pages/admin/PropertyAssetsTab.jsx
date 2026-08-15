@@ -69,7 +69,7 @@ const emptyForm = {
   current_value: '', supplier_details: '', notes: '', asset_photo_url: '',
 }
 
-function AssetFormModal({ property, asset, onClose, onSaved, onDeleted }) {
+function AssetFormModal({ property, asset, onClose, onSaved, onDeleted, readOnly = false }) {
   const [form, setForm] = useState(emptyForm)
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -182,16 +182,16 @@ function AssetFormModal({ property, asset, onClose, onSaved, onDeleted }) {
   return (
     <div style={modalOverlayStyle}>
       <div style={{ ...modalCardStyle, maxWidth: '620px' }}>
-        <p style={modalTitleStyle}>{asset ? 'Edit Asset' : 'Add Asset'}</p>
+        <p style={modalTitleStyle}>{readOnly ? 'View Asset' : asset ? 'Edit Asset' : 'Add Asset'}</p>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
           <div>
             <p style={modalLabelStyle}>Asset Name</p>
-            <input type="text" value={form.asset_name} onChange={(e) => set('asset_name', e.target.value)} style={inputStyle} />
+            <input type="text" value={form.asset_name} disabled={readOnly} onChange={(e) => set('asset_name', e.target.value)} style={inputStyle} />
           </div>
           <div>
             <p style={modalLabelStyle}>Category</p>
-            <select value={form.asset_category} onChange={(e) => set('asset_category', e.target.value)} style={inputStyle}>
+            <select value={form.asset_category} disabled={readOnly} onChange={(e) => set('asset_category', e.target.value)} style={inputStyle}>
               <option value="">Select...</option>
               {ASSET_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
@@ -199,34 +199,34 @@ function AssetFormModal({ property, asset, onClose, onSaved, onDeleted }) {
 
           <div>
             <p style={modalLabelStyle}>Make</p>
-            <input type="text" value={form.make} onChange={(e) => set('make', e.target.value)} style={inputStyle} />
+            <input type="text" value={form.make} disabled={readOnly} onChange={(e) => set('make', e.target.value)} style={inputStyle} />
           </div>
           <div>
             <p style={modalLabelStyle}>Model</p>
-            <input type="text" value={form.model} onChange={(e) => set('model', e.target.value)} style={inputStyle} />
+            <input type="text" value={form.model} disabled={readOnly} onChange={(e) => set('model', e.target.value)} style={inputStyle} />
           </div>
 
           <div style={{ gridColumn: '1 / -1' }}>
             <p style={modalLabelStyle}>Serial Number</p>
-            <input type="text" value={form.serial_number} onChange={(e) => set('serial_number', e.target.value)} style={inputStyle} />
+            <input type="text" value={form.serial_number} disabled={readOnly} onChange={(e) => set('serial_number', e.target.value)} style={inputStyle} />
           </div>
 
           <div>
             <p style={modalLabelStyle}>Installation Date</p>
-            <input type="date" value={form.installation_date} onChange={(e) => set('installation_date', e.target.value)} style={inputStyle} />
+            <input type="date" value={form.installation_date} disabled={readOnly} onChange={(e) => set('installation_date', e.target.value)} style={inputStyle} />
           </div>
           <div>
             <p style={modalLabelStyle}>Lifespan Threshold (years)</p>
-            <input type="number" value={form.lifespan_years} onChange={(e) => set('lifespan_years', e.target.value)} style={inputStyle} />
+            <input type="number" value={form.lifespan_years} disabled={readOnly} onChange={(e) => set('lifespan_years', e.target.value)} style={inputStyle} />
           </div>
 
           <div>
             <p style={modalLabelStyle}>Warranty Start Date</p>
-            <input type="date" value={form.warranty_start} onChange={(e) => set('warranty_start', e.target.value)} style={inputStyle} />
+            <input type="date" value={form.warranty_start} disabled={readOnly} onChange={(e) => set('warranty_start', e.target.value)} style={inputStyle} />
           </div>
           <div>
             <p style={modalLabelStyle}>Warranty End Date</p>
-            <input type="date" value={form.warranty_end} onChange={(e) => set('warranty_end', e.target.value)} style={inputStyle} />
+            <input type="date" value={form.warranty_end} disabled={readOnly} onChange={(e) => set('warranty_end', e.target.value)} style={inputStyle} />
             {form.warranty_end && (
               <span style={{
                 display: 'inline-block', marginTop: '6px', fontSize: '10px', fontWeight: 800, padding: '2px 10px', borderRadius: '20px',
@@ -240,13 +240,13 @@ function AssetFormModal({ property, asset, onClose, onSaved, onDeleted }) {
 
           <div>
             <p style={modalLabelStyle}>Current Status</p>
-            <select value={form.current_status} onChange={(e) => set('current_status', e.target.value)} style={inputStyle}>
+            <select value={form.current_status} disabled={readOnly} onChange={(e) => set('current_status', e.target.value)} style={inputStyle}>
               {CURRENT_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
           <div>
             <p style={modalLabelStyle}>Maintenance Frequency</p>
-            <select value={form.maintenance_frequency} onChange={(e) => set('maintenance_frequency', e.target.value)} style={inputStyle}>
+            <select value={form.maintenance_frequency} disabled={readOnly} onChange={(e) => set('maintenance_frequency', e.target.value)} style={inputStyle}>
               <option value="">Select...</option>
               {MAINTENANCE_FREQUENCIES.map(f => <option key={f} value={f}>{f}</option>)}
             </select>
@@ -254,7 +254,7 @@ function AssetFormModal({ property, asset, onClose, onSaved, onDeleted }) {
 
           <div>
             <p style={modalLabelStyle}>Last Service Date</p>
-            <input type="date" value={form.last_service_date} onChange={(e) => set('last_service_date', e.target.value)} style={inputStyle} />
+            <input type="date" value={form.last_service_date} disabled={readOnly} onChange={(e) => set('last_service_date', e.target.value)} style={inputStyle} />
           </div>
           <div>
             <p style={modalLabelStyle}>Next Service Date</p>
@@ -263,17 +263,17 @@ function AssetFormModal({ property, asset, onClose, onSaved, onDeleted }) {
 
           <div style={{ gridColumn: '1 / -1' }}>
             <p style={modalLabelStyle}>Current Value (£)</p>
-            <input type="number" value={form.current_value} onChange={(e) => set('current_value', e.target.value)} style={inputStyle} />
+            <input type="number" value={form.current_value} disabled={readOnly} onChange={(e) => set('current_value', e.target.value)} style={inputStyle} />
           </div>
 
           <div style={{ gridColumn: '1 / -1' }}>
             <p style={modalLabelStyle}>Supplier Details</p>
-            <textarea value={form.supplier_details} onChange={(e) => set('supplier_details', e.target.value)} rows={2} style={{ ...inputStyle, resize: 'vertical' }} />
+            <textarea value={form.supplier_details} disabled={readOnly} onChange={(e) => set('supplier_details', e.target.value)} rows={2} style={{ ...inputStyle, resize: 'vertical' }} />
           </div>
 
           <div style={{ gridColumn: '1 / -1' }}>
             <p style={modalLabelStyle}>Notes</p>
-            <textarea value={form.notes} onChange={(e) => set('notes', e.target.value)} rows={2} style={{ ...inputStyle, resize: 'vertical' }} />
+            <textarea value={form.notes} disabled={readOnly} onChange={(e) => set('notes', e.target.value)} rows={2} style={{ ...inputStyle, resize: 'vertical' }} />
           </div>
 
           <div style={{ gridColumn: '1 / -1' }}>
@@ -281,20 +281,28 @@ function AssetFormModal({ property, asset, onClose, onSaved, onDeleted }) {
             {form.asset_photo_url && (
               <img src={form.asset_photo_url} alt="Asset" style={{ width: '100%', maxHeight: '180px', objectFit: 'cover', borderRadius: '10px', display: 'block', marginBottom: '8px' }} />
             )}
-            <input type="file" accept="image/*" id="asset-photo-input" onChange={handlePhoto} style={{ display: 'none' }} />
-            <button
-              onClick={() => document.getElementById('asset-photo-input').click()}
-              disabled={uploading}
-              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `2px dashed ${COLORS.slate300}`, background: COLORS.white, color: COLORS.slate500, fontSize: '13px', fontWeight: 600, cursor: uploading ? 'not-allowed' : 'pointer' }}
-            >
-              {uploading ? 'Uploading...' : form.asset_photo_url ? 'Change photo' : 'Upload photo'}
-            </button>
+            {!readOnly && (
+              <>
+                <input type="file" accept="image/*" id="asset-photo-input" onChange={handlePhoto} style={{ display: 'none' }} />
+                <button
+                  onClick={() => document.getElementById('asset-photo-input').click()}
+                  disabled={uploading}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `2px dashed ${COLORS.slate300}`, background: COLORS.white, color: COLORS.slate500, fontSize: '13px', fontWeight: 600, cursor: uploading ? 'not-allowed' : 'pointer' }}
+                >
+                  {uploading ? 'Uploading...' : form.asset_photo_url ? 'Change photo' : 'Upload photo'}
+                </button>
+              </>
+            )}
           </div>
         </div>
 
         {error && <p style={modalErrorStyle}>{error}</p>}
 
-        {confirmingDelete ? (
+        {readOnly ? (
+          <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
+            <button onClick={onClose} style={modalConfirmBtnStyle}>Close</button>
+          </div>
+        ) : confirmingDelete ? (
           <div style={{ marginTop: '16px', padding: '14px', background: COLORS.red50, border: `1px solid ${COLORS.red200}`, borderRadius: '10px' }}>
             <p style={{ margin: '0 0 12px 0', fontSize: '13px', fontWeight: 700, color: COLORS.red900 }}>Delete this asset? This cannot be undone.</p>
             <div style={{ display: 'flex', gap: '10px' }}>
@@ -333,7 +341,7 @@ function AssetFormModal({ property, asset, onClose, onSaved, onDeleted }) {
   )
 }
 
-function AssetCard({ asset, onOpen }) {
+function AssetCard({ asset, onOpen, readOnly = false }) {
   const nextService = computeNextService(asset.last_service_date, asset.maintenance_frequency)
   const replace = considerReplace(asset.installation_date, asset.lifespan_years)
   const statusStyle = STATUS_STYLES[asset.current_status] || STATUS_STYLES['Operational']
@@ -367,13 +375,14 @@ function AssetCard({ asset, onOpen }) {
         onClick={() => onOpen(asset)}
         style={{ width: '100%', padding: '9px', background: COLORS.teal700, color: COLORS.white, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}
       >
-        View / Edit
+        {readOnly ? 'View' : 'View / Edit'}
       </button>
     </div>
   )
 }
 
-export default function PropertyAssetsTab({ property }) {
+export default function PropertyAssetsTab({ property, profile }) {
+  const readOnly = profile?.division === 'Landlord Liaison'
   const [assets, setAssets] = useState([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
@@ -431,12 +440,14 @@ export default function PropertyAssetsTab({ property }) {
         <p style={{ margin: 0, fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
           Assets ({assets.length})
         </p>
-        <button
-          onClick={() => setModalAsset(null)}
-          style={{ padding: '10px 18px', background: COLORS.teal700, color: COLORS.white, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}
-        >
-          ＋ Add Asset
-        </button>
+        {!readOnly && (
+          <button
+            onClick={() => setModalAsset(null)}
+            style={{ padding: '10px 18px', background: COLORS.teal700, color: COLORS.white, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}
+          >
+            ＋ Add Asset
+          </button>
+        )}
       </div>
 
       {loadError ? (
@@ -451,7 +462,7 @@ export default function PropertyAssetsTab({ property }) {
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '12px' }}>
           {assets.map(asset => (
-            <AssetCard key={asset.id} asset={asset} onOpen={setModalAsset} />
+            <AssetCard key={asset.id} asset={asset} onOpen={setModalAsset} readOnly={readOnly} />
           ))}
         </div>
       )}
@@ -463,6 +474,7 @@ export default function PropertyAssetsTab({ property }) {
           onClose={() => setModalAsset(undefined)}
           onSaved={handleSaved}
           onDeleted={handleDeleted}
+          readOnly={readOnly}
         />
       )}
     </div>

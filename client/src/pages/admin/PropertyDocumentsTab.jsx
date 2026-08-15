@@ -218,6 +218,7 @@ function DeleteConfirmModal({ onCancel, onConfirm, deleting }) {
 }
 
 export default function PropertyDocumentsTab({ property, profile }) {
+  const readOnly = profile?.division === 'Landlord Liaison'
   const [documents, setDocuments] = useState([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
@@ -299,12 +300,14 @@ export default function PropertyDocumentsTab({ property, profile }) {
           placeholder="Search by document name or notes..."
           style={{ flex: '1 1 260px', padding: '10px 14px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', boxSizing: 'border-box' }}
         />
-        <button
-          onClick={() => setModalDoc(null)}
-          style={{ padding: '10px 18px', background: COLORS.teal700, color: COLORS.white, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
-        >
-          ＋ Upload Document
-        </button>
+        {!readOnly && (
+          <button
+            onClick={() => setModalDoc(null)}
+            style={{ padding: '10px 18px', background: COLORS.teal700, color: COLORS.white, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
+          >
+            ＋ Upload Document
+          </button>
+        )}
       </div>
 
       <div style={{ display: 'flex', gap: '4px', marginBottom: '16px', flexWrap: 'wrap', borderBottom: `1px solid ${COLORS.slate200}` }}>
@@ -365,20 +368,22 @@ export default function PropertyDocumentsTab({ property, profile }) {
                   </span>
                 </div>
 
-                <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
-                  <button
-                    onClick={() => setModalDoc(doc)}
-                    style={{ padding: '7px 14px', background: COLORS.slate100, color: COLORS.slate600, border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => setDeleteTarget(doc)}
-                    style={{ padding: '7px 14px', background: COLORS.white, color: COLORS.red600, border: `1px solid ${COLORS.red200}`, borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
-                  >
-                    Delete
-                  </button>
-                </div>
+                {!readOnly && (
+                  <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                    <button
+                      onClick={() => setModalDoc(doc)}
+                      style={{ padding: '7px 14px', background: COLORS.slate100, color: COLORS.slate600, border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => setDeleteTarget(doc)}
+                      style={{ padding: '7px 14px', background: COLORS.white, color: COLORS.red600, border: `1px solid ${COLORS.red200}`, borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                )}
               </div>
             )
           })}

@@ -653,23 +653,23 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
               {effectiveActiveTab === 'Core' ? (
                 <PropertyCoreTab property={selectedProperty} onFieldsSaved={handleCoreFieldsSaved} profile={profile} />
               ) : effectiveActiveTab === 'Compliance' ? (
-                <PropertyComplianceTab property={selectedProperty} />
+                <PropertyComplianceTab property={selectedProperty} profile={profile} />
               ) : effectiveActiveTab === 'Assets' ? (
-                <PropertyAssetsTab property={selectedProperty} />
+                <PropertyAssetsTab property={selectedProperty} profile={profile} />
               ) : effectiveActiveTab === 'Maintenance' ? (
                 <PropertyMaintenanceTab property={selectedProperty} />
               ) : effectiveActiveTab === 'Lease & Legal' ? (
-                <PropertyLeaseLegalTab property={selectedProperty} onFieldsSaved={handleCoreFieldsSaved} />
+                <PropertyLeaseLegalTab property={selectedProperty} onFieldsSaved={handleCoreFieldsSaved} profile={profile} />
               ) : effectiveActiveTab === 'Documents' ? (
                 <PropertyDocumentsTab property={selectedProperty} profile={profile} />
               ) : effectiveActiveTab === 'Notes' ? (
                 <PropertyNotesTab property={selectedProperty} profile={profile} />
               ) : effectiveActiveTab === 'Rooms' ? (
-                <PropertyRoomsTab property={selectedProperty} />
+                <PropertyRoomsTab property={selectedProperty} profile={profile} />
               ) : effectiveActiveTab === 'Restrictions' ? (
-                <PropertyRestrictionsTab property={selectedProperty} onFieldsSaved={handleCoreFieldsSaved} readOnly={profile.division === 'Housekeeping'} />
+                <PropertyRestrictionsTab property={selectedProperty} onFieldsSaved={handleCoreFieldsSaved} readOnly={profile.division === 'Housekeeping' || profile.division === 'Landlord Liaison'} />
               ) : effectiveActiveTab === 'Gardens' ? (
-                <PropertyGardensTab property={selectedProperty} onFieldsSaved={handleCoreFieldsSaved} />
+                <PropertyGardensTab property={selectedProperty} onFieldsSaved={handleCoreFieldsSaved} profile={profile} />
               ) : null}
             </>
           )

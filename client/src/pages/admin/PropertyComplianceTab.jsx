@@ -22,7 +22,7 @@ import { modalLabelStyle, modalErrorStyle, formatUKDate, COMPLIANCE_TYPES, RAG_S
 import { compressImage } from '../../lib/imageCompression'
 import { getSignedUrl } from '../../lib/storage'
 
-function ComplianceCard({ type, record, onUpload, onSave, thresholdDays }) {
+function ComplianceCard({ type, record, onUpload, onSave, thresholdDays, readOnly = false }) {
   const [expiryDate, setExpiryDate] = useState(record?.expiry_date || '')
   const [notes, setNotes] = useState(record?.notes || '')
   const [notApplicable, setNotApplicable] = useState(!!record?.not_applicable)
@@ -75,8 +75,8 @@ function ComplianceCard({ type, record, onUpload, onSave, thresholdDays }) {
         <RagPill tier={rag.tier} label={rag.label} />
       </div>
 
-      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', cursor: 'pointer' }}>
-        <input type="checkbox" checked={notApplicable} onChange={(e) => markDirty(setNotApplicable)(e.target.checked)} />
+      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', cursor: readOnly ? 'default' : 'pointer' }}>
+        <input type="checkbox" checked={notApplicable} disabled={readOnly} onChange={(e) => markDirty(setNotApplicable)(e.target.checked)} />
         <span style={{ fontSize: '12px', fontWeight: 600, color: COLORS.slate500 }}>Not applicable to this property</span>
       </label>
 
@@ -87,21 +87,26 @@ function ComplianceCard({ type, record, onUpload, onSave, thresholdDays }) {
             <input
               type="date"
               value={expiryDate || ''}
+              disabled={readOnly}
               onChange={(e) => markDirty(setExpiryDate)(e.target.value)}
-              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', boxSizing: 'border-box' }}
+              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', boxSizing: 'border-box', background: readOnly ? COLORS.slate50 : COLORS.white }}
             />
           </div>
 
           <div style={{ flex: '1 1 180px' }}>
             <p style={modalLabelStyle}>Certificate</p>
-            <input type="file" accept=".pdf,image/*" id={inputId} onChange={handleFilePick} style={{ display: 'none' }} />
-            <button
-              onClick={() => document.getElementById(inputId).click()}
-              disabled={uploading}
-              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `2px dashed ${COLORS.slate300}`, background: COLORS.white, color: COLORS.slate500, fontSize: '13px', fontWeight: 600, cursor: uploading ? 'not-allowed' : 'pointer' }}
-            >
-              {uploading ? 'Uploading...' : 'Upload Certificate'}
-            </button>
+            {!readOnly && (
+              <>
+                <input type="file" accept=".pdf,image/*" id={inputId} onChange={handleFilePick} style={{ display: 'none' }} />
+                <button
+                  onClick={() => document.getElementById(inputId).click()}
+                  disabled={uploading}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `2px dashed ${COLORS.slate300}`, background: COLORS.white, color: COLORS.slate500, fontSize: '13px', fontWeight: 600, cursor: uploading ? 'not-allowed' : 'pointer' }}
+                >
+                  {uploading ? 'Uploading...' : 'Upload Certificate'}
+                </button>
+              </>
+            )}
             {record?.cert_url && (
               <a href={record.cert_url} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', marginTop: '6px', fontSize: '12px', fontWeight: 700, color: COLORS.blue700 }}>
                 View current certificate ↗
@@ -114,9 +119,10 @@ function ComplianceCard({ type, record, onUpload, onSave, thresholdDays }) {
       <p style={modalLabelStyle}>Notes</p>
       <textarea
         value={notes}
+        disabled={readOnly}
         onChange={(e) => markDirty(setNotes)(e.target.value)}
         rows={2}
-        style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', fontFamily: 'inherit', boxSizing: 'border-box', resize: 'vertical' }}
+        style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', fontFamily: 'inherit', boxSizing: 'border-box', resize: 'vertical', background: readOnly ? COLORS.slate50 : COLORS.white }}
       />
 
       {error && <p style={modalErrorStyle}>{error}</p>}
@@ -125,22 +131,25 @@ function ComplianceCard({ type, record, onUpload, onSave, thresholdDays }) {
         <span style={{ fontSize: '11px', color: COLORS.slate400 }}>
           {record?.updated_at ? `Last updated ${formatUKDate(record.updated_at)}` : 'Never updated'}
         </span>
-        <button
-          onClick={handleSave}
-          disabled={saving || !dirty}
-          style={{
-            padding: '8px 20px', background: dirty ? COLORS.green600 : COLORS.slate200, color: dirty ? COLORS.white : COLORS.slate400,
-            border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: (saving || !dirty) ? 'not-allowed' : 'pointer',
-          }}
-        >
-          {saving ? 'Saving...' : 'Save'}
-        </button>
+        {!readOnly && (
+          <button
+            onClick={handleSave}
+            disabled={saving || !dirty}
+            style={{
+              padding: '8px 20px', background: dirty ? COLORS.green600 : COLORS.slate200, color: dirty ? COLORS.white : COLORS.slate400,
+              border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: (saving || !dirty) ? 'not-allowed' : 'pointer',
+            }}
+          >
+            {saving ? 'Saving...' : 'Save'}
+          </button>
+        )}
       </div>
     </div>
   )
 }
 
-export default function PropertyComplianceTab({ property }) {
+export default function PropertyComplianceTab({ property, profile }) {
+  const readOnly = profile?.division === 'Landlord Liaison'
   const [records, setRecords] = useState({})
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
@@ -265,6 +274,7 @@ export default function PropertyComplianceTab({ property }) {
           onUpload={handleUpload}
           onSave={upsertRecord}
           thresholdDays={thresholdDays}
+          readOnly={readOnly}
         />
       ))}
     </div>

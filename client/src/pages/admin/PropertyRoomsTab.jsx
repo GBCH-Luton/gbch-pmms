@@ -382,7 +382,7 @@ function RoomHistoryModal({ room, onClose }) {
   )
 }
 
-function RoomCard({ room, onEdit, onMarkVoid, onMarkOccupied, onViewHistory }) {
+function RoomCard({ room, onEdit, onMarkVoid, onMarkOccupied, onViewHistory, readOnly = false }) {
   const statusStyle = STATUS_STYLES[room.current_status] || STATUS_STYLES.Occupied
 
   return (
@@ -422,17 +422,21 @@ function RoomCard({ room, onEdit, onMarkVoid, onMarkOccupied, onViewHistory }) {
       </div>
 
       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-        <button onClick={() => onEdit(room)} style={{ flex: '1 1 80px', padding: '8px', background: COLORS.slate100, color: COLORS.slate600, border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>
-          Edit
-        </button>
-        {room.current_status === 'Occupied' ? (
-          <button onClick={() => onMarkVoid(room)} style={{ flex: '1 1 110px', padding: '8px', background: COLORS.amber50, color: COLORS.amber800, border: `1px solid ${COLORS.amber300}`, borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>
-            Mark as Void
-          </button>
-        ) : (
-          <button onClick={() => onMarkOccupied(room)} style={{ flex: '1 1 130px', padding: '8px', background: COLORS.green50, color: COLORS.green800, border: `1px solid ${COLORS.green200}`, borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>
-            Mark as Occupied
-          </button>
+        {!readOnly && (
+          <>
+            <button onClick={() => onEdit(room)} style={{ flex: '1 1 80px', padding: '8px', background: COLORS.slate100, color: COLORS.slate600, border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>
+              Edit
+            </button>
+            {room.current_status === 'Occupied' ? (
+              <button onClick={() => onMarkVoid(room)} style={{ flex: '1 1 110px', padding: '8px', background: COLORS.amber50, color: COLORS.amber800, border: `1px solid ${COLORS.amber300}`, borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>
+                Mark as Void
+              </button>
+            ) : (
+              <button onClick={() => onMarkOccupied(room)} style={{ flex: '1 1 130px', padding: '8px', background: COLORS.green50, color: COLORS.green800, border: `1px solid ${COLORS.green200}`, borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>
+                Mark as Occupied
+              </button>
+            )}
+          </>
         )}
         <button onClick={() => onViewHistory(room)} style={{ flex: '1 1 100px', padding: '8px', background: COLORS.white, color: COLORS.slate500, border: `1px solid ${COLORS.slate200}`, borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>
           View History
@@ -442,7 +446,8 @@ function RoomCard({ room, onEdit, onMarkVoid, onMarkOccupied, onViewHistory }) {
   )
 }
 
-export default function PropertyRoomsTab({ property }) {
+export default function PropertyRoomsTab({ property, profile }) {
+  const readOnly = profile?.division === 'Landlord Liaison'
   const [rooms, setRooms] = useState([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
@@ -526,12 +531,14 @@ export default function PropertyRoomsTab({ property }) {
             <p style={{ margin: 0, fontSize: '20px', fontWeight: 800, color: COLORS.amber600 }}>{voidCount}</p>
           </div>
         </div>
-        <button
-          onClick={() => setModalRoom(null)}
-          style={{ padding: '10px 18px', background: COLORS.blue900, color: COLORS.white, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
-        >
-          ＋ Add Room
-        </button>
+        {!readOnly && (
+          <button
+            onClick={() => setModalRoom(null)}
+            style={{ padding: '10px 18px', background: COLORS.blue900, color: COLORS.white, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
+          >
+            ＋ Add Room
+          </button>
+        )}
       </div>
 
       {rooms.length === 0 ? (
@@ -548,6 +555,7 @@ export default function PropertyRoomsTab({ property }) {
               onMarkVoid={setVoidTarget}
               onMarkOccupied={setOccupyTarget}
               onViewHistory={setHistoryTarget}
+              readOnly={readOnly}
             />
           ))}
         </div>

@@ -163,6 +163,7 @@ function DeleteConfirmModal({ onCancel, onConfirm, deleting }) {
 }
 
 export default function PropertyNotesTab({ property, profile }) {
+  const readOnly = profile?.division === 'Landlord Liaison'
   const [notes, setNotes] = useState([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
@@ -304,12 +305,14 @@ export default function PropertyNotesTab({ property, profile }) {
           placeholder="Search by text, author, or category..."
           style={{ flex: '1 1 260px', padding: '10px 14px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', boxSizing: 'border-box' }}
         />
-        <button
-          onClick={() => setModalNote(null)}
-          style={{ padding: '10px 18px', background: COLORS.teal700, color: COLORS.white, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
-        >
-          ＋ Add Note
-        </button>
+        {!readOnly && (
+          <button
+            onClick={() => setModalNote(null)}
+            style={{ padding: '10px 18px', background: COLORS.teal700, color: COLORS.white, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
+          >
+            ＋ Add Note
+          </button>
+        )}
       </div>
 
       <div style={{ display: 'flex', gap: '4px', marginBottom: '16px', flexWrap: 'wrap', borderBottom: `1px solid ${COLORS.slate200}` }}>
@@ -356,8 +359,9 @@ export default function PropertyNotesTab({ property, profile }) {
                         <span style={{ fontSize: '10px', fontWeight: 800, color: COLORS.red600, background: COLORS.red100, padding: '3px 10px', borderRadius: '20px' }}>⚑ Flagged</span>
                         <select
                           value={note.flag_status || 'Open'}
+                          disabled={readOnly}
                           onChange={(e) => handleFlagStatusChange(note, e.target.value)}
-                          style={{ padding: '4px 8px', borderRadius: '8px', border: `1px solid ${COLORS.slate200}`, fontSize: '11px', fontWeight: 700, color: COLORS.slate900, background: COLORS.slate50, cursor: 'pointer' }}
+                          style={{ padding: '4px 8px', borderRadius: '8px', border: `1px solid ${COLORS.slate200}`, fontSize: '11px', fontWeight: 700, color: COLORS.slate900, background: COLORS.slate50, cursor: readOnly ? 'default' : 'pointer' }}
                         >
                           {FLAG_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
                         </select>
@@ -365,20 +369,22 @@ export default function PropertyNotesTab({ property, profile }) {
                     )}
                   </div>
 
-                  <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
-                    <button
-                      onClick={() => setModalNote(note)}
-                      style={{ padding: '6px 12px', background: COLORS.slate100, color: COLORS.slate600, border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => setDeleteTarget(note)}
-                      style={{ padding: '6px 12px', background: COLORS.white, color: COLORS.red600, border: `1px solid ${COLORS.red200}`, borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
-                    >
-                      Delete
-                    </button>
-                  </div>
+                  {!readOnly && (
+                    <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                      <button
+                        onClick={() => setModalNote(note)}
+                        style={{ padding: '6px 12px', background: COLORS.slate100, color: COLORS.slate600, border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => setDeleteTarget(note)}
+                        style={{ padding: '6px 12px', background: COLORS.white, color: COLORS.red600, border: `1px solid ${COLORS.red200}`, borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 <p style={{ margin: '0 0 8px 0', fontSize: '14px', color: COLORS.slate900, whiteSpace: 'pre-wrap' }}>{note.note_text}</p>

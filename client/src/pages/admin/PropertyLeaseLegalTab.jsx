@@ -112,7 +112,7 @@ function formatReadValue(field, value) {
   return String(value)
 }
 
-function EditableSection({ title, fields, property, onSave, extra }) {
+function EditableSection({ title, fields, property, onSave, extra, readOnly = false }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState({})
   const [saving, setSaving] = useState(false)
@@ -139,7 +139,7 @@ function EditableSection({ title, fields, property, onSave, extra }) {
     <div style={{ background: COLORS.white, borderRadius: '16px', padding: '20px', marginBottom: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
         <p style={{ margin: 0, fontSize: '14px', fontWeight: 800, color: COLORS.slate900 }}>{title}</p>
-        {!editing && (
+        {!editing && !readOnly && (
           <button
             onClick={startEdit}
             style={{ padding: '6px 14px', background: COLORS.blue700, color: COLORS.white, border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
@@ -188,7 +188,7 @@ function EditableSection({ title, fields, property, onSave, extra }) {
   )
 }
 
-function DocUpload({ label, urlKey, property, onSave, bucketFolder }) {
+function DocUpload({ label, urlKey, property, onSave, bucketFolder, readOnly = false }) {
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState('')
   const inputId = `doc-upload-${urlKey}`
@@ -227,20 +227,26 @@ function DocUpload({ label, urlKey, property, onSave, bucketFolder }) {
           📄 {filenameFromUrl(existingUrl)} — Download ↗
         </a>
       )}
-      <input type="file" accept=".pdf,image/*" id={inputId} onChange={handlePick} style={{ display: 'none' }} />
-      <button
-        onClick={() => document.getElementById(inputId).click()}
-        disabled={uploading}
-        style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `2px dashed ${COLORS.slate300}`, background: COLORS.white, color: COLORS.slate500, fontSize: '13px', fontWeight: 600, cursor: uploading ? 'not-allowed' : 'pointer' }}
-      >
-        {uploading ? 'Uploading...' : existingUrl ? 'Replace document' : 'Upload document'}
-      </button>
+      {!readOnly && (
+        <>
+          <input type="file" accept=".pdf,image/*" id={inputId} onChange={handlePick} style={{ display: 'none' }} />
+          <button
+            onClick={() => document.getElementById(inputId).click()}
+            disabled={uploading}
+            style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `2px dashed ${COLORS.slate300}`, background: COLORS.white, color: COLORS.slate500, fontSize: '13px', fontWeight: 600, cursor: uploading ? 'not-allowed' : 'pointer' }}
+          >
+            {uploading ? 'Uploading...' : existingUrl ? 'Replace document' : 'Upload document'}
+          </button>
+        </>
+      )}
       {error && <p style={modalErrorStyle}>{error}</p>}
     </div>
   )
 }
 
-export default function PropertyLeaseLegalTab({ property, onFieldsSaved }) {
+export default function PropertyLeaseLegalTab({ property, onFieldsSaved, profile }) {
+  const readOnly = profile?.division === 'Landlord Liaison'
+
   async function saveFields(fields) {
     const { error } = await supabase
       .schema('pmms')
@@ -271,6 +277,7 @@ export default function PropertyLeaseLegalTab({ property, onFieldsSaved }) {
         title="Lease Details"
         property={property}
         onSave={saveFields}
+        readOnly={readOnly}
         fields={[
           { key: 'lease_start_date', label: 'Lease Start Date', type: 'date' },
           { key: 'lease_end_date', label: 'Lease End Date', type: 'date' },
@@ -279,7 +286,7 @@ export default function PropertyLeaseLegalTab({ property, onFieldsSaved }) {
           { key: 'special_lease_terms', label: 'Special Lease Terms', type: 'textarea' },
         ]}
         extra={
-          <DocUpload label="Lease Agreement Document" urlKey="lease_doc_url" bucketFolder="lease" property={property} onSave={saveFields} />
+          <DocUpload label="Lease Agreement Document" urlKey="lease_doc_url" bucketFolder="lease" property={property} onSave={saveFields} readOnly={readOnly} />
         }
       />
 
@@ -287,6 +294,7 @@ export default function PropertyLeaseLegalTab({ property, onFieldsSaved }) {
         title="Landlord Details"
         property={property}
         onSave={saveFields}
+        readOnly={readOnly}
         fields={[
           { key: 'landlord_company', label: 'Landlord Company Name', type: 'text' },
           { key: 'landlord_name', label: 'Landlord Contact Name', type: 'text' },
@@ -299,6 +307,7 @@ export default function PropertyLeaseLegalTab({ property, onFieldsSaved }) {
         title="Financials"
         property={property}
         onSave={saveFields}
+        readOnly={readOnly}
         fields={[
           { key: 'rent_amount', label: 'Weekly Rent Amount (£)', type: 'number' },
           { key: 'rent_payment_day', label: 'Rent Payment Day (1–31)', type: 'number', min: 1, max: 31 },
@@ -317,13 +326,13 @@ export default function PropertyLeaseLegalTab({ property, onFieldsSaved }) {
             </span>
           )}
         </div>
-        <InsuranceSection property={property} onSave={saveFields} />
+        <InsuranceSection property={property} onSave={saveFields} readOnly={readOnly} />
       </div>
     </div>
   )
 }
 
-function InsuranceSection({ property, onSave }) {
+function InsuranceSection({ property, onSave, readOnly = false }) {
   const [editing, setEditing] = useState(false)
   const [expiry, setExpiry] = useState('')
   const [saving, setSaving] = useState(false)
@@ -358,18 +367,20 @@ function InsuranceSection({ property, onSave }) {
         </div>
       )}
 
-      <DocUpload label="Insurance Policy Document" urlKey="insurance_doc_url" bucketFolder="insurance" property={property} onSave={onSave} />
+      <DocUpload label="Insurance Policy Document" urlKey="insurance_doc_url" bucketFolder="insurance" property={property} onSave={onSave} readOnly={readOnly} />
 
       {error && <p style={modalErrorStyle}>{error}</p>}
 
       <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
         {!editing ? (
-          <button
-            onClick={startEdit}
-            style={{ padding: '6px 14px', background: COLORS.blue700, color: COLORS.white, border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
-          >
-            Edit
-          </button>
+          !readOnly && (
+            <button
+              onClick={startEdit}
+              style={{ padding: '6px 14px', background: COLORS.blue700, color: COLORS.white, border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
+            >
+              Edit
+            </button>
+          )
         ) : (
           <>
             <button onClick={() => setEditing(false)} style={{ flex: 1, padding: '10px', background: COLORS.slate100, color: COLORS.slate600, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>

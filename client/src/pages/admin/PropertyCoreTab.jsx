@@ -80,7 +80,7 @@ function formatReadValue(field, value) {
   return String(value)
 }
 
-function EditableSection({ title, fields, property, onSave }) {
+function EditableSection({ title, fields, property, onSave, readOnly = false }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState({})
   const [saving, setSaving] = useState(false)
@@ -107,7 +107,7 @@ function EditableSection({ title, fields, property, onSave }) {
     <div style={{ background: COLORS.white, borderRadius: '16px', padding: '20px', marginBottom: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
         <p style={{ margin: 0, fontSize: '14px', fontWeight: 800, color: COLORS.slate900 }}>{title}</p>
-        {!editing && (
+        {!editing && !readOnly && (
           <button
             onClick={startEdit}
             style={{ padding: '6px 14px', background: COLORS.blue700, color: COLORS.white, border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
@@ -262,7 +262,7 @@ function VulnerabilitySection({ property, onSave, readOnly = false }) {
 // to staff whose `gender` matches -- an unset staff gender is treated as
 // "unknown, don't offer" for a restricted property, matching the "only
 // cleaners who match that requirement will be offered" spec.
-function CleanerAssignmentSection({ property, onSave }) {
+function CleanerAssignmentSection({ property, onSave, readOnly = false }) {
   const [editing, setEditing] = useState(false)
   const [cleaners, setCleaners] = useState([])
   const [cleanersLoading, setCleanersLoading] = useState(false)
@@ -308,7 +308,7 @@ function CleanerAssignmentSection({ property, onSave }) {
     <div style={{ background: COLORS.white, borderRadius: '16px', padding: '20px', marginBottom: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
         <p style={{ margin: 0, fontSize: '14px', fontWeight: 800, color: COLORS.slate900 }}>Assigned Cleaner</p>
-        {!editing && (
+        {!editing && !readOnly && (
           <button
             onClick={startEdit}
             style={{ padding: '6px 14px', background: COLORS.blue700, color: COLORS.white, border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
@@ -364,6 +364,7 @@ export default function PropertyCoreTab({ property, onFieldsSaved, profile }) {
   const [photoUploading, setPhotoUploading] = useState(false)
   const [photoError, setPhotoError] = useState('')
   const isHousekeeping = profile?.division === 'Housekeeping'
+  const readOnly = profile?.division === 'Landlord Liaison'
 
   async function saveFields(fields) {
     const { error } = await supabase
@@ -430,21 +431,26 @@ export default function PropertyCoreTab({ property, onFieldsSaved, profile }) {
             {property.cover_photo_url && (
               <img src={property.cover_photo_url} alt="Property cover" style={{ width: '100%', maxHeight: '260px', objectFit: 'cover', borderRadius: '10px', display: 'block', marginBottom: '12px' }} />
             )}
-            <input type="file" accept="image/*" id="cover-photo-input" onChange={handleCoverPhoto} style={{ display: 'none' }} />
-            <button
-              onClick={() => document.getElementById('cover-photo-input').click()}
-              disabled={photoUploading}
-              style={{ width: '100%', height: '44px', borderRadius: '10px', border: `2px dashed ${COLORS.slate300}`, background: COLORS.white, color: COLORS.slate500, fontSize: '13px', fontWeight: 600, cursor: photoUploading ? 'not-allowed' : 'pointer', boxSizing: 'border-box' }}
-            >
-              {photoUploading ? 'Uploading...' : property.cover_photo_url ? 'Change cover photo' : 'Upload cover photo'}
-            </button>
-            {photoError && <p style={modalErrorStyle}>{photoError}</p>}
+            {!readOnly && (
+              <>
+                <input type="file" accept="image/*" id="cover-photo-input" onChange={handleCoverPhoto} style={{ display: 'none' }} />
+                <button
+                  onClick={() => document.getElementById('cover-photo-input').click()}
+                  disabled={photoUploading}
+                  style={{ width: '100%', height: '44px', borderRadius: '10px', border: `2px dashed ${COLORS.slate300}`, background: COLORS.white, color: COLORS.slate500, fontSize: '13px', fontWeight: 600, cursor: photoUploading ? 'not-allowed' : 'pointer', boxSizing: 'border-box' }}
+                >
+                  {photoUploading ? 'Uploading...' : property.cover_photo_url ? 'Change cover photo' : 'Upload cover photo'}
+                </button>
+                {photoError && <p style={modalErrorStyle}>{photoError}</p>}
+              </>
+            )}
           </div>
 
           <EditableSection
             title="Property Details"
             property={property}
             onSave={saveFields}
+            readOnly={readOnly}
             fields={[
               { key: 'property_name', label: 'Property Name', type: 'text' },
               { key: 'address', label: 'Full Address', type: 'text' },
@@ -460,6 +466,7 @@ export default function PropertyCoreTab({ property, onFieldsSaved, profile }) {
             title="Size & Structure"
             property={property}
             onSave={saveFields}
+            readOnly={readOnly}
             fields={[
               { key: 'num_floors', label: 'Number of Floors', type: 'number' },
               { key: 'layout_type', label: 'Floor Layout (used in ticket logging)', type: 'select', options: FLOOR_LAYOUT_TYPES },
@@ -475,6 +482,7 @@ export default function PropertyCoreTab({ property, onFieldsSaved, profile }) {
             title="Access & Safety"
             property={property}
             onSave={saveFields}
+            readOnly={readOnly}
             fields={[
               { key: 'access_instructions', label: 'Access Instructions', type: 'textarea' },
               { key: 'electrical_shutoff', label: 'Electric Shutoff Location', type: 'text' },
@@ -483,14 +491,15 @@ export default function PropertyCoreTab({ property, onFieldsSaved, profile }) {
             ]}
           />
 
-          <VulnerabilitySection property={property} onSave={saveFields} />
+          <VulnerabilitySection property={property} onSave={saveFields} readOnly={readOnly} />
 
-          <CleanerAssignmentSection property={property} onSave={saveFields} />
+          <CleanerAssignmentSection property={property} onSave={saveFields} readOnly={readOnly} />
 
           <EditableSection
             title="Utilities"
             property={property}
             onSave={saveFields}
+            readOnly={readOnly}
             fields={[
               { key: 'gas_supplier', label: 'Gas Supplier', type: 'text' },
               { key: 'electric_supplier', label: 'Electric Supplier', type: 'text' },
@@ -506,6 +515,7 @@ export default function PropertyCoreTab({ property, onFieldsSaved, profile }) {
             title="Location"
             property={property}
             onSave={saveFields}
+            readOnly={readOnly}
             fields={[
               { key: 'maps_link', label: 'Google Maps Link', type: 'text' },
               { key: 'coordinates', label: 'Coordinates (lat, long)', type: 'text' },
