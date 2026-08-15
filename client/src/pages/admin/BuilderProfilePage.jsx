@@ -13,6 +13,7 @@ import {
   formatUKDateTime, formatUKDate, formatDurationDays, formatDuration,
   computeDutyStatus, computeAvgTurnaroundMs, buildWeeklyTrend,
   ukDateKey, shiftDateKey, mondayOfWeek, firstOfMonth, fetchAttendanceSummary, fetchMileageSummary,
+  fetchActivitySummary, ACTIVITY_CATEGORY_META,
 } from './shared'
 import PrintableAttendanceReport from '../../components/PrintableAttendanceReport'
 import PrintableMileageReport from '../../components/PrintableMileageReport'
@@ -32,6 +33,7 @@ const TREND_WEEKS = 8
 const SECTION_ACCENTS = {
   assignment: COLORS.green600,
   attendance: COLORS.teal700,
+  timeAway: COLORS.pink600,
   mileage: COLORS.blue600,
   trend: COLORS.indigo700,
   category: COLORS.violet600,
@@ -159,6 +161,12 @@ export default function BuilderProfilePage({ staffId, onBack }) {
   const [showAllAttendance, setShowAllAttendance] = useState(false)
   const [showAttendanceReport, setShowAttendanceReport] = useState(false)
 
+  // Time Away -- same period tabs as Attendance & Hours above (same date
+  // range makes sense for both), just a different query keyed off
+  // activity_log instead of daily_attendance.
+  const [activitySummary, setActivitySummary] = useState(null)
+  const [activityLoading, setActivityLoading] = useState(true)
+
   // Mileage -- month-level breakdown of tickets.mileage_logged. A month
   // picker rather than the day/week/quarter tabs Attendance & Hours uses,
   // since "which month" is how a builder actually thinks about mileage
@@ -262,6 +270,16 @@ export default function BuilderProfilePage({ staffId, onBack }) {
     const { from, to } = attendanceRangeFor(attendancePeriod)
     fetchAttendanceSummary(staffId, from, to).then(summary => {
       if (!cancelled) { setAttendanceSummary(summary); setAttendanceLoading(false) }
+    })
+    return () => { cancelled = true }
+  }, [staffId, attendancePeriod])
+
+  useEffect(() => {
+    let cancelled = false
+    setActivityLoading(true)
+    const { from, to } = attendanceRangeFor(attendancePeriod)
+    fetchActivitySummary(staffId, from, to).then(summary => {
+      if (!cancelled) { setActivitySummary(summary); setActivityLoading(false) }
     })
     return () => { cancelled = true }
   }, [staffId, attendancePeriod])
@@ -509,6 +527,27 @@ export default function BuilderProfilePage({ staffId, onBack }) {
               </>
             )}
           </>
+        )}
+      </div>
+
+      <div style={sectionCardStyle(SECTION_ACCENTS.timeAway)}>
+        <p style={sectionLabelStyle(SECTION_ACCENTS.timeAway, { margin: '0 0 14px 0' })}>Time Away</p>
+        {activityLoading ? (
+          <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate400, fontWeight: 600 }}>Loading...</p>
+        ) : activitySummary.count === 0 ? (
+          <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>No lunch breaks, materials runs, job travel, or office trips logged in this period.</p>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '10px' }}>
+            <AttendanceStat label="Total Time Away" value={formatDuration(activitySummary.totalMs)} colour={SECTION_ACCENTS.timeAway} />
+            {Object.entries(ACTIVITY_CATEGORY_META).map(([key, meta]) => (
+              <AttendanceStat
+                key={key}
+                label={meta.label}
+                value={formatDuration(activitySummary.totalsByCategory[key] || 0)}
+                colour={activitySummary.totalsByCategory[key] > 0 ? meta.chipFg : COLORS.slate400}
+              />
+            ))}
+          </div>
         )}
       </div>
 

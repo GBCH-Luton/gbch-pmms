@@ -49,6 +49,27 @@ export const P2_URGENT_THRESHOLD = 40
 // misreading it as "Available".
 export const SHORT_TRIP_REASONS = ['Going to the Office', 'Lunch Break', 'Getting materials myself']
 
+// One entry per activity_log.activity_category value -- lets Where's the
+// Team and Clocking's history tell "Buying Materials" apart from "Going to
+// Another Job"/"Going to the Office" instead of all three reading as one
+// generic "Travelling". Colours are distinct from every other status tone
+// already in use (green=in, slate=out, teal=on a job, amber=hold/early,
+// red=no access) so none of these reads as a false alarm.
+export const ACTIVITY_CATEGORY_META = {
+  lunch: { label: 'On lunch break', leftVerb: 'started lunch break', backVerb: 'back from lunch', dot: COLORS.violet600, chipBg: COLORS.violet100, chipFg: COLORS.violet600 },
+  materials: { label: 'Buying materials', leftVerb: 'left for materials', backVerb: 'back from materials run', dot: COLORS.pink600, chipBg: COLORS.pink100, chipFg: COLORS.pink600 },
+  job: { label: 'Heading to another job', leftVerb: 'left site — heading to another job', backVerb: 'arrived on site', dot: COLORS.indigo700, chipBg: COLORS.indigo100, chipFg: COLORS.indigo700 },
+  office: { label: 'At the office', leftVerb: 'left for the office', backVerb: 'back from the office', dot: COLORS.purple600, chipBg: COLORS.purple50, chipFg: COLORS.purple600 },
+}
+// activity_category is null on rows written before this column existed --
+// falls back to the old generic Travel/Break split rather than guessing.
+export function activityCategoryMeta(activityType, activityCategory) {
+  if (activityCategory && ACTIVITY_CATEGORY_META[activityCategory]) return ACTIVITY_CATEGORY_META[activityCategory]
+  return activityType === 'Break'
+    ? { label: 'On break', leftVerb: 'started break', backVerb: 'back from break', dot: COLORS.violet600, chipBg: COLORS.violet100, chipFg: COLORS.violet600 }
+    : { label: 'Travelling', leftVerb: 'left site', backVerb: 'returned to site', dot: COLORS.violet600, chipBg: COLORS.violet100, chipFg: COLORS.violet600 }
+}
+
 export const GENDER_RESTRICTION_OPTIONS = ['Male Only', 'Female Only', 'Both']
 export const GENDER_RESTRICTION_STYLES = {
   'Male Only': { bg: COLORS.indigo100, color: COLORS.indigo700 },
@@ -685,6 +706,47 @@ export async function fetchMileageSummary(staffId, fromDateKey, toDateKey) {
   })
 
   return { trips, totalMiles, tripCount: trips.length, daysWithTravel: dateSet.size, avgMilesPerTrip: trips.length ? totalMiles / trips.length : 0 }
+}
+
+// Time-away breakdown for one staff member over an inclusive UK-calendar-
+// date range -- mirrors fetchAttendanceSummary/fetchMileageSummary's
+// shape, but keyed off activity_log.started_at and split per
+// activity_category (lunch/materials/job/office) so "how long on lunch
+// this week" is an actual number instead of just two clock-face
+// timestamps someone has to subtract by hand. Only completed entries
+// (ended_at set) count towards the totals -- a still-open activity is
+// already visible live on Where's the Team, this is a historical rollup.
+export async function fetchActivitySummary(staffId, fromDateKey, toDateKey) {
+  const fromMs = ukDateTimeInputValueToMs(`${fromDateKey}T00:00`)
+  const toExclusiveMs = ukDateTimeInputValueToMs(`${shiftDateKey(toDateKey, 1)}T00:00`)
+
+  const { data: rows } = await supabase
+    .schema('pmms')
+    .from('activity_log')
+    .select('id, activity_type, activity_category, note, started_at, ended_at')
+    .eq('staff_id', staffId)
+    .gte('started_at', new Date(fromMs).toISOString())
+    .lt('started_at', new Date(toExclusiveMs).toISOString())
+    .not('ended_at', 'is', null)
+    .order('started_at', { ascending: false })
+
+  const totalsByCategory = { lunch: 0, materials: 0, job: 0, office: 0 }
+  let totalMs = 0
+  const dateSet = new Set()
+
+  const entries = (rows || []).map(r => {
+    const durationMs = new Date(r.ended_at) - new Date(r.started_at)
+    // Legacy rows predate activity_category -- fall back to the old
+    // Travel/Break split so pre-2026-08-15 history still counts somewhere
+    // rather than vanishing from the totals entirely.
+    const category = r.activity_category || (r.activity_type === 'Break' ? 'lunch' : 'job')
+    totalsByCategory[category] = (totalsByCategory[category] || 0) + durationMs
+    totalMs += durationMs
+    dateSet.add(ukDateKey(new Date(r.started_at).getTime()))
+    return { ...r, category, durationMs }
+  })
+
+  return { entries, totalsByCategory, totalMs, daysWithActivity: dateSet.size, count: entries.length }
 }
 
 export const filterSelectStyle = { padding: '8px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', fontWeight: 600, color: COLORS.slate900, background: COLORS.slate50, cursor: 'pointer' }

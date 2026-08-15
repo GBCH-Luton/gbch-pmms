@@ -926,12 +926,22 @@ export default function BuilderDashboard({ profile }) {
           ? 'Going to the office'
           : activityNote.trim()
 
+    // Distinct from activity_type ('Travel'/'Break') -- lets admin-side
+    // displays and duration reporting tell "Buying Materials" apart from
+    // "Going to Another Job"/"Going to the Office" instead of all three
+    // collapsing into one generic "Travelling" label.
+    const category = activityType === 'Break' ? 'lunch'
+      : travelMode === 'job' ? 'job'
+      : travelMode === 'office' ? 'office'
+      : 'materials'
+
     const { data, error } = await supabase
       .schema('pmms')
       .from('activity_log')
       .insert({
         staff_id: profile.id,
         activity_type: activityType,
+        activity_category: category,
         note,
         started_at: new Date().toISOString(),
         started_lat: position?.latitude ?? null,
@@ -939,7 +949,7 @@ export default function BuilderDashboard({ profile }) {
         ticket_id: inProgressTicket?.id ?? null,
         destination_ticket_id: destinationTicket?.id ?? null,
       })
-      .select('id, activity_type, note, started_at, destination_ticket_id')
+      .select('id, activity_type, activity_category, note, started_at, destination_ticket_id')
       .single()
 
     setStartingActivity(false)

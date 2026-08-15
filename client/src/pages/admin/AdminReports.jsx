@@ -16,7 +16,7 @@ import {
   isoDateNDaysAgo, todayIso, extractFunctionError, formatUKDateTime, formatUKDate, computeComplianceAging, COMPLIANCE_TYPES,
   fetchComplianceAgingCounts, statusColour, statusLabel,
   modalOverlayStyle, modalCardStyle, modalTitleStyle, modalSubtitleStyle, modalCancelBtnStyle,
-  shiftDateKey, mondayOfWeek, firstOfMonth,
+  shiftDateKey, mondayOfWeek, firstOfMonth, ACTIVITY_CATEGORY_META,
 } from './shared'
 import SimpleBarChart from '../../components/SimpleBarChart'
 import PrintableOperationsSnapshot from '../../components/PrintableOperationsSnapshot'
@@ -151,6 +151,7 @@ export default function AdminReports({ profile, onNavigate }) {
   const [complianceCounts, setComplianceCounts] = useState(null)
   const [staffNames, setStaffNames] = useState({})
   const [attendanceShifts, setAttendanceShifts] = useState([])
+  const [activityLog, setActivityLog] = useState([])
   const [attachments, setAttachments] = useState([])
   const [showSnapshot, setShowSnapshot] = useState(false)
   const [snapshotFromDate, setSnapshotFromDate] = useState(todayIso())
@@ -274,6 +275,13 @@ export default function AdminReports({ profile, onNavigate }) {
     const { data: shiftRows } = await supabase.schema('pmms').from('daily_attendance').select('staff_id, work_date, late_flag')
     setAttendanceShifts(shiftRows || [])
 
+    // Company-wide Time Away rollup -- same "fetch once, filter locally by
+    // date range" approach as attendanceShifts above.
+    const { data: activityRows } = await supabase.schema('pmms').from('activity_log')
+      .select('staff_id, activity_type, activity_category, started_at, ended_at')
+      .not('ended_at', 'is', null)
+    setActivityLog(activityRows || [])
+
     const { data: attachmentRows } = await supabase.schema('pmms').from('ticket_attachments').select('id, url, created_at')
     setAttachments(attachmentRows || [])
   }
@@ -363,6 +371,24 @@ export default function AdminReports({ profile, onNavigate }) {
     })
     .filter(w => w.assignedCount > 0 || w.completedCount > 0)
     .sort((a, b) => b.assignedCount - a.assignedCount)
+
+  // Company-wide (division-scoped, same as everything else on this page)
+  // Time Away totals within the selected range -- mirrors
+  // fetchActivitySummary's category split (see BuilderProfilePage.jsx's
+  // per-builder version), just summed across every builder here instead
+  // of one at a time.
+  const scopedStaffIds = new Set(builders.map(b => b.id))
+  const activityTotals = { lunch: 0, materials: 0, job: 0, office: 0 }
+  let activityTotalMs = 0
+  activityLog.forEach(a => {
+    if (!scopedStaffIds.has(a.staff_id)) return
+    const startedMs = new Date(a.started_at).getTime()
+    if (startedMs < fromTime || startedMs > toTime) return
+    const durationMs = new Date(a.ended_at) - new Date(a.started_at)
+    const category = a.activity_category || (a.activity_type === 'Break' ? 'lunch' : 'job')
+    activityTotals[category] = (activityTotals[category] || 0) + durationMs
+    activityTotalMs += durationMs
+  })
 
   // Every click-through in this page routes through here, so the current
   // Category/Staff filters this report is already scoped to always carry
@@ -844,6 +870,26 @@ export default function AdminReports({ profile, onNavigate }) {
                   )}
                   <span style={{ fontSize: '13px', fontWeight: 800, color: COLORS.slate900, fontFamily: 'monospace' }}>{p.count}</span>
                 </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div style={cardStyle}>
+        <p style={cardLabelStyle}>Time Away (Range)</p>
+        {activityTotalMs === 0 ? (
+          <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>No lunch breaks, materials runs, job travel, or office trips logged in this range.</p>
+        ) : (
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+            <div style={tileStyle(COLORS.slate600)}>
+              <p style={tileLabelStyle}>Total</p>
+              <p style={tileValueStyle}>{formatDuration(activityTotalMs)}</p>
+            </div>
+            {Object.entries(ACTIVITY_CATEGORY_META).map(([key, meta]) => (
+              <div key={key} style={tileStyle(meta.chipFg)}>
+                <p style={tileLabelStyle}>{meta.label}</p>
+                <p style={tileValueStyle}>{formatDuration(activityTotals[key] || 0)}</p>
               </div>
             ))}
           </div>

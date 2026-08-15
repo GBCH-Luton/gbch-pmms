@@ -8,6 +8,7 @@ import {
   ukDateKey, ukTimeHHMM, minutesLate, shiftDateKey,
   modalOverlayStyle, modalCardStyle, modalTitleStyle, modalLabelStyle,
   modalErrorStyle, modalCancelBtnStyle, modalConfirmBtnStyle, fetchAssignableBuilders, fetchAssignableStaffForDivision, fetchLastEndedSessionsToday, SHORT_TRIP_REASONS, STAFF_AVAILABILITY_STYLES,
+  activityCategoryMeta, ACTIVITY_CATEGORY_META,
 } from './shared'
 
 const EIGHT_HOURS_MS = 8 * 60 * 60 * 1000
@@ -353,7 +354,7 @@ export default function AdminClocking({ profile, onNavigate }) {
     const { data: activityData } = await supabase
       .schema('pmms')
       .from('activity_log')
-      .select('id, staff_id, activity_type, note, started_at, ended_at')
+      .select('id, staff_id, activity_type, activity_category, note, started_at, ended_at')
       .or(`started_at.gte.${todayKey}T00:00:00,ended_at.is.null`)
       .order('started_at', { ascending: true })
 
@@ -432,6 +433,7 @@ export default function AdminClocking({ profile, onNavigate }) {
       const shortTripTicket = (onHoldShortTrips || []).find(t => t.assigned_builder_id === b.id)
 
       let currentStatus = 'Off shift'
+      let awayMeta = null
       // Availability overrides everything below, same reasoning as
       // computeDutyStatus (shared.jsx) -- someone marked On Leave/Sick
       // can't actually be working, even if an old shift/session is still
@@ -440,7 +442,8 @@ export default function AdminClocking({ profile, onNavigate }) {
         currentStatus = b.availability
       } else if (shift && !shift.clock_out_at) {
         if (openActivityForBuilder) {
-          currentStatus = `${openActivityForBuilder.activity_type === 'Travel' ? 'Travelling' : 'On break'}${openActivityForBuilder.note ? `: ${openActivityForBuilder.note}` : ''}`
+          awayMeta = activityCategoryMeta(openActivityForBuilder.activity_type, openActivityForBuilder.activity_category)
+          currentStatus = `${awayMeta.label}${openActivityForBuilder.note ? `: ${openActivityForBuilder.note}` : ''}`
         } else if (shortTripTicket) {
           currentStatus = `${shortTripTicket.hold_reason} (Job #${shortTripTicket.ticket_number})`
         } else if (openSessionTicket) {
@@ -464,7 +467,7 @@ export default function AdminClocking({ profile, onNavigate }) {
         return sum + (end - new Date(s.clock_in_at).getTime())
       }, 0)
 
-      return { staffId: b.id, staffName: b.name, shift, currentStatus, idleSince, idleLat, idleLng, hoursTodayMs }
+      return { staffId: b.id, staffName: b.name, shift, currentStatus, awayMeta, idleSince, idleLat, idleLng, hoursTodayMs }
     }))
 
     setLoading(false)
@@ -670,7 +673,7 @@ export default function AdminClocking({ profile, onNavigate }) {
         supabase
           .schema('pmms')
           .from('activity_log')
-          .select('id, activity_type, note, started_at, ended_at, destination_ticket_id')
+          .select('id, activity_type, activity_category, note, started_at, ended_at, destination_ticket_id')
           .eq('staff_id', staffId)
           .gte('started_at', lowerBound)
           .lte('started_at', upperBound)
@@ -1066,8 +1069,8 @@ export default function AdminClocking({ profile, onNavigate }) {
                       // key, which would collide with this column's own
                       // unrelated "clocked in, idle" meaning of that word).
                       ...((row.currentStatus === 'On Leave' || row.currentStatus === 'Sick') ? STAFF_AVAILABILITY_STYLES[row.currentStatus] : {
-                        color: row.currentStatus === 'Off shift' ? COLORS.slate400 : row.currentStatus.startsWith('On Job') ? COLORS.teal700 : row.currentStatus === 'Available' ? COLORS.blue700 : COLORS.violet600,
-                        background: row.currentStatus === 'Off shift' ? COLORS.slate100 : row.currentStatus.startsWith('On Job') ? COLORS.teal50 : row.currentStatus === 'Available' ? COLORS.blue50 : COLORS.violet100,
+                        color: row.currentStatus === 'Off shift' ? COLORS.slate400 : row.currentStatus.startsWith('On Job') ? COLORS.teal700 : row.currentStatus === 'Available' ? COLORS.blue700 : (row.awayMeta?.chipFg ?? COLORS.violet600),
+                        background: row.currentStatus === 'Off shift' ? COLORS.slate100 : row.currentStatus.startsWith('On Job') ? COLORS.teal50 : row.currentStatus === 'Available' ? COLORS.blue50 : (row.awayMeta?.chipBg ?? COLORS.violet100),
                       }),
                     }}>
                       {row.currentStatus}
@@ -1467,10 +1470,10 @@ export default function AdminClocking({ profile, onNavigate }) {
                 }
               })
               historyActivity.forEach(a => {
-                const verb = a.activity_type === 'Travel' ? 'Left site' : 'Started break'
-                const backVerb = a.activity_type === 'Travel' ? 'Returned to site' : 'Back from break'
-                events.push({ time: a.started_at, label: `${verb}${a.note ? `: ${a.note}` : ''}`, tone: 'away', ticketNumber: a.destinationTicketNumber })
-                if (a.ended_at) events.push({ time: a.ended_at, label: backVerb, tone: 'back' })
+                const meta = activityCategoryMeta(a.activity_type, a.activity_category)
+                const tone = a.activity_category ? `away-${a.activity_category}` : 'away'
+                events.push({ time: a.started_at, label: `${meta.leftVerb.charAt(0).toUpperCase()}${meta.leftVerb.slice(1)}${a.note ? `: ${a.note}` : ''}`, tone, ticketNumber: a.destinationTicketNumber })
+                if (a.ended_at) events.push({ time: a.ended_at, label: `${meta.backVerb.charAt(0).toUpperCase()}${meta.backVerb.slice(1)}`, tone: 'back' })
               })
               historyJobEvents.forEach(a => {
                 const tone = a.summary.includes('Completed') ? 'done'
@@ -1483,7 +1486,10 @@ export default function AdminClocking({ profile, onNavigate }) {
 
               if (events.length === 0) return <p style={{ margin: '14px 0', fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>Nothing logged that day.</p>
 
-              const toneColor = { away: COLORS.violet600, early: COLORS.amber700, late: COLORS.amber700, hold: COLORS.amber700, noAccess: COLORS.red600, done: COLORS.green600, job: COLORS.teal700 }
+              const toneColor = {
+                away: COLORS.violet600, early: COLORS.amber700, late: COLORS.amber700, hold: COLORS.amber700, noAccess: COLORS.red600, done: COLORS.green600, job: COLORS.teal700,
+                ...Object.fromEntries(Object.entries(ACTIVITY_CATEGORY_META).map(([k, v]) => [`away-${k}`, v.dot])),
+              }
 
               return (
                 <div style={{ margin: '14px 0', display: 'flex', flexDirection: 'column', gap: '10px' }}>

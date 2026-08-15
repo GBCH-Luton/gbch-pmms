@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import { COLORS } from '../../lib/colors'
-import { priorityTierLabel, fetchFlaggedClockingCount, isTicketStuck, KpiTiles, fetchComplianceAgingCounts, fetchVoidAgingCounts, fetchGardenReviewAging, computeAvgResponseMs, formatDuration, fetchPriorityThresholds, fetchAssignableBuilders, fetchAssignableStaffForDivision, fetchLastEndedSessionsToday, ukDateKey, formatUKDateTime, minutesLate, SHORT_TRIP_REASONS } from './shared'
+import { priorityTierLabel, fetchFlaggedClockingCount, isTicketStuck, KpiTiles, fetchComplianceAgingCounts, fetchVoidAgingCounts, fetchGardenReviewAging, computeAvgResponseMs, formatDuration, fetchPriorityThresholds, fetchAssignableBuilders, fetchAssignableStaffForDivision, fetchLastEndedSessionsToday, ukDateKey, formatUKDateTime, minutesLate, SHORT_TRIP_REASONS, activityCategoryMeta, ACTIVITY_CATEGORY_META } from './shared'
 import { NavIcon } from '../../lib/icons'
 import { googleMapsLink } from '../../lib/geo'
 
@@ -182,7 +182,7 @@ function TeamWhereabouts({ profile, onNavigate }) {
 
     const [{ data: attendanceData }, { data: activityData }, { data: openSessions }, { data: auditData }, { data: onHoldShortTrips }] = await Promise.all([
       supabase.schema('pmms').from('daily_attendance').select('id, staff_id, clock_in_at, late_flag, clock_out_at, early_leave_reason').or(`work_date.eq.${todayKey},clock_out_at.is.null`),
-      supabase.schema('pmms').from('activity_log').select('id, staff_id, activity_type, note, started_at, ended_at, ticket_id, destination_ticket_id').or(`started_at.gte.${todayKey}T00:00:00,ended_at.is.null`),
+      supabase.schema('pmms').from('activity_log').select('id, staff_id, activity_type, activity_category, note, started_at, ended_at, ticket_id, destination_ticket_id').or(`started_at.gte.${todayKey}T00:00:00,ended_at.is.null`),
       supabase.schema('pmms').from('work_sessions').select('id, ticket_id, builder_id').is('ended_at', null),
       // Job start/resume/complete/pause/no-access events -- these were
       // previously invisible here entirely (this panel only ever read
@@ -241,8 +241,9 @@ function TeamWhereabouts({ profile, onNavigate }) {
         tone = 'leave'
       } else if (shift && !shift.clock_out_at) {
         if (openActivity) {
-          status = `${openActivity.activity_type === 'Travel' ? 'Travelling' : 'On break'}${openActivity.note ? `: ${openActivity.note}` : ''}`
-          tone = 'away'
+          const meta = activityCategoryMeta(openActivity.activity_type, openActivity.activity_category)
+          status = `${meta.label}${openActivity.note ? `: ${openActivity.note}` : ''}`
+          tone = openActivity.activity_category ? `away-${openActivity.activity_category}` : 'away'
         } else if (shortTripTicket) {
           status = `${shortTripTicket.hold_reason} (Job #${shortTripTicket.ticket_number})`
           tone = 'away'
@@ -289,15 +290,17 @@ function TeamWhereabouts({ profile, onNavigate }) {
       // The destination they're heading to is the more useful jump target
       // on the "left site" line than the job they just stepped away from.
       const destinationTicket = a.destination_ticket_id ? ticketsById[a.destination_ticket_id] : null
+      const meta = activityCategoryMeta(a.activity_type, a.activity_category)
+      const entryTone = a.activity_category ? `away-${a.activity_category}` : 'away'
       entries.push({
-        id: `${a.id}-start`, time: a.started_at, staffId: a.staff_id, staffName: b.name, tone: 'away',
-        text: `${a.activity_type === 'Travel' ? 'left site' : 'started break'}${a.note ? `: ${a.note}` : ''}`,
+        id: `${a.id}-start`, time: a.started_at, staffId: a.staff_id, staffName: b.name, tone: entryTone,
+        text: `${meta.leftVerb}${a.note ? `: ${a.note}` : ''}`,
         ticketNumber: (destinationTicket ?? ticket)?.ticket_number,
       })
       if (a.ended_at) {
         entries.push({
           id: `${a.id}-end`, time: a.ended_at, staffId: a.staff_id, staffName: b.name, tone: 'back',
-          text: a.activity_type === 'Travel' ? 'returned to site' : 'back from break',
+          text: meta.backVerb,
           ticketNumber: ticket?.ticket_number,
         })
       }
@@ -324,8 +327,12 @@ function TeamWhereabouts({ profile, onNavigate }) {
   const toneDot = {
     in: COLORS.green600, out: COLORS.slate900, away: COLORS.violet600, back: COLORS.slate900, early: COLORS.amber700,
     job: COLORS.teal600, done: COLORS.green600, hold: COLORS.amber700, noAccess: COLORS.red600,
+    ...Object.fromEntries(Object.entries(ACTIVITY_CATEGORY_META).map(([k, v]) => [`away-${k}`, v.dot])),
   }
-  const chipStyle = { off: { bg: COLORS.slate100, fg: COLORS.slate400 }, available: { bg: COLORS.blue50, fg: COLORS.blue700 }, job: { bg: COLORS.teal50, fg: COLORS.teal700 }, away: { bg: COLORS.violet100, fg: COLORS.violet600 }, leave: { bg: COLORS.amber100, fg: COLORS.amber600 } }
+  const chipStyle = {
+    off: { bg: COLORS.slate100, fg: COLORS.slate400 }, available: { bg: COLORS.blue50, fg: COLORS.blue700 }, job: { bg: COLORS.teal50, fg: COLORS.teal700 }, away: { bg: COLORS.violet100, fg: COLORS.violet600 }, leave: { bg: COLORS.amber100, fg: COLORS.amber600 },
+    ...Object.fromEntries(Object.entries(ACTIVITY_CATEGORY_META).map(([k, v]) => [`away-${k}`, { bg: v.chipBg, fg: v.chipFg }])),
+  }
 
   // Division filter only makes sense for an unscoped viewer (Admin or a
   // manager with no division) -- a division-scoped manager's `builders`
