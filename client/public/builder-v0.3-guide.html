@@ -80,8 +80,14 @@
     /* Scaled down by JS (see fitPhoneToViewport) to fit whatever height
        the guide is embedded at -- this frame is naturally taller than the
        Quick Guide iframe, so without this the only options were shrinking
-       to illegibility or scrolling to see the rest of the phone. */
-    transform-origin: top center;
+       to illegibility or scrolling to see the rest of the phone. Pivoting
+       from the centre (not the top) matters here: .wrap already centres
+       the full-size box via flexbox before the transform ever runs, so a
+       top-anchored scale shrank it around a point sitting above the
+       visible area and clipped the top of the phone off. Centre-anchored
+       scaling shrinks symmetrically around that same already-centred
+       point, so the result stays centred with nothing clipped. */
+    transform-origin: center center;
   }
   .phone {
     background: #050810;
