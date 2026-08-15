@@ -382,10 +382,20 @@ function TeamWhereabouts({ profile, onNavigate }) {
       height: DASHBOARD_TOP_CARD_HEIGHT, display: 'flex', flexDirection: 'column',
     }}>
       <div style={{ height: DASHBOARD_CARD_HEADER_HEIGHT, boxSizing: 'border-box', padding: '0 20px', display: 'flex', flexDirection: 'column', justifyContent: 'center', background: COLORS.slate50, borderBottom: `1px solid ${COLORS.slate200}` }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap', marginBottom: '4px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ color: COLORS.teal700 }}>📍</span>
-            <span style={{ fontSize: '12px', fontWeight: 800, color: COLORS.teal700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Where's the Team</span>
+        {/* Title+subtitle live in their own column, kept separate from the
+            filter dropdowns -- the selects render taller than the plain
+            title text, and having them share one flex row with the title
+            (like before) let their height push the title-to-subtitle gap
+            open wider than Daily Briefing's. Nesting the subtitle under
+            just the title here keeps that 4px gap identical regardless of
+            what the selects do. */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+              <span style={{ color: COLORS.teal700, fontSize: '14px', lineHeight: 1 }}>📍</span>
+              <span style={{ fontSize: '12px', fontWeight: 800, color: COLORS.teal700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Where's the Team</span>
+            </div>
+            <p style={{ margin: 0, fontSize: '11px', color: COLORS.slate500 }}>Live status and every trip logged today.</p>
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
             {!profile.division && (
@@ -408,7 +418,6 @@ function TeamWhereabouts({ profile, onNavigate }) {
             </select>
           </div>
         </div>
-        <p style={{ margin: 0, fontSize: '11px', color: COLORS.slate500 }}>Live status and every trip logged today.</p>
       </div>
 
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', padding: '12px 20px 0' }}>
