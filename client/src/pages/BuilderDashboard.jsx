@@ -54,6 +54,104 @@ const SIMS_MATERIALS_PROTOTYPE_ENABLED = true
 // amount rather than showing a number that never matches the other page's.
 const ROAD_DISTANCE_MULTIPLIER = 1.3
 
+// Hidden 2026-08-14, not removed -- the approved Leaving Site redesign
+// makes Leaving Site -> Going to Another Job the one way to open a job, so
+// the full job list, its status-filter dropdown, and the "Closest to you"
+// nearby-job nudge (another way to jump straight to a job) are all turned
+// off together. Metric tiles stay visible but lose their onClick (see the
+// tiles render below) for the same reason.
+const SHOW_JOB_LIST = false
+const SHOW_NEARBY_JOBS = false
+
+// Suggestions only, for the "Buying Materials" leaving-site page's
+// type-ahead -- typing anything not on this list is still accepted as
+// free text, same as before.
+const STORE_SUGGESTIONS = [
+  'Screwfix Luton', 'Screwfix Bedford', 'B&Q Luton', 'B&Q Bedford',
+  'Wickes Luton', 'Toolstation Luton', 'Jewson Bedford', 'Travis Perkins Luton',
+]
+
+// Shared by every Leaving Site sub-page below -- same header (Back + logo +
+// hamburger, with the full nav menu behind it) every other full-screen
+// "page" in this file already duplicates per page; pulled out once here
+// since this change adds 6 more of them at once.
+function BuilderNavHeader({ onBack, goHome, menuOpen, setMenuOpen, profile, unreadMentions, setPage, handleSignOut }) {
+  return (
+    <div style={{ position: 'sticky', top: 0, zIndex: 10 }}>
+      <div style={{ background: COLORS.white, borderBottom: `1px solid ${COLORS.slate200}`, padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <button onClick={onBack} style={{ background: COLORS.slate100, border: 'none', borderRadius: '8px', padding: '8px 14px', fontSize: '13px', fontWeight: 700, color: COLORS.slate500, cursor: 'pointer' }}>
+            ← Back
+          </button>
+          <button onClick={goHome} aria-label="Go to home" style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>
+            <img src={gbchLogo} alt="GBCH" style={{ height: '36px' }} />
+            <span style={{ fontSize: '16px', fontWeight: 800, color: COLORS.slate900 }}>PMMS</span>
+          </button>
+        </div>
+        <button
+          onClick={() => setMenuOpen(prev => !prev)}
+          aria-label="Menu"
+          style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '4px', background: 'none', border: 'none', padding: '8px', cursor: 'pointer' }}
+        >
+          <span style={{ width: '22px', height: '2px', background: COLORS.slate900, borderRadius: '2px' }} />
+          <span style={{ width: '22px', height: '2px', background: COLORS.slate900, borderRadius: '2px' }} />
+          <span style={{ width: '22px', height: '2px', background: COLORS.slate900, borderRadius: '2px' }} />
+        </button>
+      </div>
+
+      {menuOpen && (
+        <div style={{ background: COLORS.greenDark, padding: '20px' }}>
+          <p style={{ margin: '0 0 2px 0', fontSize: '16px', fontWeight: 800, color: COLORS.white }}>{profile.name}</p>
+          <p style={{ margin: '0 0 18px 0', fontSize: '13px', fontWeight: 500, color: COLORS.white, opacity: 0.8 }}>{profile.job_title}</p>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            {SHOW_LOG_TICKET_NAV && (
+              <button
+                onClick={() => { setPage('new-ticket'); setMenuOpen(false) }}
+                style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: COLORS.white, cursor: 'pointer', textAlign: 'left' }}
+              >
+                📝 Log a Ticket
+              </button>
+            )}
+            <button
+              onClick={() => { setPage('my-reports'); setMenuOpen(false) }}
+              style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: COLORS.white, cursor: 'pointer', textAlign: 'left' }}
+            >
+              📋 My Reports
+            </button>
+            <button
+              onClick={() => { setPage('mileage'); setMenuOpen(false) }}
+              style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: COLORS.white, cursor: 'pointer', textAlign: 'left' }}
+            >
+              🕐 My Mileage
+            </button>
+            <button
+              onClick={() => { setPage('metrics'); setMenuOpen(false) }}
+              style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: COLORS.white, cursor: 'pointer', textAlign: 'left' }}
+            >
+              📊 My Metrics
+            </button>
+            <button
+              onClick={() => { setPage('team-chat'); setMenuOpen(false) }}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: COLORS.white, cursor: 'pointer', textAlign: 'left' }}
+            >
+              <span>💬 Team Chat</span>
+              {unreadMentions > 0 && (
+                <span style={{ background: COLORS.red600, color: COLORS.white, fontSize: '11px', fontWeight: 800, padding: '2px 8px', borderRadius: '999px' }}>{unreadMentions}</span>
+              )}
+            </button>
+            <button
+              onClick={handleSignOut}
+              style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'none', border: 'none', borderTop: '1px solid rgba(255,255,255,0.15)', padding: '14px 4px', fontSize: '14px', fontWeight: 600, color: COLORS.white, cursor: 'pointer', textAlign: 'left' }}
+            >
+              🚪 Sign out
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function BuilderDashboard({ profile }) {
   const [tickets, setTickets] = useState([])
   const [loading, setLoading] = useState(true)
@@ -87,8 +185,6 @@ export default function BuilderDashboard({ profile }) {
   const [dmSending, setDmSending] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [contactSearch, setContactSearch] = useState('')
-  const [fromLocation, setFromLocation] = useState(null)
-  const [customLocation, setCustomLocation] = useState('')
   const [miles, setMiles] = useState(0)
   // A GPS fix is now required to clock in/resume -- directors' call: a
   // builder can step outside for signal, so "no signal" shouldn't be an
@@ -145,16 +241,18 @@ export default function BuilderDashboard({ profile }) {
   // affect job time, it's purely a supplementary "where are they right
   // now" record for managers (see pmms.activity_log).
   const [openActivity, setOpenActivity] = useState(null)
-  const [activityPickerOpen, setActivityPickerOpen] = useState(false)
   const [activityType, setActivityType] = useState('Travel')
-  // 'shop' is the original free-text "Buying Materials" flow; 'job' picks
-  // one of this builder's own Assigned tickets from a dropdown instead of
-  // typing a note, and records it in destination_ticket_id -- both still
-  // write activity_type: 'Travel', so every existing "Travelling"
-  // display elsewhere in the app keeps working unchanged.
+  // 'shop' is the free-text "Buying Materials" flow (the 'leaving-materials'
+  // page); 'job' picks one of this builder's own Assigned tickets via the
+  // 'leaving-job' search page instead of typing a note, and records it in
+  // destination_ticket_id; 'office' is a fixed note, no input needed (see
+  // 'leaving-office'). All three still write activity_type: 'Travel', so
+  // every existing "Travelling" display elsewhere in the app keeps working
+  // unchanged.
   const [travelMode, setTravelMode] = useState('shop')
   const [destinationTicketId, setDestinationTicketId] = useState('')
   const [activityNote, setActivityNote] = useState('')
+  const [jobSearchQuery, setJobSearchQuery] = useState('')
   const [startingActivity, setStartingActivity] = useState(false)
   const [endingActivity, setEndingActivity] = useState(false)
   const [activityError, setActivityError] = useState('')
@@ -404,13 +502,6 @@ export default function BuilderDashboard({ profile }) {
   }
 
   useEffect(() => {
-    // Already told the system exactly which job he was heading to when he
-    // left the last one (see "Going to Another Job") -- re-asking "coming
-    // from?" here would just be asking him to repeat himself. Miles are
-    // still needed (that part genuinely can't be known automatically).
-    const isMatchedArrival = openActivity?.activity_type === 'Travel' && openActivity.destination_ticket_id === selectedTicket?.id
-    setFromLocation(isMatchedArrival ? 'From the last job' : null)
-    setCustomLocation('')
     setMiles(0)
     setClockingIn(false)
     setClockInError('')
@@ -785,16 +876,18 @@ export default function BuilderDashboard({ profile }) {
     setTravelMode('shop')
     setDestinationTicketId('')
     setActivityNote('')
+    setJobSearchQuery('')
     setActivityError('')
-    setActivityPickerOpen(true)
+    setPage('leaving-choices')
   }
 
-  async function handleStartActivity() {
+  async function handleStartActivity(overrideDestinationTicketId) {
+    const destinationId = overrideDestinationTicketId ?? destinationTicketId
     if (activityType === 'Travel' && travelMode === 'shop' && !activityNote.trim()) {
       setActivityError('Please say where you\'re going (e.g. shop name).')
       return
     }
-    if (activityType === 'Travel' && travelMode === 'job' && !destinationTicketId) {
+    if (activityType === 'Travel' && travelMode === 'job' && !destinationId) {
       setActivityError('Please pick which job you\'re heading to.')
       return
     }
@@ -808,7 +901,7 @@ export default function BuilderDashboard({ profile }) {
     // were mid-way through (if any) when they stepped away, so managers
     // can see "left site" and "returned" against a job number later.
     const inProgressTicket = tickets.find(t => t.status === 'In Progress')
-    const destinationTicket = travelMode === 'job' ? tickets.find(t => t.id === destinationTicketId) : null
+    const destinationTicket = travelMode === 'job' ? tickets.find(t => t.id === destinationId) : null
     // The note stays a plain readable string ("Job #38 -- 12 Stanley
     // Road") so every existing display that just shows `.note` (Team
     // Whereabouts, the History modal, the day banner) already reads
@@ -818,7 +911,9 @@ export default function BuilderDashboard({ profile }) {
       ? (activityNote.trim() || 'Lunch')
       : travelMode === 'job'
         ? `Job #${destinationTicket.ticket_number} — ${destinationTicket.property?.address || 'address unknown'}`
-        : activityNote.trim()
+        : travelMode === 'office'
+          ? 'Going to the office'
+          : activityNote.trim()
 
     const { data, error } = await supabase
       .schema('pmms')
@@ -839,7 +934,14 @@ export default function BuilderDashboard({ profile }) {
     setStartingActivity(false)
     if (error) { setActivityError(error.message); return }
     setOpenActivity(data)
-    setActivityPickerOpen(false)
+    // Going to Another Job jumps straight to the (now mileage-only) job
+    // screen rather than waiting for a separate "I've arrived" tap later --
+    // see the plan's "Arrival flow" decision. Every other destination just
+    // returns to the dashboard, where the away-banner takes over.
+    if (destinationTicket) {
+      setSelectedTicket(destinationTicket)
+    }
+    setPage('jobs')
   }
 
   async function handleEndActivity() {
@@ -1161,7 +1263,7 @@ export default function BuilderDashboard({ profile }) {
     await fetchTickets()
   }
 
-  async function handleResumeWork() {
+  async function handleResumeWork(milesLogged) {
     if (tickets.some(t => t.status === 'In Progress' && t.id !== selectedTicket.id)) return
     setClockInError('')
     setClockingIn(true)
@@ -1178,7 +1280,11 @@ export default function BuilderDashboard({ profile }) {
     const { error: ticketError } = await supabase
       .schema('pmms')
       .from('tickets')
-      .update({ status: 'In Progress', status_changed_at: now, stuck_alert_sent_at: null, long_running_job_alert_sent_at: null, hold_reason: null, hold_note: null })
+      // mileage_logged/mileage_logged_at mirror handleClockIn -- an on-hold
+      // job resumed after a genuine trip away (materials ordered, unable to
+      // do) can involve real travel, same as any other arrival now that the
+      // job-ready mileage step is shared across every arrival path.
+      .update({ status: 'In Progress', status_changed_at: now, stuck_alert_sent_at: null, long_running_job_alert_sent_at: null, hold_reason: null, hold_note: null, mileage_logged: milesLogged, transit_start: null, mileage_logged_at: now })
       .eq('id', selectedTicket.id)
 
     if (ticketError) {
@@ -1662,6 +1768,18 @@ export default function BuilderDashboard({ profile }) {
       .slice(0, 2)
   })()
 
+  // Same estimate as nearbyJobs above, reused for the mileage pill shown
+  // against each result on the "Going to Another Job" search page --
+  // origin is wherever the builder most recently stopped, not a live GPS
+  // read, matching the existing convention.
+  function estimateMilesTo(ticket) {
+    if (!recentlyLeftTicket || ticket.property?.latitude == null || ticket.property?.longitude == null) return null
+    return metresToMiles(distanceMetres(
+      recentlyLeftTicket.property.latitude, recentlyLeftTicket.property.longitude,
+      ticket.property.latitude, ticket.property.longitude,
+    )) * ROAD_DISTANCE_MULTIPLIER
+  }
+
   const mileageTickets = tickets
     .filter(t => t.mileage_logged > 0)
     .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
@@ -1983,22 +2101,14 @@ export default function BuilderDashboard({ profile }) {
           )
         })() : (
           <div style={{ background: todayShift.late_flag ? COLORS.amber50 : COLORS.slate50, border: `1px solid ${todayShift.late_flag ? COLORS.amber300 : COLORS.slate200}`, borderRadius: '12px', padding: '10px 14px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '13px', fontWeight: 600, color: todayShift.late_flag ? COLORS.amber900 : COLORS.slate600 }}>
-                {todayShift.late_flag ? '⚠ ' : '🟢 '}Clocked in since {formatUKDateTime(todayShift.clock_in_at).split(' ').slice(-1)[0]}
-                {todayShift.late_flag && ` (${minutesLate(todayShift.clock_in_at, dailyClockInDeadline)}m late)`}
-              </span>
-              <button
-                onClick={openActivityPicker}
-                style={{ padding: '8px 14px', background: COLORS.white, color: COLORS.slate600, border: `1px solid ${COLORS.slate200}`, borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
-              >
-                Leaving Site
-              </button>
-            </div>
+            <span style={{ fontSize: '13px', fontWeight: 600, color: todayShift.late_flag ? COLORS.amber900 : COLORS.slate600 }}>
+              {todayShift.late_flag ? '⚠ ' : '🟢 '}Clocked in since {formatUKDateTime(todayShift.clock_in_at).split(' ').slice(-1)[0]}
+              {todayShift.late_flag && ` (${minutesLate(todayShift.clock_in_at, dailyClockInDeadline)}m late)`}
+            </span>
             {/* Deliberately its own row, set apart with a divider and
                 lighter weight -- found live that this sitting as a
-                same-size button right next to "Leaving Site" above led to
-                a mis-tap that ended someone's whole day by accident.
+                same-size button right next to "Leaving Site" led to a
+                mis-tap that ended someone's whole day by accident.
                 Clocking out is the rarer, bigger action, so it shouldn't
                 look like an equal, casual choice next to a short trip. */}
             <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: `1px solid ${todayShift.late_flag ? COLORS.amber200 : COLORS.slate200}`, textAlign: 'right' }}>
@@ -2013,6 +2123,18 @@ export default function BuilderDashboard({ profile }) {
           </div>
         )}
         {clockOutForDayError && <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: COLORS.red500, fontWeight: 600 }}>{clockOutForDayError}</p>}
+
+        {/* Its own big, distinctly-coloured button -- indigo rather than any
+            shade used by the metric tiles below, so it never reads as "just
+            another tile". Full-width and unmissable, per the approved
+            Leaving Site redesign. */}
+        <button
+          onClick={openActivityPicker}
+          style={{ width: '100%', marginTop: '10px', padding: '22px 20px', background: COLORS.indigo700, color: COLORS.white, border: 'none', borderRadius: '16px', fontSize: '17px', fontWeight: 800, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', boxShadow: '0 6px 16px rgba(67,56,202,0.35)' }}
+        >
+          🚶 Leaving Site
+          <span style={{ fontSize: '12px', fontWeight: 600, opacity: 0.85 }}>Log a trip, break, or head to your next job</span>
+        </button>
 
         {clockOutConfirmOpen && (
           <div style={{ marginTop: '8px', background: COLORS.white, border: `1px solid ${COLORS.slate300}`, borderRadius: '12px', padding: '14px' }}>
@@ -2031,75 +2153,6 @@ export default function BuilderDashboard({ profile }) {
             </div>
           </div>
         )}
-
-        {activityPickerOpen && (() => {
-          const assignedJobs = tickets.filter(t => t.status === 'Assigned')
-          return (
-          <div style={{ marginTop: '8px', background: COLORS.white, border: `1px solid ${COLORS.slate200}`, borderRadius: '12px', padding: '14px' }}>
-            <p style={{ margin: '0 0 10px 0', fontSize: '12px', fontWeight: 700, color: COLORS.slate500, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Where are you going?</p>
-            <div style={{ display: 'flex', gap: '8px', marginBottom: '10px', flexWrap: 'wrap' }}>
-              {[
-                { type: 'Travel', mode: 'shop', label: '🛒 Buying Materials' },
-                { type: 'Travel', mode: 'job', label: '🚗 Going to Another Job' },
-                { type: 'Break', mode: 'shop', label: '🍽️ Lunch Break' },
-              ].map(opt => {
-                const active = activityType === opt.type && (opt.type !== 'Travel' || travelMode === opt.mode)
-                return (
-                  <button
-                    key={opt.mode + opt.type}
-                    onClick={() => { setActivityType(opt.type); setTravelMode(opt.mode); setActivityNote(''); setDestinationTicketId('') }}
-                    style={{
-                      padding: '8px 14px', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer',
-                      border: active ? `2px solid ${COLORS.teal600}` : `1px solid ${COLORS.slate200}`,
-                      background: active ? `${COLORS.teal600}14` : COLORS.slate50,
-                      color: COLORS.slate900,
-                    }}
-                  >
-                    {opt.label}
-                  </button>
-                )
-              })}
-            </div>
-            {activityType === 'Travel' && travelMode === 'job' ? (
-              assignedJobs.length === 0 ? (
-                <p style={{ margin: '0 0 10px 0', fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>No other assigned jobs to head to right now.</p>
-              ) : (
-                <select
-                  value={destinationTicketId}
-                  onChange={(e) => setDestinationTicketId(e.target.value)}
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '14px', boxSizing: 'border-box', marginBottom: '10px' }}
-                >
-                  <option value="">Select a job...</option>
-                  {assignedJobs.map(t => (
-                    <option key={t.id} value={t.id}>#{t.ticket_number} — {t.property?.address || 'Unknown address'}</option>
-                  ))}
-                </select>
-              )
-            ) : (
-              <input
-                type="text"
-                value={activityNote}
-                onChange={(e) => setActivityNote(e.target.value)}
-                placeholder={activityType === 'Travel' ? 'Shop/destination name...' : 'Note (optional)'}
-                style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '14px', boxSizing: 'border-box', marginBottom: '10px' }}
-              />
-            )}
-            {activityError && <p style={{ margin: '0 0 10px 0', fontSize: '12px', color: COLORS.red500, fontWeight: 600 }}>{activityError}</p>}
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button onClick={() => setActivityPickerOpen(false)} style={{ flex: 1, padding: '10px', background: COLORS.slate100, color: COLORS.slate600, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
-                Cancel
-              </button>
-              <button
-                onClick={handleStartActivity}
-                disabled={startingActivity}
-                style={{ flex: 2, padding: '10px', background: COLORS.teal600, color: COLORS.white, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: startingActivity ? 'not-allowed' : 'pointer', opacity: startingActivity ? 0.7 : 1 }}
-              >
-                {startingActivity ? 'Starting…' : 'Start'}
-              </button>
-            </div>
-          </div>
-          )
-        })()}
 
         {earlyLeavePromptOpen && (
           <div style={{ marginTop: '8px', background: COLORS.white, border: `1px solid ${COLORS.amber300}`, borderRadius: '12px', padding: '14px' }}>
@@ -2129,22 +2182,19 @@ export default function BuilderDashboard({ profile }) {
         )}
       </div>
 
-      {/* Metric tiles */}
+      {/* Metric tiles -- disabled, not removed. Same appearance as before,
+          but no longer clickable filters: Leaving Site -> Resume Jobs
+          replaced On Hold's old click-to-filter path, and the full job
+          list below them is hidden (see SHOW_JOB_LIST). */}
       <div style={{ padding: '16px 16px 0 16px', maxWidth: '600px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-        <button
-          onClick={() => setStatusFilter('WORKING')}
-          style={{ width: '100%', padding: '14px', background: COLORS.teal600, color: COLORS.white, border: 'none', borderRadius: '12px', cursor: 'pointer', textAlign: 'center' }}
-        >
+        <div style={{ width: '100%', padding: '14px', background: COLORS.teal600, color: COLORS.white, border: 'none', borderRadius: '12px', textAlign: 'center', boxSizing: 'border-box' }}>
           <div style={{ fontSize: '28px', fontWeight: 800 }}>{inProgressTickets.length}</div>
           <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Working On Now</div>
-        </button>
-        <button
-          onClick={() => setStatusFilter('URGENT')}
-          style={{ width: '100%', padding: '14px', background: COLORS.red500, color: COLORS.white, border: 'none', borderRadius: '12px', cursor: 'pointer', textAlign: 'center' }}
-        >
+        </div>
+        <div style={{ width: '100%', padding: '14px', background: COLORS.red500, color: COLORS.white, border: 'none', borderRadius: '12px', textAlign: 'center', boxSizing: 'border-box' }}>
           <div style={{ fontSize: '28px', fontWeight: 800 }}>{urgentTickets.length}</div>
           <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Urgent</div>
-        </button>
+        </div>
         {SHOW_AVAILABLE_JOBS_NAV && (
           <button
             onClick={() => setPage('available-jobs')}
@@ -2154,47 +2204,40 @@ export default function BuilderDashboard({ profile }) {
             <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Available Jobs</div>
           </button>
         )}
-        <button
-          onClick={() => setStatusFilter('TODO')}
-          style={{ width: '100%', padding: '14px', background: COLORS.blue500, color: COLORS.white, border: 'none', borderRadius: '12px', cursor: 'pointer', textAlign: 'center' }}
-        >
+        <div style={{ width: '100%', padding: '14px', background: COLORS.blue500, color: COLORS.white, border: 'none', borderRadius: '12px', textAlign: 'center', boxSizing: 'border-box' }}>
           <div style={{ fontSize: '28px', fontWeight: 800 }}>{toDoTickets.length}</div>
           <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>To do</div>
-        </button>
-        <button
-          onClick={() => setStatusFilter('HOLD')}
-          style={{ width: '100%', padding: '14px', background: COLORS.amber500, color: COLORS.white, border: 'none', borderRadius: '12px', cursor: 'pointer', textAlign: 'center' }}
-        >
+        </div>
+        <div style={{ width: '100%', padding: '14px', background: COLORS.amber500, color: COLORS.white, border: 'none', borderRadius: '12px', textAlign: 'center', boxSizing: 'border-box' }}>
           <div style={{ fontSize: '28px', fontWeight: 800 }}>{onHoldTickets.length}</div>
           <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>On hold</div>
-        </button>
-        <button
-          onClick={() => setStatusFilter('DONE')}
-          style={{ width: '100%', padding: '14px', background: COLORS.slate500, color: COLORS.white, border: 'none', borderRadius: '12px', cursor: 'pointer', textAlign: 'center' }}
-        >
+        </div>
+        <div style={{ width: '100%', padding: '14px', background: COLORS.slate500, color: COLORS.white, border: 'none', borderRadius: '12px', textAlign: 'center', boxSizing: 'border-box' }}>
           <div style={{ fontSize: '28px', fontWeight: 800 }}>{doneTickets.length}</div>
           <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Done</div>
-        </button>
+        </div>
 
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', border: `1px solid ${COLORS.slate200}`, background: COLORS.slate50, fontSize: '14px', fontWeight: 700, color: COLORS.slate900, boxSizing: 'border-box', cursor: 'pointer' }}
-        >
-          <option value="ALL">All jobs</option>
-          <option value="WORKING">🔧 Working now</option>
-          <option value="URGENT">🚨 Urgent</option>
-          <option value="TODO">📋 To do</option>
-          <option value="HOLD">⏸ On hold</option>
-          <option value="DONE">✓ Done</option>
-        </select>
+        {SHOW_JOB_LIST && (
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            style={{ width: '100%', padding: '12px 14px', borderRadius: '12px', border: `1px solid ${COLORS.slate200}`, background: COLORS.slate50, fontSize: '14px', fontWeight: 700, color: COLORS.slate900, boxSizing: 'border-box', cursor: 'pointer' }}
+          >
+            <option value="ALL">All jobs</option>
+            <option value="WORKING">🔧 Working now</option>
+            <option value="URGENT">🚨 Urgent</option>
+            <option value="TODO">📋 To do</option>
+            <option value="HOLD">⏸ On hold</option>
+            <option value="DONE">✓ Done</option>
+          </select>
+        )}
       </div>
 
       {/* Closest to you -- a nudge, not a reorder. The full list below is
           untouched (still priority first); this just calls out the 1-2
           remaining jobs nearest to wherever the builder most recently
           stopped, so an urgent-but-distant job never gets buried. */}
-      {statusFilter === 'ALL' && nearbyJobs.length > 0 && (
+      {SHOW_NEARBY_JOBS && statusFilter === 'ALL' && nearbyJobs.length > 0 && (
         <div style={{ padding: '16px 16px 0', maxWidth: '600px', margin: '0 auto' }}>
           <p style={{ margin: '0 0 8px 0', fontSize: '11px', fontWeight: 800, color: COLORS.teal700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>📍 Closest to you</p>
           {nearbyJobs.map(({ ticket: t, miles }) => (
@@ -2216,6 +2259,7 @@ export default function BuilderDashboard({ profile }) {
       )}
 
       {/* Job list */}
+      {SHOW_JOB_LIST && (
       <div style={{ padding: '16px', maxWidth: '600px', margin: '0 auto' }}>
         {filteredTickets.length === 0 && (
           <div style={{ background: COLORS.white, borderRadius: '16px', padding: '40px', textAlign: 'center' }}>
@@ -2240,6 +2284,7 @@ export default function BuilderDashboard({ profile }) {
           </div>
         ))}
       </div>
+      )}
       {/* Job detail modal */}
 {selectedTicket && (
   <div style={{ position: 'fixed', top: 'var(--pmms-banner-offset, 0px)', left: 0, right: 0, bottom: 0, background: COLORS.slate100, zIndex: 50, overflowY: 'auto', fontFamily: 'system-ui, sans-serif' }}>
@@ -2410,103 +2455,43 @@ export default function BuilderDashboard({ profile }) {
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            {isMatchedArrival ? (
+            {isMatchedArrival && (
               <div style={{ padding: '12px 14px', borderRadius: '10px', background: COLORS.teal600 + '14', border: `1px solid ${COLORS.teal600}` }}>
-                <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate900, fontWeight: 600 }}>🚗 Coming from your last job — already logged when you left.</p>
+                <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate900, fontWeight: 600 }}>🚗 On your way here — logged when you left your last job.</p>
               </div>
-            ) : (
-            <div>
-              <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: COLORS.slate500, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Coming from</p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {[
-                  { key: 'Home', icon: '🏠' },
-                  { key: 'Office / depot', icon: '🏢' },
-                  { key: 'Already on site', icon: '📍' },
-                  { key: 'Somewhere else', icon: '✏️' },
-                ].map(option => {
-                  const active = fromLocation === option.key
-                  return (
-                    <button
-                      key={option.key}
-                      onClick={() => { setFromLocation(option.key); if (option.key === 'Already on site') setMiles(0) }}
-                      style={{
-                        width: '100%',
-                        padding: '12px',
-                        borderRadius: '10px',
-                        border: active ? `2px solid ${COLORS.teal600}` : `1px solid ${COLORS.slate200}`,
-                        background: active ? `${COLORS.teal600}14` : COLORS.slate50,
-                        color: COLORS.slate900,
-                        fontSize: '14px',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        textAlign: 'left',
-                      }}
-                    >
-                      {option.icon} {option.key}
-                    </button>
-                  )
-                })}
-              </div>
-              {fromLocation === 'Somewhere else' && (
-                <input
-                  type="text"
-                  value={customLocation}
-                  onChange={(e) => setCustomLocation(e.target.value)}
-                  placeholder="Type location..."
-                  style={{ width: '100%', marginTop: '8px', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '14px', boxSizing: 'border-box' }}
-                />
-              )}
-            </div>
             )}
 
-            {fromLocation === 'Already on site' ? (
-              <div style={{ padding: '12px 14px', borderRadius: '10px', background: COLORS.slate50, border: `1px solid ${COLORS.slate200}` }}>
-                <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate600, fontWeight: 600 }}>📍 0 miles — you're already at this property.</p>
+            <div>
+              <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: COLORS.slate500, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Mileage</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', overflow: 'hidden' }}>
+                <button
+                  onClick={() => setMiles(m => Math.max(0, m - 0.5))}
+                  style={{ width: '40px', height: '40px', borderRadius: '50%', background: COLORS.slate500, color: COLORS.white, border: 'none', fontSize: '18px', fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
+                >
+                  −
+                </button>
+                <input
+                  type="number"
+                  step="0.5"
+                  value={miles}
+                  onChange={(e) => setMiles(parseFloat(e.target.value) || 0)}
+                  style={{ flex: 1, minWidth: 0, textAlign: 'center', padding: '10px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '16px', fontWeight: 700, boxSizing: 'border-box' }}
+                />
+                <button
+                  onClick={() => setMiles(m => m + 0.5)}
+                  style={{ width: '40px', height: '40px', borderRadius: '50%', background: COLORS.slate500, color: COLORS.white, border: 'none', fontSize: '18px', fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
+                >
+                  +
+                </button>
               </div>
-            ) : (
-              <div>
-                <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: COLORS.slate500, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Miles driven to get here</p>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', overflow: 'hidden' }}>
-                  <button
-                    onClick={() => setMiles(m => Math.max(0, m - 0.5))}
-                    style={{ width: '40px', height: '40px', borderRadius: '50%', background: COLORS.slate500, color: COLORS.white, border: 'none', fontSize: '18px', fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
-                  >
-                    −
-                  </button>
-                  <input
-                    type="number"
-                    step="0.5"
-                    value={miles}
-                    onChange={(e) => setMiles(parseFloat(e.target.value) || 0)}
-                    style={{ flex: 1, minWidth: 0, textAlign: 'center', padding: '10px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '16px', fontWeight: 700, boxSizing: 'border-box' }}
-                  />
-                  <button
-                    onClick={() => setMiles(m => m + 0.5)}
-                    style={{ width: '40px', height: '40px', borderRadius: '50%', background: COLORS.slate500, color: COLORS.white, border: 'none', fontSize: '18px', fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
-                  >
-                    +
-                  </button>
-                </div>
-              </div>
-            )}
+            </div>
 
             <button
-              onClick={() => {
-                if (!fromLocation) { setClockInError("Please select where you're coming from."); return }
-                if (fromLocation === 'Somewhere else' && !customLocation.trim()) { setClockInError('Please type where you\'re coming from.'); return }
-                // "Already on site" is the one legitimate reason to submit
-                // 0 miles (e.g. a second ticket at a property they never
-                // left) -- any other path with 0 still on the stepper means
-                // they haven't actually entered anything, not that the
-                // trip was genuinely free.
-                if (fromLocation !== 'Already on site' && miles === 0) { setClockInError("Please enter the miles driven, or select 'Already on site' if you didn't travel."); return }
-                setClockInError('')
-                handleClockIn(fromLocation === 'Somewhere else' ? customLocation : fromLocation, miles)
-              }}
+              onClick={() => { setClockInError(''); handleClockIn(null, miles) }}
               disabled={clockingIn}
               style={{ width: '100%', padding: '16px', background: COLORS.teal600, color: COLORS.white, border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: 700, cursor: clockingIn ? 'not-allowed' : 'pointer', opacity: clockingIn ? 0.7 : 1 }}
             >
-              {clockingIn ? 'Getting your location…' : "✓ I've arrived — start work"}
+              {clockingIn ? 'Getting your location…' : "✓ Arrived — start work"}
             </button>
             {clockInError && <p style={{ margin: 0, fontSize: '13px', color: COLORS.red500, fontWeight: 600 }}>{clockInError}</p>}
 
@@ -2709,12 +2694,36 @@ export default function BuilderDashboard({ profile }) {
               </div>
             ) : (
               <>
+                <div>
+                  <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: COLORS.slate500, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Mileage</p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', overflow: 'hidden' }}>
+                    <button
+                      onClick={() => setMiles(m => Math.max(0, m - 0.5))}
+                      style={{ width: '40px', height: '40px', borderRadius: '50%', background: COLORS.slate500, color: COLORS.white, border: 'none', fontSize: '18px', fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
+                    >
+                      −
+                    </button>
+                    <input
+                      type="number"
+                      step="0.5"
+                      value={miles}
+                      onChange={(e) => setMiles(parseFloat(e.target.value) || 0)}
+                      style={{ flex: 1, minWidth: 0, textAlign: 'center', padding: '10px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '16px', fontWeight: 700, boxSizing: 'border-box' }}
+                    />
+                    <button
+                      onClick={() => setMiles(m => m + 0.5)}
+                      style={{ width: '40px', height: '40px', borderRadius: '50%', background: COLORS.slate500, color: COLORS.white, border: 'none', fontSize: '18px', fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
                 <button
-                  onClick={handleResumeWork}
+                  onClick={() => handleResumeWork(miles)}
                   disabled={clockingIn}
                   style={{ width: '100%', padding: '16px', background: COLORS.teal600, color: COLORS.white, border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: 700, cursor: clockingIn ? 'not-allowed' : 'pointer', opacity: clockingIn ? 0.7 : 1 }}
                 >
-                  {clockingIn ? 'Getting your location…' : '✓ Back on site — restart work'}
+                  {clockingIn ? 'Getting your location…' : '✓ Arrived — restart work'}
                 </button>
                 {clockInError && <p style={{ margin: 0, fontSize: '13px', color: COLORS.red500, fontWeight: 600 }}>{clockInError}</p>}
               </>
@@ -2889,6 +2898,232 @@ export default function BuilderDashboard({ profile }) {
   </div>
 )}
 
+      {/* Leaving Site -- Where are you going? */}
+      {page === 'leaving-choices' && (
+        <div style={{ position: 'fixed', top: 'var(--pmms-banner-offset, 0px)', left: 0, right: 0, bottom: 0, background: COLORS.slate100, zIndex: 50, overflowY: 'auto', fontFamily: 'system-ui, sans-serif' }}>
+          <BuilderNavHeader onBack={() => setPage('jobs')} goHome={goHome} menuOpen={menuOpen} setMenuOpen={setMenuOpen} profile={profile} unreadMentions={unreadMentions} setPage={setPage} handleSignOut={handleSignOut} />
+          <div style={{ padding: '16px', maxWidth: '600px', margin: '0 auto' }}>
+            <p style={{ margin: '0 0 12px 0', fontSize: '12px', fontWeight: 700, color: COLORS.slate500, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Where are you going?</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <button
+                onClick={() => { setActivityType('Travel'); setTravelMode('shop'); setActivityNote(''); setActivityError(''); setPage('leaving-materials') }}
+                style={{ width: '100%', padding: '16px', borderRadius: '12px', fontSize: '15px', fontWeight: 700, cursor: 'pointer', border: `1px solid ${COLORS.slate200}`, background: COLORS.slate50, color: COLORS.slate900, textAlign: 'center' }}
+              >
+                🛒 Buying Materials
+              </button>
+              <button
+                onClick={() => { setActivityType('Travel'); setTravelMode('job'); setDestinationTicketId(''); setJobSearchQuery(''); setActivityError(''); setPage('leaving-job') }}
+                style={{ width: '100%', padding: '16px', borderRadius: '12px', fontSize: '15px', fontWeight: 700, cursor: 'pointer', border: 'none', background: COLORS.green600, color: COLORS.white, textAlign: 'center' }}
+              >
+                🚗 Going to Another Job
+              </button>
+              <button
+                onClick={() => { setActivityType('Travel'); setTravelMode('office'); setActivityError(''); setPage('leaving-office') }}
+                style={{ width: '100%', padding: '16px', borderRadius: '12px', fontSize: '15px', fontWeight: 700, cursor: 'pointer', border: `1px solid ${COLORS.slate200}`, background: COLORS.slate50, color: COLORS.slate900, textAlign: 'center' }}
+              >
+                🏢 Going to the Office
+              </button>
+              <button
+                onClick={() => { setActivityType('Break'); setActivityNote(''); setActivityError(''); setPage('leaving-lunch') }}
+                style={{ width: '100%', padding: '16px', borderRadius: '12px', fontSize: '15px', fontWeight: 700, cursor: 'pointer', border: `1px solid ${COLORS.slate200}`, background: COLORS.slate50, color: COLORS.slate900, textAlign: 'center' }}
+              >
+                🍽️ Lunch Break
+              </button>
+              <button
+                onClick={() => setPage('leaving-resume')}
+                style={{ width: '100%', padding: '16px', borderRadius: '12px', fontSize: '15px', fontWeight: 700, cursor: 'pointer', border: 'none', background: COLORS.amber500, color: COLORS.white, textAlign: 'center' }}
+              >
+                ▶ Resume Jobs
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Leaving Site -- Going to Another Job (search) */}
+      {page === 'leaving-job' && (() => {
+        const assignedJobs = tickets.filter(t => t.status === 'Assigned')
+        const q = jobSearchQuery.trim().toLowerCase()
+        const results = (q
+          ? assignedJobs.filter(t =>
+              String(t.ticket_number).startsWith(q) ||
+              (t.property?.address || '').toLowerCase().includes(q) ||
+              (t.category || '').toLowerCase().includes(q) ||
+              (t.description || '').toLowerCase().includes(q)
+            )
+          : assignedJobs
+        ).slice(0, 8)
+        return (
+        <div style={{ position: 'fixed', top: 'var(--pmms-banner-offset, 0px)', left: 0, right: 0, bottom: 0, background: COLORS.slate100, zIndex: 50, overflowY: 'auto', fontFamily: 'system-ui, sans-serif' }}>
+          <BuilderNavHeader onBack={() => setPage('leaving-choices')} goHome={goHome} menuOpen={menuOpen} setMenuOpen={setMenuOpen} profile={profile} unreadMentions={unreadMentions} setPage={setPage} handleSignOut={handleSignOut} />
+          <div style={{ padding: '16px', maxWidth: '600px', margin: '0 auto' }}>
+            <p style={{ margin: '0 0 12px 0', fontSize: '12px', fontWeight: 700, color: COLORS.slate500, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Going to Another Job</p>
+            <input
+              type="text"
+              autoFocus
+              value={jobSearchQuery}
+              onChange={(e) => setJobSearchQuery(e.target.value)}
+              placeholder="Type a job number or address..."
+              style={{ width: '100%', padding: '13px 14px', borderRadius: '12px', border: `1px solid ${COLORS.slate200}`, fontSize: '14px', boxSizing: 'border-box', marginBottom: '14px' }}
+            />
+            {activityError && <p style={{ margin: '0 0 10px 0', fontSize: '12px', color: COLORS.red500, fontWeight: 600 }}>{activityError}</p>}
+            {assignedJobs.length === 0 ? (
+              <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic', textAlign: 'center' }}>No other assigned jobs to head to right now.</p>
+            ) : results.length === 0 ? (
+              <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic', textAlign: 'center' }}>No jobs match "{jobSearchQuery}".</p>
+            ) : (
+              <div style={{ border: `1px solid ${COLORS.slate200}`, borderRadius: '12px', overflow: 'hidden', background: COLORS.white }}>
+                {results.map((t, i) => {
+                  const miles = estimateMilesTo(t)
+                  return (
+                    <button
+                      key={t.id}
+                      onClick={() => handleStartActivity(t.id)}
+                      disabled={startingActivity}
+                      style={{ display: 'block', width: '100%', textAlign: 'left', padding: '12px 14px', border: 'none', borderBottom: i < results.length - 1 ? `1px solid ${COLORS.slate300}` : 'none', background: COLORS.white, cursor: startingActivity ? 'not-allowed' : 'pointer' }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '2px' }}>
+                        <span style={{ fontSize: '10.5px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.05em' }}>#{t.ticket_number} · {t.category}</span>
+                        {miles != null && (
+                          <span style={{ flexShrink: 0, fontSize: '10.5px', fontWeight: 800, color: COLORS.white, background: COLORS.teal600, padding: '2px 8px', borderRadius: '20px', whiteSpace: 'nowrap' }}>{miles.toFixed(1)} mi</span>
+                        )}
+                      </div>
+                      <p style={{ margin: '0 0 2px 0', fontSize: '13.5px', fontWeight: 800, color: COLORS.slate900 }}>{t.property?.address}</p>
+                      <p style={{ margin: 0, fontSize: '12px', color: COLORS.slate500 }}>{t.description}{t.room ? ` — ${t.room}` : ''}</p>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+        )
+      })()}
+
+      {/* Leaving Site -- Buying Materials */}
+      {page === 'leaving-materials' && (() => {
+        const q = activityNote.trim().toLowerCase()
+        const matches = q ? STORE_SUGGESTIONS.filter(s => s.toLowerCase().includes(q)) : []
+        return (
+        <div style={{ position: 'fixed', top: 'var(--pmms-banner-offset, 0px)', left: 0, right: 0, bottom: 0, background: COLORS.slate100, zIndex: 50, overflowY: 'auto', fontFamily: 'system-ui, sans-serif' }}>
+          <BuilderNavHeader onBack={() => setPage('leaving-choices')} goHome={goHome} menuOpen={menuOpen} setMenuOpen={setMenuOpen} profile={profile} unreadMentions={unreadMentions} setPage={setPage} handleSignOut={handleSignOut} />
+          <div style={{ padding: '16px', maxWidth: '600px', margin: '0 auto' }}>
+            <p style={{ margin: '0 0 12px 0', fontSize: '12px', fontWeight: 700, color: COLORS.slate500, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Buying Materials</p>
+            <input
+              type="text"
+              autoFocus
+              value={activityNote}
+              onChange={(e) => setActivityNote(e.target.value)}
+              placeholder="Type a store name, or your own..."
+              style={{ width: '100%', padding: '13px 14px', borderRadius: '12px', border: `1px solid ${COLORS.slate200}`, fontSize: '14px', boxSizing: 'border-box', marginBottom: '10px' }}
+            />
+            {matches.length > 0 ? (
+              <div style={{ marginBottom: '10px' }}>
+                {matches.map(s => (
+                  <button
+                    key={s}
+                    onClick={() => setActivityNote(s)}
+                    style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', marginBottom: '6px', border: `1px solid ${COLORS.slate100}`, borderRadius: '10px', background: COLORS.white, fontSize: '14px', fontWeight: 600, color: COLORS.slate900, cursor: 'pointer' }}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            ) : q ? (
+              <p style={{ margin: '0 0 10px 0', fontSize: '12.5px', color: COLORS.slate400, fontStyle: 'italic' }}>Not listed — "{activityNote}" will be used as typed.</p>
+            ) : null}
+            {activityError && <p style={{ margin: '0 0 10px 0', fontSize: '12px', color: COLORS.red500, fontWeight: 600 }}>{activityError}</p>}
+            <button
+              onClick={() => handleStartActivity()}
+              disabled={startingActivity || !activityNote.trim()}
+              style={{ width: '100%', padding: '14px', background: COLORS.teal600, color: COLORS.white, border: 'none', borderRadius: '12px', fontSize: '14.5px', fontWeight: 700, cursor: (startingActivity || !activityNote.trim()) ? 'not-allowed' : 'pointer', opacity: (startingActivity || !activityNote.trim()) ? 0.5 : 1 }}
+            >
+              {startingActivity ? 'Starting…' : 'Start'}
+            </button>
+          </div>
+        </div>
+        )
+      })()}
+
+      {/* Leaving Site -- Going to the Office */}
+      {page === 'leaving-office' && (
+        <div style={{ position: 'fixed', top: 'var(--pmms-banner-offset, 0px)', left: 0, right: 0, bottom: 0, background: COLORS.slate100, zIndex: 50, overflowY: 'auto', fontFamily: 'system-ui, sans-serif' }}>
+          <BuilderNavHeader onBack={() => setPage('leaving-choices')} goHome={goHome} menuOpen={menuOpen} setMenuOpen={setMenuOpen} profile={profile} unreadMentions={unreadMentions} setPage={setPage} handleSignOut={handleSignOut} />
+          <div style={{ padding: '16px', maxWidth: '600px', margin: '0 auto' }}>
+            <p style={{ margin: '0 0 12px 0', fontSize: '12px', fontWeight: 700, color: COLORS.slate500, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Going to the Office</p>
+            <div style={{ padding: '12px 14px', borderRadius: '10px', background: COLORS.slate50, border: `1px solid ${COLORS.slate200}`, marginBottom: '12px' }}>
+              <p style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: COLORS.slate600 }}>You're heading to the office — no address needed.</p>
+            </div>
+            {activityError && <p style={{ margin: '0 0 10px 0', fontSize: '12px', color: COLORS.red500, fontWeight: 600 }}>{activityError}</p>}
+            <button
+              onClick={() => handleStartActivity()}
+              disabled={startingActivity}
+              style={{ width: '100%', padding: '14px', background: COLORS.teal600, color: COLORS.white, border: 'none', borderRadius: '12px', fontSize: '14.5px', fontWeight: 700, cursor: startingActivity ? 'not-allowed' : 'pointer', opacity: startingActivity ? 0.7 : 1 }}
+            >
+              {startingActivity ? 'Starting…' : 'Start'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Leaving Site -- Lunch Break */}
+      {page === 'leaving-lunch' && (
+        <div style={{ position: 'fixed', top: 'var(--pmms-banner-offset, 0px)', left: 0, right: 0, bottom: 0, background: COLORS.slate100, zIndex: 50, overflowY: 'auto', fontFamily: 'system-ui, sans-serif' }}>
+          <BuilderNavHeader onBack={() => setPage('leaving-choices')} goHome={goHome} menuOpen={menuOpen} setMenuOpen={setMenuOpen} profile={profile} unreadMentions={unreadMentions} setPage={setPage} handleSignOut={handleSignOut} />
+          <div style={{ padding: '16px', maxWidth: '600px', margin: '0 auto' }}>
+            <p style={{ margin: '0 0 12px 0', fontSize: '12px', fontWeight: 700, color: COLORS.slate500, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Lunch Break</p>
+            <input
+              type="text"
+              value={activityNote}
+              onChange={(e) => setActivityNote(e.target.value)}
+              placeholder="Note (optional)"
+              style={{ width: '100%', padding: '13px 14px', borderRadius: '12px', border: `1px solid ${COLORS.slate200}`, fontSize: '14px', boxSizing: 'border-box', marginBottom: '12px' }}
+            />
+            {activityError && <p style={{ margin: '0 0 10px 0', fontSize: '12px', color: COLORS.red500, fontWeight: 600 }}>{activityError}</p>}
+            <button
+              onClick={() => handleStartActivity()}
+              disabled={startingActivity}
+              style={{ width: '100%', padding: '14px', background: COLORS.teal600, color: COLORS.white, border: 'none', borderRadius: '12px', fontSize: '14.5px', fontWeight: 700, cursor: startingActivity ? 'not-allowed' : 'pointer', opacity: startingActivity ? 0.7 : 1 }}
+            >
+              {startingActivity ? 'Starting…' : 'Start'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Leaving Site -- Resume Jobs (on-hold, non-short-trip) */}
+      {page === 'leaving-resume' && (() => {
+        const resumable = onHoldTickets.filter(t => !SHORT_TRIP_REASONS.includes(t.hold_reason))
+        return (
+        <div style={{ position: 'fixed', top: 'var(--pmms-banner-offset, 0px)', left: 0, right: 0, bottom: 0, background: COLORS.slate100, zIndex: 50, overflowY: 'auto', fontFamily: 'system-ui, sans-serif' }}>
+          <BuilderNavHeader onBack={() => setPage('leaving-choices')} goHome={goHome} menuOpen={menuOpen} setMenuOpen={setMenuOpen} profile={profile} unreadMentions={unreadMentions} setPage={setPage} handleSignOut={handleSignOut} />
+          <div style={{ padding: '16px', maxWidth: '600px', margin: '0 auto' }}>
+            <p style={{ margin: '0 0 12px 0', fontSize: '12px', fontWeight: 700, color: COLORS.slate500, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Resume Jobs</p>
+            {resumable.length === 0 ? (
+              <div style={{ background: COLORS.white, borderRadius: '16px', padding: '34px 20px', textAlign: 'center' }}>
+                <p style={{ margin: 0, color: COLORS.slate400, fontWeight: 600 }}>Nothing on hold.</p>
+              </div>
+            ) : resumable.map(t => (
+              <button
+                key={t.id}
+                onClick={() => { setSelectedTicket(t); setPage('jobs') }}
+                style={{ display: 'block', width: '100%', textAlign: 'left', background: COLORS.white, border: `1px solid ${COLORS.slate200}`, borderRadius: '12px', padding: '14px', marginBottom: '10px', cursor: 'pointer' }}
+              >
+                <p style={{ margin: '0 0 2px 0', fontSize: '10.5px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Job #{t.ticket_number} · {t.category}</p>
+                <p style={{ margin: '0 0 4px 0', fontSize: '14.5px', fontWeight: 700, color: COLORS.slate900 }}>{t.property?.address}</p>
+                <p style={{ margin: '0 0 8px 0', fontSize: '12.5px', color: COLORS.slate500 }}>{t.description}{t.room ? ` — ${t.room}` : ''}</p>
+                {(t.hold_reason || t.hold_note) && (
+                  <p style={{ margin: 0, fontSize: '12px', fontWeight: 700, color: COLORS.amber800, background: COLORS.amber50, border: `1px solid ${COLORS.amber300}`, borderRadius: '8px', padding: '6px 10px' }}>
+                    ⏸ {t.hold_reason}{t.hold_note ? ` — ${t.hold_note}` : ''}
+                  </p>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+        )
+      })()}
+
       {/* My Mileage page */}
       {page === 'mileage' && (
         <div style={{ position: 'fixed', top: 'var(--pmms-banner-offset, 0px)', left: 0, right: 0, bottom: 0, background: COLORS.slate100, zIndex: 50, overflowY: 'auto', fontFamily: 'system-ui, sans-serif' }}>
@@ -3003,7 +3238,6 @@ export default function BuilderDashboard({ profile }) {
                 <div key={t.id} style={{ background: COLORS.white, borderRadius: '16px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
                   <div>
                     <p style={{ margin: '0 0 4px 0', fontSize: '14px', fontWeight: 700, color: COLORS.slate900 }}>{t.property?.address}</p>
-                    <p style={{ margin: '0 0 2px 0', fontSize: '13px', color: COLORS.slate500 }}>{t.transit_start}</p>
                     <p style={{ margin: 0, fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Job #{t.ticket_number}</p>
                   </div>
                   <p style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: COLORS.blue500, flexShrink: 0 }}>{t.mileage_logged}</p>
