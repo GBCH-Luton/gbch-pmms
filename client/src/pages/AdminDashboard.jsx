@@ -20,6 +20,7 @@ const AdminDashboardPage = lazy(() => import('./admin/AdminDashboard'))
 const AdminPipeline = lazy(() => import('./admin/AdminPipeline'))
 const AdminProperties = lazy(() => import('./admin/AdminProperties'))
 const AdminCompliance = lazy(() => import('./admin/AdminCompliance'))
+const AdminLandlordLiaison = lazy(() => import('./admin/AdminLandlordLiaison'))
 const AdminVoids = lazy(() => import('./admin/AdminVoids'))
 const AdminSignOff = lazy(() => import('./admin/AdminSignOff'))
 const AdminBuilders = lazy(() => import('./admin/AdminBuilders'))
@@ -57,9 +58,9 @@ const NAV_ITEMS = [
   ...(EVENTS_FEATURE_ENABLED ? [{ key: 'events', label: 'Events', icon: 'calendar', Component: AdminEvents }] : []),
   { key: 'properties', label: 'Properties', icon: 'building', Component: AdminProperties },
   { key: 'voids', label: 'Voids', icon: 'key', Component: AdminVoids, divisions: ['Maintenance'] },
-  // Division dashboards, grouped together in this order -- Landlord
-  // Liaison goes here too once it exists.
+  // Division dashboards, grouped together in this order.
   { key: 'compliance', label: 'Compliance', icon: 'shield', Component: AdminCompliance, divisions: ['Maintenance', 'Compliance'] },
+  { key: 'landlord-liaison', label: 'Landlord Liaison', icon: 'building', Component: AdminLandlordLiaison, divisions: ['Maintenance', 'Landlord Liaison'] },
   { key: 'housekeeping', label: 'Housekeeping', icon: 'broom', Component: AdminHousekeeping, divisionOnly: 'Housekeeping' },
   { key: 'builders', label: 'Staff', icon: 'users', Component: AdminBuilders },
   { key: 'clocking', label: 'Clocking', icon: 'clock', Component: AdminClocking },

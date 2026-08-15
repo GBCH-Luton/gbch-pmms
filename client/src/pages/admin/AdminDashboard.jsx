@@ -555,7 +555,7 @@ export default function AdminDashboard({ profile, onNavigate }) {
     const { data, error } = await supabase
       .schema('pmms')
       .from('tickets')
-      .select('id, status, created_at, completed_at, status_changed_at, first_assigned_at, priority_score, priority_override, mileage_logged, hold_reason, needs_followup')
+      .select('id, status, category, created_at, completed_at, status_changed_at, first_assigned_at, priority_score, priority_override, mileage_logged, hold_reason, needs_followup')
 
     if (!error) setTickets(data)
     setLoading(false)
@@ -757,6 +757,15 @@ export default function AdminDashboard({ profile, onNavigate }) {
     { label: 'Recently Attended', value: gardenAgingCounts.recent, colour: COLORS.green600 },
   ]
 
+  const landlordLiaisonTickets = tickets.filter(t => t.category === 'Landlord Liaison')
+  const landlordLiaisonOpenCount = landlordLiaisonTickets.filter(t => t.status !== 'Completed' && t.status !== 'Archived' && t.status !== 'Cancelled').length
+  const landlordLiaisonUnassignedCount = landlordLiaisonTickets.filter(t => t.status === 'Pending').length
+
+  const landlordLiaisonKpis = [
+    { label: 'Open', value: landlordLiaisonOpenCount, colour: COLORS.indigo700 },
+    { label: 'Unassigned', value: landlordLiaisonUnassignedCount, colour: COLORS.red600 },
+  ]
+
   const pendingSignOffCount = tickets.filter(t => t.status === 'Completed').length
 
   const fleetMileageThisMonth = tickets
@@ -769,6 +778,7 @@ export default function AdminDashboard({ profile, onNavigate }) {
   // section this profile can't see (and couldn't click through to) would
   // just be confusing.
   const complianceVisible = !profile.division || profile.division === 'Compliance'
+  const landlordLiaisonVisible = !profile.division || profile.division === 'Landlord Liaison'
   const voidGardensVisible = !profile.division
 
   // Mirrors every red-coloured Pipeline KPI tile exactly (see kpis above)
@@ -797,6 +807,11 @@ export default function AdminDashboard({ profile, onNavigate }) {
   if (complianceVisible) {
     if (complianceCounts.expired > 0) flaggedLines.push({ target: 'compliance', tone: 'warning', text: <><b>{complianceCounts.expired} compliance certificate{complianceCounts.expired === 1 ? '' : 's'}</b> {complianceCounts.expired === 1 ? 'has' : 'have'} expired.</> })
     else quietLines.push({ target: 'compliance', tone: 'quiet', text: <>Compliance — no updates. {complianceCounts.dueSoon} due soon.</> })
+  }
+
+  if (landlordLiaisonVisible) {
+    if (landlordLiaisonUnassignedCount > 0) flaggedLines.push({ target: 'landlord-liaison', tone: 'warning', text: <><b>{landlordLiaisonUnassignedCount} Landlord Liaison ticket{landlordLiaisonUnassignedCount === 1 ? '' : 's'}</b> {landlordLiaisonUnassignedCount === 1 ? 'is' : 'are'} still unassigned.</> })
+    else quietLines.push({ target: 'landlord-liaison', tone: 'quiet', text: <>Landlord Liaison — no updates. {landlordLiaisonOpenCount} open.</> })
   }
 
   if (voidGardensVisible) {
@@ -853,6 +868,7 @@ export default function AdminDashboard({ profile, onNavigate }) {
         <div style={{ width: '100%' }}>
           <KpiTiles
             kpis={kpis}
+            columns={5}
             onTileClick={(kpi) => onNavigate?.('pipeline', { statusFilter: kpi.statusFilter, priorityFilter: kpi.priorityFilter, stuckOnly: kpi.stuckOnly, needsFollowupOnly: kpi.needsFollowupOnly })}
           />
         </div>
@@ -913,6 +929,17 @@ export default function AdminDashboard({ profile, onNavigate }) {
             <KpiTiles
               kpis={complianceKpis}
               onTileClick={(kpi) => onNavigate?.('compliance', { tierFilter: kpi.tierFilter })}
+            />
+          </div>
+        </DashboardSection>
+      )}
+
+      {landlordLiaisonVisible && (
+        <DashboardSection id="landlord-liaison" title="Landlord Liaison" background={COLORS.white} alertCount={landlordLiaisonUnassignedCount} defaultCollapsed>
+          <div style={{ width: '100%' }}>
+            <KpiTiles
+              kpis={landlordLiaisonKpis}
+              onTileClick={() => onNavigate?.('landlord-liaison')}
             />
           </div>
         </DashboardSection>

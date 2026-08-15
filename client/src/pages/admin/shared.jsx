@@ -230,14 +230,23 @@ export function isTicketStuck(ticket, thresholdsSetting, nowMs = Date.now(), p1T
 // uneven last row for free (each tile's flex-grow shares the leftover
 // space) instead of needing a manual "span the gap" calculation.
 // `kpis` items: { label, value, colour, ...whatever onTileClick needs }.
-export function KpiTiles({ kpis, onTileClick }) {
+// `columns`, when passed, switches from the default flex-wrap (which packs
+// as many tiles as fit per row, leaving an unbalanced lone tile on the last
+// row -- exactly the "8 then 1" problem the Pipeline section hit with 9
+// KPI tiles) to a fixed-column CSS grid instead, so a 9-tile set reliably
+// lays out as 5-then-4 rather than however many happen to fit. Omitted
+// (every other KpiTiles call site), behaviour is unchanged.
+export function KpiTiles({ kpis, onTileClick, columns }) {
   return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
+    <div style={columns
+      ? { display: 'grid', gridTemplateColumns: `repeat(${columns}, 1fr)`, gap: '12px', marginBottom: '16px' }
+      : { display: 'flex', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }
+    }>
       {kpis.map((kpi) => (
         <button
           key={kpi.label}
           onClick={() => onTileClick?.(kpi)}
-          style={{ flex: '1 1 160px', background: kpi.colour, borderRadius: '16px', padding: '16px', border: 'none', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', textAlign: 'center' }}
+          style={{ ...(columns ? {} : { flex: '1 1 160px' }), background: kpi.colour, borderRadius: '16px', padding: '16px', border: 'none', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', textAlign: 'center' }}
         >
           <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{kpi.label}</p>
           <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: COLORS.white }}>{kpi.value}</p>
