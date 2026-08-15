@@ -844,15 +844,15 @@ export default function AdminDashboard({ profile, onNavigate }) {
 
   return (
     <div>
-      {/* Where's the Team is builder-clocking/activity focused -- nothing
-          Landlord Liaison manages, so it's hidden (not removed) for that
-          division alone. A single-person division today; if a second
-          Landlord Liaison hire ever needs it, drop this condition. With
-          nothing to split against, Daily Briefing runs standalone and
-          height="auto" so it shrinks to its own content instead of
-          staying stretched to the fixed height it used to share with
-          TeamWhereabouts. */}
-      {profile.division === 'Landlord Liaison' ? (
+      {/* Where's the Team is builder-clocking/activity focused -- neither
+          Landlord Liaison nor Compliance manage builders, so it's hidden
+          (not removed) for those two divisions. If either division's
+          headcount grows into managing staff of their own, drop this
+          condition for that division. With nothing to split against,
+          Daily Briefing runs standalone and height="auto" so it shrinks
+          to its own content instead of staying stretched to the fixed
+          height it used to share with TeamWhereabouts. */}
+      {(profile.division === 'Landlord Liaison' || profile.division === 'Compliance') ? (
         <div style={{ marginBottom: '16px' }}>
           <DailyBriefing lines={briefingLines} height="auto" />
         </div>
