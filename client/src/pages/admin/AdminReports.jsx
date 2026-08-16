@@ -55,18 +55,48 @@ const AI_EXAMPLE_QUESTIONS = [
   'What is the most common issue category?',
   'Which builders have completed the most jobs?',
   'Which categories had the most tickets this month?',
+  'How is [Name] doing this week?',
+  "Compare all builders' performance this week",
 ]
 
 // Matched first, before ever calling Claude -- these questions stay
 // instant and free. Anything that doesn't match one of these falls
-// through to the real API call.
+// through to the real API call. Note these regexes only decide WHICH
+// runner handles the question -- they don't capture data out of the
+// text. The two parameterised ones (person/compare) re-scan the raw
+// question themselves (aiExtractStaffName/aiExtractPeriod below) so a
+// runner works for any name or period, not one regex per person.
 const AI_PATTERNS = [
   { test: /propert.*(most|top).*(ticket|issue)|which propert.*(most|open)/i, key: 'topProperties' },
   { test: /compliance.*(overdue|expired|expiring|lapsing)|overdue.*compliance/i, key: 'complianceOverdue' },
+  { test: /compare.*(builder|housekeep|staff).*performance/i, key: 'compareStaffPerformance' },
+  { test: /how(?:'s| is) .+(doing|performing)/i, key: 'personPerformance' },
   { test: /categor.*ticket.*month|month.*categor.*ticket/i, key: 'topCategoryThisMonth' },
   { test: /(most common|top).*(issue|categor)/i, key: 'topCategory' },
   { test: /builder.*(most|top).*(job|complet)|who.*most.*job/i, key: 'topBuilders' },
 ]
+
+// Scans the raw question text for a period phrase -- "this week" is the
+// default when none is named, since that's the most common ask.
+function aiExtractPeriod(questionText) {
+  const t = questionText.toLowerCase()
+  const today = todayIso()
+  if (t.includes('today')) return { from: today, to: today, label: 'today' }
+  if (t.includes('this month')) return { from: firstOfMonth(today), to: today, label: 'this month' }
+  return { from: mondayOfWeek(today), to: today, label: 'this week' }
+}
+
+// Scans the raw question text for any real staff member's name -- this is
+// what lets one runner answer "How is Tony doing?" / "How is Paulo doing?"
+// / any other name without a separate regex or free-list entry per
+// person. Tries a full-name match first, then just the first name, both
+// as a substring so "How's Tony getting on" still resolves.
+function aiExtractStaffName(questionText, builders) {
+  const t = questionText.toLowerCase()
+  return builders.find(b => t.includes(b.name.toLowerCase()))
+    || builders.find(b => t.includes(b.name.toLowerCase().split(' ')[0]))
+    || null
+}
 
 async function aiRunTopProperties() {
   const { data } = await supabase.schema('pmms').from('tickets').select('id, property_id').not('status', 'in', '("Completed","Archived","Cancelled")')
@@ -159,7 +189,75 @@ async function aiRunTopCategoryThisMonth() {
   }
 }
 
-const AI_RUNNERS = { topProperties: aiRunTopProperties, complianceOverdue: aiRunComplianceOverdue, topCategory: aiRunTopCategory, topCategoryThisMonth: aiRunTopCategoryThisMonth, topBuilders: aiRunTopBuilders }
+// Parameterised -- unlike the runners above, these read the raw question
+// text (and the already-loaded staff list) themselves, so one runner
+// answers the question for any name/period instead of needing a new
+// regex or free-list entry per person.
+async function aiRunPersonPerformance(questionText, builders) {
+  const staff = aiExtractStaffName(questionText, builders)
+  if (!staff) {
+    return { summary: 'I couldn’t tell which staff member you meant — try including their first name, e.g. "How is Tony doing this week?"', rows: [] }
+  }
+  const period = aiExtractPeriod(questionText)
+
+  const { data: completedData } = await supabase.schema('pmms').from('tickets')
+    .select('id, completed_at, created_at')
+    .eq('assigned_builder_id', staff.id)
+    .in('status', ['Completed', 'Archived'])
+    .gte('completed_at', `${period.from}T00:00:00`)
+    .lte('completed_at', `${period.to}T23:59:59`)
+  const { data: openData } = await supabase.schema('pmms').from('tickets')
+    .select('id')
+    .eq('assigned_builder_id', staff.id)
+    .not('status', 'in', '("Completed","Archived","Cancelled")')
+
+  const completed = completedData || []
+  const openCount = openData?.length || 0
+  const avgMs = completed.length
+    ? completed.reduce((sum, t) => sum + Math.max(0, new Date(t.completed_at) - new Date(t.created_at)), 0) / completed.length
+    : null
+
+  return {
+    summary: `${staff.name} completed ${completed.length} job${completed.length === 1 ? '' : 's'} ${period.label}${avgMs != null ? `, averaging ${formatDuration(avgMs)} raise-to-completion` : ''}. ${openCount} job${openCount === 1 ? '' : 's'} currently open.`,
+    stats: [
+      { label: `Completed ${period.label}`, value: completed.length, colour: COLORS.green600 },
+      { label: 'Currently open', value: openCount, colour: COLORS.amber600 },
+      ...(avgMs != null ? [{ label: 'Avg. completion time', value: formatDuration(avgMs), colour: COLORS.teal600 }] : []),
+    ],
+  }
+}
+
+async function aiRunCompareStaffPerformance(questionText, builders) {
+  const period = aiExtractPeriod(questionText)
+  const t = questionText.toLowerCase()
+  const pool = t.includes('housekeep') ? builders.filter(b => b.division === 'Housekeeping')
+    : t.includes('builder') ? builders.filter(b => b.division === 'Maintenance')
+    : builders
+
+  if (!pool.length) return { summary: 'No matching staff found.', rows: [] }
+
+  const { data } = await supabase.schema('pmms').from('tickets')
+    .select('assigned_builder_id')
+    .in('assigned_builder_id', pool.map(b => b.id))
+    .in('status', ['Completed', 'Archived'])
+    .gte('completed_at', `${period.from}T00:00:00`)
+    .lte('completed_at', `${period.to}T23:59:59`)
+
+  const counts = {}
+  ;(data || []).forEach(row => { counts[row.assigned_builder_id] = (counts[row.assigned_builder_id] || 0) + 1 })
+  const rows = pool.map(b => ({ label: b.name.split(' ')[0], value: counts[b.id] || 0 })).sort((a, b) => b.value - a.value)
+
+  return {
+    summary: rows.length && rows[0].value > 0 ? `${rows[0].label} completed the most jobs ${period.label}, with ${rows[0].value}.` : `No completed jobs ${period.label} yet.`,
+    columns: ['Staff', `Completed (${period.label})`], rows,
+  }
+}
+
+const AI_RUNNERS = {
+  topProperties: aiRunTopProperties, complianceOverdue: aiRunComplianceOverdue, topCategory: aiRunTopCategory,
+  topCategoryThisMonth: aiRunTopCategoryThisMonth, topBuilders: aiRunTopBuilders,
+  personPerformance: aiRunPersonPerformance, compareStaffPerformance: aiRunCompareStaffPerformance,
+}
 
 export default function AdminReports({ profile, onNavigate }) {
   const [tickets, setTickets] = useState(null)
@@ -219,8 +317,8 @@ export default function AdminReports({ profile, onNavigate }) {
     const match = AI_PATTERNS.find(p => p.test.test(aiQuestion))
     if (match) {
       setAiLoading(true)
-      const result = await AI_RUNNERS[match.key]()
-      setAiAnswer({ free: true, ...result })
+      const result = await AI_RUNNERS[match.key](aiQuestion, builders)
+      setAiAnswer({ free: true, question: aiQuestion, ...result })
       setAiLoading(false)
       return
     }
@@ -232,7 +330,7 @@ export default function AdminReports({ profile, onNavigate }) {
     if (fnError) { setAiError(await extractFunctionError(fnError)); return }
     if (data?.error) { setAiError(data.error); return }
 
-    setAiAnswer({ free: false, text: data.answer })
+    setAiAnswer({ free: false, question: aiQuestion, text: data.answer })
     setAiUsagePage(0)
     loadAiUsage()
   }
@@ -586,7 +684,7 @@ export default function AdminReports({ profile, onNavigate }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: COLORS.violet100, border: `1px solid ${COLORS.violet500}`, borderRadius: '12px', padding: '12px 16px', marginBottom: '12px' }}>
               <span style={{ fontSize: '18px' }}>✨</span>
               <p style={{ margin: 0, fontSize: '12.5px', color: COLORS.slate600, lineHeight: 1.5 }}>
-                <b style={{ color: COLORS.slate900 }}>Ask AI</b> — the 4 example questions below are answered instantly and free. Anything else is sent to Claude Haiku 4.5, generated from a snapshot of your real data (review before relying on it for decisions) and has a small real cost (see AI Usage below).
+                <b style={{ color: COLORS.slate900 }}>Ask AI</b> — the free questions below are answered instantly with no cost. Anything else is sent to Claude Haiku 4.5, generated from a snapshot of your real data (review before relying on it for decisions) and has a small real cost (see AI Usage below).
               </p>
             </div>
 
@@ -645,31 +743,6 @@ export default function AdminReports({ profile, onNavigate }) {
           {aiError && (
             <div style={{ ...cardStyle, background: COLORS.red50, border: `1px solid ${COLORS.red200}` }}>
               <p style={{ margin: 0, fontSize: '13px', color: COLORS.red900 }}>{aiError}</p>
-            </div>
-          )}
-
-          {aiAnswer && aiAnswer.free && (
-            <div style={cardStyle}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
-                <p style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: COLORS.slate900 }}>{aiAnswer.summary}</p>
-                <span style={{ fontSize: '10px', fontWeight: 800, color: COLORS.green600, background: COLORS.green100, padding: '2px 8px', borderRadius: '20px', whiteSpace: 'nowrap' }}>Free</span>
-              </div>
-              {aiAnswer.rows.length > 0 && (
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead><tr><th style={thStyle}>{aiAnswer.columns[0]}</th><th style={thStyle}>{aiAnswer.columns[1]}</th></tr></thead>
-                  <tbody>
-                    {aiAnswer.rows.map((r, i) => (
-                      <tr key={i}><td style={tdStyle}>{r.label}</td><td style={tdStyle}>{r.value}</td></tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          )}
-
-          {aiAnswer && !aiAnswer.free && (
-            <div style={cardStyle}>
-              <p style={{ margin: 0, fontSize: '14px', color: COLORS.slate900, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{aiAnswer.text}</p>
             </div>
           )}
 
@@ -987,6 +1060,87 @@ export default function AdminReports({ profile, onNavigate }) {
 
       {showSnapshot && (
         <PrintableOperationsSnapshot summary={snapshotSummary} onClose={() => setShowSnapshot(false)} />
+      )}
+
+      {aiAnswer && (
+        <div style={modalOverlayStyle} onClick={() => setAiAnswer(null)}>
+          <div style={{ ...modalCardStyle, maxWidth: '640px' }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px' }}>
+              <p style={modalTitleStyle}>{aiAnswer.question}</p>
+              {aiAnswer.free && (
+                <span style={{ fontSize: '10px', fontWeight: 800, color: COLORS.green600, background: COLORS.green100, padding: '2px 8px', borderRadius: '20px', whiteSpace: 'nowrap', flexShrink: 0 }}>Free</span>
+              )}
+            </div>
+            <p style={modalSubtitleStyle}>{aiAnswer.free ? 'Answered instantly, no cost' : 'Answered by Claude Haiku 4.5 — review before relying on it'}</p>
+
+            {!aiAnswer.free && (
+              <p style={{ margin: '16px 0 0 0', fontSize: '13.5px', color: COLORS.slate600, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{aiAnswer.text}</p>
+            )}
+
+            {aiAnswer.free && (
+              <p style={{ margin: '16px 0 0 0', fontSize: '14px', fontWeight: 700, color: COLORS.slate900 }}>{aiAnswer.summary}</p>
+            )}
+
+            {aiAnswer.free && aiAnswer.stats && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginTop: '16px' }}>
+                {aiAnswer.stats.map(s => (
+                  <div key={s.label} style={tileStyle(s.colour)}>
+                    <p style={tileLabelStyle}>{s.label}</p>
+                    <p style={tileValueStyle}>{s.value}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {aiAnswer.free && aiAnswer.rows && aiAnswer.rows.length === 0 && (
+              <p style={{ margin: '16px 0 0 0', fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>Nothing to show.</p>
+            )}
+
+            {aiAnswer.free && aiAnswer.rows && aiAnswer.rows.length > 0 && (() => {
+              const numeric = aiAnswer.rows.every(r => typeof r.value === 'number')
+              if (numeric) {
+                return (
+                  <>
+                    <div style={{ marginTop: '18px', overflowX: 'auto' }}>
+                      <SimpleBarChart
+                        data={aiAnswer.rows.map(r => ({ label: r.label, values: [r.value] }))}
+                        series={[{ name: aiAnswer.columns?.[1] || 'Value', color: COLORS.teal600 }]}
+                      />
+                    </div>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '16px' }}>
+                      <thead><tr><th style={thStyle}>{aiAnswer.columns[0]}</th><th style={thStyle}>{aiAnswer.columns[1]}</th></tr></thead>
+                      <tbody>
+                        {aiAnswer.rows.map((r, i) => (
+                          <tr key={i}><td style={tdStyle}>{r.label}</td><td style={tdStyle}>{r.value}</td></tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </>
+                )
+              }
+              // Non-numeric rows (e.g. compliance status text) don't fit a bar
+              // chart, so they get colour-coded badges instead -- still visual,
+              // just not forced into a chart shape that wouldn't mean anything.
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '16px' }}>
+                  {aiAnswer.rows.map((r, i) => {
+                    const badge = /expired/i.test(r.value) ? { bg: COLORS.red100, fg: COLORS.red600 }
+                      : /expiring|due soon/i.test(r.value) ? { bg: COLORS.amber100, fg: COLORS.amber600 }
+                      : { bg: COLORS.slate100, fg: COLORS.slate500 }
+                    return (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', padding: '10px 12px', background: COLORS.slate50, borderRadius: '10px' }}>
+                        <span style={{ fontSize: '13px', color: COLORS.slate900 }}>{r.label}</span>
+                        <span style={{ fontSize: '11px', fontWeight: 800, color: badge.fg, background: badge.bg, padding: '3px 10px', borderRadius: '20px', flexShrink: 0 }}>{r.value}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            })()}
+
+            <button onClick={() => setAiAnswer(null)} style={{ ...modalCancelBtnStyle, width: '100%', marginTop: '20px' }}>Close</button>
+          </div>
+        </div>
       )}
 
       {viewingLogRow && (
