@@ -5,7 +5,7 @@
 // calculations across every property/builder instead of one at a time, and
 // adds a date range so it shows trends, not just a live snapshot.
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import { COLORS } from '../../lib/colors'
 import { attachProperties } from '../../lib/properties'
@@ -636,6 +636,7 @@ export default function AdminReports({ profile, onNavigate }) {
 
   const [aiQuestion, setAiQuestion] = useState('')
   const [aiQuestionDropdownOpen, setAiQuestionDropdownOpen] = useState(false)
+  const aiQuestionBoxRef = useRef(null)
   const [aiLoading, setAiLoading] = useState(false)
   const [aiAnswer, setAiAnswer] = useState(null)
   const [aiError, setAiError] = useState('')
@@ -644,6 +645,24 @@ export default function AdminReports({ profile, onNavigate }) {
   const [aiUsagePage, setAiUsagePage] = useState(0)
   const [aiUsagePageSize, setAiUsagePageSize] = useState(5)
   const [aiUsageTab, setAiUsageTab] = useState('history')
+
+  // Closes the free-question dropdown on a genuine outside click, rather
+  // than relying on the input's blur event -- the clear (x) button
+  // deliberately keeps focus on the input via preventDefault (see its
+  // onMouseDown below) so it can reopen the list, which means blur no
+  // longer reliably fires afterwards to close it again. A document-level
+  // listener catches every outside click regardless of what did or didn't
+  // blur the input.
+  useEffect(() => {
+    if (!aiQuestionDropdownOpen) return
+    function handleOutsideClick(e) {
+      if (aiQuestionBoxRef.current && !aiQuestionBoxRef.current.contains(e.target)) {
+        setAiQuestionDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleOutsideClick)
+    return () => document.removeEventListener('mousedown', handleOutsideClick)
+  }, [aiQuestionDropdownOpen])
 
   useEffect(() => {
     load()
@@ -1046,13 +1065,12 @@ export default function AdminReports({ profile, onNavigate }) {
 
             <div style={{ ...cardStyle, boxSizing: 'border-box' }}>
               <div style={{ display: 'flex', gap: '8px', position: 'relative' }}>
-                <div style={{ flex: 1, position: 'relative' }}>
+                <div ref={aiQuestionBoxRef} style={{ flex: 1, position: 'relative' }}>
                   <input
                     type="text"
                     value={aiQuestion}
                     onChange={(e) => { setAiQuestion(e.target.value); setAiQuestionDropdownOpen(true) }}
                     onFocus={() => setAiQuestionDropdownOpen(true)}
-                    onBlur={() => setTimeout(() => setAiQuestionDropdownOpen(false), 150)}
                     onKeyDown={(e) => e.key === 'Enter' && !aiLoading && aiQuestion.trim() && handleAskAi()}
                     placeholder="Type your own, or pick a free question below"
                     style={{ width: '100%', height: '44px', padding: `0 ${aiQuestion ? '38px' : '14px'} 0 14px`, borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13.5px', boxSizing: 'border-box' }}
@@ -1076,15 +1094,17 @@ export default function AdminReports({ profile, onNavigate }) {
                         <p style={{ margin: 0, padding: '8px 14px', fontSize: '10.5px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: `1px solid ${COLORS.slate100}` }}>
                           Free questions — instant, no cost ({filtered.length})
                         </p>
-                        {/* Capped to ~10 rows tall so a growing free-question
-                            list doesn't push the dropdown off-screen -- the
-                            rest scroll into view instead of expanding it. */}
-                        <div style={{ maxHeight: '370px', overflowY: 'auto' }}>
+                        {/* Capped to exactly 10 rows tall (fixed row height,
+                            so no partial 11th row peeks in at the bottom) --
+                            the rest scroll into view instead of pushing the
+                            dropdown further down the page. */}
+                        <div style={{ maxHeight: '380px', overflowY: 'auto' }}>
                           {filtered.map(q => (
                             <button
                               key={q}
+                              title={q}
                               onMouseDown={(e) => { e.preventDefault(); setAiQuestion(q); setAiAnswer(null); setAiError(''); setAiQuestionDropdownOpen(false) }}
-                              style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', border: 'none', borderTop: `1px solid ${COLORS.slate100}`, background: COLORS.white, color: COLORS.slate900, fontSize: '13px', cursor: 'pointer' }}
+                              style={{ display: 'flex', alignItems: 'center', width: '100%', height: '38px', boxSizing: 'border-box', textAlign: 'left', padding: '0 14px', border: 'none', borderTop: `1px solid ${COLORS.slate100}`, background: COLORS.white, color: COLORS.slate900, fontSize: '13px', cursor: 'pointer', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
                             >
                               {q}
                             </button>
