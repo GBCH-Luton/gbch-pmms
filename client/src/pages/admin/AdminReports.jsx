@@ -45,19 +45,25 @@ function avgMsLabel(ms) {
 // AI Usage table below). The whole box stays admin-only, matching the
 // original AI Trial page's own scoping, since the Claude fallback half
 // of it has a real cost.
+// Grows over time: each entry here started as a real (paid) Claude
+// question that got asked often enough to be worth answering for free
+// instead -- see AI_PATTERNS/AI_RUNNERS below for the matching regex and
+// the actual local computation behind each one.
 const AI_EXAMPLE_QUESTIONS = [
   'Which properties have the most open tickets?',
   'What compliance is overdue or expiring soon?',
   'What is the most common issue category?',
   'Which builders have completed the most jobs?',
+  'Which categories had the most tickets this month?',
 ]
 
-// Matched first, before ever calling Claude -- these 4 questions stay
+// Matched first, before ever calling Claude -- these questions stay
 // instant and free. Anything that doesn't match one of these falls
 // through to the real API call.
 const AI_PATTERNS = [
   { test: /propert.*(most|top).*(ticket|issue)|which propert.*(most|open)/i, key: 'topProperties' },
   { test: /compliance.*(overdue|expired|expiring|lapsing)|overdue.*compliance/i, key: 'complianceOverdue' },
+  { test: /categor.*ticket.*month|month.*categor.*ticket/i, key: 'topCategoryThisMonth' },
   { test: /(most common|top).*(issue|categor)/i, key: 'topCategory' },
   { test: /builder.*(most|top).*(job|complet)|who.*most.*job/i, key: 'topBuilders' },
 ]
@@ -138,7 +144,22 @@ async function aiRunTopBuilders() {
   }
 }
 
-const AI_RUNNERS = { topProperties: aiRunTopProperties, complianceOverdue: aiRunComplianceOverdue, topCategory: aiRunTopCategory, topBuilders: aiRunTopBuilders }
+async function aiRunTopCategoryThisMonth() {
+  const monthStart = firstOfMonth(todayIso())
+  const { data } = await supabase.schema('pmms').from('tickets').select('category, created_at').gte('created_at', `${monthStart}T00:00:00`)
+  if (!data?.length) return { summary: 'No tickets logged this month yet.', rows: [] }
+
+  const counts = {}
+  data.forEach(t => { if (t.category) counts[t.category] = (counts[t.category] || 0) + 1 })
+  const rows = Object.entries(counts).map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value).slice(0, 5)
+
+  return {
+    summary: rows.length ? `${rows[0].label} had the most tickets this month, with ${rows[0].value}.` : 'No tickets logged this month yet.',
+    columns: ['Category', 'Tickets (this month)'], rows,
+  }
+}
+
+const AI_RUNNERS = { topProperties: aiRunTopProperties, complianceOverdue: aiRunComplianceOverdue, topCategory: aiRunTopCategory, topCategoryThisMonth: aiRunTopCategoryThisMonth, topBuilders: aiRunTopBuilders }
 
 export default function AdminReports({ profile, onNavigate }) {
   const [tickets, setTickets] = useState(null)
@@ -166,6 +187,7 @@ export default function AdminReports({ profile, onNavigate }) {
   const isAdmin = profile.role === 'admin'
 
   const [aiQuestion, setAiQuestion] = useState('')
+  const [aiQuestionDropdownOpen, setAiQuestionDropdownOpen] = useState(false)
   const [aiLoading, setAiLoading] = useState(false)
   const [aiAnswer, setAiAnswer] = useState(null)
   const [aiError, setAiError] = useState('')
@@ -569,26 +591,46 @@ export default function AdminReports({ profile, onNavigate }) {
             </div>
 
             <div style={{ ...cardStyle, flex: 1, boxSizing: 'border-box' }}>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <input
-                  type="text"
-                  value={aiQuestion}
-                  onChange={(e) => setAiQuestion(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && !aiLoading && aiQuestion.trim() && handleAskAi()}
-                  placeholder="e.g. Which properties have the most open tickets?"
-                  style={{ flex: 1, height: '44px', padding: '0 14px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13.5px', boxSizing: 'border-box' }}
-                />
+              <div style={{ display: 'flex', gap: '8px', position: 'relative' }}>
+                <div style={{ flex: 1, position: 'relative' }}>
+                  <input
+                    type="text"
+                    value={aiQuestion}
+                    onChange={(e) => { setAiQuestion(e.target.value); setAiQuestionDropdownOpen(true) }}
+                    onFocus={() => setAiQuestionDropdownOpen(true)}
+                    onBlur={() => setTimeout(() => setAiQuestionDropdownOpen(false), 150)}
+                    onKeyDown={(e) => e.key === 'Enter' && !aiLoading && aiQuestion.trim() && handleAskAi()}
+                    placeholder="Type your own, or pick a free question below"
+                    style={{ width: '100%', height: '44px', padding: '0 14px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13.5px', boxSizing: 'border-box' }}
+                  />
+                  {aiQuestionDropdownOpen && (() => {
+                    const filtered = AI_EXAMPLE_QUESTIONS.filter(q => q.toLowerCase().includes(aiQuestion.trim().toLowerCase()))
+                    if (filtered.length === 0) return null
+                    return (
+                      <div style={{ position: 'absolute', top: '48px', left: 0, right: 0, zIndex: 10, background: COLORS.white, border: `1px solid ${COLORS.slate200}`, borderRadius: '10px', boxShadow: '0 6px 18px rgba(0,0,0,0.12)', overflow: 'hidden' }}>
+                        <p style={{ margin: 0, padding: '8px 14px', fontSize: '10.5px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: `1px solid ${COLORS.slate100}` }}>
+                          Free questions — instant, no cost
+                        </p>
+                        {filtered.map(q => (
+                          <button
+                            key={q}
+                            onMouseDown={(e) => { e.preventDefault(); setAiQuestion(q); setAiAnswer(null); setAiError(''); setAiQuestionDropdownOpen(false) }}
+                            style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', border: 'none', borderTop: `1px solid ${COLORS.slate100}`, background: COLORS.white, color: COLORS.slate900, fontSize: '13px', cursor: 'pointer' }}
+                          >
+                            {q}
+                          </button>
+                        ))}
+                      </div>
+                    )
+                  })()}
+                </div>
                 <button onClick={handleAskAi} disabled={!aiQuestion.trim() || aiLoading} style={{ padding: '0 20px', borderRadius: '10px', border: 'none', background: COLORS.teal700, color: COLORS.white, fontWeight: 700, fontSize: '13px', cursor: 'pointer', opacity: !aiQuestion.trim() || aiLoading ? 0.5 : 1 }}>
                   {aiLoading ? '...' : 'Ask →'}
                 </button>
               </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '12px' }}>
-                {AI_EXAMPLE_QUESTIONS.map(q => (
-                  <button key={q} onClick={() => { setAiQuestion(q); setAiAnswer(null); setAiError('') }} style={{ fontSize: '11.5px', padding: '5px 10px', borderRadius: '999px', border: `1px solid ${COLORS.slate200}`, background: COLORS.slate50, color: COLORS.slate600, cursor: 'pointer' }}>
-                    {q}
-                  </button>
-                ))}
-              </div>
+              <p style={{ margin: '10px 0 0', fontSize: '11px', color: COLORS.slate400 }}>
+                Asked something useful more than once? Tell your PMMS admin the exact wording and it can be added to the free list above.
+              </p>
             </div>
           </div>
 
