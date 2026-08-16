@@ -171,6 +171,15 @@ export default function AdminPipeline({
   const [editMileageError, setEditMileageError] = useState('')
   const [editMileageSaving, setEditMileageSaving] = useState(false)
 
+  // Lets a manager overturn the builder's own "this needs a follow-up
+  // visit" flag from the completion form -- e.g. it was ticked in error,
+  // or the follow-up has since been dealt with and the flag/note is stale.
+  const [editFollowupModalTicket, setEditFollowupModalTicket] = useState(null)
+  const [editFollowupNeeded, setEditFollowupNeeded] = useState(false)
+  const [editFollowupNote, setEditFollowupNote] = useState('')
+  const [editFollowupError, setEditFollowupError] = useState('')
+  const [editFollowupSaving, setEditFollowupSaving] = useState(false)
+
   const [historyModalTicket, setHistoryModalTicket] = useState(null)
   const [historyEvents, setHistoryEvents] = useState([])
 
@@ -317,6 +326,14 @@ export default function AdminPipeline({
       setEditMileageError('')
     }
   }, [editMileageModalTicket])
+
+  useEffect(() => {
+    if (editFollowupModalTicket) {
+      setEditFollowupNeeded(!!editFollowupModalTicket.needs_followup)
+      setEditFollowupNote(editFollowupModalTicket.followup_note || '')
+      setEditFollowupError('')
+    }
+  }, [editFollowupModalTicket])
 
   useEffect(() => {
     if (priorityModalTicket) {
@@ -679,6 +696,31 @@ export default function AdminPipeline({
     await postAuditEvent(t.id, profile, 'Mileage Updated', `Mileage changed from ${t.mileage_logged ?? 0} to ${newMileage}.`)
     await fetchTickets()
     closeEditMileageModal()
+  }
+
+  function openEditFollowupModal(ticket) { setEditFollowupModalTicket(ticket) }
+  function closeEditFollowupModal() { setEditFollowupModalTicket(null) }
+
+  async function submitEditFollowup() {
+    const t = editFollowupModalTicket
+    const newNote = editFollowupNeeded ? (editFollowupNote.trim() || null) : null
+
+    setEditFollowupSaving(true)
+    const { error } = await supabase
+      .schema('pmms')
+      .from('tickets')
+      .update({ needs_followup: editFollowupNeeded, followup_note: newNote })
+      .eq('id', t.id)
+    setEditFollowupSaving(false)
+
+    if (error) { setEditFollowupError(error.message); return }
+
+    await postAuditEvent(t.id, profile, 'Follow-up Updated',
+      editFollowupNeeded
+        ? `Marked as needing follow-up.${newNote ? ` Note: ${newNote}` : ''}`
+        : 'Follow-up flag cleared.')
+    await fetchTickets()
+    closeEditFollowupModal()
   }
 
   function openPriorityModal(ticket) { setPriorityModalTicket(ticket) }
@@ -1338,8 +1380,15 @@ export default function AdminPipeline({
 
                             <div style={expandSectionStyle}>
                               <p style={expandSectionTitleStyle}>Notes &amp; Flags</p>
-                              {!t.no_access_flag && !(t.status === 'On Hold' && t.hold_reason) && !t.completion_note && !t.cancel_reason && (
+                              {!t.no_access_flag && !(t.status === 'On Hold' && t.hold_reason) && !t.completion_note && !t.cancel_reason && !t.needs_followup && (
                                 <p style={{ fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic', margin: 0 }}>No notes on this ticket</p>
+                              )}
+
+                              {t.needs_followup && (
+                                <div style={{ padding: '8px 10px', background: COLORS.violet100, border: `1px solid ${COLORS.violet500}`, borderRadius: '8px', marginBottom: '8px' }}>
+                                  <p style={{ margin: 0, fontSize: '11px', fontWeight: 800, color: COLORS.violet600 }}>Needs Follow-up</p>
+                                  {t.followup_note && <p style={{ margin: '2px 0 0 0', fontSize: '12px', color: COLORS.slate900 }}>{t.followup_note}</p>}
+                                </div>
                               )}
 
                               {t.status === 'Cancelled' && t.cancel_reason && (
@@ -1377,6 +1426,13 @@ export default function AdminPipeline({
                               <button onClick={() => openCommentsModal(t)} style={actionBtnStyle}>Comments</button>
                               <button onClick={() => openHistoryModal(t)} style={actionBtnStyle}>History</button>
                               <button onClick={() => openPriorityModal(t)} style={actionBtnStyle}>Priority</button>
+                              {/* Same Archived-is-locked rule as Edit Estimate/Edit
+                                  Mileage below -- once signed off, only the raiser
+                                  can still edit a ticket, so a manager's update
+                                  here would silently fail past that point. */}
+                              {t.status !== 'Archived' && (
+                                <button onClick={() => openEditFollowupModal(t)} style={actionBtnStyle}>{t.needs_followup ? 'Edit Follow-up' : 'Flag Follow-up'}</button>
+                              )}
                               {EVENTS_FEATURE_ENABLED && (
                                 <button onClick={() => openAddToEventModal(t)} style={actionBtnStyle}>{t.event_id ? 'Change Event' : 'Add to Event'}</button>
                               )}
@@ -1765,6 +1821,49 @@ export default function AdminPipeline({
               <button onClick={closeEditMileageModal} style={modalCancelBtnStyle}>Cancel</button>
               <button onClick={submitEditMileage} disabled={editMileageSaving} style={{ ...modalConfirmBtnStyle, opacity: editMileageSaving ? 0.6 : 1, cursor: editMileageSaving ? 'not-allowed' : 'pointer' }}>
                 {editMileageSaving ? 'Saving...' : 'Save'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editFollowupModalTicket && (
+        <div style={modalOverlayStyle}>
+          <div style={modalCardStyle}>
+            <p style={modalTitleStyle}>Follow-up — Ticket #{editFollowupModalTicket.ticket_number}</p>
+            <p style={modalSubtitleStyle}>{editFollowupModalTicket.property?.address}</p>
+
+            <label style={modalLabelStyle}>Needs a follow-up visit?</label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <label style={radioRowStyle(editFollowupNeeded)}>
+                <input type="radio" name="edit-followup" checked={editFollowupNeeded} onChange={() => setEditFollowupNeeded(true)} />
+                <span style={{ fontSize: '13px', fontWeight: 600, color: COLORS.slate900 }}>Yes</span>
+              </label>
+              <label style={radioRowStyle(!editFollowupNeeded)}>
+                <input type="radio" name="edit-followup" checked={!editFollowupNeeded} onChange={() => setEditFollowupNeeded(false)} />
+                <span style={{ fontSize: '13px', fontWeight: 600, color: COLORS.slate900 }}>No</span>
+              </label>
+            </div>
+
+            {editFollowupNeeded && (
+              <>
+                <label style={modalLabelStyle}>Note (optional)</label>
+                <textarea
+                  value={editFollowupNote}
+                  onChange={(e) => setEditFollowupNote(e.target.value)}
+                  rows={2}
+                  placeholder="e.g. Needs a second visit once the part arrives..."
+                  style={modalTextareaStyle}
+                />
+              </>
+            )}
+
+            {editFollowupError && <p style={modalErrorStyle}>{editFollowupError}</p>}
+
+            <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
+              <button onClick={closeEditFollowupModal} style={modalCancelBtnStyle}>Cancel</button>
+              <button onClick={submitEditFollowup} disabled={editFollowupSaving} style={{ ...modalConfirmBtnStyle, opacity: editFollowupSaving ? 0.6 : 1, cursor: editFollowupSaving ? 'not-allowed' : 'pointer' }}>
+                {editFollowupSaving ? 'Saving...' : 'Save'}
               </button>
             </div>
           </div>
