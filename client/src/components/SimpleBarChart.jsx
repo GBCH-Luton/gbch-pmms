@@ -12,12 +12,17 @@ import { COLORS } from '../lib/colors'
 //   individual bar becomes clickable (data items can carry extra fields like a
 //   week's ISO date range purely for the caller's own use -- this component
 //   never reads anything but label/values off them).
+// hideAxisLabels?: boolean -- drops the text label under each bar/group and
+//   relies on the native SVG <title> hover tooltip (label + value) instead.
+//   For callers whose labels are long/unpredictable (e.g. Ask AI's answer
+//   modal -- ticket numbers plus a full address, or full staff names) where
+//   the labels would otherwise overlap or clip past the chart's edge.
 
 const CHART_HEIGHT = 180
 const BAR_GAP = 4
 const GROUP_GAP = 18
 
-export default function SimpleBarChart({ data, series, height = CHART_HEIGHT, onBarClick }) {
+export default function SimpleBarChart({ data, series, height = CHART_HEIGHT, onBarClick, hideAxisLabels = false }) {
   if (!data || data.length === 0) {
     return <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>No data for this range.</p>
   }
@@ -31,8 +36,8 @@ export default function SimpleBarChart({ data, series, height = CHART_HEIGHT, on
   // short date labels ("08/06") always fit horizontally, but longer text
   // like "Other / Unlisted Trade" overlaps its neighbour at this bar width
   // unless it's angled out of the way.
-  const rotateLabels = series.length === 1 && data.some(d => d.label.length > 6)
-  const labelHeight = rotateLabels ? 70 : 34
+  const rotateLabels = !hideAxisLabels && series.length === 1 && data.some(d => d.label.length > 6)
+  const labelHeight = hideAxisLabels ? 8 : (rotateLabels ? 70 : 34)
   // Rotated labels lean left from their anchor point, so the first one needs
   // breathing room on the left edge or it clips outside the SVG viewport.
   const sidePadding = rotateLabels ? 40 : 0
@@ -56,7 +61,9 @@ export default function SimpleBarChart({ data, series, height = CHART_HEIGHT, on
                       style={onBarClick && value > 0 ? { cursor: 'pointer' } : undefined}
                       onClick={onBarClick && value > 0 ? () => onBarClick(d, seriesIdx) : undefined}
                     >
-                      {onBarClick && value > 0 && <title>{`${s.name}: ${value} -- click to view in Pipeline`}</title>}
+                      {value > 0 && (
+                        <title>{`${d.label}${series.length > 1 ? ` — ${s.name}` : ''}: ${value}${onBarClick ? ' -- click to view in Pipeline' : ''}`}</title>
+                      )}
                     </rect>
                     {value > 0 && (
                       <text x={x + barWidth / 2} y={y - 4} textAnchor="middle" fontSize="10" fontWeight="700" fill={COLORS.slate600}>
@@ -66,7 +73,7 @@ export default function SimpleBarChart({ data, series, height = CHART_HEIGHT, on
                   </g>
                 )
               })}
-              {rotateLabels ? (
+              {!hideAxisLabels && (rotateLabels ? (
                 <text
                   x={groupX + groupWidth / 2} y={height + 14}
                   textAnchor="end" fontSize="11" fontWeight="600" fill={COLORS.slate500}
@@ -78,7 +85,7 @@ export default function SimpleBarChart({ data, series, height = CHART_HEIGHT, on
                 <text x={groupX + groupWidth / 2} y={height + 18} textAnchor="middle" fontSize="11" fontWeight="600" fill={COLORS.slate500}>
                   {d.label}
                 </text>
-              )}
+              ))}
             </g>
           )
         })}

@@ -1477,6 +1477,7 @@ export default function AdminReports({ profile, onNavigate }) {
                       <SimpleBarChart
                         data={aiAnswer.rows.map(r => ({ label: r.label, values: [r.value] }))}
                         series={[{ name: aiAnswer.columns?.[1] || 'Value', color: COLORS.teal600 }]}
+                        hideAxisLabels
                       />
                     </div>
                     <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '16px' }}>
