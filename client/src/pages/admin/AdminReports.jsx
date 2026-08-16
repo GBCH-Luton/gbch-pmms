@@ -15,8 +15,8 @@ import {
   fetchAssignableBuilders, fetchAssignableStaffForDivision, resolveCategoryDivision, computeAvgTurnaroundMs, computeAvgResponseMs, buildWeeklyTrend,
   isoDateNDaysAgo, todayIso, extractFunctionError, formatUKDateTime, formatUKDate, computeComplianceAging, COMPLIANCE_TYPES,
   fetchComplianceAgingCounts, statusColour, statusLabel,
-  modalOverlayStyle, modalCardStyle, modalTitleStyle, modalSubtitleStyle, modalCancelBtnStyle,
-  shiftDateKey, mondayOfWeek, firstOfMonth, ACTIVITY_CATEGORY_META,
+  modalOverlayStyle, modalCardStyle, modalTitleStyle, modalSubtitleStyle,
+  shiftDateKey, mondayOfWeek, firstOfMonth, ACTIVITY_CATEGORY_META, fetchAttendanceSummary,
 } from './shared'
 import SimpleBarChart from '../../components/SimpleBarChart'
 import PrintableOperationsSnapshot from '../../components/PrintableOperationsSnapshot'
@@ -28,6 +28,11 @@ const tileValueStyle = { margin: 0, fontSize: '26px', fontWeight: 800, color: CO
 const cardStyle = { background: COLORS.white, borderRadius: '16px', padding: '18px 20px', marginBottom: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }
 const cardLabelStyle = { margin: '0 0 12px 0', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }
 const filterLabelStyle = { display: 'block', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, marginBottom: '4px' }
+// modalCancelBtnStyle (shared.jsx) is barely visible on a white modal card --
+// slate-100 on white reads as almost no button at all. Local override just
+// for this page's two modals, not a change to the shared style everywhere
+// else in the app relies on.
+const modalCloseBtnStyle = { flex: 1, padding: '10px', background: COLORS.slate200, color: COLORS.slate900, border: `1px solid ${COLORS.slate300}`, borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }
 
 
 function avgMsLabel(ms) {
@@ -57,20 +62,31 @@ const AI_EXAMPLE_QUESTIONS = [
   'Which categories had the most tickets this month?',
   'How is [Name] doing this week?',
   "Compare all builders' performance this week",
+  'Who has the most open tickets right now?',
+  'Who is clocking in late the most this week?',
+  'Who has the fastest average completion time this month?',
+  'Who has the most overtime this week?',
+  'Who has flagged the most jobs as unable to do this month?',
 ]
 
 // Matched first, before ever calling Claude -- these questions stay
 // instant and free. Anything that doesn't match one of these falls
 // through to the real API call. Note these regexes only decide WHICH
 // runner handles the question -- they don't capture data out of the
-// text. The two parameterised ones (person/compare) re-scan the raw
-// question themselves (aiExtractStaffName/aiExtractPeriod below) so a
-// runner works for any name or period, not one regex per person.
+// text. The parameterised ones (person/compare/workload/late/fastest/
+// overtime/unable-to-do) re-scan the raw question themselves
+// (aiExtractStaffName/aiExtractPeriod below) so a runner works for any
+// name or period, not one regex per person or per week.
 const AI_PATTERNS = [
   { test: /propert.*(most|top).*(ticket|issue)|which propert.*(most|open)/i, key: 'topProperties' },
   { test: /compliance.*(overdue|expired|expiring|lapsing)|overdue.*compliance/i, key: 'complianceOverdue' },
   { test: /compare.*(builder|housekeep|staff).*performance/i, key: 'compareStaffPerformance' },
   { test: /how(?:'s| is) .+(doing|performing)/i, key: 'personPerformance' },
+  { test: /who.*(most|highest).*(open|workload)|which (builder|staff|housekeeper).*(most|highest).*open/i, key: 'mostOpenTickets' },
+  { test: /who.*late.*most|late.*most.*clock/i, key: 'mostLateClockIns' },
+  { test: /fastest.*(completion|average)/i, key: 'fastestCompletion' },
+  { test: /overtime/i, key: 'mostOvertime' },
+  { test: /unable to do|most.*flagged/i, key: 'mostUnableToDo' },
   { test: /categor.*ticket.*month|month.*categor.*ticket/i, key: 'topCategoryThisMonth' },
   { test: /(most common|top).*(issue|categor)/i, key: 'topCategory' },
   { test: /builder.*(most|top).*(job|complet)|who.*most.*job/i, key: 'topBuilders' },
@@ -253,10 +269,113 @@ async function aiRunCompareStaffPerformance(questionText, builders) {
   }
 }
 
+// Current workload snapshot -- no period, since "open right now" is
+// inherently a live count, not something that varies by date range.
+async function aiRunMostOpenTickets(questionText, builders) {
+  const { data } = await supabase.schema('pmms').from('tickets')
+    .select('assigned_builder_id')
+    .not('assigned_builder_id', 'is', null)
+    .not('status', 'in', '("Completed","Archived","Cancelled")')
+  if (!data?.length) return { summary: 'No open tickets right now.', rows: [] }
+
+  const nameById = Object.fromEntries(builders.map(b => [b.id, b.name.split(' ')[0]]))
+  const counts = {}
+  data.forEach(t => { counts[t.assigned_builder_id] = (counts[t.assigned_builder_id] || 0) + 1 })
+  const rows = Object.entries(counts).map(([id, value]) => ({ label: nameById[id] || 'Unknown', value })).sort((a, b) => b.value - a.value).slice(0, 8)
+
+  return {
+    summary: rows.length ? `${rows[0].label} has the most open tickets right now, with ${rows[0].value}.` : 'No open tickets right now.',
+    columns: ['Staff', 'Open tickets'], rows,
+  }
+}
+
+// Late clock-ins and overtime both reuse fetchAttendanceSummary (shared.jsx)
+// -- the same per-day threshold logic BuilderProfilePage.jsx's Attendance
+// tab and My Metrics already rely on, rather than re-deriving "late" or
+// "overtime" from daily_attendance columns a second time here.
+async function aiRunMostLateClockIns(questionText, builders) {
+  const period = aiExtractPeriod(questionText)
+  const summaries = await Promise.all(builders.map(async b => ({ b, s: await fetchAttendanceSummary(b.id, period.from, period.to) })))
+  const rows = summaries.map(({ b, s }) => ({ label: b.name.split(' ')[0], value: s.lateCount }))
+    .filter(r => r.value > 0).sort((a, b) => b.value - a.value).slice(0, 8)
+
+  return {
+    summary: rows.length ? `${rows[0].label} clocked in late the most ${period.label}, ${rows[0].value} time${rows[0].value === 1 ? '' : 's'}.` : `No late clock-ins ${period.label}.`,
+    columns: ['Staff', `Late clock-ins (${period.label})`], rows,
+  }
+}
+
+async function aiRunFastestCompletion(questionText, builders) {
+  const period = aiExtractPeriod(questionText)
+  const { data } = await supabase.schema('pmms').from('tickets')
+    .select('assigned_builder_id, created_at, completed_at')
+    .not('assigned_builder_id', 'is', null)
+    .in('status', ['Completed', 'Archived'])
+    .gte('completed_at', `${period.from}T00:00:00`)
+    .lte('completed_at', `${period.to}T23:59:59`)
+  if (!data?.length) return { summary: `No completed jobs ${period.label} yet.`, rows: [] }
+
+  const nameById = Object.fromEntries(builders.map(b => [b.id, b.name.split(' ')[0]]))
+  const totals = {}
+  data.forEach(t => {
+    const ms = Math.max(0, new Date(t.completed_at) - new Date(t.created_at))
+    if (!totals[t.assigned_builder_id]) totals[t.assigned_builder_id] = { sum: 0, count: 0 }
+    totals[t.assigned_builder_id].sum += ms
+    totals[t.assigned_builder_id].count += 1
+  })
+  const rows = Object.entries(totals)
+    .map(([id, v]) => ({ label: nameById[id] || 'Unknown', value: Math.round((v.sum / v.count / 3600000) * 10) / 10 }))
+    .sort((a, b) => a.value - b.value).slice(0, 8)
+
+  return {
+    summary: rows.length ? `${rows[0].label} has the fastest average completion time ${period.label}, at ${rows[0].value}h per job.` : `No completed jobs ${period.label} yet.`,
+    columns: ['Staff', 'Avg. hours per job'], rows,
+  }
+}
+
+async function aiRunMostOvertime(questionText, builders) {
+  const period = aiExtractPeriod(questionText)
+  const summaries = await Promise.all(builders.map(async b => ({ b, s: await fetchAttendanceSummary(b.id, period.from, period.to) })))
+  const rows = summaries.map(({ b, s }) => ({ label: b.name.split(' ')[0], value: s.overtimeCount }))
+    .filter(r => r.value > 0).sort((a, b) => b.value - a.value).slice(0, 8)
+
+  return {
+    summary: rows.length ? `${rows[0].label} had the most overtime days ${period.label}, ${rows[0].value}.` : `No overtime days logged ${period.label}.`,
+    columns: ['Staff', `Overtime days (${period.label})`], rows,
+  }
+}
+
+// "Unable to Do" is the same Builder v2 Stop-sheet flag the main dashboard's
+// KPI tile already tracks (hold_reason === 'Unable to Do the Job') -- a
+// recurring pattern here is usually a training/access/tooling gap worth a
+// conversation, not a discipline issue, so this is framed as "flagged," not
+// "failed."
+async function aiRunMostUnableToDo(questionText, builders) {
+  const period = aiExtractPeriod(questionText)
+  const { data } = await supabase.schema('pmms').from('tickets')
+    .select('assigned_builder_id')
+    .eq('hold_reason', 'Unable to Do the Job')
+    .gte('status_changed_at', `${period.from}T00:00:00`)
+    .lte('status_changed_at', `${period.to}T23:59:59`)
+  if (!data?.length) return { summary: `No jobs flagged as unable to do ${period.label}.`, rows: [] }
+
+  const nameById = Object.fromEntries(builders.map(b => [b.id, b.name.split(' ')[0]]))
+  const counts = {}
+  data.forEach(t => { if (t.assigned_builder_id) counts[t.assigned_builder_id] = (counts[t.assigned_builder_id] || 0) + 1 })
+  const rows = Object.entries(counts).map(([id, value]) => ({ label: nameById[id] || 'Unknown', value })).sort((a, b) => b.value - a.value).slice(0, 8)
+
+  return {
+    summary: rows.length ? `${rows[0].label} flagged the most jobs as unable to do ${period.label}, ${rows[0].value}.` : `No jobs flagged as unable to do ${period.label}.`,
+    columns: ['Staff', `Unable to Do flags (${period.label})`], rows,
+  }
+}
+
 const AI_RUNNERS = {
   topProperties: aiRunTopProperties, complianceOverdue: aiRunComplianceOverdue, topCategory: aiRunTopCategory,
   topCategoryThisMonth: aiRunTopCategoryThisMonth, topBuilders: aiRunTopBuilders,
   personPerformance: aiRunPersonPerformance, compareStaffPerformance: aiRunCompareStaffPerformance,
+  mostOpenTickets: aiRunMostOpenTickets, mostLateClockIns: aiRunMostLateClockIns,
+  fastestCompletion: aiRunFastestCompletion, mostOvertime: aiRunMostOvertime, mostUnableToDo: aiRunMostUnableToDo,
 }
 
 export default function AdminReports({ profile, onNavigate }) {
@@ -679,16 +798,22 @@ export default function AdminReports({ profile, onNavigate }) {
       <h2 style={{ margin: '0 0 16px 0', fontSize: '18px', fontWeight: 800, color: COLORS.slate900 }}>Reports</h2>
 
       {isAdmin ? (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', alignItems: 'stretch' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: COLORS.violet100, border: `1px solid ${COLORS.violet500}`, borderRadius: '12px', padding: '12px 16px', marginBottom: '12px' }}>
-              <span style={{ fontSize: '18px' }}>✨</span>
-              <p style={{ margin: 0, fontSize: '12.5px', color: COLORS.slate600, lineHeight: 1.5 }}>
-                <b style={{ color: COLORS.slate900 }}>Ask AI</b> — the free questions below are answered instantly with no cost. Anything else is sent to Claude Haiku 4.5, generated from a snapshot of your real data (review before relying on it for decisions) and has a small real cost (see AI Usage below).
-              </p>
-            </div>
+            {/* Hidden 2026-08-16 -- the explanatory banner was only needed
+                before the free-question list was self-explanatory; the box
+                itself, its placeholder text, and the "Free" badge on each
+                answer already carry the same information now. */}
+            {false && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: COLORS.violet100, border: `1px solid ${COLORS.violet500}`, borderRadius: '12px', padding: '12px 16px', marginBottom: '12px' }}>
+                <span style={{ fontSize: '18px' }}>✨</span>
+                <p style={{ margin: 0, fontSize: '12.5px', color: COLORS.slate600, lineHeight: 1.5 }}>
+                  <b style={{ color: COLORS.slate900 }}>Ask AI</b> — the free questions below are answered instantly with no cost. Anything else is sent to Claude Haiku 4.5, generated from a snapshot of your real data (review before relying on it for decisions) and has a small real cost (see AI Usage below).
+                </p>
+              </div>
+            )}
 
-            <div style={{ ...cardStyle, flex: 1, boxSizing: 'border-box' }}>
+            <div style={{ ...cardStyle, boxSizing: 'border-box' }}>
               <div style={{ display: 'flex', gap: '8px', position: 'relative' }}>
                 <div style={{ flex: 1, position: 'relative' }}>
                   <input
@@ -699,8 +824,19 @@ export default function AdminReports({ profile, onNavigate }) {
                     onBlur={() => setTimeout(() => setAiQuestionDropdownOpen(false), 150)}
                     onKeyDown={(e) => e.key === 'Enter' && !aiLoading && aiQuestion.trim() && handleAskAi()}
                     placeholder="Type your own, or pick a free question below"
-                    style={{ width: '100%', height: '44px', padding: '0 14px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13.5px', boxSizing: 'border-box' }}
+                    style={{ width: '100%', height: '44px', padding: `0 ${aiQuestion ? '38px' : '14px'} 0 14px`, borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13.5px', boxSizing: 'border-box' }}
                   />
+                  {aiQuestion && (
+                    <button
+                      type="button"
+                      onMouseDown={(e) => { e.preventDefault(); setAiQuestion(''); setAiAnswer(null); setAiError(''); setAiQuestionDropdownOpen(false) }}
+                      title="Clear"
+                      aria-label="Clear question"
+                      style={{ position: 'absolute', top: '50%', right: '10px', transform: 'translateY(-50%)', width: '22px', height: '22px', borderRadius: '50%', border: 'none', background: COLORS.slate100, color: COLORS.slate500, fontSize: '13px', lineHeight: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    >
+                      ✕
+                    </button>
+                  )}
                   {aiQuestionDropdownOpen && (() => {
                     const filtered = AI_EXAMPLE_QUESTIONS.filter(q => q.toLowerCase().includes(aiQuestion.trim().toLowerCase()))
                     if (filtered.length === 0) return null
@@ -1138,7 +1274,7 @@ export default function AdminReports({ profile, onNavigate }) {
               )
             })()}
 
-            <button onClick={() => setAiAnswer(null)} style={{ ...modalCancelBtnStyle, width: '100%', marginTop: '20px' }}>Close</button>
+            <button onClick={() => setAiAnswer(null)} style={{ ...modalCloseBtnStyle, width: '100%', marginTop: '20px' }}>Close</button>
           </div>
         </div>
       )}
@@ -1154,7 +1290,7 @@ export default function AdminReports({ profile, onNavigate }) {
             <p style={{ margin: '16px 0 0 0', fontSize: '13.5px', color: COLORS.slate600, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
               {viewingLogRow.answer}
             </p>
-            <button onClick={() => setViewingLogRow(null)} style={{ ...modalCancelBtnStyle, width: '100%', marginTop: '20px' }}>Close</button>
+            <button onClick={() => setViewingLogRow(null)} style={{ ...modalCloseBtnStyle, width: '100%', marginTop: '20px' }}>Close</button>
           </div>
         </div>
       )}
