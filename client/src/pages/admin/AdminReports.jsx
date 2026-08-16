@@ -11,12 +11,13 @@ import { COLORS } from '../../lib/colors'
 import { attachProperties } from '../../lib/properties'
 import { fetchAllMaintenanceCategoryNames } from '../../lib/maintenanceCategories'
 import {
-  formatDuration, filterSelectStyle, thStyle, tdStyle,
+  formatDuration, formatDurationDays, filterSelectStyle, thStyle, tdStyle,
   fetchAssignableBuilders, fetchAssignableStaffForDivision, resolveCategoryDivision, computeAvgTurnaroundMs, computeAvgResponseMs, buildWeeklyTrend,
   isoDateNDaysAgo, todayIso, extractFunctionError, formatUKDateTime, formatUKDate, computeComplianceAging, COMPLIANCE_TYPES,
-  fetchComplianceAgingCounts, statusColour, statusLabel,
+  fetchComplianceAgingCounts, fetchVoidAgingCounts, fetchHousekeepingCounts, statusColour, statusLabel,
   modalOverlayStyle, modalCardStyle, modalTitleStyle, modalSubtitleStyle,
   shiftDateKey, mondayOfWeek, firstOfMonth, ACTIVITY_CATEGORY_META, fetchAttendanceSummary,
+  priorityTierLabel, fetchPriorityThresholds,
 } from './shared'
 import SimpleBarChart from '../../components/SimpleBarChart'
 import PrintableOperationsSnapshot from '../../components/PrintableOperationsSnapshot'
@@ -67,6 +68,16 @@ const AI_EXAMPLE_QUESTIONS = [
   'Who has the fastest average completion time this month?',
   'Who has the most overtime this week?',
   'Who has flagged the most jobs as unable to do this month?',
+  'Which tickets have been open the longest?',
+  'How many tickets were raised this week vs last week?',
+  'Which day of the week has the most tickets raised?',
+  'How long do tickets take to get signed off after completion?',
+  'Which properties have repeat issues in the same category?',
+  'Who is raising the most tickets this month?',
+  'How many void properties are over their target turnaround time right now?',
+  'Who has missed or incomplete clock-outs this week?',
+  'How many housekeeping visits are overdue or delayed right now?',
+  'Does urgent priority actually get resolved faster than standard?',
 ]
 
 // Matched first, before ever calling Claude -- these questions stay
@@ -90,6 +101,16 @@ const AI_PATTERNS = [
   { test: /categor.*ticket.*month|month.*categor.*ticket/i, key: 'topCategoryThisMonth' },
   { test: /(most common|top).*(issue|categor)/i, key: 'topCategory' },
   { test: /builder.*(most|top).*(job|complet)|who.*most.*job/i, key: 'topBuilders' },
+  { test: /tickets?.*(open|longest)|longest.*open/i, key: 'oldestOpenTickets' },
+  { test: /this week.*(vs|last week)|last week.*this week/i, key: 'ticketVolumeTrend' },
+  { test: /day of the week|busiest day/i, key: 'busiestDayOfWeek' },
+  { test: /sign(ed)?[ -]?off/i, key: 'signOffSpeed' },
+  { test: /repeat.*(issue|categor)|same categor.*repeat/i, key: 'repeatIssues' },
+  { test: /who.*rais.*most|rais.*most.*ticket/i, key: 'topRaisers' },
+  { test: /void.*(turnaround|target|overdue)/i, key: 'voidTurnaround' },
+  { test: /missed.*clock|clock.*(missed|incomplete)/i, key: 'missedClockOuts' },
+  { test: /housekeeping visit|routine visit.*(overdue|delayed|missed)/i, key: 'missedHousekeepingVisits' },
+  { test: /urgent.*(faster|resolv)|priority.*(faster|resolv)/i, key: 'priorityResolutionSpeed' },
 ]
 
 // Scans the raw question text for a period phrase -- "this week" is the
@@ -370,12 +391,222 @@ async function aiRunMostUnableToDo(questionText, builders) {
   }
 }
 
+async function aiRunOldestOpenTickets() {
+  const { data } = await supabase.schema('pmms').from('tickets')
+    .select('ticket_number, category, created_at, property_id')
+    .not('status', 'in', '("Completed","Archived","Cancelled")')
+  if (!data?.length) return { summary: 'No open tickets right now.', rows: [] }
+
+  const withProps = await attachProperties(data, 'address')
+  const nowMs = Date.now()
+  const ranked = withProps
+    .map(t => ({ label: `#${t.ticket_number} ${t.property?.address || 'Unknown'}`, ageMs: nowMs - new Date(t.created_at).getTime() }))
+    .sort((a, b) => b.ageMs - a.ageMs)
+    .slice(0, 8)
+  const rows = ranked.map(r => ({ label: r.label, value: Math.round((r.ageMs / 86400000) * 10) / 10 }))
+
+  return {
+    summary: `Ticket ${ranked[0].label.split(' ')[0]} has been open the longest, ${formatDurationDays(ranked[0].ageMs)}.`,
+    columns: ['Ticket', 'Days open'], rows,
+  }
+}
+
+async function aiRunTicketVolumeTrend() {
+  const today = todayIso()
+  const thisWeekStart = mondayOfWeek(today)
+  const lastWeekStart = shiftDateKey(thisWeekStart, -7)
+  const lastWeekEnd = shiftDateKey(thisWeekStart, -1)
+
+  const { data } = await supabase.schema('pmms').from('tickets').select('created_at').gte('created_at', `${lastWeekStart}T00:00:00`)
+  const rows_ = data || []
+  const thisWeekCount = rows_.filter(t => t.created_at >= `${thisWeekStart}T00:00:00`).length
+  const lastWeekCount = rows_.filter(t => t.created_at >= `${lastWeekStart}T00:00:00` && t.created_at <= `${lastWeekEnd}T23:59:59`).length
+  const diff = thisWeekCount - lastWeekCount
+  const trendWord = diff > 0 ? `up ${diff}` : diff < 0 ? `down ${Math.abs(diff)}` : 'unchanged'
+
+  return {
+    summary: `${thisWeekCount} ticket${thisWeekCount === 1 ? '' : 's'} raised this week vs ${lastWeekCount} last week (${trendWord}).`,
+    columns: ['Week', 'Tickets raised'],
+    rows: [{ label: 'Last week', value: lastWeekCount }, { label: 'This week', value: thisWeekCount }],
+  }
+}
+
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+
+async function aiRunBusiestDayOfWeek() {
+  const { data } = await supabase.schema('pmms').from('tickets').select('created_at')
+  if (!data?.length) return { summary: 'No tickets logged yet.', rows: [] }
+
+  const counts = [0, 0, 0, 0, 0, 0, 0]
+  data.forEach(t => { counts[new Date(t.created_at).getDay()] += 1 })
+  const rows = DAY_NAMES.map((label, i) => ({ label, value: counts[i] })).sort((a, b) => b.value - a.value)
+
+  return {
+    summary: `${rows[0].label} sees the most tickets raised, ${rows[0].value} all-time.`,
+    columns: ['Day', 'Tickets raised (all-time)'], rows,
+  }
+}
+
+// Mirrors AdminSignOff.jsx's own signOffWaitMs (Archived tickets:
+// status_changed_at - completed_at, the moment the raiser signed off minus
+// the moment the builder finished) -- same definition, computed here as an
+// average/max instead of a per-ticket list.
+async function aiRunSignOffSpeed() {
+  const { data } = await supabase.schema('pmms').from('tickets')
+    .select('ticket_number, completed_at, status_changed_at')
+    .eq('status', 'Archived')
+    .not('completed_at', 'is', null)
+  const signedOff = (data || []).filter(t => t.status_changed_at)
+  if (!signedOff.length) return { summary: 'No tickets have been signed off yet.', rows: [] }
+
+  const waits = signedOff.map(t => Math.max(0, new Date(t.status_changed_at) - new Date(t.completed_at)))
+  const avgMs = waits.reduce((sum, w) => sum + w, 0) / waits.length
+  const maxMs = Math.max(...waits)
+  const under24h = waits.filter(w => w < 86400000).length
+
+  return {
+    summary: `Signed-off tickets wait an average of ${formatDurationDays(avgMs)} after completion before the raiser signs off. ${under24h} of ${signedOff.length} were signed off within a day.`,
+    stats: [
+      { label: 'Average wait', value: formatDurationDays(avgMs), colour: COLORS.teal600 },
+      { label: 'Longest wait', value: formatDurationDays(maxMs), colour: COLORS.red600 },
+      { label: 'Within a day', value: `${under24h} / ${signedOff.length}`, colour: COLORS.green600 },
+    ],
+  }
+}
+
+async function aiRunRepeatIssues() {
+  const { data } = await supabase.schema('pmms').from('tickets').select('property_id, category')
+  if (!data?.length) return { summary: 'No tickets logged yet.', rows: [] }
+
+  const counts = {}
+  data.forEach(t => {
+    if (!t.property_id || !t.category) return
+    const key = `${t.property_id}::${t.category}`
+    counts[key] = (counts[key] || 0) + 1
+  })
+  const repeats = Object.entries(counts).filter(([, c]) => c >= 2).map(([key, count]) => ({ propertyId: key.split('::')[0], category: key.split('::')[1], count }))
+  if (!repeats.length) return { summary: 'No property has raised the same issue category more than once.', rows: [] }
+
+  const withProps = await attachProperties(repeats.map(r => ({ property_id: r.propertyId })), 'address')
+  const rows = repeats
+    .map((r, i) => ({ label: `${withProps[i].property?.address || 'Unknown'} — ${r.category}`, value: r.count }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 8)
+
+  return {
+    summary: `${rows[0].label} has come up ${rows[0].value} times — the most repeated issue on the portfolio.`,
+    columns: ['Property — Category', 'Times raised'], rows,
+  }
+}
+
+async function aiRunTopRaisers() {
+  const monthStart = firstOfMonth(todayIso())
+  const { data } = await supabase.schema('pmms').from('tickets').select('raised_by_name, created_at').gte('created_at', `${monthStart}T00:00:00`)
+  const counts = {}
+  ;(data || []).forEach(t => { if (t.raised_by_name) counts[t.raised_by_name] = (counts[t.raised_by_name] || 0) + 1 })
+  const rows = Object.entries(counts).map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value).slice(0, 8)
+  if (!rows.length) return { summary: 'No tickets raised this month yet.', rows: [] }
+
+  return {
+    summary: `${rows[0].label} has raised the most tickets this month, ${rows[0].value}.`,
+    columns: ['Raised by', 'Tickets (this month)'], rows,
+  }
+}
+
+// Reuses fetchVoidAgingCounts (shared.jsx) -- same source of truth as the
+// dashboard's Void Aging tiles and the Voids page's own KPI strip, not a
+// re-derived copy.
+async function aiRunVoidTurnaround() {
+  const counts = await fetchVoidAgingCounts()
+  const total = counts.overdue + counts.aging + counts.recent
+  if (!total) return { summary: 'No void rooms right now.', rows: [] }
+
+  return {
+    summary: `${counts.overdue} void room${counts.overdue === 1 ? ' is' : 's are'} over the target turnaround time, out of ${total} currently void.`,
+    stats: [
+      { label: 'Overdue', value: counts.overdue, colour: COLORS.red600 },
+      { label: 'Aging', value: counts.aging, colour: COLORS.amber600 },
+      { label: 'Recent', value: counts.recent, colour: COLORS.green600 },
+    ],
+  }
+}
+
+// missedClockOutCount (fetchAttendanceSummary, shared.jsx) already covers
+// both a flagged missed_clock_out AND a still-open row from a past day
+// (see that function's own wasMissed logic) -- no separate "incomplete"
+// count needed here, that would double-count the same days.
+async function aiRunMissedClockOuts(questionText, builders) {
+  const period = aiExtractPeriod(questionText)
+  const summaries = await Promise.all(builders.map(async b => ({ b, s: await fetchAttendanceSummary(b.id, period.from, period.to) })))
+  const rows = summaries.map(({ b, s }) => ({ label: b.name.split(' ')[0], value: s.missedClockOutCount }))
+    .filter(r => r.value > 0).sort((a, b) => b.value - a.value).slice(0, 8)
+
+  return {
+    summary: rows.length ? `${rows[0].label} has the most missed or incomplete clock-outs ${period.label}, ${rows[0].value}.` : `No missed clock-outs ${period.label}.`,
+    columns: ['Staff', `Missed clock-outs (${period.label})`], rows,
+  }
+}
+
+// Reuses fetchHousekeepingCounts (shared.jsx) -- same source of truth as
+// the dashboard's Housekeeping KPI tiles. A live snapshot, like Void Aging
+// and compliance -- "overdue" doesn't have a "this month" version of
+// itself, it either is or isn't right now.
+async function aiRunMissedHousekeepingVisits() {
+  const counts = await fetchHousekeepingCounts()
+  const total = counts.overdue + counts.dueSoon + counts.ok
+  if (!total) return { summary: 'No properties on a cleaning rota yet.', rows: [] }
+
+  return {
+    summary: `${counts.overdue} routine visit${counts.overdue === 1 ? ' is' : 's are'} overdue and ${counts.dueSoon} due soon, out of ${total} properties on a cleaning rota.`,
+    stats: [
+      { label: 'Overdue', value: counts.overdue, colour: COLORS.red600 },
+      { label: 'Due soon', value: counts.dueSoon, colour: COLORS.amber600 },
+      { label: 'On track', value: counts.ok, colour: COLORS.green600 },
+    ],
+  }
+}
+
+async function aiRunPriorityResolutionSpeed(questionText) {
+  const period = aiExtractPeriod(questionText)
+  const thresholds = await fetchPriorityThresholds()
+  const { data } = await supabase.schema('pmms').from('tickets')
+    .select('priority_score, priority_override, created_at, completed_at')
+    .in('status', ['Completed', 'Archived'])
+    .gte('completed_at', `${period.from}T00:00:00`)
+    .lte('completed_at', `${period.to}T23:59:59`)
+  if (!data?.length) return { summary: `No completed jobs ${period.label} yet.`, rows: [] }
+
+  const totals = {}
+  data.forEach(t => {
+    const tier = t.priority_override || priorityTierLabel(t.priority_score, thresholds.p1, thresholds.p2)
+    const ms = Math.max(0, new Date(t.completed_at) - new Date(t.created_at))
+    if (!totals[tier]) totals[tier] = { sum: 0, count: 0 }
+    totals[tier].sum += ms
+    totals[tier].count += 1
+  })
+  const order = ['P1 Critical', 'P2 Urgent', 'P3 Routine']
+  const rows = order.filter(tier => totals[tier]).map(tier => ({ label: tier, value: Math.round((totals[tier].sum / totals[tier].count / 3600000) * 10) / 10 }))
+  if (rows.length < 2) return { summary: `Not enough completed jobs across different priority tiers ${period.label} to compare.`, rows }
+
+  const fastest = [...rows].sort((a, b) => a.value - b.value)[0]
+  const workingAsIntended = rows[0].value <= rows[rows.length - 1].value
+
+  return {
+    summary: `${fastest.label} jobs resolve fastest ${period.label}, averaging ${fastest.value}h${workingAsIntended ? ' — priority flagging looks like it is working.' : ' — worth a look, higher-priority jobs are not resolving faster than lower-priority ones.'}`,
+    columns: ['Priority', 'Avg. hours to resolve'], rows,
+  }
+}
+
 const AI_RUNNERS = {
   topProperties: aiRunTopProperties, complianceOverdue: aiRunComplianceOverdue, topCategory: aiRunTopCategory,
   topCategoryThisMonth: aiRunTopCategoryThisMonth, topBuilders: aiRunTopBuilders,
   personPerformance: aiRunPersonPerformance, compareStaffPerformance: aiRunCompareStaffPerformance,
   mostOpenTickets: aiRunMostOpenTickets, mostLateClockIns: aiRunMostLateClockIns,
   fastestCompletion: aiRunFastestCompletion, mostOvertime: aiRunMostOvertime, mostUnableToDo: aiRunMostUnableToDo,
+  oldestOpenTickets: aiRunOldestOpenTickets, ticketVolumeTrend: aiRunTicketVolumeTrend, busiestDayOfWeek: aiRunBusiestDayOfWeek,
+  signOffSpeed: aiRunSignOffSpeed, repeatIssues: aiRunRepeatIssues, topRaisers: aiRunTopRaisers,
+  voidTurnaround: aiRunVoidTurnaround, missedClockOuts: aiRunMissedClockOuts,
+  missedHousekeepingVisits: aiRunMissedHousekeepingVisits, priorityResolutionSpeed: aiRunPriorityResolutionSpeed,
 }
 
 export default function AdminReports({ profile, onNavigate }) {
@@ -843,17 +1074,22 @@ export default function AdminReports({ profile, onNavigate }) {
                     return (
                       <div style={{ position: 'absolute', top: '48px', left: 0, right: 0, zIndex: 10, background: COLORS.white, border: `1px solid ${COLORS.slate200}`, borderRadius: '10px', boxShadow: '0 6px 18px rgba(0,0,0,0.12)', overflow: 'hidden' }}>
                         <p style={{ margin: 0, padding: '8px 14px', fontSize: '10.5px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: `1px solid ${COLORS.slate100}` }}>
-                          Free questions — instant, no cost
+                          Free questions — instant, no cost ({filtered.length})
                         </p>
-                        {filtered.map(q => (
-                          <button
-                            key={q}
-                            onMouseDown={(e) => { e.preventDefault(); setAiQuestion(q); setAiAnswer(null); setAiError(''); setAiQuestionDropdownOpen(false) }}
-                            style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', border: 'none', borderTop: `1px solid ${COLORS.slate100}`, background: COLORS.white, color: COLORS.slate900, fontSize: '13px', cursor: 'pointer' }}
-                          >
-                            {q}
-                          </button>
-                        ))}
+                        {/* Capped to ~10 rows tall so a growing free-question
+                            list doesn't push the dropdown off-screen -- the
+                            rest scroll into view instead of expanding it. */}
+                        <div style={{ maxHeight: '370px', overflowY: 'auto' }}>
+                          {filtered.map(q => (
+                            <button
+                              key={q}
+                              onMouseDown={(e) => { e.preventDefault(); setAiQuestion(q); setAiAnswer(null); setAiError(''); setAiQuestionDropdownOpen(false) }}
+                              style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', border: 'none', borderTop: `1px solid ${COLORS.slate100}`, background: COLORS.white, color: COLORS.slate900, fontSize: '13px', cursor: 'pointer' }}
+                            >
+                              {q}
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     )
                   })()}
