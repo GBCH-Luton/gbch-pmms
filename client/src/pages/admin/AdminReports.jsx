@@ -1104,6 +1104,8 @@ export default function AdminReports({ profile, onNavigate }) {
                               key={q}
                               title={q}
                               onMouseDown={(e) => { e.preventDefault(); setAiQuestion(q); setAiAnswer(null); setAiError(''); setAiQuestionDropdownOpen(false) }}
+                              onMouseEnter={(e) => { e.currentTarget.style.background = COLORS.slate50 }}
+                              onMouseLeave={(e) => { e.currentTarget.style.background = COLORS.white }}
                               style={{ display: 'flex', alignItems: 'center', width: '100%', height: '38px', boxSizing: 'border-box', textAlign: 'left', padding: '0 14px', border: 'none', borderTop: `1px solid ${COLORS.slate100}`, background: COLORS.white, color: COLORS.slate900, fontSize: '13px', cursor: 'pointer', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
                             >
                               {q}
@@ -1118,9 +1120,6 @@ export default function AdminReports({ profile, onNavigate }) {
                   {aiLoading ? '...' : 'Ask →'}
                 </button>
               </div>
-              <p style={{ margin: '10px 0 0', fontSize: '11px', color: COLORS.slate400 }}>
-                Asked something useful more than once? Tell your PMMS admin the exact wording and it can be added to the free list above.
-              </p>
             </div>
           </div>
 
