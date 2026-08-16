@@ -78,6 +78,7 @@ const AI_EXAMPLE_QUESTIONS = [
   'Who has missed or incomplete clock-outs this week?',
   'How many housekeeping visits are overdue or delayed right now?',
   'Does urgent priority actually get resolved faster than standard?',
+  'How many hours did each staff member work this week?',
 ]
 
 // Matched first, before ever calling Claude -- these questions stay
@@ -111,6 +112,7 @@ const AI_PATTERNS = [
   { test: /missed.*clock|clock.*(missed|incomplete)/i, key: 'missedClockOuts' },
   { test: /housekeeping visit|routine visit.*(overdue|delayed|missed)/i, key: 'missedHousekeepingVisits' },
   { test: /urgent.*(faster|resolv)|priority.*(faster|resolv)/i, key: 'priorityResolutionSpeed' },
+  { test: /how many hours|hours worked/i, key: 'hoursWorkedByStaff' },
 ]
 
 // Scans the raw question text for a period phrase -- "this week" is the
@@ -597,6 +599,26 @@ async function aiRunPriorityResolutionSpeed(questionText) {
   }
 }
 
+// Reuses fetchAttendanceSummary's totalMs per staff member -- same worked-
+// hours figure BuilderProfilePage's Attendance tab and My Metrics already
+// show per person, just laid out across the whole team for one period.
+async function aiRunHoursWorkedByStaff(questionText, builders) {
+  const period = aiExtractPeriod(questionText)
+  const summaries = await Promise.all(builders.map(async b => ({ b, s: await fetchAttendanceSummary(b.id, period.from, period.to) })))
+  const rows = summaries
+    .map(({ b, s }) => ({ label: b.name.split(' ')[0], value: Math.round((s.totalMs / 3600000) * 10) / 10 }))
+    .filter(r => r.value > 0)
+    .sort((a, b) => b.value - a.value)
+  if (!rows.length) return { summary: `No hours logged ${period.label}.`, rows: [] }
+
+  const totalHours = Math.round(rows.reduce((sum, r) => sum + r.value, 0) * 10) / 10
+
+  return {
+    summary: `${rows[0].label} worked the most hours ${period.label}, at ${rows[0].value}h. ${totalHours}h logged across the team.`,
+    columns: ['Staff', `Hours worked (${period.label})`], rows,
+  }
+}
+
 const AI_RUNNERS = {
   topProperties: aiRunTopProperties, complianceOverdue: aiRunComplianceOverdue, topCategory: aiRunTopCategory,
   topCategoryThisMonth: aiRunTopCategoryThisMonth, topBuilders: aiRunTopBuilders,
@@ -607,6 +629,7 @@ const AI_RUNNERS = {
   signOffSpeed: aiRunSignOffSpeed, repeatIssues: aiRunRepeatIssues, topRaisers: aiRunTopRaisers,
   voidTurnaround: aiRunVoidTurnaround, missedClockOuts: aiRunMissedClockOuts,
   missedHousekeepingVisits: aiRunMissedHousekeepingVisits, priorityResolutionSpeed: aiRunPriorityResolutionSpeed,
+  hoursWorkedByStaff: aiRunHoursWorkedByStaff,
 }
 
 export default function AdminReports({ profile, onNavigate }) {
