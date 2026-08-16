@@ -829,7 +829,7 @@ export default function AdminReports({ profile, onNavigate }) {
                   {aiQuestion && (
                     <button
                       type="button"
-                      onMouseDown={(e) => { e.preventDefault(); setAiQuestion(''); setAiAnswer(null); setAiError(''); setAiQuestionDropdownOpen(false) }}
+                      onMouseDown={(e) => { e.preventDefault(); setAiQuestion(''); setAiAnswer(null); setAiError(''); setAiQuestionDropdownOpen(true) }}
                       title="Clear"
                       aria-label="Clear question"
                       style={{ position: 'absolute', top: '50%', right: '10px', transform: 'translateY(-50%)', width: '22px', height: '22px', borderRadius: '50%', border: 'none', background: COLORS.slate100, color: COLORS.slate500, fontSize: '13px', lineHeight: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
