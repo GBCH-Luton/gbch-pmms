@@ -748,31 +748,33 @@ export default function AdminReports({ profile, onNavigate }) {
   ]
   const activePresetLabel = snapshotPresets.find(p => p.from === snapshotFromDate && p.to === snapshotToDate)?.label
 
-  // Reused in two spots below (side-by-side with Ask AI for admins, alone
-  // for managers who don't get the AI box at all) -- built once so there's
-  // one source of truth for it rather than two copies drifting apart.
-  // height/flex column so it stretches to match the Ask AI column's height
-  // when the two sit side by side in the grid below.
+  // Reused in two spots below (full-width for admins, alone for managers
+  // who don't get the AI box at all) -- built once so there's one source
+  // of truth for it rather than two copies drifting apart. Presets, the
+  // From/To range, and the Generate button all sit in one flex-wrap row
+  // now the card is full-width -- fits on one line on a normal screen,
+  // wraps onto its own lines only once the viewport gets too narrow to
+  // fit everything (small/mobile).
   const snapshotCard = (
-    <div style={{ ...cardStyle, display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }}>
-      <p style={{ margin: '0 0 10px 0', fontSize: '14px', fontWeight: 800, color: COLORS.slate900 }}>Operations Snapshot</p>
-      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
-        {snapshotPresets.map(p => (
-          <button
-            key={p.label}
-            onClick={() => { setSnapshotFromDate(p.from); setSnapshotToDate(p.to) }}
-            style={{
-              fontSize: '11.5px', fontWeight: 700, padding: '6px 12px', borderRadius: '999px', cursor: 'pointer',
-              border: activePresetLabel === p.label ? 'none' : `1px solid ${COLORS.slate200}`,
-              background: activePresetLabel === p.label ? COLORS.brandNavy : COLORS.slate50,
-              color: activePresetLabel === p.label ? COLORS.white : COLORS.slate600,
-            }}
-          >
-            {p.label}
-          </button>
-        ))}
-      </div>
-      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: '14px' }}>
+    <div style={{ ...cardStyle, boxSizing: 'border-box' }}>
+      <p style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: 800, color: COLORS.slate900 }}>Operations Snapshot</p>
+      <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+          {snapshotPresets.map(p => (
+            <button
+              key={p.label}
+              onClick={() => { setSnapshotFromDate(p.from); setSnapshotToDate(p.to) }}
+              style={{
+                fontSize: '11.5px', fontWeight: 700, padding: '6px 12px', borderRadius: '999px', cursor: 'pointer',
+                border: activePresetLabel === p.label ? 'none' : `1px solid ${COLORS.slate200}`,
+                background: activePresetLabel === p.label ? COLORS.brandNavy : COLORS.slate50,
+                color: activePresetLabel === p.label ? COLORS.white : COLORS.slate600,
+              }}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
         <div>
           <label style={filterLabelStyle}>From</label>
           <input type="date" value={snapshotFromDate} max={snapshotToDate} onChange={(e) => setSnapshotFromDate(e.target.value)} style={filterSelectStyle} />
@@ -781,11 +783,9 @@ export default function AdminReports({ profile, onNavigate }) {
           <label style={filterLabelStyle}>To</label>
           <input type="date" value={snapshotToDate} min={snapshotFromDate} max={todayIso()} onChange={(e) => setSnapshotToDate(e.target.value)} style={filterSelectStyle} />
         </div>
-      </div>
-      <div style={{ marginTop: 'auto' }}>
         <button
           onClick={() => setShowSnapshot(true)}
-          style={{ padding: '10px 18px', borderRadius: '10px', border: 'none', background: COLORS.brandNavy, color: COLORS.white, fontWeight: 700, fontSize: '13px', cursor: 'pointer' }}
+          style={{ padding: '10px 18px', borderRadius: '10px', border: 'none', background: COLORS.brandNavy, color: COLORS.white, fontWeight: 700, fontSize: '13px', cursor: 'pointer', whiteSpace: 'nowrap' }}
         >
           📊 Generate Snapshot
         </button>
