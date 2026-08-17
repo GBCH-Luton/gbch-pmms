@@ -378,6 +378,7 @@ export default function AdminPipeline({
         id, ticket_number, status, category, description, room, priority_score, priority_override, mileage_logged,
         no_access_flag, no_access_note, hold_reason, hold_note, completion_note, photo_url, completion_photo_url,
         needs_followup, followup_note,
+        signoff_flagged, signoff_note, signoff_resolved, signoff_good_standard, signoff_clean,
         completed_at, created_at, status_changed_at, first_assigned_at, assigned_builder_id, estimated_minutes, assign_type, property_id, event_id,
         raised_by, raised_by_name, cancel_type, cancel_reason, cancel_duplicate_ref
       `)
@@ -1426,8 +1427,28 @@ export default function AdminPipeline({
 
                             <div style={expandSectionStyle}>
                               <p style={expandSectionTitleStyle}>Notes &amp; Flags</p>
-                              {!t.no_access_flag && !(t.status === 'On Hold' && t.hold_reason) && !t.completion_note && !t.cancel_reason && !t.needs_followup && (
+                              {!t.no_access_flag && !(t.status === 'On Hold' && t.hold_reason) && !t.completion_note && !t.cancel_reason && !t.needs_followup && !t.signoff_flagged && (
                                 <p style={{ fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic', margin: 0 }}>No notes on this ticket</p>
+                              )}
+
+                              {/* Submitter's 3-question sign-off check came back
+                                  with at least one "No" -- see
+                                  add_submitter_signoff_quality_check.sql. Blocks
+                                  the submitter from archiving until this is
+                                  addressed; they were already notified in-app +
+                                  push, this is the persistent record. */}
+                              {t.signoff_flagged && (
+                                <div style={{ padding: '8px 10px', background: COLORS.red50, border: `1px solid ${COLORS.red200}`, borderRadius: '8px', marginBottom: '8px' }}>
+                                  <p style={{ margin: 0, fontSize: '11px', fontWeight: 800, color: COLORS.red600 }}>⚠ Sign-off Flagged by Submitter</p>
+                                  {t.signoff_note && <p style={{ margin: '2px 0 4px 0', fontSize: '12px', color: COLORS.red900 }}>{t.signoff_note}</p>}
+                                  <p style={{ margin: 0, fontSize: '11px', fontWeight: 700, color: COLORS.red600 }}>
+                                    {[
+                                      t.signoff_resolved === false && 'Not resolved',
+                                      t.signoff_good_standard === false && 'Not to a good standard',
+                                      t.signoff_clean === false && 'Not left clean',
+                                    ].filter(Boolean).join(' · ')}
+                                  </p>
+                                </div>
                               )}
 
                               {t.needs_followup && (

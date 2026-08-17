@@ -24,7 +24,7 @@ import { logLoginEvent } from '../lib/loginEvents'
 import { uploadTicketAttachments, formatUploadProgress } from '../lib/ticketAttachments'
 import { fetchMaintenanceCategories, sortedCategoryEntries, isUnlistedTag, unlistedTagFor, unlistedLabelFor, calculatePriorityScore } from '../lib/maintenanceCategories'
 import { attachBuilderSafeProperties } from '../lib/properties'
-import { statusColour, statusLabel, postSystemComment, postAuditEvent, KpiTiles, resolveStaffPhotoUrl, suggestAutoAssignBuilder, createNotification } from './admin/shared'
+import { statusColour, statusLabel, postSystemComment, postAuditEvent, KpiTiles, resolveStaffPhotoUrl, suggestAutoAssignBuilder, createNotification, fetchManagersForDivision, sendPushNotification } from './admin/shared'
 import { NavIcon } from '../lib/icons'
 import PropertySearchSelect from '../components/PropertySearchSelect'
 import VoiceInputButton from '../components/VoiceInputButton'
@@ -660,23 +660,49 @@ function PipelineList({ profile, onGoToSignOff }) {
 // before/after evidence (reported photo vs completion photo) the real
 // Sign-Off page shows, since that's the actual point of this step -- a
 // considered check, not a rubber stamp.
+//
+// The 3-question quality check (agreed with directors, built 2026-08-17 --
+// see add_submitter_signoff_quality_check.sql) sits in front of the actual
+// archive: all 3 "Yes" archives exactly as before; any "No" blocks
+// archiving and notifies the ticket's division manager(s) instead, with a
+// required note on what's wrong. The ticket stays in the Sign-Off list
+// (still status 'Completed') so the submitter can come back and try again
+// once it's addressed.
+const SIGNOFF_QUESTIONS = [
+  { key: 'resolved', label: 'Was the issue resolved?' },
+  { key: 'goodStandard', label: 'Was the work done to a good standard?' },
+  { key: 'clean', label: 'Was the property left clean and tidy?' },
+]
+
 function SignOffList({ profile, onChanged }) {
   const [tickets, setTickets] = useState([])
   const [loading, setLoading] = useState(true)
   const [confirmId, setConfirmId] = useState(null)
   const [archivingId, setArchivingId] = useState(null)
   const [archiveError, setArchiveError] = useState('')
+  const [signoffAnswers, setSignoffAnswers] = useState({ resolved: null, goodStandard: null, clean: null })
+  const [signoffNote, setSignoffNote] = useState('')
+  const [maintenanceCategories, setMaintenanceCategories] = useState({})
 
   useEffect(() => {
     fetchPending()
+    fetchMaintenanceCategories().then(setMaintenanceCategories)
   }, [])
+
+  // Fresh answers every time a different ticket's confirm panel opens --
+  // never carries a stale answer over from whichever ticket was open before.
+  useEffect(() => {
+    setSignoffAnswers({ resolved: null, goodStandard: null, clean: null })
+    setSignoffNote('')
+    setArchiveError('')
+  }, [confirmId])
 
   async function fetchPending() {
     setLoading(true)
     const { data, error } = await supabase
       .schema('pmms')
       .from('tickets')
-      .select('id, ticket_number, category, issue_tag, room, photo_url, completion_note, completion_photo_url, created_at, property_id')
+      .select('id, ticket_number, category, issue_tag, room, photo_url, completion_note, completion_photo_url, created_at, property_id, signoff_flagged, signoff_note, signoff_submitted_at')
       .eq('raised_by', profile.id)
       .eq('status', 'Completed')
       .order('created_at', { ascending: false })
@@ -692,7 +718,11 @@ function SignOffList({ profile, onChanged }) {
     const { error } = await supabase
       .schema('pmms')
       .from('tickets')
-      .update({ status: 'Archived', status_changed_at: new Date().toISOString(), stuck_alert_sent_at: null })
+      .update({
+        status: 'Archived', status_changed_at: new Date().toISOString(), stuck_alert_sent_at: null,
+        signoff_resolved: true, signoff_good_standard: true, signoff_clean: true, signoff_flagged: false,
+        signoff_note: null, signoff_submitted_at: new Date().toISOString(),
+      })
       .eq('id', ticket.id)
 
     if (error) {
@@ -703,6 +733,50 @@ function SignOffList({ profile, onChanged }) {
 
     await postSystemComment(ticket.id, profile, `Verified and archived by ${profile.name}.`)
     await postAuditEvent(ticket.id, profile, 'Status Changed', `Completed → Archived (verified by ${profile.name})`)
+    setArchivingId(null)
+    setConfirmId(null)
+    await fetchPending()
+    onChanged?.()
+  }
+
+  // The "No" path -- ticket stays Completed (never archived), the 3
+  // answers + note are recorded, and the ticket's division manager(s) get
+  // notified (in-app + push), same notifyUnableToDo pattern
+  // BuilderDashboard.jsx already uses for the equivalent builder-side flag.
+  async function handleFlagSignoff(ticket) {
+    setArchiveError('')
+    setArchivingId(ticket.id)
+    const note = signoffNote.trim()
+    const now = new Date().toISOString()
+
+    const { error } = await supabase
+      .schema('pmms')
+      .from('tickets')
+      .update({
+        signoff_resolved: signoffAnswers.resolved, signoff_good_standard: signoffAnswers.goodStandard, signoff_clean: signoffAnswers.clean,
+        signoff_note: note, signoff_flagged: true, signoff_submitted_at: now,
+      })
+      .eq('id', ticket.id)
+
+    if (error) {
+      setArchiveError(error.message)
+      setArchivingId(null)
+      return
+    }
+
+    await postSystemComment(ticket.id, profile, `Sign-off flagged by ${profile.name}: ${note}`)
+    await postAuditEvent(ticket.id, profile, 'Sign-off Flagged', note)
+
+    const division = maintenanceCategories[ticket.category]?.division || 'Maintenance'
+    const managers = await fetchManagersForDivision(division)
+    const message = `Job #${ticket.ticket_number} sign-off flagged by ${profile.name}: ${note}`
+    for (const manager of managers) {
+      await createNotification(manager.id, ticket.id, message)
+    }
+    if (managers.length > 0) {
+      await sendPushNotification(managers.map(m => m.id), 'Sign-off flagged', `#${ticket.ticket_number} — ${note}`)
+    }
+
     setArchivingId(null)
     setConfirmId(null)
     await fetchPending()
@@ -751,22 +825,69 @@ function SignOffList({ profile, onChanged }) {
               <p style={{ margin: '0 0 12px 0', fontSize: '12px', color: COLORS.slate600, background: COLORS.slate50, borderRadius: '8px', padding: '8px 10px' }}>{t.completion_note}</p>
             )}
 
+            {t.signoff_flagged && (
+              <div style={{ margin: '0 0 12px 0', padding: '8px 10px', background: COLORS.amber50, border: `1px solid ${COLORS.amber300}`, borderRadius: '8px' }}>
+                <p style={{ margin: 0, fontSize: '11px', fontWeight: 800, color: COLORS.amber800 }}>⚠ You flagged this — awaiting the manager</p>
+                <p style={{ margin: '2px 0 0 0', fontSize: '12px', color: COLORS.amber900 }}>{t.signoff_note}</p>
+              </div>
+            )}
+
             {archiveError && confirmId === t.id && (
               <p style={{ margin: '0 0 8px 0', fontSize: '12px', color: COLORS.red600, fontWeight: 600 }}>{archiveError}</p>
             )}
 
-            {confirmId === t.id ? (
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button
-                  onClick={() => handleVerifyArchive(t)}
-                  disabled={archivingId === t.id}
-                  style={{ ...choiceBtn(true), flex: 1, opacity: archivingId === t.id ? 0.6 : 1, cursor: archivingId === t.id ? 'not-allowed' : 'pointer' }}
-                >
-                  {archivingId === t.id ? 'Confirming...' : 'Confirm sign-off'}
-                </button>
-                <button onClick={() => setConfirmId(null)} style={{ ...choiceBtn(false), flex: 1 }}>Cancel</button>
-              </div>
-            ) : (
+            {confirmId === t.id ? (() => {
+              const allAnswered = SIGNOFF_QUESTIONS.every(q => signoffAnswers[q.key] !== null)
+              const allYes = SIGNOFF_QUESTIONS.every(q => signoffAnswers[q.key] === true)
+              const anyNo = SIGNOFF_QUESTIONS.some(q => signoffAnswers[q.key] === false)
+              const canSubmit = allAnswered && (allYes || (anyNo && signoffNote.trim() !== ''))
+              const busy = archivingId === t.id
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {SIGNOFF_QUESTIONS.map(q => (
+                    <div key={q.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+                      <span style={{ fontSize: '13px', fontWeight: 600, color: COLORS.slate900 }}>{q.label}</span>
+                      <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+                        <button
+                          onClick={() => setSignoffAnswers(prev => ({ ...prev, [q.key]: true }))}
+                          style={{ ...choiceBtn(signoffAnswers[q.key] === true), padding: '6px 14px' }}
+                        >
+                          Yes
+                        </button>
+                        <button
+                          onClick={() => setSignoffAnswers(prev => ({ ...prev, [q.key]: false }))}
+                          style={{ ...choiceBtn(signoffAnswers[q.key] === false), padding: '6px 14px' }}
+                        >
+                          No
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  {anyNo && (
+                    <textarea
+                      value={signoffNote}
+                      onChange={(e) => setSignoffNote(e.target.value)}
+                      placeholder="What's wrong, so the manager knows what to follow up on..."
+                      rows={2}
+                      style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', fontFamily: 'inherit', boxSizing: 'border-box', resize: 'vertical' }}
+                    />
+                  )}
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                      onClick={() => (allYes ? handleVerifyArchive(t) : handleFlagSignoff(t))}
+                      disabled={!canSubmit || busy}
+                      style={{
+                        ...choiceBtn(true), flex: 1, opacity: (!canSubmit || busy) ? 0.5 : 1, cursor: (!canSubmit || busy) ? 'not-allowed' : 'pointer',
+                        ...(anyNo ? { borderColor: COLORS.red600, background: COLORS.red600, color: COLORS.white } : {}),
+                      }}
+                    >
+                      {busy ? 'Saving...' : anyNo ? 'Flag for manager review' : 'Confirm sign-off'}
+                    </button>
+                    <button onClick={() => setConfirmId(null)} style={{ ...choiceBtn(false), flex: 1 }}>Cancel</button>
+                  </div>
+                </div>
+              )
+            })() : (
               <button onClick={() => setConfirmId(t.id)} style={{ ...choiceBtn(true), width: '100%' }}>✓ Verify &amp; Sign Off</button>
             )}
           </div>
