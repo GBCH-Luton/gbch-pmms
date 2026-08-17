@@ -130,21 +130,30 @@ async function fetchRawMaintenanceCategories() {
 // Manager) so their category picker doesn't list every Maintenance
 // category. Omitted (the default for unscoped managers and Admin), this
 // returns every category exactly as before -- no behaviour change there.
+//
+// Falls back to the full list when the scoped result is empty -- a
+// division with no categories of its own (e.g. Landlord Liaison, once its
+// one category was deleted 2026-08-17 as no longer needed) would otherwise
+// leave that manager's ticket form completely empty. Same form everyone
+// else sees, not a dead end.
 export async function fetchMaintenanceCategories(division) {
   const categories = await fetchRawMaintenanceCategories()
-  return Object.fromEntries(
-    Object.entries(categories).filter(([, c]) => c.enabled !== false && (!division || (c.division || 'Maintenance') === division))
-  )
+  const enabled = Object.fromEntries(Object.entries(categories).filter(([, c]) => c.enabled !== false))
+  if (!division) return enabled
+  const scoped = Object.fromEntries(Object.entries(enabled).filter(([, c]) => (c.division || 'Maintenance') === division))
+  return Object.keys(scoped).length > 0 ? scoped : enabled
 }
 
 // All category names (enabled AND disabled), in display order -- for
 // filter dropdowns (Pipeline, Reports, a property's Maintenance tab).
 // Unlike fetchMaintenanceCategories(), a disabled category must still show
 // up here so existing tickets raised under it stay filterable.
-// Same optional `division` narrowing as fetchMaintenanceCategories() above.
+// Same optional `division` narrowing (and same empty-scope fallback to the
+// full list) as fetchMaintenanceCategories() above.
 export async function fetchAllMaintenanceCategoryNames(division) {
   const categories = await fetchRawMaintenanceCategories()
-  return sortedCategoryEntries(categories)
-    .filter(([, c]) => !division || (c.division || 'Maintenance') === division)
-    .map(([name]) => name)
+  const all = sortedCategoryEntries(categories)
+  if (!division) return all.map(([name]) => name)
+  const scoped = all.filter(([, c]) => (c.division || 'Maintenance') === division)
+  return (scoped.length > 0 ? scoped : all).map(([name]) => name)
 }
