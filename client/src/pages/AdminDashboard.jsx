@@ -265,6 +265,16 @@ export default function AdminDashboard({ profile }) {
   const [arrivalError, setArrivalError] = useState('')
   const [arrivalSaving, setArrivalSaving] = useState(false)
 
+  // Keyed on profile.id, not a plain mount-only []  -- View As swaps the
+  // Supabase session (and this shell's `profile` prop) onto the
+  // impersonated staff member WITHOUT remounting this component (same
+  // route, same component instance), so a mount-only effect would only
+  // ever fetch whatever identity was active when the page first loaded --
+  // the admin's own account, before switching into View As -- and never
+  // re-fetch for her. Found live: the "Your Day" card stayed stuck on
+  // "Not clocked in" (and Log a Visit stayed hidden, since it's nested
+  // inside the same dailyShift-is-set branch) even after she was
+  // genuinely clocked in, because this never re-ran for her identity.
   useEffect(() => {
     if (!showsDailyClockingUI) { setDailyShiftLoading(false); return }
     fetchDailyShift()
@@ -274,7 +284,7 @@ export default function AdminDashboard({ profile }) {
     supabase.schema('pmms').from('settings').select('setting_value').eq('setting_key', 'daily_clock_out_reminder_time').maybeSingle()
       .then(({ data }) => { if (data?.setting_value) setDailyClockOutDeadline(data.setting_value) })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [profile.id])
 
   async function fetchDailyShift() {
     const { data } = await supabase
