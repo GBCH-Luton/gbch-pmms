@@ -7,7 +7,7 @@ import {
   thStyle, tdStyle, actionBtnStyle, filterSelectStyle, formatUKDate, formatUKDateTime, toUkDateTimeInputValue, ukDateTimeInputValueToMs,
   ukDateKey, ukTimeHHMM, minutesLate, shiftDateKey,
   modalOverlayStyle, modalCardStyle, modalTitleStyle, modalLabelStyle,
-  modalErrorStyle, modalCancelBtnStyle, modalConfirmBtnStyle, fetchAssignableBuilders, fetchAssignableStaffForDivision, fetchLastEndedSessionsToday, SHORT_TRIP_REASONS, STAFF_AVAILABILITY_STYLES,
+  modalErrorStyle, modalCancelBtnStyle, modalConfirmBtnStyle, fetchAssignableBuilders, fetchAssignableStaffForDivision, fetchAssignableStaffForRole, fetchLastEndedSessionsToday, SHORT_TRIP_REASONS, STAFF_AVAILABILITY_STYLES,
   activityCategoryMeta, ACTIVITY_CATEGORY_META,
 } from './shared'
 
@@ -324,7 +324,17 @@ export default function AdminClocking({ profile, onNavigate }) {
       .select('id, name, home_postcode, home_latitude, home_longitude')
     setAllStaff(builderData || [])
     const assignableBuilders = await (profile.division ? fetchAssignableStaffForDivision(profile.division) : fetchAssignableBuilders())
-    setBuilders(assignableBuilders)
+    // The Landlord Liaison Manager has her own daily clock-in/out (see
+    // requiresDailyClocking in pages/AdminDashboard.jsx) but no builder-
+    // level role, so fetchAssignableStaffForDivision/fetchAssignableBuilders
+    // above never include her -- merged in here the same way
+    // admin/AdminDashboard.jsx's TeamWhereabouts already does, so a manager
+    // reviewing this page can actually see/override her attendance.
+    const clockingManagers = (!profile.division || profile.division === 'Landlord Liaison')
+      ? (await fetchAssignableStaffForRole('Landlord Liaison Manager')).map(s => ({ ...s, division: 'Landlord Liaison' }))
+      : []
+    const assignableStaff = [...assignableBuilders, ...clockingManagers]
+    setBuilders(assignableStaff)
 
     const { data: deadlineRow } = await supabase
       .schema('pmms')
@@ -418,14 +428,14 @@ export default function AdminClocking({ profile, onNavigate }) {
     // "Available" on its own says nothing about how long, or where he was
     // last -- this is the same clock_out_lat/lng already saved the moment
     // any job ends (complete or pause), just not previously surfaced here.
-    const lastEndedByBuilder = await fetchLastEndedSessionsToday(assignableBuilders.map(b => b.id), todayKey)
+    const lastEndedByBuilder = await fetchLastEndedSessionsToday(assignableStaff.map(b => b.id), todayKey)
 
     // Merge daily_attendance + activity_log + the live work_sessions just
     // fetched above into one row per builder: their shift, a derived
     // "where are they right now" status, and today's total hours (summed
     // across however many separate shifts they had today, in case of an
     // early clock-out corrected by clocking back in).
-    setAttendanceRows(assignableBuilders.map(b => {
+    setAttendanceRows(assignableStaff.map(b => {
       const shift = (attendanceData || []).find(a => a.staff_id === b.id) || null
       const openSession = (openSessions || []).find(s => s.builder_id === b.id)
       const openSessionTicket = openSession ? liveTicketData.find(t => t.id === openSession.ticket_id) : null

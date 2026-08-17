@@ -71,6 +71,7 @@ export const ACTIVITY_CATEGORY_META = {
   materials: { label: 'Buying materials', leftVerb: 'left for materials', backVerb: 'back from materials run', dot: COLORS.pink600, chipBg: COLORS.pink100, chipFg: COLORS.pink600 },
   job: { label: 'Heading to another job', leftVerb: 'left site — heading to another job', backVerb: 'arrived on site', dot: COLORS.indigo700, chipBg: COLORS.indigo100, chipFg: COLORS.indigo700 },
   office: { label: 'At the office', leftVerb: 'left for the office', backVerb: 'back from the office', dot: COLORS.purple600, chipBg: COLORS.purple50, chipFg: COLORS.purple600 },
+  visit: { label: 'Visiting a property', leftVerb: 'left for a property visit', backVerb: 'back from the visit', dot: COLORS.blue600, chipBg: COLORS.blue100, chipFg: COLORS.blue700 },
 }
 // activity_category is null on rows written before this column existed --
 // falls back to the old generic Travel/Break split rather than guessing.

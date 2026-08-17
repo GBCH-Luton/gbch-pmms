@@ -434,7 +434,7 @@ function TeamWhereabouts({ profile, onNavigate }) {
               onChange={(e) => setFilterStaffId(e.target.value)}
               style={{ fontSize: '12px', fontWeight: 700, color: COLORS.slate900, background: COLORS.white, border: `1px solid ${COLORS.slate200}`, borderRadius: '8px', padding: '6px 10px', cursor: 'pointer' }}
             >
-              <option value="All">All builders</option>
+              <option value="All">All staff</option>
               {divisionScopedBuilders.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
             </select>
           </div>
