@@ -212,7 +212,7 @@ function TeamWhereabouts({ profile, onNavigate }) {
 
     const [{ data: attendanceData }, { data: activityData }, { data: openSessions }, { data: auditData }, { data: onHoldShortTrips }] = await Promise.all([
       supabase.schema('pmms').from('daily_attendance').select('id, staff_id, clock_in_at, late_flag, clock_out_at, early_leave_reason').or(`work_date.eq.${todayKey},clock_out_at.is.null`),
-      supabase.schema('pmms').from('activity_log').select('id, staff_id, activity_type, activity_category, note, started_at, ended_at, ticket_id, destination_ticket_id').or(`started_at.gte.${todayKey}T00:00:00,ended_at.is.null`),
+      supabase.schema('pmms').from('activity_log').select('id, staff_id, activity_type, activity_category, note, end_note, started_at, ended_at, ticket_id, destination_ticket_id').or(`started_at.gte.${todayKey}T00:00:00,ended_at.is.null`),
       supabase.schema('pmms').from('work_sessions').select('id, ticket_id, builder_id').is('ended_at', null),
       // Job start/resume/complete/pause/no-access events -- these were
       // previously invisible here entirely (this panel only ever read
@@ -330,7 +330,7 @@ function TeamWhereabouts({ profile, onNavigate }) {
       if (a.ended_at) {
         entries.push({
           id: `${a.id}-end`, time: a.ended_at, staffId: a.staff_id, staffName: b.name, tone: 'back',
-          text: meta.backVerb,
+          text: `${meta.backVerb}${a.end_note ? `: ${a.end_note}` : ''}`,
           // Same preference as the "left site" line above -- for a
           // 'job'-category trip the destination is the job they actually
           // arrived at, not whatever job (if any) they left from. Using

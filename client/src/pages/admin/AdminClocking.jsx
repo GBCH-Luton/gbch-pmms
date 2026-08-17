@@ -683,7 +683,7 @@ export default function AdminClocking({ profile, onNavigate }) {
         supabase
           .schema('pmms')
           .from('activity_log')
-          .select('id, activity_type, activity_category, note, started_at, ended_at, destination_ticket_id')
+          .select('id, activity_type, activity_category, note, end_note, started_at, ended_at, destination_ticket_id')
           .eq('staff_id', staffId)
           .gte('started_at', lowerBound)
           .lte('started_at', upperBound)
@@ -1483,7 +1483,7 @@ export default function AdminClocking({ profile, onNavigate }) {
                 const meta = activityCategoryMeta(a.activity_type, a.activity_category)
                 const tone = a.activity_category ? `away-${a.activity_category}` : 'away'
                 events.push({ time: a.started_at, label: `${meta.leftVerb.charAt(0).toUpperCase()}${meta.leftVerb.slice(1)}${a.note ? `: ${a.note}` : ''}`, tone, ticketNumber: a.destinationTicketNumber })
-                if (a.ended_at) events.push({ time: a.ended_at, label: `${meta.backVerb.charAt(0).toUpperCase()}${meta.backVerb.slice(1)}`, tone: 'back' })
+                if (a.ended_at) events.push({ time: a.ended_at, label: `${meta.backVerb.charAt(0).toUpperCase()}${meta.backVerb.slice(1)}${a.end_note ? `: ${a.end_note}` : ''}`, tone: 'back' })
               })
               historyJobEvents.forEach(a => {
                 const tone = a.summary.includes('Completed') ? 'done'

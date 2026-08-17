@@ -268,6 +268,15 @@ export default function AdminDashboard({ profile }) {
   const [visitSaving, setVisitSaving] = useState(false)
   const [arrivalOpen, setArrivalOpen] = useState(false)
   const [arrivalMiles, setArrivalMiles] = useState(null)
+  // 'office' | 'home' | null -- closing a visit only ever recorded WHEN
+  // it ended, not WHERE she ended up, so Where's the Team flipped straight
+  // to a bare "Available" with no way to tell "back at the office,
+  // working" from "gone home, done for the day" apart. Required alongside
+  // mileage, same as mileage itself, and saved to activity_log.end_note
+  // (add_activity_log_end_note.sql) so it shows up on the "back from the
+  // visit" line the same way the destination already does on the "left
+  // for a visit" line.
+  const [arrivalLocation, setArrivalLocation] = useState(null)
   const [arrivalError, setArrivalError] = useState('')
   const [arrivalSaving, setArrivalSaving] = useState(false)
 
@@ -421,18 +430,21 @@ export default function AdminDashboard({ profile }) {
 
   function openArrival() {
     setArrivalMiles(null)
+    setArrivalLocation(null)
     setArrivalError('')
     setArrivalOpen(true)
   }
 
   async function submitArrival() {
     if (arrivalMiles === null) { setArrivalError("Enter miles driven, or 0 if you didn't drive."); return }
+    if (!arrivalLocation) { setArrivalError("Let us know where you are now."); return }
     setArrivalError('')
     setArrivalSaving(true)
+    const endNote = arrivalLocation === 'office' ? 'now at the office' : 'heading home for the day'
     const { error } = await supabase
       .schema('pmms')
       .from('activity_log')
-      .update({ ended_at: new Date().toISOString(), mileage_logged: arrivalMiles })
+      .update({ ended_at: new Date().toISOString(), mileage_logged: arrivalMiles, end_note: endNote })
       .eq('id', openVisit.id)
 
     setArrivalSaving(false)
@@ -1103,6 +1115,34 @@ export default function AdminDashboard({ profile }) {
                         +
                       </button>
                     </div>
+
+                    <p style={{ margin: '14px 0 8px 0', fontSize: '13px', fontWeight: 700, color: COLORS.slate900 }}>Where are you now?</p>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button
+                        onClick={() => setArrivalLocation('office')}
+                        style={{
+                          flex: 1, padding: '10px', borderRadius: '10px', fontSize: '12.5px', fontWeight: 700, cursor: 'pointer',
+                          background: arrivalLocation === 'office' ? COLORS.blue600 : COLORS.white,
+                          color: arrivalLocation === 'office' ? COLORS.white : COLORS.slate600,
+                          border: `1px solid ${arrivalLocation === 'office' ? COLORS.blue600 : COLORS.slate200}`,
+                        }}
+                      >
+                        🏢 Back at the Office
+                      </button>
+                      <button
+                        onClick={() => setArrivalLocation('home')}
+                        style={{
+                          flex: 1, padding: '10px', borderRadius: '10px', fontSize: '12.5px', fontWeight: 700, cursor: 'pointer',
+                          background: arrivalLocation === 'home' ? COLORS.blue600 : COLORS.white,
+                          color: arrivalLocation === 'home' ? COLORS.white : COLORS.slate600,
+                          border: `1px solid ${arrivalLocation === 'home' ? COLORS.blue600 : COLORS.slate200}`,
+                        }}
+                      >
+                        🏠 Home for the Day
+                      </button>
+                    </div>
+                    <p style={{ margin: '6px 0 0 0', fontSize: '11px', color: COLORS.slate400 }}>Going straight to another property instead? Finish this visit, then tap Log a Visit again.</p>
+
                     {arrivalError && <p style={{ margin: '8px 0 0 0', fontSize: '12px', color: COLORS.red500, fontWeight: 600 }}>{arrivalError}</p>}
                     <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
                       <button onClick={() => setArrivalOpen(false)} style={{ flex: 1, padding: '10px', background: COLORS.slate100, color: COLORS.slate600, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
