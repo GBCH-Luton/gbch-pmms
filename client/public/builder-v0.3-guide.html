@@ -420,6 +420,7 @@
     completeNote: '',
     completePhotoAttached: false,
     checklistChecked: {},
+    materialsUsedRows: [],     // [{ name, quantity }] -- what THIS job used, optional, free text
     followUpNeeded: false,
     followUpNote: '',
     clockOutConfirmOpen: false,
@@ -596,12 +597,19 @@
   function stopReasonBack() { state.stopReasonPicked = null; render(); }
   function markJobCompletedFromStop() {
     state.checklistChecked = {};
+    state.materialsUsedRows = [];
     state.followUpNeeded = false;
     state.followUpNote = '';
     state.stopSheetOpen = false;
     state.showCompleteConfirm = true;
     render();
   }
+
+  // ---- Materials Used (job completion) -- what THIS job used, separate
+  // from the purchase-trip receipts above. Free text, no catalog. ----
+  function addMaterialsUsedRow() { state.materialsUsedRows.push({ name: '', quantity: '' }); render(); }
+  function updateMaterialsUsedRow(index, field, value) { state.materialsUsedRows[index][field] = value; render(); }
+  function removeMaterialsUsedRow(index) { state.materialsUsedRows.splice(index, 1); render(); }
   function toggleFollowUp() { state.followUpNeeded = !state.followUpNeeded; render(); }
   function confirmStop() {
     const reason = state.stopReasonPicked;
@@ -685,7 +693,7 @@
       todayShift: null, page: 'dashboard', openActivity: null, awaySince: null, receiptRows: [], selectedTicketId: null, miles: null,
       jobSearchQuery: '', materialsQuery: '', idleSince: null, idleSeconds: 0, inProgressSeconds: 0, breakSeconds: 0,
       stopSheetOpen: false, materialsAskOpen: false, stopReasonPicked: null, stopNote: '',
-      showCompleteConfirm: false, completeNote: '', completePhotoAttached: false, checklistChecked: {},
+      showCompleteConfirm: false, completeNote: '', completePhotoAttached: false, checklistChecked: {}, materialsUsedRows: [],
       followUpNeeded: false, followUpNote: '',
       clockOutConfirmOpen: false, earlyLeavePromptOpen: false, earlyLeaveReason: '', clockOutForDayError: '', menuOpen: false,
     });
@@ -1077,6 +1085,14 @@
           ` : ''}
           <textarea class="complete-note" placeholder="Describe the work completed..." oninput="state.completeNote=this.value">${state.completeNote}</textarea>
           <button class="photo-btn ${state.completePhotoAttached ? 'attached' : ''}" onclick="togglePhoto()">${state.completePhotoAttached ? '✓ Photo attached' : '📷 Attach Photo'}</button>
+          <p style="margin:0 0 8px;font-size:12px;font-weight:700;color:var(--app-slate500);text-transform:uppercase;letter-spacing:0.06em">Materials Used (optional)</p>
+          ${state.materialsUsedRows.map((row, i) => `
+            <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+              <input type="text" value="${row.name}" oninput="updateMaterialsUsedRow(${i}, 'name', this.value)" placeholder="What (e.g. 15mm elbow, screws)..." style="flex:1;padding:10px 12px;border-radius:10px;border:1px solid var(--app-slate200);font-size:13px" />
+              <input type="text" value="${row.quantity}" oninput="updateMaterialsUsedRow(${i}, 'quantity', this.value)" placeholder="Qty" style="width:80px;padding:10px;border-radius:10px;border:1px solid var(--app-slate200);font-size:13px" />
+              <button onclick="removeMaterialsUsedRow(${i})" aria-label="Remove" style="width:36px;height:36px;flex-shrink:0;border:none;background:var(--app-red100);color:var(--app-red600);border-radius:8px;font-size:15px;cursor:pointer">✕</button>
+            </div>`).join('')}
+          <button onclick="addMaterialsUsedRow()" style="width:100%;padding:10px;border-radius:10px;border:1px dashed var(--app-slate300);background:var(--app-slate50);color:var(--app-slate500);font-size:13px;font-weight:600;cursor:pointer;margin-bottom:10px">+ Add ${state.materialsUsedRows.length > 0 ? 'another' : 'a'} material</button>
           <label class="followup-check">
             <input type="checkbox" ${state.followUpNeeded ? 'checked' : ''} onchange="toggleFollowUp()" />
             <span>

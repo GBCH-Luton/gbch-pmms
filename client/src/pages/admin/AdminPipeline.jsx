@@ -1471,48 +1471,54 @@ export default function AdminPipeline({
                             {/* Receipts -- only from a "Buying Materials" trip
                                 logged while this ticket was in progress (see
                                 add_activity_receipts_table.sql). Closed by
-                                default, and only shown at all when this ticket
-                                actually has any -- most never will. */}
-                            {receiptsByTicketId[t.id]?.length > 0 && (
-                              <div style={expandSectionStyle}>
-                                <button
-                                  onClick={() => setExpandedReceiptTicketIds(prev => {
-                                    const next = new Set(prev)
-                                    if (next.has(t.id)) next.delete(t.id); else next.add(t.id)
-                                    return next
-                                  })}
-                                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
-                                >
-                                  <p style={{ ...expandSectionTitleStyle, margin: 0 }}>🧾 Receipts ({receiptsByTicketId[t.id].length})</p>
-                                  <span style={{ fontSize: '11px', fontWeight: 700, color: COLORS.slate400 }}>{expandedReceiptTicketIds.has(t.id) ? '▲ Hide' : '▼ Show'}</span>
-                                </button>
-                                {expandedReceiptTicketIds.has(t.id) && (() => {
-                                  const receipts = receiptsByTicketId[t.id]
-                                  const photoUrls = receipts.filter(r => r.photo_url).map(r => r.photo_url)
-                                  return (
-                                    <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                      {receipts.map((r, i) => (
-                                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px', background: COLORS.slate50, borderRadius: '10px' }}>
-                                          {r.photo_url ? (
-                                            <img
-                                              src={r.photo_url} alt="Receipt"
-                                              onClick={() => setReceiptLightbox({ urls: photoUrls, index: photoUrls.indexOf(r.photo_url) })}
-                                              style={{ width: '48px', height: '48px', objectFit: 'cover', borderRadius: '8px', cursor: 'pointer', flexShrink: 0 }}
-                                            />
-                                          ) : (
-                                            <div style={{ width: '48px', height: '48px', borderRadius: '8px', background: COLORS.slate200, flexShrink: 0 }} />
-                                          )}
-                                          <div style={{ flex: 1 }}>
-                                            <p style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: COLORS.slate900 }}>{r.amount != null ? `£${Number(r.amount).toFixed(2)}` : 'No amount entered'}</p>
-                                            <p style={{ margin: 0, fontSize: '11px', color: COLORS.slate400 }}>{formatUKDateTime(r.created_at)}</p>
+                                default. Always shown, even with zero receipts,
+                                so the feature itself is visible/demoable, not
+                                just its results. */}
+                            {(() => {
+                              const receipts = receiptsByTicketId[t.id] || []
+                              return (
+                                <div style={expandSectionStyle}>
+                                  <button
+                                    onClick={() => setExpandedReceiptTicketIds(prev => {
+                                      const next = new Set(prev)
+                                      if (next.has(t.id)) next.delete(t.id); else next.add(t.id)
+                                      return next
+                                    })}
+                                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
+                                  >
+                                    <p style={{ ...expandSectionTitleStyle, margin: 0 }}>🧾 Receipts ({receipts.length})</p>
+                                    <span style={{ fontSize: '11px', fontWeight: 700, color: COLORS.slate400 }}>{expandedReceiptTicketIds.has(t.id) ? '▲ Hide' : '▼ Show'}</span>
+                                  </button>
+                                  {expandedReceiptTicketIds.has(t.id) && (() => {
+                                    if (receipts.length === 0) {
+                                      return <p style={{ margin: '12px 0 0 0', fontSize: '12.5px', color: COLORS.slate400, fontStyle: 'italic' }}>No receipts logged for this job.</p>
+                                    }
+                                    const photoUrls = receipts.filter(r => r.photo_url).map(r => r.photo_url)
+                                    return (
+                                      <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                        {receipts.map((r, i) => (
+                                          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px', background: COLORS.slate50, borderRadius: '10px' }}>
+                                            {r.photo_url ? (
+                                              <img
+                                                src={r.photo_url} alt="Receipt"
+                                                onClick={() => setReceiptLightbox({ urls: photoUrls, index: photoUrls.indexOf(r.photo_url) })}
+                                                style={{ width: '48px', height: '48px', objectFit: 'cover', borderRadius: '8px', cursor: 'pointer', flexShrink: 0 }}
+                                              />
+                                            ) : (
+                                              <div style={{ width: '48px', height: '48px', borderRadius: '8px', background: COLORS.slate200, flexShrink: 0 }} />
+                                            )}
+                                            <div style={{ flex: 1 }}>
+                                              <p style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: COLORS.slate900 }}>{r.amount != null ? `£${Number(r.amount).toFixed(2)}` : 'No amount entered'}</p>
+                                              <p style={{ margin: 0, fontSize: '11px', color: COLORS.slate400 }}>{formatUKDateTime(r.created_at)}</p>
+                                            </div>
                                           </div>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  )
-                                })()}
-                              </div>
-                            )}
+                                        ))}
+                                      </div>
+                                    )
+                                  })()}
+                                </div>
+                              )
+                            })()}
 
                             {/* Materials Used -- what this job actually
                                 consumed, logged by the builder at completion
@@ -1520,32 +1526,41 @@ export default function AdminPipeline({
                                 Separate section from Receipts above -- a
                                 receipt is proof of spend on a shopping trip,
                                 not necessarily for this one job; this is the
-                                other side, what THIS job used. */}
-                            {materialsUsedByTicketId[t.id]?.length > 0 && (
-                              <div style={expandSectionStyle}>
-                                <button
-                                  onClick={() => setExpandedMaterialsTicketIds(prev => {
-                                    const next = new Set(prev)
-                                    if (next.has(t.id)) next.delete(t.id); else next.add(t.id)
-                                    return next
-                                  })}
-                                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
-                                >
-                                  <p style={{ ...expandSectionTitleStyle, margin: 0 }}>🧱 Materials Used ({materialsUsedByTicketId[t.id].length})</p>
-                                  <span style={{ fontSize: '11px', fontWeight: 700, color: COLORS.slate400 }}>{expandedMaterialsTicketIds.has(t.id) ? '▲ Hide' : '▼ Show'}</span>
-                                </button>
-                                {expandedMaterialsTicketIds.has(t.id) && (
-                                  <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                    {materialsUsedByTicketId[t.id].map((m, i) => (
-                                      <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', padding: '8px 10px', background: COLORS.slate50, borderRadius: '10px' }}>
-                                        <span style={{ fontSize: '13px', fontWeight: 600, color: COLORS.slate900 }}>{m.name}</span>
-                                        <span style={{ fontSize: '12px', fontWeight: 700, color: COLORS.slate500, flexShrink: 0 }}>{m.quantity}</span>
+                                other side, what THIS job used. Always shown,
+                                even with nothing logged, same reasoning as
+                                Receipts above. */}
+                            {(() => {
+                              const materialsUsed = materialsUsedByTicketId[t.id] || []
+                              return (
+                                <div style={expandSectionStyle}>
+                                  <button
+                                    onClick={() => setExpandedMaterialsTicketIds(prev => {
+                                      const next = new Set(prev)
+                                      if (next.has(t.id)) next.delete(t.id); else next.add(t.id)
+                                      return next
+                                    })}
+                                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
+                                  >
+                                    <p style={{ ...expandSectionTitleStyle, margin: 0 }}>🧱 Materials Used ({materialsUsed.length})</p>
+                                    <span style={{ fontSize: '11px', fontWeight: 700, color: COLORS.slate400 }}>{expandedMaterialsTicketIds.has(t.id) ? '▲ Hide' : '▼ Show'}</span>
+                                  </button>
+                                  {expandedMaterialsTicketIds.has(t.id) && (
+                                    materialsUsed.length === 0 ? (
+                                      <p style={{ margin: '12px 0 0 0', fontSize: '12.5px', color: COLORS.slate400, fontStyle: 'italic' }}>No materials logged for this job.</p>
+                                    ) : (
+                                      <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                        {materialsUsed.map((m, i) => (
+                                          <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', padding: '8px 10px', background: COLORS.slate50, borderRadius: '10px' }}>
+                                            <span style={{ fontSize: '13px', fontWeight: 600, color: COLORS.slate900 }}>{m.name}</span>
+                                            <span style={{ fontSize: '12px', fontWeight: 700, color: COLORS.slate500, flexShrink: 0 }}>{m.quantity}</span>
+                                          </div>
+                                        ))}
                                       </div>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                            )}
+                                    )
+                                  )}
+                                </div>
+                              )
+                            })()}
 
                             <div style={{ gridColumn: '1 / -1', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                               <button onClick={() => openCommentsModal(t)} style={actionBtnStyle}>Comments</button>
