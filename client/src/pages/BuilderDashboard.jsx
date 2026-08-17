@@ -1694,6 +1694,16 @@ export default function BuilderDashboard({ profile }) {
   const onBreakTicket = tickets.find(t => t.status === 'On Hold' && SHORT_TRIP_REASONS.includes(t.hold_reason)) || null
   const lockedTicket = activeTicket || onBreakTicket || null
 
+  // Of the 3 short trips, only these two are genuinely a driving errand --
+  // "Lunch Break" stays a single-button resume with no mileage step, but
+  // "Getting materials myself" and "Going to the Office" get the same
+  // mileage stepper the real On Hold / fresh-arrival resume already uses,
+  // since that round trip is real, trackable mileage the report was
+  // otherwise silently losing (mileage_logged was never touched on these
+  // two resumes before -- handleResumeWork() was just called with no
+  // argument at all).
+  const shortTripNeedsMileage = !!selectedTicket && SHORT_TRIP_REASONS.includes(selectedTicket.hold_reason) && selectedTicket.hold_reason !== 'Lunch Break'
+
   const isIdle = inProgressTickets.length === 0 && !lockedTicket
 
   // "Idle since" -- the moment he stopped actively working, if he's not on
@@ -2738,7 +2748,7 @@ export default function BuilderDashboard({ profile }) {
             </button>
           </div>
         )}
-        {selectedTicket.status === 'On Hold' && !SHORT_TRIP_REASONS.includes(selectedTicket.hold_reason) && (
+        {selectedTicket.status === 'On Hold' && (!SHORT_TRIP_REASONS.includes(selectedTicket.hold_reason) || shortTripNeedsMileage) && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             {(selectedTicket.hold_reason || selectedTicket.hold_note) && (
               <div style={{ padding: '14px', borderRadius: '10px', background: COLORS.amber50, border: `1px solid ${COLORS.amber300}` }}>
@@ -2797,7 +2807,7 @@ export default function BuilderDashboard({ profile }) {
             )}
           </div>
         )}
-        {selectedTicket.status === 'On Hold' && SHORT_TRIP_REASONS.includes(selectedTicket.hold_reason) && (
+        {selectedTicket.status === 'On Hold' && SHORT_TRIP_REASONS.includes(selectedTicket.hold_reason) && !shortTripNeedsMileage && (
           <div>
             <button
               onClick={handleResumeWork}
