@@ -1148,7 +1148,7 @@ export default function AdminClocking({ profile, onNavigate }) {
               )}
             </div>
             <select value={builderFilter} onChange={(e) => setBuilderFilter(e.target.value)} style={filterSelectStyle}>
-              <option value="All">All builders</option>
+              <option value="All">All staff</option>
               {builders.map(b => (
                 <option key={b.id} value={b.id}>{b.name}</option>
               ))}

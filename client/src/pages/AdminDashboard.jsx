@@ -220,12 +220,17 @@ export default function AdminDashboard({ profile }) {
   // add_stale_shift_alerting.sql/check-clock-out-reminders for the
   // pre-existing 2-hour-grace auto-close this reuses as-is.
   //
-  // Skipped while an admin is impersonating (View As) -- an admin testing
-  // on their own device has no reason to have real GPS signal for HER
-  // shift, and forcing a clock-in through here would write a fake
-  // attendance row onto her real record. View As is for previewing what
-  // she sees, not for simulating her actual day.
-  const requiresDailyClocking = profile.division === 'Landlord Liaison' && !getImpersonationMarker()
+  // The whole-app BLOCKING gate is skipped while an admin is impersonating
+  // (View As) -- an admin testing on their own device has no reason to
+  // have real GPS signal for HER shift, and being forced through the
+  // clock-in screen just to preview another page would defeat the point
+  // of View As. `showsDailyClockingUI` is the separate, non-impersonation-
+  // gated flag: it controls whether the Clocking page's own "Your Day"
+  // card (clock status, Clock Out, Log a Visit) fetches/renders at all,
+  // so that card is still visible/testable during View As even though the
+  // app-wide block isn't enforced.
+  const showsDailyClockingUI = profile.division === 'Landlord Liaison'
+  const requiresDailyClocking = showsDailyClockingUI && !getImpersonationMarker()
   const [dailyShift, setDailyShift] = useState(null)
   const [staleDailyShift, setStaleDailyShift] = useState(null)
   const [dailyShiftLoading, setDailyShiftLoading] = useState(true)
@@ -261,7 +266,7 @@ export default function AdminDashboard({ profile }) {
   const [arrivalSaving, setArrivalSaving] = useState(false)
 
   useEffect(() => {
-    if (!requiresDailyClocking) { setDailyShiftLoading(false); return }
+    if (!showsDailyClockingUI) { setDailyShiftLoading(false); return }
     fetchDailyShift()
     fetchOpenVisit()
     supabase.schema('pmms').from('settings').select('setting_value').eq('setting_key', 'daily_clock_in_deadline').maybeSingle()
@@ -309,8 +314,17 @@ export default function AdminDashboard({ profile }) {
   async function handleDailyClockIn() {
     setClockInForDayError('')
     setClockingInForDay(true)
-    const position = await getCurrentPositionSafe()
-    if (!position) {
+    // An admin clocking in FOR her while impersonating (to test the
+    // Clocking page's own card, reachable here since the whole-app gate
+    // no longer forces this screen during View As -- see
+    // showsDailyClockingUI/requiresDailyClocking above) has no reason to
+    // have real GPS signal for HER shift, so this skips the location
+    // requirement entirely rather than blocking on the same "Couldn't get
+    // your location" error a real clock-in would. Real Kathryn, not
+    // impersonated, still goes through the normal GPS-required path.
+    const impersonating = !!getImpersonationMarker()
+    const position = impersonating ? null : await getCurrentPositionSafe()
+    if (!position && !impersonating) {
       setClockingInForDay(false)
       setClockInForDayError("Couldn't get your location. Make sure location is turned on and you have signal, then try again.")
       return
@@ -324,8 +338,8 @@ export default function AdminDashboard({ profile }) {
         staff_id: profile.id,
         work_date: ukDateKey(now.getTime()),
         clock_in_at: now.toISOString(),
-        clock_in_lat: position.latitude,
-        clock_in_lng: position.longitude,
+        clock_in_lat: position?.latitude ?? null,
+        clock_in_lng: position?.longitude ?? null,
         late_flag: ukTimeHHMM(now.getTime()) > dailyClockInDeadline,
       })
       .select('id, work_date, clock_in_at, late_flag')
@@ -987,7 +1001,23 @@ export default function AdminDashboard({ profile }) {
 
         {/* Main content */}
         <div style={{ flex: 1, padding: '20px', width: '100%', boxSizing: 'border-box' }}>
-          {requiresDailyClocking && dailyShift && currentPage === 'clocking' && (
+          {showsDailyClockingUI && currentPage === 'clocking' && !dailyShiftLoading && !dailyShift && (
+            <div style={{ marginBottom: '16px', padding: '14px 16px', borderRadius: '12px', background: COLORS.slate50, border: `1px solid ${COLORS.slate200}` }}>
+              <p style={{ margin: '0 0 10px 0', fontSize: '11px', fontWeight: 800, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Your Day</p>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+                <span style={{ fontSize: '13px', fontWeight: 600, color: COLORS.slate600 }}>Not clocked in for today yet.</span>
+                <button
+                  onClick={handleDailyClockIn}
+                  disabled={clockingInForDay}
+                  style={{ padding: '7px 12px', background: COLORS.teal600, color: COLORS.white, border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: clockingInForDay ? 'not-allowed' : 'pointer', opacity: clockingInForDay ? 0.7 : 1 }}
+                >
+                  {clockingInForDay ? 'Clocking in…' : '✓ Clock In for the Day'}
+                </button>
+              </div>
+              {clockInForDayError && <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: COLORS.red500, fontWeight: 600 }}>{clockInForDayError}</p>}
+            </div>
+          )}
+          {showsDailyClockingUI && dailyShift && currentPage === 'clocking' && (
             <div style={{ marginBottom: '16px', padding: '14px 16px', borderRadius: '12px', background: dailyShift.late_flag ? COLORS.amber50 : COLORS.slate50, border: `1px solid ${dailyShift.late_flag ? COLORS.amber300 : COLORS.slate200}` }}>
               <p style={{ margin: '0 0 10px 0', fontSize: '11px', fontWeight: 800, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Your Day</p>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
