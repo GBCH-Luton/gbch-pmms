@@ -250,8 +250,14 @@ export default function AdminDashboard({ profile }) {
   // Job" travel does (see add_activity_log_visit_columns.sql): an open row
   // with activity_category = 'visit' means she's away right now, which is
   // what makes her show up as "Away -- visiting X" on Where's the Team in
-  // real time. Mileage is captured on arrival, not departure -- same
-  // reasoning as a builder's own mileage-on-arrival.
+  // real time. Mileage is captured when she finishes the visit, not when
+  // she leaves for it -- same reasoning as a builder's own mileage-on-
+  // arrival (the real distance is only known once it's actually driven).
+  // Deliberately NOT framed as "arriving" anywhere -- unlike a builder's
+  // one-way trip to a specific next job, she might go on to another
+  // property, back to the office, or straight home, so "finish this
+  // visit and log what you drove" makes no assumption about where she's
+  // headed next.
   const [openVisit, setOpenVisit] = useState(null)
   const [visitPickerOpen, setVisitPickerOpen] = useState(false)
   const [visitProperties, setVisitProperties] = useState([])
@@ -437,7 +443,7 @@ export default function AdminDashboard({ profile }) {
 
   function attemptDailyClockOut() {
     setClockOutForDayError('')
-    if (openVisit) { setClockOutForDayError('Log your arrival back before clocking out for the day.'); return }
+    if (openVisit) { setClockOutForDayError('Finish logging your current visit before clocking out for the day.'); return }
     if (ukTimeHHMM() < dailyClockOutDeadline) {
       setEarlyLeaveReason('')
       setEarlyLeavePromptOpen(true)
@@ -1060,7 +1066,7 @@ export default function AdminDashboard({ profile }) {
                       onClick={openArrival}
                       style={{ padding: '7px 12px', background: COLORS.blue600, color: COLORS.white, border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
                     >
-                      ✓ Arrived — Log Mileage
+                      ✓ Finish Visit — Log Mileage
                     </button>
                   </div>
                 ) : (
@@ -1074,7 +1080,8 @@ export default function AdminDashboard({ profile }) {
 
                 {arrivalOpen && (
                   <div style={{ marginTop: '10px', background: COLORS.white, border: `1px solid ${COLORS.slate300}`, borderRadius: '12px', padding: '14px' }}>
-                    <p style={{ margin: '0 0 10px 0', fontSize: '13px', fontWeight: 700, color: COLORS.slate900 }}>Miles driven to {openVisit?.note}</p>
+                    <p style={{ margin: '0 0 10px 0', fontSize: '13px', fontWeight: 700, color: COLORS.slate900 }}>Miles driven for this visit</p>
+                    <p style={{ margin: '0 0 10px 0', fontSize: '11.5px', color: COLORS.slate500 }}>Whatever you drove for this trip — there and back, or one-way if you're heading somewhere else next.</p>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', overflow: 'hidden' }}>
                       <button
                         onClick={() => setArrivalMiles(m => Math.max(0, (m ?? 0) - 0.5))}
@@ -1106,7 +1113,7 @@ export default function AdminDashboard({ profile }) {
                         disabled={arrivalSaving}
                         style={{ flex: 2, padding: '10px', background: COLORS.blue600, color: COLORS.white, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: arrivalSaving ? 'not-allowed' : 'pointer', opacity: arrivalSaving ? 0.7 : 1 }}
                       >
-                        {arrivalSaving ? 'Saving…' : 'Confirm Arrival'}
+                        {arrivalSaving ? 'Saving…' : 'Finish Visit'}
                       </button>
                     </div>
                   </div>
