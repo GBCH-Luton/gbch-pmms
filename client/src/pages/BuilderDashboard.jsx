@@ -249,6 +249,11 @@ export default function BuilderDashboard({ profile }) {
   const [destinationTicketId, setDestinationTicketId] = useState('')
   const [activityNote, setActivityNote] = useState('')
   const [jobSearchQuery, setJobSearchQuery] = useState('')
+  // Optional receipt capture, shown only when ending a 'materials' trip --
+  // see add_activity_log_receipt_columns.sql. Never required; "I'm Back"
+  // works exactly as before if left blank.
+  const [receiptPhotoFile, setReceiptPhotoFile] = useState(null)
+  const [receiptAmount, setReceiptAmount] = useState('')
   // Admin-configurable (AdminSettings.jsx "Material Stores") -- only the
   // active ones are offered as suggestions; inactive ones are kept so past
   // trips that named them still read fine, just not resurfaced going
@@ -627,7 +632,7 @@ export default function BuilderDashboard({ profile }) {
       .schema('pmms')
       .from('tickets')
       .select(`
-        id, ticket_number, status, status_changed_at, category, issue_tag, description, room, priority_score, estimated_minutes, mileage_logged, transit_start, created_at, completed_at, hold_reason, hold_note, photo_url, property_id, checklist_responses, delay_reason, delay_reason_note, delay_reason_status
+        id, ticket_number, status, status_changed_at, category, issue_tag, description, room, priority_score, estimated_minutes, mileage_logged, transit_start, created_at, completed_at, completion_note, completion_photo_url, hold_reason, hold_note, photo_url, property_id, checklist_responses, delay_reason, delay_reason_note, delay_reason_status
       `)
       .eq('assigned_builder_id', profile.id)
       .not('status', 'in', '("Archived","Cancelled")')
@@ -967,17 +972,41 @@ export default function BuilderDashboard({ profile }) {
 
   async function handleEndActivity() {
     setEndingActivity(true)
+
+    // Optional -- only ever present on a 'materials' trip, and only if the
+    // builder actually attached one. Uploaded before the position fetch so
+    // a failed upload doesn't burn a GPS fix for nothing.
+    let receiptPhotoUrl = null
+    if (receiptPhotoFile) {
+      try {
+        const compressed = await compressImage(receiptPhotoFile)
+        const path = `receipts/${profile.id}/${Date.now()}-${compressed.name}`
+        await uploadFileWithProgress('ticket-photos', path, compressed)
+        receiptPhotoUrl = await getSignedUrl('ticket-photos', path)
+      } catch (uploadErr) {
+        setEndingActivity(false)
+        setActivityError(uploadErr.message)
+        return
+      }
+    }
+
     const position = await getCurrentPositionSafe()
 
     const { error } = await supabase
       .schema('pmms')
       .from('activity_log')
-      .update({ ended_at: new Date().toISOString(), ended_lat: position?.latitude ?? null, ended_lng: position?.longitude ?? null })
+      .update({
+        ended_at: new Date().toISOString(), ended_lat: position?.latitude ?? null, ended_lng: position?.longitude ?? null,
+        ...(receiptPhotoUrl ? { receipt_photo_url: receiptPhotoUrl } : {}),
+        ...(receiptAmount.trim() !== '' ? { receipt_amount: Number(receiptAmount) } : {}),
+      })
       .eq('id', openActivity.id)
 
     setEndingActivity(false)
     if (error) { setActivityError(error.message); return }
     setOpenActivity(null)
+    setReceiptPhotoFile(null)
+    setReceiptAmount('')
   }
 
   async function handleClockIn(transitStart, milesLogged) {
@@ -1118,7 +1147,7 @@ export default function BuilderDashboard({ profile }) {
     const previousStatus = selectedTicket.status
     const position = await getCurrentPositionSafe()
 
-    await supabase
+    const { error: ticketError } = await supabase
       .schema('pmms')
       .from('tickets')
       .update({
@@ -1128,6 +1157,18 @@ export default function BuilderDashboard({ profile }) {
         ...(checklistResponses ? { checklist_responses: checklistResponses } : {}),
       })
       .eq('id', selectedTicket.id)
+
+    // The photo/video is already uploaded by this point (see the try/catch
+    // above) -- if the status update itself fails (dropped connection, RLS
+    // hiccup), stop here rather than carrying on as if the job closed. The
+    // overlay stays open with the note/photos still attached so a retry
+    // doesn't need re-entering anything.
+    if (ticketError) {
+      console.error('Failed to complete ticket:', ticketError)
+      setCompleteSubmitting(false)
+      setCompleteError("Couldn't save -- check your connection and try again.")
+      return
+    }
 
     await supabase
       .schema('pmms')
@@ -1184,13 +1225,17 @@ export default function BuilderDashboard({ profile }) {
   // on this same ticket, now showing the break timer, instead of being
   // released back to the job list. Everything else about the pause is
   // identical regardless of which reason it is.
+  // Returns { error } rather than throwing -- handleStop (the only caller)
+  // needs to know whether to keep the Stop sheet open and show something,
+  // instead of closing it and silently leaving the ticket in whatever
+  // state it was already in.
   async function handlePause(reason, note, { keepLocked = false } = {}) {
     const now = new Date().toISOString()
     const ticket = selectedTicket
     const previousStatus = ticket.status
     const position = await getCurrentPositionSafe()
 
-    await supabase
+    const { error: ticketError } = await supabase
       .schema('pmms')
       .from('tickets')
       // long_break_alert_sent_at reset here, not just on Resume -- every
@@ -1199,6 +1244,11 @@ export default function BuilderDashboard({ profile }) {
       // over from days ago (see check-long-breaks Edge Function).
       .update({ status: 'On Hold', status_changed_at: now, stuck_alert_sent_at: null, long_break_alert_sent_at: null, hold_reason: reason, hold_note: note })
       .eq('id', ticket.id)
+
+    if (ticketError) {
+      console.error('Failed to pause ticket:', ticketError)
+      return { error: ticketError }
+    }
 
     await supabase
       .schema('pmms')
@@ -1226,6 +1276,7 @@ export default function BuilderDashboard({ profile }) {
     } else {
       setSelectedTicket(null)
     }
+    return { error: null }
   }
 
   // Instant push + in-app notification to whoever manages this ticket's
@@ -1252,8 +1303,12 @@ export default function BuilderDashboard({ profile }) {
   async function handleStop(reason, note) {
     setStopSubmitting(true)
     setStopError('')
-    await handlePause(reason, note, { keepLocked: SHORT_TRIP_REASONS.includes(reason) })
+    const result = await handlePause(reason, note, { keepLocked: SHORT_TRIP_REASONS.includes(reason) })
     setStopSubmitting(false)
+    if (result?.error) {
+      setStopError("Couldn't save -- check your connection and try again.")
+      return
+    }
     setStopSheetOpen(false)
     setMaterialsAskOpen(false)
     setStopReasonPicked(null)
@@ -2120,6 +2175,7 @@ export default function BuilderDashboard({ profile }) {
         {openActivity ? (() => {
           const destinationTicket = openActivity.destination_ticket_id ? tickets.find(t => t.id === openActivity.destination_ticket_id) : null
           return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap', background: COLORS.violet100, border: `1px solid ${COLORS.violet500}`, borderRadius: '12px', padding: '10px 14px' }}>
             <span style={{ fontSize: '13px', fontWeight: 600, color: COLORS.violet600 }}>
               🚶 Away — {openActivity.activity_type === 'Travel' ? 'Travelling' : 'On break'}{openActivity.note ? `: ${openActivity.note}` : ''} since {formatUKDateTime(openActivity.started_at).split(' ').slice(-1)[0]}
@@ -2141,6 +2197,28 @@ export default function BuilderDashboard({ profile }) {
                 {endingActivity ? 'Saving…' : "✓ I'm Back"}
               </button>
             </div>
+          </div>
+          {/* Purchase-side materials tracking -- optional, never blocks
+              "I'm Back". Separate from the "Materials Used" picker on job
+              completion (that one logs what was USED on a job, a sandbox
+              stub that doesn't save anywhere yet; this logs what was
+              BOUGHT on this trip, real and saved to activity_log). */}
+          {openActivity.activity_category === 'materials' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', background: COLORS.white, border: `1px solid ${COLORS.slate200}`, borderRadius: '12px', padding: '10px 14px' }}>
+              <span style={{ fontSize: '12px', fontWeight: 700, color: COLORS.slate500 }}>Receipt (optional):</span>
+              <label style={{ padding: '7px 12px', background: receiptPhotoFile ? COLORS.green100 : COLORS.slate100, color: receiptPhotoFile ? COLORS.green700 : COLORS.slate600, borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>
+                {receiptPhotoFile ? '✓ Photo attached' : '📷 Add photo'}
+                <input type="file" accept="image/*" capture="environment" onChange={(e) => setReceiptPhotoFile(e.target.files[0] || null)} style={{ display: 'none' }} />
+              </label>
+              <input
+                type="number" min="0" step="0.01" placeholder="£ total"
+                value={receiptAmount}
+                onChange={(e) => setReceiptAmount(e.target.value)}
+                style={{ width: '90px', padding: '7px 10px', borderRadius: '8px', border: `1px solid ${COLORS.slate200}`, fontSize: '12px', fontFamily: 'inherit' }}
+              />
+            </div>
+          )}
+          {activityError && <p style={{ margin: 0, fontSize: '12px', color: COLORS.red500, fontWeight: 600 }}>{activityError}</p>}
           </div>
           )
         })() : (
@@ -2226,19 +2304,29 @@ export default function BuilderDashboard({ profile }) {
         )}
       </div>
 
-      {/* Metric tiles -- disabled, not removed. Same appearance as before,
-          but no longer clickable filters: Leaving Site -> Resume Jobs
-          replaced On Hold's old click-to-filter path, and the full job
-          list below them is hidden (see SHOW_JOB_LIST). */}
+      {/* Metric tiles -- Working On Now stays non-interactive (if it's
+          non-zero the builder is already locked into that job's overlay
+          and can't be looking at this screen anyway). The rest jump
+          straight to something: Urgent/Done get their own small job lists
+          below, To Do reuses the exact same "Going to Another Job" entry
+          point as the green pill on the Leaving Site screen, On Hold
+          already jumped to Resume Jobs. Urgent/To Do are disabled while
+          away for the same reason On Hold already was -- jumping into a
+          job while still marked away would leave that activity_log entry
+          dangling; Done is a read-only history view, no such conflict. */}
       <div style={{ padding: '16px 16px 0 16px', maxWidth: '600px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '10px' }}>
         <div style={{ width: '100%', padding: '14px', background: COLORS.teal600, color: COLORS.white, border: 'none', borderRadius: '12px', textAlign: 'center', boxSizing: 'border-box' }}>
           <div style={{ fontSize: '28px', fontWeight: 800 }}>{inProgressTickets.length}</div>
           <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Working On Now</div>
         </div>
-        <div style={{ width: '100%', padding: '14px', background: COLORS.red500, color: COLORS.white, border: 'none', borderRadius: '12px', textAlign: 'center', boxSizing: 'border-box' }}>
+        <button
+          onClick={() => { if (!openActivity) setPage('urgent-jobs') }}
+          disabled={!!openActivity}
+          style={{ width: '100%', padding: '14px', background: COLORS.red500, color: COLORS.white, border: 'none', borderRadius: '12px', textAlign: 'center', boxSizing: 'border-box', cursor: openActivity ? 'default' : 'pointer' }}
+        >
           <div style={{ fontSize: '28px', fontWeight: 800 }}>{urgentTickets.length}</div>
           <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Urgent</div>
-        </div>
+        </button>
         {SHOW_AVAILABLE_JOBS_NAV && (
           <button
             onClick={() => setPage('available-jobs')}
@@ -2248,16 +2336,23 @@ export default function BuilderDashboard({ profile }) {
             <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Available Jobs</div>
           </button>
         )}
-        <div style={{ width: '100%', padding: '14px', background: COLORS.blue500, color: COLORS.white, border: 'none', borderRadius: '12px', textAlign: 'center', boxSizing: 'border-box' }}>
+        <button
+          onClick={() => {
+            if (openActivity) return
+            setActivityType('Travel'); setTravelMode('job'); setDestinationTicketId(''); setJobSearchQuery(''); setActivityError('')
+            setPage('leaving-job')
+          }}
+          disabled={!!openActivity}
+          style={{ width: '100%', padding: '14px', background: COLORS.blue500, color: COLORS.white, border: 'none', borderRadius: '12px', textAlign: 'center', boxSizing: 'border-box', cursor: openActivity ? 'default' : 'pointer' }}
+        >
           <div style={{ fontSize: '28px', fontWeight: 800 }}>{toDoTickets.length}</div>
           <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>To do</div>
-        </div>
+        </button>
         <button
-          // The one live tile -- jumps straight to the same Resume Jobs
-          // screen the Leaving Site pill opens, since On Hold jobs are
-          // exactly what that screen lists. Disabled while away, matching
-          // Leaving Site's own gating (there's no path into Resume Jobs at
-          // all while an activity is open).
+          // Jumps straight to the same Resume Jobs screen the Leaving Site
+          // pill opens, since On Hold jobs are exactly what that screen
+          // lists. Disabled while away -- there's no path into Resume Jobs
+          // at all while an activity is open.
           onClick={() => { if (!openActivity) setPage('leaving-resume') }}
           disabled={!!openActivity}
           style={{ width: '100%', padding: '14px', background: COLORS.amber500, color: COLORS.white, border: 'none', borderRadius: '12px', textAlign: 'center', boxSizing: 'border-box', cursor: openActivity ? 'default' : 'pointer' }}
@@ -2265,10 +2360,13 @@ export default function BuilderDashboard({ profile }) {
           <div style={{ fontSize: '28px', fontWeight: 800 }}>{onHoldTickets.length}</div>
           <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>On hold</div>
         </button>
-        <div style={{ width: '100%', padding: '14px', background: COLORS.slate500, color: COLORS.white, border: 'none', borderRadius: '12px', textAlign: 'center', boxSizing: 'border-box' }}>
+        <button
+          onClick={() => setPage('done-jobs')}
+          style={{ width: '100%', padding: '14px', background: COLORS.slate500, color: COLORS.white, border: 'none', borderRadius: '12px', textAlign: 'center', boxSizing: 'border-box', cursor: 'pointer' }}
+        >
           <div style={{ fontSize: '28px', fontWeight: 800 }}>{doneTickets.length}</div>
           <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Done</div>
-        </div>
+        </button>
 
         {SHOW_JOB_LIST && (
           <select
@@ -2819,6 +2917,22 @@ export default function BuilderDashboard({ profile }) {
             {clockInError && <p style={{ margin: '8px 0 0 0', fontSize: '13px', color: COLORS.red500, fontWeight: 600 }}>{clockInError}</p>}
           </div>
         )}
+        {/* Reference view only -- reached from the Done tile's job list, not
+            an active job screen, so this is deliberately just the outcome
+            (note + photos), no buttons of any kind. */}
+        {selectedTicket.status === 'Completed' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ padding: '14px', borderRadius: '10px', background: COLORS.green50, border: `1px solid ${COLORS.green200}` }}>
+              <p style={{ margin: '0 0 4px 0', fontSize: '11px', fontWeight: 700, color: COLORS.green600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                Completed{selectedTicket.completed_at ? ` ${formatUKDateTime(selectedTicket.completed_at)}` : ''}
+              </p>
+              {selectedTicket.completion_note && (
+                <p style={{ margin: 0, fontSize: '14px', color: COLORS.green900 }}>{selectedTicket.completion_note}</p>
+              )}
+            </div>
+            <TicketAttachmentGallery ticketId={selectedTicket.id} fallbackUrl={selectedTicket.completion_photo_url} mediaHeight="140px" stage="completed" />
+          </div>
+        )}
       </div>
 
       {/* Comments */}
@@ -3195,6 +3309,71 @@ export default function BuilderDashboard({ profile }) {
                     ⏸ {t.hold_reason}{t.hold_note ? ` — ${t.hold_note}` : ''}
                   </p>
                 )}
+              </button>
+            ))}
+          </div>
+        </div>
+        )
+      })()}
+
+      {/* Urgent tile's own job list -- same "tap a card, land straight on
+          the ready-to-start job screen" pattern as Resume Jobs above, just
+          scoped to urgentTickets instead of on-hold ones. Reached only
+          from the dashboard tile, not the Leaving Site menu, so Back goes
+          straight to the dashboard rather than into leaving-choices. */}
+      {page === 'urgent-jobs' && (
+        <div style={{ position: 'fixed', top: 'var(--pmms-banner-offset, 0px)', left: 0, right: 0, bottom: 0, background: COLORS.slate100, zIndex: 50, overflowY: 'auto', fontFamily: 'system-ui, sans-serif' }}>
+          <BuilderNavHeader onBack={() => setPage('jobs')} goHome={goHome} menuOpen={menuOpen} setMenuOpen={setMenuOpen} profile={profile} unreadMentions={unreadMentions} setPage={setPage} handleSignOut={handleSignOut} />
+          <div style={{ padding: '16px', maxWidth: '600px', margin: '0 auto' }}>
+            <p style={{ margin: '0 0 12px 0', fontSize: '12px', fontWeight: 700, color: COLORS.slate500, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Urgent Jobs</p>
+            {urgentTickets.length === 0 ? (
+              <div style={{ background: COLORS.white, borderRadius: '16px', padding: '34px 20px', textAlign: 'center' }}>
+                <p style={{ margin: 0, color: COLORS.slate400, fontWeight: 600 }}>Nothing urgent right now.</p>
+              </div>
+            ) : urgentTickets.map(t => (
+              <button
+                key={t.id}
+                onClick={() => { setSelectedTicket(t); setPage('jobs') }}
+                style={{ display: 'block', width: '100%', textAlign: 'left', background: COLORS.white, border: `1px solid ${COLORS.red200}`, borderRadius: '12px', padding: '14px', marginBottom: '10px', cursor: 'pointer' }}
+              >
+                <p style={{ margin: '0 0 2px 0', fontSize: '10.5px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Job #{t.ticket_number} · {t.category}</p>
+                <p style={{ margin: '0 0 4px 0', fontSize: '14.5px', fontWeight: 700, color: COLORS.slate900 }}>{t.property?.address}</p>
+                <p style={{ margin: 0, fontSize: '12.5px', color: COLORS.slate500 }}>{t.description}{t.room ? ` — ${t.room}` : ''}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Done tile's own job list -- read-only history, most recently
+          completed first. Tapping a card opens the same ticket overlay
+          every other job uses, but a Completed ticket only ever shows the
+          outcome (note + photos) there, no action buttons -- see the
+          selectedTicket.status === 'Completed' branch in the Actions
+          card above. */}
+      {page === 'done-jobs' && (() => {
+        const recentlyDone = [...doneTickets].sort((a, b) => new Date(b.completed_at || 0) - new Date(a.completed_at || 0))
+        return (
+        <div style={{ position: 'fixed', top: 'var(--pmms-banner-offset, 0px)', left: 0, right: 0, bottom: 0, background: COLORS.slate100, zIndex: 50, overflowY: 'auto', fontFamily: 'system-ui, sans-serif' }}>
+          <BuilderNavHeader onBack={() => setPage('jobs')} goHome={goHome} menuOpen={menuOpen} setMenuOpen={setMenuOpen} profile={profile} unreadMentions={unreadMentions} setPage={setPage} handleSignOut={handleSignOut} />
+          <div style={{ padding: '16px', maxWidth: '600px', margin: '0 auto' }}>
+            <p style={{ margin: '0 0 12px 0', fontSize: '12px', fontWeight: 700, color: COLORS.slate500, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Done Jobs</p>
+            {recentlyDone.length === 0 ? (
+              <div style={{ background: COLORS.white, borderRadius: '16px', padding: '34px 20px', textAlign: 'center' }}>
+                <p style={{ margin: 0, color: COLORS.slate400, fontWeight: 600 }}>No completed jobs yet.</p>
+              </div>
+            ) : recentlyDone.map(t => (
+              <button
+                key={t.id}
+                onClick={() => { setSelectedTicket(t); setPage('jobs') }}
+                style={{ display: 'block', width: '100%', textAlign: 'left', background: COLORS.white, border: `1px solid ${COLORS.slate200}`, borderRadius: '12px', padding: '14px', marginBottom: '10px', cursor: 'pointer' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
+                  <p style={{ margin: '0 0 2px 0', fontSize: '10.5px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Job #{t.ticket_number} · {t.category}</p>
+                  {t.completed_at && <span style={{ flexShrink: 0, fontSize: '11px', fontWeight: 700, color: COLORS.slate400 }}>{formatUKDate(t.completed_at)}</span>}
+                </div>
+                <p style={{ margin: '0 0 4px 0', fontSize: '14.5px', fontWeight: 700, color: COLORS.slate900 }}>{t.property?.address}</p>
+                <p style={{ margin: 0, fontSize: '12.5px', color: COLORS.slate500 }}>{t.description}{t.room ? ` — ${t.room}` : ''}</p>
               </button>
             ))}
           </div>
