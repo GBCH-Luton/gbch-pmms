@@ -73,6 +73,14 @@ export default function AdminPipeline({
   const [receiptsByTicketId, setReceiptsByTicketId] = useState({})
   const [expandedReceiptTicketIds, setExpandedReceiptTicketIds] = useState(() => new Set())
   const [receiptLightbox, setReceiptLightbox] = useState(null) // { urls, index } | null
+  // Materials Used (see add_ticket_materials_used_table.sql) -- what a
+  // job actually consumed, logged at completion. Same "closed by default,
+  // only shown at all when non-empty" pattern as Receipts above, but kept
+  // as its own Set/map rather than reusing the receipts one -- a ticket
+  // can have either, both, or neither, and each should remember its own
+  // expanded state independently.
+  const [materialsUsedByTicketId, setMaterialsUsedByTicketId] = useState({})
+  const [expandedMaterialsTicketIds, setExpandedMaterialsTicketIds] = useState(() => new Set())
   // Captured into local state at mount rather than re-read from the prop
   // later -- the parent (AdminDashboard.jsx) nulls the prop out as soon as
   // onInitialFilterConsumed fires, which happens before tickets have even
@@ -394,6 +402,18 @@ export default function AdminPipeline({
       receiptsGrouped[r.ticket_id].push(r)
     })
     setReceiptsByTicketId(receiptsGrouped)
+
+    const { data: materialsUsedData } = await supabase
+      .schema('pmms')
+      .from('ticket_materials_used')
+      .select('ticket_id, name, quantity, created_at')
+      .order('created_at', { ascending: true })
+    const materialsUsedGrouped = {}
+    ;(materialsUsedData || []).forEach(m => {
+      if (!materialsUsedGrouped[m.ticket_id]) materialsUsedGrouped[m.ticket_id] = []
+      materialsUsedGrouped[m.ticket_id].push(m)
+    })
+    setMaterialsUsedByTicketId(materialsUsedGrouped)
 
     if (!ticketsError && !staffError) {
       const withProperties = await attachProperties(ticketsData, 'address')
@@ -1491,6 +1511,39 @@ export default function AdminPipeline({
                                     </div>
                                   )
                                 })()}
+                              </div>
+                            )}
+
+                            {/* Materials Used -- what this job actually
+                                consumed, logged by the builder at completion
+                                (see add_ticket_materials_used_table.sql).
+                                Separate section from Receipts above -- a
+                                receipt is proof of spend on a shopping trip,
+                                not necessarily for this one job; this is the
+                                other side, what THIS job used. */}
+                            {materialsUsedByTicketId[t.id]?.length > 0 && (
+                              <div style={expandSectionStyle}>
+                                <button
+                                  onClick={() => setExpandedMaterialsTicketIds(prev => {
+                                    const next = new Set(prev)
+                                    if (next.has(t.id)) next.delete(t.id); else next.add(t.id)
+                                    return next
+                                  })}
+                                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
+                                >
+                                  <p style={{ ...expandSectionTitleStyle, margin: 0 }}>🧱 Materials Used ({materialsUsedByTicketId[t.id].length})</p>
+                                  <span style={{ fontSize: '11px', fontWeight: 700, color: COLORS.slate400 }}>{expandedMaterialsTicketIds.has(t.id) ? '▲ Hide' : '▼ Show'}</span>
+                                </button>
+                                {expandedMaterialsTicketIds.has(t.id) && (
+                                  <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                    {materialsUsedByTicketId[t.id].map((m, i) => (
+                                      <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', padding: '8px 10px', background: COLORS.slate50, borderRadius: '10px' }}>
+                                        <span style={{ fontSize: '13px', fontWeight: 600, color: COLORS.slate900 }}>{m.name}</span>
+                                        <span style={{ fontSize: '12px', fontWeight: 700, color: COLORS.slate500, flexShrink: 0 }}>{m.quantity}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
                             )}
 

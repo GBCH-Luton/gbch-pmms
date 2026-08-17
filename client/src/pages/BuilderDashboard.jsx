@@ -9,7 +9,6 @@ import { logLoginEvent } from '../lib/loginEvents'
 import { pushNotificationsSupported, hasActivePushSubscription, enablePushNotifications } from '../lib/pushNotifications'
 import { pushEmergencyAlert, priorityTierLabel, fetchPriorityThresholds, Avatar, formatUKDate, formatUKDateTime, ukDateKey, ukTimeHHMM, minutesLate, shiftDateKey, fetchAttendanceSummary, formatDuration, formatDurationDays, fetchManagersForDivision, createNotification, sendPushNotification, SHORT_TRIP_REASONS } from './admin/shared'
 import { distanceMetres, metresToMiles } from '../lib/geo'
-import { fetchAvailableMaterials, logMaterialUsage } from '../lib/simsMaterialsBridge'
 import { fetchChannelMessages, subscribeToChannel, postMessage, markChannelRead, markChannelReadRemote, fetchChannelReads, countUnreadMentions, colorForSender } from '../lib/chat'
 import { fetchDmContacts, fetchConversations, fetchThreadMessages, subscribeToDm, postDm, markThreadRead, countUnreadDms } from '../lib/dm'
 import { NavIcon } from '../lib/icons'
@@ -36,10 +35,6 @@ const SHOW_LOG_TICKET_NAV = false
 // are all still here, just unreachable from the nav/dashboard tile. Flip
 // back to true to bring it back.
 const SHOW_AVAILABLE_JOBS_NAV = false
-
-// Sandbox-only prototype (see lib/simsMaterialsBridge.js) -- not
-// production-bound, not required for either PMMS or SIMS's launch.
-const SIMS_MATERIALS_PROTOTYPE_ENABLED = true
 
 // SHORT_TRIP_REASONS (imported above, from admin/shared) are the 3 Stop
 // reasons that are a short, specific personal trip -- the builder stays
@@ -253,7 +248,7 @@ export default function BuilderDashboard({ profile }) {
   // see add_activity_receipts_table.sql. Never required; "I'm Back" works
   // exactly as before if left with no rows. One row per physical receipt
   // (a materials run can span two shops/two receipts), same "array of
-  // rows with add/remove" shape as materialRows below.
+  // rows with add/remove" shape as materialsUsedRows below.
   const [receiptRows, setReceiptRows] = useState([])
   // Admin-configurable (AdminSettings.jsx "Material Stores") -- only the
   // active ones are offered as suggestions; inactive ones are kept so past
@@ -307,10 +302,12 @@ export default function BuilderDashboard({ profile }) {
   // shipped 2026-08-15; added back here on 2026-08-15.
   const [followUpNeeded, setFollowUpNeeded] = useState(false)
   const [followUpNote, setFollowUpNote] = useState('')
-  // Sandbox-only SIMS materials-used prototype (see simsMaterialsBridge.js).
-  const [availableMaterials, setAvailableMaterials] = useState([])
-  const [materialsLoading, setMaterialsLoading] = useState(false)
-  const [materialRows, setMaterialRows] = useState([])
+  // What this job actually used -- free text (name/kind + quantity), not a
+  // catalog pick, since there's no real stock system to pick from yet. See
+  // add_ticket_materials_used_table.sql -- deliberately separate from a
+  // purchase-trip receipt (activity_receipts), which isn't reliably tied
+  // to any one job (a bulk buy can supply several future jobs).
+  const [materialsUsedRows, setMaterialsUsedRows] = useState([])
   const [routineVisitChecklistTemplate, setRoutineVisitChecklistTemplate] = useState([])
   const [checklistChecked, setChecklistChecked] = useState({})
   const [loggingMode, setLoggingMode] = useState('maintenance') // 'maintenance' | 'compliance'
@@ -1116,25 +1113,16 @@ export default function BuilderDashboard({ profile }) {
     setClockingIn(false)
   }
 
-  useEffect(() => {
-    if (!showCompleteConfirm || !SIMS_MATERIALS_PROTOTYPE_ENABLED) return
-    setMaterialsLoading(true)
-    fetchAvailableMaterials().then(items => {
-      setAvailableMaterials(items)
-      setMaterialsLoading(false)
-    })
-  }, [showCompleteConfirm])
-
-  function addMaterialRow() {
-    setMaterialRows(prev => [...prev, { itemId: '', quantity: '' }])
+  function addMaterialsUsedRow() {
+    setMaterialsUsedRows(prev => [...prev, { name: '', quantity: '' }])
   }
 
-  function updateMaterialRow(index, field, value) {
-    setMaterialRows(prev => prev.map((row, i) => i === index ? { ...row, [field]: value } : row))
+  function updateMaterialsUsedRow(index, field, value) {
+    setMaterialsUsedRows(prev => prev.map((row, i) => i === index ? { ...row, [field]: value } : row))
   }
 
-  function removeMaterialRow(index) {
-    setMaterialRows(prev => prev.filter((_, i) => i !== index))
+  function removeMaterialsUsedRow(index) {
+    setMaterialsUsedRows(prev => prev.filter((_, i) => i !== index))
   }
 
   async function handleComplete(note, mediaFiles, checklistResponses, needsFollowup, followupNote) {
@@ -1233,14 +1221,18 @@ export default function BuilderDashboard({ profile }) {
 
     await postAuditEvent(selectedTicket.id, 'Status Changed', `${previousStatus} → Completed — ${note.trim()}`)
 
-    // Sandbox-only SIMS materials-used prototype -- see
-    // lib/simsMaterialsBridge.js for what this is stubbing out to.
-    if (SIMS_MATERIALS_PROTOTYPE_ENABLED) {
-      const rowsToLog = materialRows.filter(row => row.itemId && Number(row.quantity) > 0)
-      for (const row of rowsToLog) {
-        await logMaterialUsage(selectedTicket.id, row.itemId, Number(row.quantity), profile.id)
-      }
-      setMaterialRows([])
+    // Optional -- what this job actually used, free text. Rows left
+    // completely blank are silently skipped, same convention as the
+    // receipts rows on "I'm Back".
+    const materialsToLog = materialsUsedRows.filter(row => row.name.trim() !== '')
+    if (materialsToLog.length > 0) {
+      await supabase.schema('pmms').from('ticket_materials_used').insert(
+        materialsToLog.map(row => ({
+          ticket_id: selectedTicket.id, staff_id: profile.id,
+          name: row.name.trim(), quantity: row.quantity.trim() || '1',
+        }))
+      )
+      setMaterialsUsedRows([])
     }
 
     setCompleteSubmitting(false)
@@ -2815,50 +2807,42 @@ export default function BuilderDashboard({ profile }) {
               <p style={{ margin: 0, fontSize: '12px', color: COLORS.slate500, fontWeight: 600 }}>{formatUploadProgress(completeUploadProgress)}</p>
             )}
 
-            {SIMS_MATERIALS_PROTOTYPE_ENABLED && (
-              <div>
-                <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: COLORS.slate500, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Materials Used (optional)</p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {materialRows.map((row, index) => (
-                    <div key={index} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                      <select
-                        value={row.itemId}
-                        onChange={(e) => updateMaterialRow(index, 'itemId', e.target.value)}
-                        style={{ flex: 1, padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', fontFamily: 'inherit', boxSizing: 'border-box' }}
-                      >
-                        <option value="">Select an item...</option>
-                        {availableMaterials.map(item => (
-                          <option key={item.id} value={item.id}>{item.name} ({item.unit})</option>
-                        ))}
-                      </select>
-                      <input
-                        type="number"
-                        min="0"
-                        step="1"
-                        value={row.quantity}
-                        onChange={(e) => updateMaterialRow(index, 'quantity', e.target.value)}
-                        placeholder="Qty"
-                        style={{ width: '70px', padding: '10px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', fontFamily: 'inherit', boxSizing: 'border-box' }}
-                      />
-                      <button
-                        onClick={() => removeMaterialRow(index)}
-                        aria-label="Remove"
-                        style={{ width: '36px', height: '36px', flexShrink: 0, border: 'none', background: COLORS.red100, color: COLORS.red600, borderRadius: '8px', fontSize: '15px', cursor: 'pointer' }}
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  ))}
-                  <button
-                    onClick={addMaterialRow}
-                    disabled={materialsLoading}
-                    style={{ width: '100%', padding: '10px', borderRadius: '10px', border: `1px dashed ${COLORS.slate300}`, background: COLORS.slate50, color: COLORS.slate500, fontSize: '13px', fontWeight: 600, cursor: materialsLoading ? 'not-allowed' : 'pointer' }}
-                  >
-                    {materialsLoading ? 'Loading items...' : '+ Add material'}
-                  </button>
-                </div>
+            <div>
+              <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: COLORS.slate500, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Materials Used (optional)</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {materialsUsedRows.map((row, index) => (
+                  <div key={index} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <input
+                      type="text"
+                      value={row.name}
+                      onChange={(e) => updateMaterialsUsedRow(index, 'name', e.target.value)}
+                      placeholder="What (e.g. 15mm elbow, screws)..."
+                      style={{ flex: 1, padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', fontFamily: 'inherit', boxSizing: 'border-box' }}
+                    />
+                    <input
+                      type="text"
+                      value={row.quantity}
+                      onChange={(e) => updateMaterialsUsedRow(index, 'quantity', e.target.value)}
+                      placeholder="Qty"
+                      style={{ width: '80px', padding: '10px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', fontFamily: 'inherit', boxSizing: 'border-box' }}
+                    />
+                    <button
+                      onClick={() => removeMaterialsUsedRow(index)}
+                      aria-label="Remove"
+                      style={{ width: '36px', height: '36px', flexShrink: 0, border: 'none', background: COLORS.red100, color: COLORS.red600, borderRadius: '8px', fontSize: '15px', cursor: 'pointer' }}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+                <button
+                  onClick={addMaterialsUsedRow}
+                  style={{ width: '100%', padding: '10px', borderRadius: '10px', border: `1px dashed ${COLORS.slate300}`, background: COLORS.slate50, color: COLORS.slate500, fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}
+                >
+                  + Add {materialsUsedRows.length > 0 ? 'another' : 'a'} material
+                </button>
               </div>
-            )}
+            </div>
 
             <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '12px 14px', borderRadius: '10px', background: COLORS.amber50, border: `1px solid ${COLORS.amber300}`, cursor: 'pointer' }}>
               <input
@@ -3053,7 +3037,7 @@ export default function BuilderDashboard({ profile }) {
               <p style={{ margin: '0 0 16px 0', fontSize: '13px', fontWeight: 500, color: COLORS.slate500 }}>This is logged and shown to the office</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <button
-                  onClick={() => { setChecklistChecked({}); setMaterialRows([]); setFollowUpNeeded(false); setFollowUpNote(''); setStopSheetOpen(false); setShowCompleteConfirm(true) }}
+                  onClick={() => { setChecklistChecked({}); setMaterialsUsedRows([]); setFollowUpNeeded(false); setFollowUpNote(''); setStopSheetOpen(false); setShowCompleteConfirm(true) }}
                   style={{ width: '100%', padding: '14px', borderRadius: '10px', border: 'none', background: COLORS.green600, color: COLORS.white, fontSize: '14px', fontWeight: 700, cursor: 'pointer', textAlign: 'left' }}
                 >
                   ✓ Job Completed
