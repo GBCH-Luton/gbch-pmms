@@ -715,35 +715,35 @@ export default function AdminRaiseTicket({ profile, onNavigate }) {
             </div>
           )}
 
-          {/* Step 5: Assignment & Details (admin-only) */}
-          {ticketStep4Complete && (
+          {/* Step 5: Assignment & Details -- Maintenance-Manager-only (and
+              admin/other divisions), not Landlord Liaison Manager (see
+              canAssignBuilder). Not just the builder picker -- priority
+              override, department and event are all part of assigning the
+              job out, which isn't her call either. */}
+          {ticketStep4Complete && canAssignBuilder && (
             <div style={{ background: SECTION_BG[0], padding: '20px', borderBottom: '1px solid rgba(15,23,42,0.06)' }}>
               <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: COLORS.slate900 }}>5. Assignment &amp; Details</p>
 
-              {canAssignBuilder && (
-                <>
-                  <p style={fieldLabelStyle}>Assign to builder</p>
-                  <select
-                    value={assignedBuilderId}
-                    onChange={(e) => setAssignedBuilderId(e.target.value)}
-                    style={{ ...fieldSelectStyle, marginBottom: '4px' }}
-                  >
-                    <option value="">Leave unassigned</option>
-                    {builders.map(b => (
-                      <option key={b.id} value={b.id} style={b.availability !== 'Available' ? { color: COLORS.slate400 } : undefined}>{builderOptionLabel(b)}</option>
-                    ))}
-                  </select>
-                  {assignedBuilderId && assignedBuilderId === autoSuggestedBuilderId && (
-                    <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 600, color: COLORS.slate500 }}>
-                      Auto-suggested (least-busy eligible builder) — change or clear to assign manually.
-                    </p>
-                  )}
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 10px 0', fontSize: '12px', fontWeight: 600, color: COLORS.slate500, cursor: 'pointer' }}>
-                    <input type="checkbox" checked={ignoreSkills} onChange={(e) => setIgnoreSkills(e.target.checked)} />
-                    Show all builders (ignore skills)
-                  </label>
-                </>
+              <p style={fieldLabelStyle}>Assign to builder</p>
+              <select
+                value={assignedBuilderId}
+                onChange={(e) => setAssignedBuilderId(e.target.value)}
+                style={{ ...fieldSelectStyle, marginBottom: '4px' }}
+              >
+                <option value="">Leave unassigned</option>
+                {builders.map(b => (
+                  <option key={b.id} value={b.id} style={b.availability !== 'Available' ? { color: COLORS.slate400 } : undefined}>{builderOptionLabel(b)}</option>
+                ))}
+              </select>
+              {assignedBuilderId && assignedBuilderId === autoSuggestedBuilderId && (
+                <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 600, color: COLORS.slate500 }}>
+                  Auto-suggested (least-busy eligible builder) — change or clear to assign manually.
+                </p>
               )}
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 10px 0', fontSize: '12px', fontWeight: 600, color: COLORS.slate500, cursor: 'pointer' }}>
+                <input type="checkbox" checked={ignoreSkills} onChange={(e) => setIgnoreSkills(e.target.checked)} />
+                Show all builders (ignore skills)
+              </label>
               {assignedBuilderId && (
                 <>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 14px 0', fontSize: '13px', fontWeight: 600, color: COLORS.slate900, cursor: 'pointer' }}>
@@ -1021,7 +1021,13 @@ export default function AdminRaiseTicket({ profile, onNavigate }) {
             </div>
           )}
 
-          {/* Step 4: Assignment & Details (admin-only) */}
+          {/* Step 4: Assignment, Details & Submit -- the submit button lives
+              in this same block (compliance mode has no separate Photo &
+              Submit step the way maintenance mode does), so this can't be
+              hidden wholesale for Landlord Liaison Manager the way step 5
+              above is. Only the assignment/priority/department fields
+              (Maintenance-Manager-only, see canAssignBuilder) are hidden;
+              the block itself, and Submit, stay reachable. */}
           {complianceCheckType && complianceResults.length > 0 && !complianceResults.some(r => r === null) && (
             <div style={{ background: SECTION_BG[1], padding: '20px' }}>
               <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: COLORS.slate900 }}>4. Assignment, Details &amp; Submit</p>
@@ -1048,53 +1054,53 @@ export default function AdminRaiseTicket({ profile, onNavigate }) {
                     <input type="checkbox" checked={ignoreSkills} onChange={(e) => setIgnoreSkills(e.target.checked)} />
                     Show all builders (ignore skills)
                   </label>
-                </>
-              )}
-              {assignedBuilderId && (
-                <>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 14px 0', fontSize: '13px', fontWeight: 600, color: COLORS.slate900, cursor: 'pointer' }}>
-                    <input type="checkbox" checked={sendPushOnAssign} onChange={(e) => setSendPushOnAssign(e.target.checked)} />
-                    Also send a push notification
-                  </label>
+                  {assignedBuilderId && (
+                    <>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 14px 0', fontSize: '13px', fontWeight: 600, color: COLORS.slate900, cursor: 'pointer' }}>
+                        <input type="checkbox" checked={sendPushOnAssign} onChange={(e) => setSendPushOnAssign(e.target.checked)} />
+                        Also send a push notification
+                      </label>
 
-                  {/* Manager-only, applied to every ticket this compliance
-                      batch creates -- never shown to or fetched by the builder. */}
-                  <p style={fieldLabelStyle}>Estimated time per ticket (minutes, required)</p>
-                  <input
-                    type="number"
-                    min="0"
-                    step="5"
-                    value={estimatedMinutes}
-                    onChange={(e) => setEstimatedMinutes(e.target.value)}
-                    placeholder="e.g. 30"
+                      {/* Manager-only, applied to every ticket this compliance
+                          batch creates -- never shown to or fetched by the builder. */}
+                      <p style={fieldLabelStyle}>Estimated time per ticket (minutes, required)</p>
+                      <input
+                        type="number"
+                        min="0"
+                        step="5"
+                        value={estimatedMinutes}
+                        onChange={(e) => setEstimatedMinutes(e.target.value)}
+                        placeholder="e.g. 30"
+                        style={{ ...fieldSelectStyle, marginBottom: '14px' }}
+                      />
+                    </>
+                  )}
+
+                  <p style={fieldLabelStyle}>Priority override</p>
+                  <select
+                    value={priorityOverride}
+                    onChange={(e) => setPriorityOverride(e.target.value)}
                     style={{ ...fieldSelectStyle, marginBottom: '14px' }}
-                  />
+                  >
+                    <option value="">Use calculated priority</option>
+                    <option value="P1 Critical">P1 Critical</option>
+                    <option value="P2 Urgent">P2 Urgent</option>
+                    <option value="P3 Routine">P3 Routine</option>
+                  </select>
+
+                  <p style={fieldLabelStyle}>Department</p>
+                  <select
+                    value={department}
+                    onChange={(e) => setDepartment(e.target.value)}
+                    style={{ ...fieldSelectStyle, marginBottom: '16px' }}
+                  >
+                    <option value="">Select a department...</option>
+                    {departments.map(d => (
+                      <option key={d} value={d}>{d}</option>
+                    ))}
+                  </select>
                 </>
               )}
-
-              <p style={fieldLabelStyle}>Priority override</p>
-              <select
-                value={priorityOverride}
-                onChange={(e) => setPriorityOverride(e.target.value)}
-                style={{ ...fieldSelectStyle, marginBottom: '14px' }}
-              >
-                <option value="">Use calculated priority</option>
-                <option value="P1 Critical">P1 Critical</option>
-                <option value="P2 Urgent">P2 Urgent</option>
-                <option value="P3 Routine">P3 Routine</option>
-              </select>
-
-              <p style={fieldLabelStyle}>Department</p>
-              <select
-                value={department}
-                onChange={(e) => setDepartment(e.target.value)}
-                style={{ ...fieldSelectStyle, marginBottom: '16px' }}
-              >
-                <option value="">Select a department...</option>
-                {departments.map(d => (
-                  <option key={d} value={d}>{d}</option>
-                ))}
-              </select>
 
               {ticketError && (
                 <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: COLORS.red500 }}>{ticketError}</p>
