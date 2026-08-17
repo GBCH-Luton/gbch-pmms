@@ -343,6 +343,7 @@ export default function BuilderDashboard({ profile }) {
   const [reportedTickets, setReportedTickets] = useState([])
   const [notifications, setNotifications] = useState([])
   const [notifPanelOpen, setNotifPanelOpen] = useState(false)
+  const [notificationOpenError, setNotificationOpenError] = useState('')
   const [availableJobs, setAvailableJobs] = useState([])
   const [claimError, setClaimError] = useState('')
   const [claimingId, setClaimingId] = useState(null)
@@ -2023,7 +2024,7 @@ export default function BuilderDashboard({ profile }) {
           </button>
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
             <button
-              onClick={() => setNotifPanelOpen(prev => !prev)}
+              onClick={() => { setNotifPanelOpen(prev => !prev); setNotificationOpenError('') }}
               aria-label="Notifications"
               style={{ position: 'relative', background: 'none', border: 'none', padding: '8px', cursor: 'pointer', fontSize: '20px', lineHeight: 1 }}
             >
@@ -2052,6 +2053,11 @@ export default function BuilderDashboard({ profile }) {
 
         {notifPanelOpen && (
           <div style={{ background: COLORS.white, borderBottom: `1px solid ${COLORS.slate200}`, maxHeight: '320px', overflowY: 'auto' }}>
+            {notificationOpenError && (
+              <p style={{ margin: 0, padding: '10px 20px', fontSize: '12.5px', fontWeight: 600, color: COLORS.amber800, background: COLORS.amber50, borderBottom: `1px solid ${COLORS.amber200}` }}>
+                {notificationOpenError}
+              </p>
+            )}
             {notifications.length === 0 ? (
               <p style={{ margin: 0, padding: '20px', fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic', textAlign: 'center' }}>No notifications yet.</p>
             ) : (
@@ -2061,8 +2067,18 @@ export default function BuilderDashboard({ profile }) {
                   onClick={() => {
                     if (!n.read) markNotificationRead(n.id)
                     const t = tickets.find(t => t.id === n.ticket_id)
-                    if (t) openTicket(t)
-                    setNotifPanelOpen(false)
+                    if (t) {
+                      openTicket(t)
+                      setNotifPanelOpen(false)
+                      setNotificationOpenError('')
+                    } else {
+                      // Most likely reassigned to someone else since the
+                      // notification was created -- fetchTickets() only
+                      // ever returns this builder's own current jobs, so a
+                      // stale ticket_id just silently matched nothing
+                      // before this, with no explanation at all.
+                      setNotificationOpenError("This job isn't assigned to you anymore.")
+                    }
                   }}
                   style={{
                     display: 'block', width: '100%', textAlign: 'left', padding: '12px 20px', border: 'none', borderBottom: `1px solid ${COLORS.slate100}`,
