@@ -171,6 +171,13 @@ export default function AdminClocking({ profile, onNavigate }) {
   const [hoursPeriod, setHoursPeriod] = useState('month')
   const [monthlyRows, setMonthlyRows] = useState([])
   const [monthlyLoading, setMonthlyLoading] = useState(true)
+  // Sorted alphabetically by staff name by default (unlike the Completed
+  // Job Timesheet's own sort below, which starts unsorted) -- always has
+  // an active column/direction rather than null.
+  const [hoursSortColumn, setHoursSortColumn] = useState('staff')
+  const [hoursSortDirection, setHoursSortDirection] = useState('asc')
+  const [hoveredHoursStaffId, setHoveredHoursStaffId] = useState(null)
+  const [selectedHoursStaffId, setSelectedHoursStaffId] = useState(null)
 
   function openPinMap(lat, lng) {
     setMapModal({ mode: 'pin', embedUrl: googleMapsEmbedLink(lat, lng) })
@@ -262,15 +269,18 @@ export default function AdminClocking({ profile, onNavigate }) {
     if (allStaff.length > 0) fetchCompletedRowsForDate(completedDate)
   }, [completedDate, allStaff])
 
-  // "In Transit": time clocked in that isn't accounted for by a job or
-  // a declared Leaving
-  // Site/Log a Visit activity. Computed as total clocked minus on-job
-  // minus declared, not tracked as its own state -- builders don't get a
-  // new button or flow, this is purely a reporting rollup over data that
-  // already exists. Shares the Travel & Visits breakdown below (both are
-  // "hours over a period" reports over the same three data sources), and
-  // both now respond to the same Today/This Week/This Month period
-  // picker instead of being locked to a calendar month.
+  // Idle time -- labelled "Idle" in the UI, matching the live Where's the
+  // Team/Today's Attendance status word (see [[project_idle_time_reporting]]
+  // -- "In Transit" was tried and rejected as a term, not settled on
+  // yet): time clocked in that isn't accounted for by a job or a
+  // declared Leaving Site/Log a Visit activity. Computed as total
+  // clocked minus on-job minus declared, not tracked as its own state --
+  // builders don't get a new button or flow, this is purely a reporting
+  // rollup over data that already exists. Shares the Travel & Visits
+  // breakdown below (both are "hours over a period" reports over the
+  // same three data sources), and both now respond to the same
+  // Today/This Week/This Month period picker instead of being locked to
+  // a calendar month.
   async function fetchMonthlyHours() {
     setMonthlyLoading(true)
     const todayKey = ukDateKey()
@@ -307,7 +317,7 @@ export default function AdminClocking({ profile, onNavigate }) {
       .gte('work_date', from)
       .lte('work_date', to)
 
-    // On-job time, for the In Transit subtraction -- deliberately every
+    // On-job time, for the Idle subtraction -- deliberately every
     // work_session in range, not just completed ones, so a builder
     // currently mid-job today still counts their time so far rather than
     // reading as falsely "in transit" until they finish.
@@ -966,6 +976,40 @@ export default function AdminClocking({ profile, onNavigate }) {
       })
     : filteredCompletedRows
 
+  const HOURS_SORT_ACCESSORS = {
+    staff: (r) => (r.staffName || '').toLowerCase(),
+    days: (r) => r.daysWorked,
+    total: (r) => r.totalMs,
+    onJob: (r) => r.onJobMs,
+    idle: (r) => r.inTransitMs,
+  }
+
+  function handleHoursSort(column) {
+    if (hoursSortColumn === column) {
+      setHoursSortDirection(d => (d === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setHoursSortColumn(column)
+      setHoursSortDirection('asc')
+    }
+  }
+
+  const sortedMonthlyRows = [...monthlyRows].sort((a, b) => {
+    const accessor = HOURS_SORT_ACCESSORS[hoursSortColumn]
+    const av = accessor(a)
+    const bv = accessor(b)
+    const cmp = typeof av === 'string' ? av.localeCompare(bv) : av - bv
+    return hoursSortDirection === 'asc' ? cmp : -cmp
+  })
+
+  // A day averaging under 8 hours for the selected period is worth a
+  // manager's attention at a glance -- guarded on daysWorked so someone
+  // with nothing recorded this period (on leave, hasn't started yet)
+  // reads as blank, not a false flag.
+  const UNDER_DAY_MS = 8 * 3600000
+  function isUnderDayAverage(r) {
+    return r.daysWorked > 0 && (r.totalMs / r.daysWorked) < UNDER_DAY_MS
+  }
+
   if (loading) return (
     <div style={{ minHeight: '200px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <p style={{ color: COLORS.slate400, fontWeight: 600, fontFamily: 'system-ui' }}>Loading clocking data...</p>
@@ -1406,7 +1450,7 @@ export default function AdminClocking({ profile, onNavigate }) {
 
       {/* Section 4: Hours Summary -- payroll-style rollup, summed from
           daily_attendance/work_sessions/activity_log over Today / This
-          Week / an arbitrary picked month. "In Transit" is time clocked
+          Week / an arbitrary picked month. "Idle" is time clocked
           in that's neither on a job nor a declared activity -- a report,
           not a new tracked state, so nothing about how builders use the
           app changes. */}
@@ -1415,7 +1459,7 @@ export default function AdminClocking({ profile, onNavigate }) {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px', marginBottom: '14px' }}>
           <div>
             <h2 style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: 800, color: COLORS.slate900 }}>Hours Summary</h2>
-            <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate500 }}>Total hours per builder, split into on-job and in-transit (clocked in, no job or trip logged) time.</p>
+            <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate500 }}>Total hours per staff member, split into on-job and idle (clocked in, no job or trip logged) time.</p>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
             {[['today', 'Today'], ['week', 'This Week'], ['month', 'This Month']].map(([key, label]) => (
@@ -1450,31 +1494,59 @@ export default function AdminClocking({ profile, onNavigate }) {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: COLORS.slate50, borderBottom: `1px solid ${COLORS.slate200}` }}>
-                  <th style={thStyle}>Builder</th>
-                  <th style={thStyle}>Days Worked</th>
-                  <th style={thStyle}>Total Hours</th>
-                  <th style={thStyle}>On Job</th>
-                  <th style={thStyle}>In Transit</th>
+                  {[
+                    { key: 'staff', label: 'Staff' },
+                    { key: 'days', label: 'Days Worked' },
+                    { key: 'total', label: 'Total Hours' },
+                    { key: 'onJob', label: 'On Job' },
+                    { key: 'idle', label: 'Idle' },
+                  ].map(col => (
+                    <th
+                      key={col.key}
+                      onClick={() => handleHoursSort(col.key)}
+                      style={{ ...thStyle, cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}
+                    >
+                      {col.label}
+                      <span style={{ color: hoursSortColumn === col.key ? COLORS.slate600 : COLORS.slate300 }}>
+                        {' '}{hoursSortColumn === col.key ? (hoursSortDirection === 'asc' ? '▲' : '▼') : '↕'}
+                      </span>
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
-                {monthlyRows.length === 0 && (
+                {sortedMonthlyRows.length === 0 && (
                   <tr>
                     <td colSpan={5} style={{ padding: '32px', textAlign: 'center', color: COLORS.slate400, fontWeight: 600 }}>No attendance recorded for this period.</td>
                   </tr>
                 )}
-                {monthlyRows.map(r => (
-                  <tr key={r.staffId} style={{ borderBottom: `1px solid ${COLORS.slate100}` }}>
-                    <td style={tdStyle}>{r.staffName}</td>
-                    <td style={tdStyle}>{r.daysWorked}</td>
-                    <td style={{ ...tdStyle, fontWeight: 700, fontFamily: 'monospace' }}>
-                      {formatDuration(r.totalMs)}
-                      {r.hasIncomplete && <span style={{ display: 'block', fontSize: '10px', fontWeight: 700, color: COLORS.amber700 }}>⚠ Has a shift with no clock-out -- excluded from total</span>}
-                    </td>
-                    <td style={{ ...tdStyle, fontFamily: 'monospace' }}>{formatDuration(r.onJobMs)}</td>
-                    <td style={{ ...tdStyle, fontFamily: 'monospace' }}>{formatDuration(r.inTransitMs)}</td>
-                  </tr>
-                ))}
+                {sortedMonthlyRows.map(r => {
+                  const isSelected = selectedHoursStaffId === r.staffId
+                  const isHovered = hoveredHoursStaffId === r.staffId
+                  return (
+                    <tr
+                      key={r.staffId}
+                      onMouseEnter={() => setHoveredHoursStaffId(r.staffId)}
+                      onMouseLeave={() => setHoveredHoursStaffId(null)}
+                      onClick={() => setSelectedHoursStaffId(isSelected ? null : r.staffId)}
+                      style={{
+                        borderBottom: `1px solid ${COLORS.slate100}`,
+                        borderLeft: `3px solid ${isSelected ? COLORS.pink600 : 'transparent'}`,
+                        background: isSelected ? COLORS.pink100 : isHovered ? COLORS.slate50 : 'transparent',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <td style={tdStyle}>{r.staffName}</td>
+                      <td style={tdStyle}>{r.daysWorked}</td>
+                      <td style={{ ...tdStyle, fontWeight: 700, fontFamily: 'monospace', color: isUnderDayAverage(r) ? COLORS.red600 : COLORS.slate900 }}>
+                        {formatDuration(r.totalMs)}
+                        {r.hasIncomplete && <span style={{ display: 'block', fontSize: '10px', fontWeight: 700, color: COLORS.amber700 }}>⚠ Has a shift with no clock-out -- excluded from total</span>}
+                      </td>
+                      <td style={{ ...tdStyle, fontFamily: 'monospace' }}>{formatDuration(r.onJobMs)}</td>
+                      <td style={{ ...tdStyle, fontFamily: 'monospace' }}>{formatDuration(r.inTransitMs)}</td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
