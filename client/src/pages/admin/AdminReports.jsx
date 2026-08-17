@@ -684,22 +684,43 @@ async function aiRunPortfolioGrowth() {
   }
 }
 
+// Rows are per-PROPERTY (clickable through to that property's profile,
+// see the answer modal's propertyId handling) rather than aggregated to
+// one row per landlord -- a landlord with several properties would
+// otherwise hide exactly which of their properties needs attention. The
+// headline summary still ranks by each landlord's total across all their
+// properties, computed separately, so "X has the most open tickets"
+// keeps its original (aggregate) meaning even though the table below it
+// is now broken out property by property.
 async function aiRunLandlordOpenTickets() {
   const { data: openTickets } = await supabase.schema('pmms').from('tickets').select('property_id').not('status', 'in', '("Completed","Archived","Cancelled")')
   if (!openTickets?.length) return { summary: 'No open tickets right now.', rows: [] }
 
-  const withProps = await attachProperties(openTickets, 'landlord_company, landlord_name')
-  const counts = {}
+  const withProps = await attachProperties(openTickets, 'address, landlord_company, landlord_name')
+  const propertyCounts = {}
   withProps.forEach(t => {
-    const landlord = t.property?.landlord_company || t.property?.landlord_name
-    if (landlord) counts[landlord] = (counts[landlord] || 0) + 1
+    if (!t.property_id || !t.property) return
+    const landlord = t.property.landlord_company || t.property.landlord_name
+    if (!landlord) return
+    if (!propertyCounts[t.property_id]) propertyCounts[t.property_id] = { address: t.property.address, landlord, count: 0 }
+    propertyCounts[t.property_id].count += 1
   })
-  const rows = Object.entries(counts).map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value).slice(0, 8)
-  if (!rows.length) return { summary: 'No open tickets are on properties with a landlord recorded.', rows: [] }
+
+  const propertyRows = Object.entries(propertyCounts).map(([propertyId, v]) => ({ propertyId, ...v }))
+  if (!propertyRows.length) return { summary: 'No open tickets are on properties with a landlord recorded.', rows: [] }
+
+  const landlordTotals = {}
+  propertyRows.forEach(p => { landlordTotals[p.landlord] = (landlordTotals[p.landlord] || 0) + p.count })
+  const [topLandlord, topLandlordCount] = Object.entries(landlordTotals).sort((a, b) => b[1] - a[1])[0]
+
+  const rows = propertyRows
+    .sort((a, b) => (landlordTotals[b.landlord] - landlordTotals[a.landlord]) || (b.count - a.count))
+    .slice(0, 10)
+    .map(p => ({ label: `${p.landlord} — ${p.address}`, value: p.count, propertyId: p.propertyId }))
 
   return {
-    summary: `${rows[0].label} has the most open tickets against their properties, ${rows[0].value}.`,
-    columns: ['Landlord', 'Open tickets'], rows,
+    summary: `${topLandlord} has the most open tickets against their properties, ${topLandlordCount}.`,
+    columns: ['Landlord — Property', 'Open tickets'], rows,
   }
 }
 
@@ -1651,7 +1672,15 @@ export default function AdminReports({ profile, onNavigate }) {
                       <thead><tr><th style={thStyle}>{aiAnswer.columns[0]}</th><th style={thStyle}>{aiAnswer.columns[1]}</th></tr></thead>
                       <tbody>
                         {aiAnswer.rows.map((r, i) => (
-                          <tr key={i}><td style={tdStyle}>{r.label}</td><td style={tdStyle}>{r.value}</td></tr>
+                          <tr key={i}>
+                            <td
+                              style={{ ...tdStyle, ...(r.propertyId && onNavigate ? { cursor: 'pointer', color: COLORS.blue700, fontWeight: 700 } : {}) }}
+                              onClick={r.propertyId && onNavigate ? () => { setAiAnswer(null); onNavigate('properties', { propertyId: r.propertyId }) } : undefined}
+                            >
+                              {r.label}
+                            </td>
+                            <td style={tdStyle}>{r.value}</td>
+                          </tr>
                         ))}
                       </tbody>
                     </table>
