@@ -7,11 +7,12 @@ import { COLORS } from '../lib/colors'
 import { logLoginEvent } from '../lib/loginEvents'
 import { pushNotificationsSupported, hasActivePushSubscription, enablePushNotifications } from '../lib/pushNotifications'
 import gbchLogo from '../assets/gbch-logo.svg'
-import { EVENTS_FEATURE_ENABLED, AI_TRIAL_FEATURE_ENABLED, LANDLORD_LIAISON_PAGE_ENABLED, resolveStaffPhotoUrl } from './admin/shared'
+import { EVENTS_FEATURE_ENABLED, AI_TRIAL_FEATURE_ENABLED, LANDLORD_LIAISON_PAGE_ENABLED, resolveStaffPhotoUrl, ukDateKey, ukTimeHHMM, minutesLate, formatUKDate, formatUKDateTime } from './admin/shared'
 import { getImpersonationMarker, returnToAdmin } from '../lib/impersonation'
 import { countUnreadMessages } from '../lib/chat'
 import { countUnreadDms } from '../lib/dm'
 import { fetchDivisions } from '../lib/divisions'
+import { getCurrentPositionSafe } from '../lib/geo'
 
 // Lazy-loaded: an admin/manager only ever looks at a handful of these tabs
 // in a given session, so each becomes its own chunk fetched on first visit
@@ -202,6 +203,143 @@ export default function AdminDashboard({ profile }) {
   const [buildersInitialStaffId, setBuildersInitialStaffId] = useState(null)
   const [pushEnabled, setPushEnabled] = useState(false)
   const [pushError, setPushError] = useState('')
+
+  // Landlord Liaison Manager gets her own daily clock-in/out, same rules
+  // as builders (late/early flags, stale-shift lockout) -- mirrors
+  // BuilderDashboard.jsx's own handleClockInForDay/attemptClockOutForDay
+  // almost exactly, minus the in-progress-job/away-activity blockers on
+  // clocking out (not applicable to her -- no jobs of her own). The
+  // existing check-clock-out-reminders auto-clockout cron already applies
+  // generically to any open pmms.daily_attendance row regardless of role,
+  // so no backend change was needed for that part -- see
+  // add_stale_shift_alerting.sql/check-clock-out-reminders for the
+  // pre-existing 2-hour-grace auto-close this reuses as-is.
+  const requiresDailyClocking = profile.division === 'Landlord Liaison'
+  const [dailyShift, setDailyShift] = useState(null)
+  const [staleDailyShift, setStaleDailyShift] = useState(null)
+  const [dailyShiftLoading, setDailyShiftLoading] = useState(true)
+  const [dailyClockInDeadline, setDailyClockInDeadline] = useState('09:00')
+  const [dailyClockOutDeadline, setDailyClockOutDeadline] = useState('17:00')
+  const [clockingInForDay, setClockingInForDay] = useState(false)
+  const [clockInForDayError, setClockInForDayError] = useState('')
+  const [clockingOutForDay, setClockingOutForDay] = useState(false)
+  const [clockOutForDayError, setClockOutForDayError] = useState('')
+  const [earlyLeavePromptOpen, setEarlyLeavePromptOpen] = useState(false)
+  const [earlyLeaveReason, setEarlyLeaveReason] = useState('')
+  const [clockOutConfirmOpen, setClockOutConfirmOpen] = useState(false)
+
+  useEffect(() => {
+    if (!requiresDailyClocking) { setDailyShiftLoading(false); return }
+    fetchDailyShift()
+    supabase.schema('pmms').from('settings').select('setting_value').eq('setting_key', 'daily_clock_in_deadline').maybeSingle()
+      .then(({ data }) => { if (data?.setting_value) setDailyClockInDeadline(data.setting_value) })
+    supabase.schema('pmms').from('settings').select('setting_value').eq('setting_key', 'daily_clock_out_reminder_time').maybeSingle()
+      .then(({ data }) => { if (data?.setting_value) setDailyClockOutDeadline(data.setting_value) })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  async function fetchDailyShift() {
+    const { data } = await supabase
+      .schema('pmms')
+      .from('daily_attendance')
+      .select('id, work_date, clock_in_at, late_flag')
+      .eq('staff_id', profile.id)
+      .is('clock_out_at', null)
+      .order('clock_in_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    // Same stale-shift rule as BuilderDashboard.jsx: a shift still open
+    // from a previous calendar day past stale_shift_hours blocks a fresh
+    // clock-in until a manager closes it via AdminClocking's "Clock Out
+    // For Them" -- no auto clock-out at this stage (only the same-day,
+    // 2-hour-grace cron does that), so an old unresolved shift is never
+    // silently guessed at.
+    if (data) {
+      const { data: thresholdRow } = await supabase
+        .schema('pmms').from('settings').select('setting_value')
+        .eq('setting_key', 'stale_shift_hours').maybeSingle()
+      const thresholdHours = thresholdRow?.setting_value != null ? Number(thresholdRow.setting_value) : 16
+      const hoursOpen = (Date.now() - new Date(data.clock_in_at).getTime()) / 3600000
+      if (data.work_date !== ukDateKey() && hoursOpen >= thresholdHours) {
+        setStaleDailyShift(data)
+        setDailyShift(null)
+        setDailyShiftLoading(false)
+        return
+      }
+    }
+    setStaleDailyShift(null)
+    setDailyShift(data || null)
+    setDailyShiftLoading(false)
+  }
+
+  async function handleDailyClockIn() {
+    setClockInForDayError('')
+    setClockingInForDay(true)
+    const position = await getCurrentPositionSafe()
+    if (!position) {
+      setClockingInForDay(false)
+      setClockInForDayError("Couldn't get your location. Make sure location is turned on and you have signal, then try again.")
+      return
+    }
+
+    const now = new Date()
+    const { data, error } = await supabase
+      .schema('pmms')
+      .from('daily_attendance')
+      .insert({
+        staff_id: profile.id,
+        work_date: ukDateKey(now.getTime()),
+        clock_in_at: now.toISOString(),
+        clock_in_lat: position.latitude,
+        clock_in_lng: position.longitude,
+        late_flag: ukTimeHHMM(now.getTime()) > dailyClockInDeadline,
+      })
+      .select('id, work_date, clock_in_at, late_flag')
+      .single()
+
+    setClockingInForDay(false)
+    if (error) { setClockInForDayError(error.message); return }
+    setDailyShift(data)
+  }
+
+  function attemptDailyClockOut() {
+    setClockOutForDayError('')
+    if (ukTimeHHMM() < dailyClockOutDeadline) {
+      setEarlyLeaveReason('')
+      setEarlyLeavePromptOpen(true)
+      return
+    }
+    setClockOutConfirmOpen(true)
+  }
+
+  function submitEarlyLeaveDaily() {
+    if (!earlyLeaveReason.trim()) { setClockOutForDayError('Please give a reason for finishing early.'); return }
+    submitDailyClockOut(earlyLeaveReason.trim())
+  }
+
+  async function submitDailyClockOut(earlyReason) {
+    setClockOutForDayError('')
+    setClockingOutForDay(true)
+    const position = await getCurrentPositionSafe()
+
+    const { error } = await supabase
+      .schema('pmms')
+      .from('daily_attendance')
+      .update({
+        clock_out_at: new Date().toISOString(),
+        clock_out_lat: position?.latitude ?? null,
+        clock_out_lng: position?.longitude ?? null,
+        ...(earlyReason ? { early_leave_reason: earlyReason } : {}),
+      })
+      .eq('id', dailyShift.id)
+
+    setClockingOutForDay(false)
+    if (error) { setClockOutForDayError(error.message); return }
+    setEarlyLeavePromptOpen(false)
+    setClockOutConfirmOpen(false)
+    setDailyShift(null)
+  }
 
   useEffect(() => {
     // Permission alone doesn't mean a subscription actually exists (a
@@ -642,6 +780,61 @@ export default function AdminDashboard({ profile }) {
     ? activeNavItem.Component
     : AdminDashboardPage
 
+  // Gates the whole app -- no sidebar, no pages, nothing -- until she
+  // clocks in for the day. Same all-or-nothing rule BuilderDashboard.jsx
+  // already applies to builders, just at the shell level here since a
+  // manager's "day" isn't scoped to any one page.
+  if (requiresDailyClocking) {
+    if (dailyShiftLoading) {
+      return (
+        <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: COLORS.slate100 }}>
+          <p style={{ color: COLORS.slate400, fontWeight: 600, fontFamily: 'system-ui, sans-serif' }}>Loading...</p>
+        </div>
+      )
+    }
+    if (staleDailyShift) {
+      return (
+        <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: COLORS.slate100, fontFamily: 'system-ui, sans-serif', padding: '20px' }}>
+          <div style={{ width: '100%', maxWidth: '360px', background: COLORS.white, borderRadius: '20px', padding: '28px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', textAlign: 'center' }}>
+            <img src={gbchLogo} alt="GBCH" style={{ height: '44px', marginBottom: '16px' }} />
+            <p style={{ margin: '0 0 6px 0', fontSize: '18px', fontWeight: 800, color: COLORS.amber800 }}>⚠ Waiting on your manager</p>
+            <p style={{ margin: '0 0 20px 0', fontSize: '13px', color: COLORS.slate600, lineHeight: 1.5 }}>
+              Your shift from {formatUKDate(staleDailyShift.work_date)} (clocked in {formatUKDateTime(staleDailyShift.clock_in_at)}) was never closed out. A manager's been notified and needs to close it before you can clock in today.
+            </p>
+            <button onClick={fetchDailyShift} style={{ width: '100%', padding: '14px', background: COLORS.teal600, color: COLORS.white, border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: 700, cursor: 'pointer' }}>
+              Check again
+            </button>
+            <button onClick={handleSignOut} style={{ marginTop: '18px', background: 'none', border: 'none', fontSize: '12px', color: COLORS.slate400, cursor: 'pointer', textDecoration: 'underline' }}>
+              Sign out
+            </button>
+          </div>
+        </div>
+      )
+    }
+    if (!dailyShift) {
+      return (
+        <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: COLORS.slate100, fontFamily: 'system-ui, sans-serif', padding: '20px' }}>
+          <div style={{ width: '100%', maxWidth: '380px', background: COLORS.white, borderRadius: '20px', padding: '28px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', textAlign: 'center' }}>
+            <p style={{ fontSize: '13px', fontWeight: 800, color: COLORS.teal700, letterSpacing: '0.08em', textTransform: 'uppercase', margin: '0 0 16px' }}>GBCH PMMS</p>
+            <h1 style={{ margin: '0 0 6px 0', fontSize: '18px', fontWeight: 800, color: COLORS.slate900 }}>Good {new Date().getHours() < 12 ? 'morning' : 'afternoon'}, {profile.name.split(' ')[0]}</h1>
+            <p style={{ margin: '0 0 22px 0', fontSize: '13px', color: COLORS.slate500, lineHeight: 1.5 }}>Clock in to start your working day and access PMMS.</p>
+            <button
+              onClick={handleDailyClockIn}
+              disabled={clockingInForDay}
+              style={{ width: '100%', padding: '16px', background: COLORS.teal600, color: COLORS.white, border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: 700, cursor: clockingInForDay ? 'not-allowed' : 'pointer', opacity: clockingInForDay ? 0.7 : 1 }}
+            >
+              {clockingInForDay ? 'Getting your location…' : '✓ Clock In for the Day'}
+            </button>
+            {clockInForDayError && <p style={{ margin: '12px 0 0 0', fontSize: '13px', color: COLORS.red500, fontWeight: 600 }}>{clockInForDayError}</p>}
+            <button onClick={handleSignOut} style={{ marginTop: '18px', background: 'none', border: 'none', fontSize: '12px', color: COLORS.slate400, cursor: 'pointer', textDecoration: 'underline' }}>
+              Sign out
+            </button>
+          </div>
+        </div>
+      )
+    }
+  }
+
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: COLORS.slate100, fontFamily: 'system-ui, sans-serif' }}>
 
@@ -685,6 +878,68 @@ export default function AdminDashboard({ profile }) {
 
         {/* Main content */}
         <div style={{ flex: 1, padding: '20px', width: '100%', boxSizing: 'border-box' }}>
+          {requiresDailyClocking && dailyShift && (
+            <div style={{ marginBottom: '16px', padding: '10px 14px', borderRadius: '12px', background: dailyShift.late_flag ? COLORS.amber50 : COLORS.slate50, border: `1px solid ${dailyShift.late_flag ? COLORS.amber300 : COLORS.slate200}` }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+                <span style={{ fontSize: '13px', fontWeight: 600, color: dailyShift.late_flag ? COLORS.amber900 : COLORS.slate600 }}>
+                  {dailyShift.late_flag ? '⚠ ' : '🟢 '}Clocked in since {formatUKDateTime(dailyShift.clock_in_at).split(' ').slice(-1)[0]}
+                  {dailyShift.late_flag && ` (${minutesLate(dailyShift.clock_in_at, dailyClockInDeadline)}m late)`}
+                </span>
+                <button
+                  onClick={attemptDailyClockOut}
+                  disabled={clockingOutForDay}
+                  style={{ padding: '6px 4px', background: 'none', color: COLORS.slate500, border: 'none', fontSize: '12px', fontWeight: 700, textDecoration: 'underline', cursor: clockingOutForDay ? 'not-allowed' : 'pointer', opacity: clockingOutForDay ? 0.7 : 1 }}
+                >
+                  {clockingOutForDay ? 'Clocking out…' : 'Clock Out for the Day'}
+                </button>
+              </div>
+              {clockOutForDayError && <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: COLORS.red500, fontWeight: 600 }}>{clockOutForDayError}</p>}
+
+              {earlyLeavePromptOpen && (
+                <div style={{ marginTop: '10px', background: COLORS.white, border: `1px solid ${COLORS.amber300}`, borderRadius: '12px', padding: '14px' }}>
+                  <p style={{ margin: '0 0 4px 0', fontSize: '13px', fontWeight: 800, color: COLORS.amber800 }}>⚠ You're finishing before {dailyClockOutDeadline}</p>
+                  <p style={{ margin: '0 0 10px 0', fontSize: '12px', color: COLORS.slate500 }}>Just so it's on record why -- e.g. "all visits done", "doctor's appointment".</p>
+                  <input
+                    type="text"
+                    value={earlyLeaveReason}
+                    onChange={(e) => setEarlyLeaveReason(e.target.value)}
+                    placeholder="Reason for finishing early..."
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '14px', boxSizing: 'border-box', marginBottom: '10px' }}
+                  />
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button onClick={() => setEarlyLeavePromptOpen(false)} style={{ flex: 1, padding: '10px', background: COLORS.slate100, color: COLORS.slate600, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
+                      Cancel
+                    </button>
+                    <button
+                      onClick={submitEarlyLeaveDaily}
+                      disabled={clockingOutForDay}
+                      style={{ flex: 2, padding: '10px', background: COLORS.slate900, color: COLORS.white, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: clockingOutForDay ? 'not-allowed' : 'pointer', opacity: clockingOutForDay ? 0.7 : 1 }}
+                    >
+                      {clockingOutForDay ? 'Clocking out…' : 'Confirm Clock Out'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {clockOutConfirmOpen && (
+                <div style={{ marginTop: '10px', background: COLORS.white, border: `1px solid ${COLORS.slate300}`, borderRadius: '12px', padding: '14px' }}>
+                  <p style={{ margin: '0 0 10px 0', fontSize: '13px', fontWeight: 700, color: COLORS.slate900 }}>Clock out for the day?</p>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button onClick={() => setClockOutConfirmOpen(false)} style={{ flex: 1, padding: '10px', background: COLORS.slate100, color: COLORS.slate600, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => submitDailyClockOut(null)}
+                      disabled={clockingOutForDay}
+                      style={{ flex: 2, padding: '10px', background: COLORS.slate900, color: COLORS.white, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: clockingOutForDay ? 'not-allowed' : 'pointer', opacity: clockingOutForDay ? 0.7 : 1 }}
+                    >
+                      {clockingOutForDay ? 'Clocking out…' : 'Yes, Clock Out'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
           <Suspense fallback={<p style={{ color: COLORS.slate400, fontSize: '13px' }}>Loading...</p>}>
             <ActivePage
               profile={profile}

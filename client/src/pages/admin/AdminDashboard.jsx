@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import { COLORS } from '../../lib/colors'
-import { priorityTierLabel, fetchFlaggedClockingCount, isTicketStuck, KpiTiles, fetchComplianceAgingCounts, fetchVoidAgingCounts, fetchGardenReviewAging, fetchHousekeepingCounts, computeAvgResponseMs, formatDuration, fetchPriorityThresholds, fetchAssignableBuilders, fetchAssignableStaffForDivision, fetchLastEndedSessionsToday, ukDateKey, formatUKDateTime, minutesLate, SHORT_TRIP_REASONS, activityCategoryMeta, ACTIVITY_CATEGORY_META, LANDLORD_LIAISON_PAGE_ENABLED } from './shared'
+import { priorityTierLabel, fetchFlaggedClockingCount, isTicketStuck, KpiTiles, fetchComplianceAgingCounts, fetchVoidAgingCounts, fetchGardenReviewAging, fetchHousekeepingCounts, computeAvgResponseMs, formatDuration, fetchPriorityThresholds, fetchAssignableBuilders, fetchAssignableStaffForDivision, fetchAssignableStaffForRole, fetchLastEndedSessionsToday, ukDateKey, formatUKDateTime, minutesLate, SHORT_TRIP_REASONS, activityCategoryMeta, ACTIVITY_CATEGORY_META, LANDLORD_LIAISON_PAGE_ENABLED } from './shared'
 import { NavIcon } from '../../lib/icons'
 import { googleMapsLink } from '../../lib/geo'
 
@@ -184,7 +184,21 @@ function TeamWhereabouts({ profile, onNavigate }) {
   async function fetchData(isBackground = false) {
     if (!isBackground) setLoading(true)
     const assignableBuilders = await (profile.division ? fetchAssignableStaffForDivision(profile.division) : fetchAssignableBuilders())
-    setBuilders(assignableBuilders)
+
+    // Landlord Liaison Manager has her own daily clock-in/out (see
+    // AdminDashboard.jsx's requiresDailyClocking gate) but no builder-level
+    // role, so fetchAssignableStaffForDivision/fetchAssignableBuilders
+    // above never include her -- merged in here instead. Everything below
+    // (status computation, the attendance-derived log entries) already
+    // works for her with zero further changes: she'll simply never have a
+    // work_sessions/activity_log/on-hold-ticket row, so her status falls
+    // straight through to the existing "clocked in, nothing else open" ->
+    // Available branch, same as any builder between jobs.
+    const clockingManagers = (!profile.division || profile.division === 'Landlord Liaison')
+      ? (await fetchAssignableStaffForRole('Landlord Liaison Manager')).map(s => ({ ...s, division: 'Landlord Liaison' }))
+      : []
+    const allStaff = [...assignableBuilders, ...clockingManagers]
+    setBuilders(allStaff)
 
     const todayKey = ukDateKey()
 
@@ -210,7 +224,7 @@ function TeamWhereabouts({ profile, onNavigate }) {
       supabase.schema('pmms').from('audit_events').select('id, actor_id, ticket_id, summary, created_at')
         .eq('action', 'Status Changed')
         .gte('created_at', `${todayKey}T00:00:00`)
-        .in('actor_id', assignableBuilders.map(b => b.id)),
+        .in('actor_id', allStaff.map(b => b.id)),
       // Builder v2's Stop-sheet short trips (Lunch Break / Going to the
       // Office / Getting materials myself) end the work_session and don't
       // touch activity_log -- without this, a builder on one of these reads
@@ -235,10 +249,10 @@ function TeamWhereabouts({ profile, onNavigate }) {
     // "Available" on its own says nothing about how long, or where he was
     // last -- this is the same clock_out_lat/lng already saved the moment
     // any job ends (complete or pause), just not previously surfaced here.
-    const lastEndedByBuilder = await fetchLastEndedSessionsToday(assignableBuilders.map(b => b.id), todayKey)
+    const lastEndedByBuilder = await fetchLastEndedSessionsToday(allStaff.map(b => b.id), todayKey)
 
     const statuses = {}
-    assignableBuilders.forEach(b => {
+    allStaff.forEach(b => {
       const shift = (attendanceData || [])
         .filter(a => a.staff_id === b.id)
         .sort((x, y) => new Date(y.clock_in_at) - new Date(x.clock_in_at))[0]
@@ -285,7 +299,7 @@ function TeamWhereabouts({ profile, onNavigate }) {
 
     const entries = []
     ;(attendanceData || []).forEach(a => {
-      const b = assignableBuilders.find(x => x.id === a.staff_id)
+      const b = allStaff.find(x => x.id === a.staff_id)
       if (!b) return
       entries.push({
         id: `${a.id}-in`, time: a.clock_in_at, staffId: a.staff_id, staffName: b.name, tone: 'in',
@@ -300,7 +314,7 @@ function TeamWhereabouts({ profile, onNavigate }) {
       }
     })
     ;(activityData || []).forEach(a => {
-      const b = assignableBuilders.find(x => x.id === a.staff_id)
+      const b = allStaff.find(x => x.id === a.staff_id)
       if (!b) return
       const ticket = a.ticket_id ? ticketsById[a.ticket_id] : null
       // The destination they're heading to is the more useful jump target
@@ -329,7 +343,7 @@ function TeamWhereabouts({ profile, onNavigate }) {
       }
     })
     ;(auditData || []).forEach(a => {
-      const b = assignableBuilders.find(x => x.id === a.actor_id)
+      const b = allStaff.find(x => x.id === a.actor_id)
       if (!b) return
       const ticket = a.ticket_id ? ticketsById[a.ticket_id] : null
       const tone = a.summary.includes('Completed') ? 'done'
@@ -917,7 +931,7 @@ export default function AdminDashboard({ profile, onNavigate }) {
           Daily Briefing runs standalone and height="auto" so it shrinks
           to its own content instead of staying stretched to the fixed
           height it used to share with TeamWhereabouts. */}
-      {(profile.division === 'Landlord Liaison' || profile.division === 'Compliance') ? (
+      {(profile.division === 'Compliance') ? (
         <div style={{ marginBottom: '16px' }}>
           <DailyBriefing lines={briefingLines} height="auto" />
         </div>
