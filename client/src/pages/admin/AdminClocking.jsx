@@ -271,18 +271,59 @@ export default function AdminClocking({ profile, onNavigate }) {
       .gte('work_date', firstDay)
       .lte('work_date', lastDay)
 
+    // Travel & Visits rollup -- see [[project_landlord_liaison_division]]:
+    // each completed activity_log row splits into travel time and, for a
+    // property, on-site time, so hours travelling / on site / office and
+    // visit count can all be reported without guessing. Scoped to the
+    // same month as the attendance query above and merged into the same
+    // rows so "office" time can be derived as whatever's left of the
+    // day's clocked hours once travel/on-site/lunch are subtracted --
+    // builders never produce these categories (only Log a Visit does),
+    // so they naturally end up with zeros here, not a special case.
+    const { data: activityData } = await supabase
+      .schema('pmms')
+      .from('activity_log')
+      .select('staff_id, activity_category, started_at, arrived_at, ended_at, mileage_logged')
+      .in('activity_category', ['visit', 'visit_office', 'visit_other', 'lunch'])
+      .gte('started_at', `${firstDay}T00:00:00`)
+      .lt('started_at', `${shiftDateKey(lastDay, 1)}T00:00:00`)
+      .not('ended_at', 'is', null)
+
     setMonthlyRows(builders.map(b => {
       const shifts = (data || []).filter(s => s.staff_id === b.id)
       // Still-open shifts (forgotten clock-out, or today if viewing the
       // current month) are excluded from the total and flagged instead,
       // rather than silently counted as zero or guessed at.
       const totalMs = shifts.reduce((sum, s) => s.clock_out_at ? sum + (new Date(s.clock_out_at) - new Date(s.clock_in_at)) : sum, 0)
+
+      const legs = (activityData || []).filter(a => a.staff_id === b.id)
+      let visitCount = 0, travelMs = 0, onSiteMs = 0, lunchMs = 0, miles = 0
+      legs.forEach(a => {
+        const start = new Date(a.started_at).getTime()
+        const end = new Date(a.ended_at).getTime()
+        if (a.activity_category === 'lunch') {
+          lunchMs += (end - start)
+        } else if (a.activity_category === 'visit') {
+          visitCount += 1
+          const arrived = a.arrived_at ? new Date(a.arrived_at).getTime() : end
+          travelMs += (arrived - start)
+          onSiteMs += (end - arrived)
+          miles += a.mileage_logged || 0
+        } else {
+          // visit_office / visit_other -- travel-only, no on-site phase.
+          travelMs += (end - start)
+          miles += a.mileage_logged || 0
+        }
+      })
+      const officeMs = Math.max(0, totalMs - travelMs - onSiteMs - lunchMs)
+
       return {
         staffId: b.id,
         staffName: b.name,
         daysWorked: new Set(shifts.map(s => s.work_date)).size,
         totalMs,
         hasIncomplete: shifts.some(s => !s.clock_out_at),
+        visitCount, travelMs, onSiteMs, lunchMs, officeMs, miles,
       }
     }))
     setMonthlyLoading(false)
@@ -1356,6 +1397,56 @@ export default function AdminClocking({ profile, onNavigate }) {
           </div>
         )}
       </div>
+
+      {/* Section 5: Travel & Visits -- rolled up from Log a Visit's
+          activity_log rows (see [[project_landlord_liaison_division]]).
+          Only ever populated for staff who actually use Log a Visit --
+          builders don't produce these categories, so they're filtered
+          out below rather than cluttering the table with zero rows.
+          Shares monthlyMonth with Monthly Hours above rather than its
+          own picker, since both are the same month-scoped rollup. */}
+      {monthlyRows.some(r => r.visitCount > 0 || r.travelMs > 0) && (
+        <div style={sectionCardStyle({ marginTop: '20px' })}>
+          <SectionAccent color={COLORS.blue600} />
+          <h2 style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: 800, color: COLORS.slate900 }}>Travel &amp; Visits</h2>
+          <p style={{ margin: '0 0 14px 0', fontSize: '13px', color: COLORS.slate500 }}>
+            Property visits logged via "Log a Visit" for the selected month. Office hours are whatever's left of the day's clocked time once travel, on-site, and lunch are subtracted.
+          </p>
+
+          {monthlyLoading ? (
+            <p style={{ color: COLORS.slate400, fontWeight: 600, fontSize: '13px' }}>Loading...</p>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ background: COLORS.slate50, borderBottom: `1px solid ${COLORS.slate200}` }}>
+                    <th style={thStyle}>Staff</th>
+                    <th style={thStyle}>Visits</th>
+                    <th style={thStyle}>Travel Time</th>
+                    <th style={thStyle}>On-Site Time</th>
+                    <th style={thStyle}>Office Time</th>
+                    <th style={thStyle}>Lunch Time</th>
+                    <th style={thStyle}>Miles</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {monthlyRows.filter(r => r.visitCount > 0 || r.travelMs > 0).map(r => (
+                    <tr key={r.staffId} style={{ borderBottom: `1px solid ${COLORS.slate100}` }}>
+                      <td style={tdStyle}>{r.staffName}</td>
+                      <td style={{ ...tdStyle, fontWeight: 700 }}>{r.visitCount}</td>
+                      <td style={{ ...tdStyle, fontFamily: 'monospace' }}>{formatDuration(r.travelMs)}</td>
+                      <td style={{ ...tdStyle, fontFamily: 'monospace' }}>{formatDuration(r.onSiteMs)}</td>
+                      <td style={{ ...tdStyle, fontFamily: 'monospace' }}>{formatDuration(r.officeMs)}</td>
+                      <td style={{ ...tdStyle, fontFamily: 'monospace' }}>{formatDuration(r.lunchMs)}</td>
+                      <td style={{ ...tdStyle, fontWeight: 700 }}>{r.miles ? r.miles.toFixed(1) : '0.0'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Edit clock times modal */}
       {editRow && (
