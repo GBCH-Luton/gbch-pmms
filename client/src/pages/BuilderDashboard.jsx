@@ -250,10 +250,11 @@ export default function BuilderDashboard({ profile }) {
   const [activityNote, setActivityNote] = useState('')
   const [jobSearchQuery, setJobSearchQuery] = useState('')
   // Optional receipt capture, shown only when ending a 'materials' trip --
-  // see add_activity_log_receipt_columns.sql. Never required; "I'm Back"
-  // works exactly as before if left blank.
-  const [receiptPhotoFile, setReceiptPhotoFile] = useState(null)
-  const [receiptAmount, setReceiptAmount] = useState('')
+  // see add_activity_receipts_table.sql. Never required; "I'm Back" works
+  // exactly as before if left with no rows. One row per physical receipt
+  // (a materials run can span two shops/two receipts), same "array of
+  // rows with add/remove" shape as materialRows below.
+  const [receiptRows, setReceiptRows] = useState([])
   // Admin-configurable (AdminSettings.jsx "Material Stores") -- only the
   // active ones are offered as suggestions; inactive ones are kept so past
   // trips that named them still read fine, just not resurfaced going
@@ -879,7 +880,7 @@ export default function BuilderDashboard({ profile }) {
     const { data } = await supabase
       .schema('pmms')
       .from('activity_log')
-      .select('id, activity_type, note, started_at, destination_ticket_id')
+      .select('id, activity_type, activity_category, note, started_at, destination_ticket_id, ticket_id')
       .eq('staff_id', profile.id)
       .is('ended_at', null)
       .order('started_at', { ascending: false })
@@ -955,7 +956,7 @@ export default function BuilderDashboard({ profile }) {
         ticket_id: inProgressTicket?.id ?? null,
         destination_ticket_id: destinationTicket?.id ?? null,
       })
-      .select('id, activity_type, activity_category, note, started_at, destination_ticket_id')
+      .select('id, activity_type, activity_category, note, started_at, destination_ticket_id, ticket_id')
       .single()
 
     setStartingActivity(false)
@@ -971,24 +972,41 @@ export default function BuilderDashboard({ profile }) {
     setPage('jobs')
   }
 
+  function addReceiptRow() {
+    setReceiptRows(prev => [...prev, { photoFile: null, amount: '' }])
+  }
+  function updateReceiptRow(index, field, value) {
+    setReceiptRows(prev => prev.map((row, i) => i === index ? { ...row, [field]: value } : row))
+  }
+  function removeReceiptRow(index) {
+    setReceiptRows(prev => prev.filter((_, i) => i !== index))
+  }
+
   async function handleEndActivity() {
     setEndingActivity(true)
 
-    // Optional -- only ever present on a 'materials' trip, and only if the
-    // builder actually attached one. Uploaded before the position fetch so
+    // Optional -- only ever present on a 'materials' trip, and only for
+    // rows the builder actually filled in (a photo and/or an amount; a row
+    // added then left completely empty is silently skipped rather than
+    // inserted as a blank receipt). Uploaded before the position fetch so
     // a failed upload doesn't burn a GPS fix for nothing.
-    let receiptPhotoUrl = null
-    if (receiptPhotoFile) {
-      try {
-        const compressed = await compressImage(receiptPhotoFile)
-        const path = `receipts/${profile.id}/${Date.now()}-${compressed.name}`
-        await uploadFileWithProgress('ticket-photos', path, compressed)
-        receiptPhotoUrl = await getSignedUrl('ticket-photos', path)
-      } catch (uploadErr) {
-        setEndingActivity(false)
-        setActivityError(uploadErr.message)
-        return
+    const rowsToLog = receiptRows.filter(row => row.photoFile || row.amount.trim() !== '')
+    const uploadedReceipts = []
+    for (const row of rowsToLog) {
+      let photoUrl = null
+      if (row.photoFile) {
+        try {
+          const compressed = await compressImage(row.photoFile)
+          const path = `receipts/${profile.id}/${Date.now()}-${compressed.name}`
+          await uploadFileWithProgress('ticket-photos', path, compressed)
+          photoUrl = await getSignedUrl('ticket-photos', path)
+        } catch (uploadErr) {
+          setEndingActivity(false)
+          setActivityError(uploadErr.message)
+          return
+        }
       }
+      uploadedReceipts.push({ photo_url: photoUrl, amount: row.amount.trim() !== '' ? Number(row.amount) : null })
     }
 
     const position = await getCurrentPositionSafe()
@@ -996,18 +1014,27 @@ export default function BuilderDashboard({ profile }) {
     const { error } = await supabase
       .schema('pmms')
       .from('activity_log')
-      .update({
-        ended_at: new Date().toISOString(), ended_lat: position?.latitude ?? null, ended_lng: position?.longitude ?? null,
-        ...(receiptPhotoUrl ? { receipt_photo_url: receiptPhotoUrl } : {}),
-        ...(receiptAmount.trim() !== '' ? { receipt_amount: Number(receiptAmount) } : {}),
-      })
+      .update({ ended_at: new Date().toISOString(), ended_lat: position?.latitude ?? null, ended_lng: position?.longitude ?? null })
       .eq('id', openActivity.id)
 
+    if (error) {
+      setEndingActivity(false)
+      setActivityError(error.message)
+      return
+    }
+
+    if (uploadedReceipts.length > 0) {
+      await supabase.schema('pmms').from('activity_receipts').insert(
+        uploadedReceipts.map(r => ({
+          activity_log_id: openActivity.id, ticket_id: openActivity.ticket_id ?? null, staff_id: profile.id,
+          photo_url: r.photo_url, amount: r.amount,
+        }))
+      )
+    }
+
     setEndingActivity(false)
-    if (error) { setActivityError(error.message); return }
     setOpenActivity(null)
-    setReceiptPhotoFile(null)
-    setReceiptAmount('')
+    setReceiptRows([])
   }
 
   async function handleClockIn(transitStart, milesLogged) {
@@ -2220,18 +2247,35 @@ export default function BuilderDashboard({ profile }) {
               stub that doesn't save anywhere yet; this logs what was
               BOUGHT on this trip, real and saved to activity_log). */}
           {openActivity.activity_category === 'materials' && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', background: COLORS.white, border: `1px solid ${COLORS.slate200}`, borderRadius: '12px', padding: '10px 14px' }}>
-              <span style={{ fontSize: '12px', fontWeight: 700, color: COLORS.slate500 }}>Receipt (optional):</span>
-              <label style={{ padding: '7px 12px', background: receiptPhotoFile ? COLORS.green100 : COLORS.slate100, color: receiptPhotoFile ? COLORS.green700 : COLORS.slate600, borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>
-                {receiptPhotoFile ? '✓ Photo attached' : '📷 Add photo'}
-                <input type="file" accept="image/*" capture="environment" onChange={(e) => setReceiptPhotoFile(e.target.files[0] || null)} style={{ display: 'none' }} />
-              </label>
-              <input
-                type="number" min="0" step="0.01" placeholder="£ total"
-                value={receiptAmount}
-                onChange={(e) => setReceiptAmount(e.target.value)}
-                style={{ width: '90px', padding: '7px 10px', borderRadius: '8px', border: `1px solid ${COLORS.slate200}`, fontSize: '12px', fontFamily: 'inherit' }}
-              />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: COLORS.white, border: `1px solid ${COLORS.slate200}`, borderRadius: '12px', padding: '10px 14px' }}>
+              <span style={{ fontSize: '12px', fontWeight: 700, color: COLORS.slate500 }}>Receipts (optional -- one row per receipt)</span>
+              {receiptRows.map((row, index) => (
+                <div key={index} style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <label style={{ padding: '7px 12px', background: row.photoFile ? COLORS.green100 : COLORS.slate100, color: row.photoFile ? COLORS.green700 : COLORS.slate600, borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>
+                    {row.photoFile ? '✓ Photo attached' : '📷 Add photo'}
+                    <input type="file" accept="image/*" capture="environment" onChange={(e) => updateReceiptRow(index, 'photoFile', e.target.files[0] || null)} style={{ display: 'none' }} />
+                  </label>
+                  <input
+                    type="number" min="0" step="0.01" placeholder="£ total"
+                    value={row.amount}
+                    onChange={(e) => updateReceiptRow(index, 'amount', e.target.value)}
+                    style={{ width: '90px', padding: '7px 10px', borderRadius: '8px', border: `1px solid ${COLORS.slate200}`, fontSize: '12px', fontFamily: 'inherit' }}
+                  />
+                  <button
+                    onClick={() => removeReceiptRow(index)}
+                    aria-label="Remove receipt"
+                    style={{ width: '30px', height: '30px', flexShrink: 0, border: 'none', background: COLORS.red100, color: COLORS.red600, borderRadius: '8px', fontSize: '13px', cursor: 'pointer' }}
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+              <button
+                onClick={addReceiptRow}
+                style={{ padding: '8px', borderRadius: '8px', border: `1px dashed ${COLORS.slate300}`, background: COLORS.slate50, color: COLORS.slate500, fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
+              >
+                + Add {receiptRows.length > 0 ? 'another' : 'a'} receipt
+              </button>
             </div>
           )}
           {activityError && <p style={{ margin: 0, fontSize: '12px', color: COLORS.red500, fontWeight: 600 }}>{activityError}</p>}

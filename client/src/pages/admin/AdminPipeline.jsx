@@ -8,6 +8,7 @@ import { fetchAllMaintenanceCategoryNames } from '../../lib/maintenanceCategorie
 import { fetchDivisions } from '../../lib/divisions'
 import PrintableTicketReport from '../../components/PrintableTicketReport'
 import TicketAttachmentGallery from '../../components/TicketAttachmentGallery'
+import PhotoLightbox from '../../components/PhotoLightbox'
 import { compressImage } from '../../lib/imageCompression'
 import { getSignedUrl } from '../../lib/storage'
 import {
@@ -63,6 +64,15 @@ export default function AdminPipeline({
   const [tickets, setTickets] = useState([])
   const [loading, setLoading] = useState(true)
   const [expandedTicketId, setExpandedTicketId] = useState(null)
+  // Receipts (see add_activity_receipts_table.sql) -- keyed by ticket_id
+  // since a materials trip is only ever attached to whichever job was in
+  // progress when the builder left, if any. The section itself is closed
+  // by default per ticket (a Set of ticket ids that have been expanded),
+  // separate from expandedTicketId (the row itself) so re-expanding a row
+  // doesn't lose which receipts sections were already open.
+  const [receiptsByTicketId, setReceiptsByTicketId] = useState({})
+  const [expandedReceiptTicketIds, setExpandedReceiptTicketIds] = useState(() => new Set())
+  const [receiptLightbox, setReceiptLightbox] = useState(null) // { urls, index } | null
   // Captured into local state at mount rather than re-read from the prop
   // later -- the parent (AdminDashboard.jsx) nulls the prop out as soon as
   // onInitialFilterConsumed fires, which happens before tickets have even
@@ -368,6 +378,22 @@ export default function AdminPipeline({
     const { data: staffData, error: staffError } = await supabase
       .from('staff')
       .select('id, name')
+
+    // Grouped client-side into a ticket_id -> rows map, same "fetch once,
+    // group locally" approach as staffData above -- the portfolio's total
+    // receipt count is tiny, no reason to query this per-ticket.
+    const { data: receiptsData } = await supabase
+      .schema('pmms')
+      .from('activity_receipts')
+      .select('ticket_id, photo_url, amount, created_at')
+      .not('ticket_id', 'is', null)
+      .order('created_at', { ascending: true })
+    const receiptsGrouped = {}
+    ;(receiptsData || []).forEach(r => {
+      if (!receiptsGrouped[r.ticket_id]) receiptsGrouped[r.ticket_id] = []
+      receiptsGrouped[r.ticket_id].push(r)
+    })
+    setReceiptsByTicketId(receiptsGrouped)
 
     if (!ticketsError && !staffError) {
       const withProperties = await attachProperties(ticketsData, 'address')
@@ -1422,6 +1448,52 @@ export default function AdminPipeline({
                               )}
                             </div>
 
+                            {/* Receipts -- only from a "Buying Materials" trip
+                                logged while this ticket was in progress (see
+                                add_activity_receipts_table.sql). Closed by
+                                default, and only shown at all when this ticket
+                                actually has any -- most never will. */}
+                            {receiptsByTicketId[t.id]?.length > 0 && (
+                              <div style={expandSectionStyle}>
+                                <button
+                                  onClick={() => setExpandedReceiptTicketIds(prev => {
+                                    const next = new Set(prev)
+                                    if (next.has(t.id)) next.delete(t.id); else next.add(t.id)
+                                    return next
+                                  })}
+                                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
+                                >
+                                  <p style={{ ...expandSectionTitleStyle, margin: 0 }}>🧾 Receipts ({receiptsByTicketId[t.id].length})</p>
+                                  <span style={{ fontSize: '11px', fontWeight: 700, color: COLORS.slate400 }}>{expandedReceiptTicketIds.has(t.id) ? '▲ Hide' : '▼ Show'}</span>
+                                </button>
+                                {expandedReceiptTicketIds.has(t.id) && (() => {
+                                  const receipts = receiptsByTicketId[t.id]
+                                  const photoUrls = receipts.filter(r => r.photo_url).map(r => r.photo_url)
+                                  return (
+                                    <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                      {receipts.map((r, i) => (
+                                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px', background: COLORS.slate50, borderRadius: '10px' }}>
+                                          {r.photo_url ? (
+                                            <img
+                                              src={r.photo_url} alt="Receipt"
+                                              onClick={() => setReceiptLightbox({ urls: photoUrls, index: photoUrls.indexOf(r.photo_url) })}
+                                              style={{ width: '48px', height: '48px', objectFit: 'cover', borderRadius: '8px', cursor: 'pointer', flexShrink: 0 }}
+                                            />
+                                          ) : (
+                                            <div style={{ width: '48px', height: '48px', borderRadius: '8px', background: COLORS.slate200, flexShrink: 0 }} />
+                                          )}
+                                          <div style={{ flex: 1 }}>
+                                            <p style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: COLORS.slate900 }}>{r.amount != null ? `£${Number(r.amount).toFixed(2)}` : 'No amount entered'}</p>
+                                            <p style={{ margin: 0, fontSize: '11px', color: COLORS.slate400 }}>{formatUKDateTime(r.created_at)}</p>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )
+                                })()}
+                              </div>
+                            )}
+
                             <div style={{ gridColumn: '1 / -1', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                               <button onClick={() => openCommentsModal(t)} style={actionBtnStyle}>Comments</button>
                               <button onClick={() => openHistoryModal(t)} style={actionBtnStyle}>History</button>
@@ -1868,6 +1940,15 @@ export default function AdminPipeline({
             </div>
           </div>
         </div>
+      )}
+
+      {receiptLightbox && (
+        <PhotoLightbox
+          urls={receiptLightbox.urls}
+          index={receiptLightbox.index}
+          onNavigate={(i) => setReceiptLightbox(prev => ({ ...prev, index: i }))}
+          onClose={() => setReceiptLightbox(null)}
+        />
       )}
 
       {priorityModalTicket && (
