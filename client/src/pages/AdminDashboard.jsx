@@ -214,7 +214,13 @@ export default function AdminDashboard({ profile }) {
   // so no backend change was needed for that part -- see
   // add_stale_shift_alerting.sql/check-clock-out-reminders for the
   // pre-existing 2-hour-grace auto-close this reuses as-is.
-  const requiresDailyClocking = profile.division === 'Landlord Liaison'
+  //
+  // Skipped while an admin is impersonating (View As) -- an admin testing
+  // on their own device has no reason to have real GPS signal for HER
+  // shift, and forcing a clock-in through here would write a fake
+  // attendance row onto her real record. View As is for previewing what
+  // she sees, not for simulating her actual day.
+  const requiresDailyClocking = profile.division === 'Landlord Liaison' && !getImpersonationMarker()
   const [dailyShift, setDailyShift] = useState(null)
   const [staleDailyShift, setStaleDailyShift] = useState(null)
   const [dailyShiftLoading, setDailyShiftLoading] = useState(true)
