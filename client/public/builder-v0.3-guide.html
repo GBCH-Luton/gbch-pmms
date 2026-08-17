@@ -385,7 +385,7 @@
     { id: 3, number: 201, category: 'General Repairs', address: '4 Mead House, Chapel Langley, Luton LU1 5DF', room: 'Office', desc: 'Door handle in the main office has come loose.', status: 'Assigned', vulnerable: false, urgent: false, miles: 4.8 },
     { id: 4, number: 189, category: 'Doors/Locks', address: '7 Ashcroft Road, Luton LU2 0EF', room: 'Front Door', desc: "Lock is sticking, key hard to turn.", status: 'On Hold', holdReason: 'Waiting for materials (ordered)', holdNote: 'Lock ordered from Screwfix, due Thursday', vulnerable: false, urgent: false, miles: 1.1 },
     { id: 5, number: 230, category: 'Cleaning Rota', address: '9 Farley Hill, Luton LU1 5EX', room: null, desc: 'Fortnightly communal area clean.', status: 'Assigned', vulnerable: false, urgent: false, miles: 1.4, routineVisit: true },
-    { id: 6, number: 220, category: 'Interior Painting', address: '2 Havelock Road, Luton LU1 1SG', room: 'Hallway', desc: 'Scuff marks and small holes need filling and touch-up paint.', status: 'Completed', vulnerable: false, urgent: false, miles: 0.9 },
+    { id: 6, number: 220, category: 'Interior Painting', address: '2 Havelock Road, Luton LU1 1SG', room: 'Hallway', desc: 'Scuff marks and small holes need filling and touch-up paint.', status: 'Completed', vulnerable: false, urgent: false, miles: 0.9, completionNote: 'Filled and repainted scuffed areas in the hallway with matching magnolia paint.' },
   ];
 
   function job(id) { return jobs.find(j => j.id === id) || null; }
@@ -401,8 +401,9 @@
   const state = {
     todayShift: null,          // { clockInAt: Date, lateFlag }
     page: 'dashboard',         // dashboard | leaving-choices | leaving-job | leaving-materials | leaving-office | leaving-lunch | leaving-resume
-    openActivity: null,        // { kind: 'Travel'|'Break', label, note, destinationTicketId }
+    openActivity: null,        // { kind: 'Travel'|'Break', label, note, destinationTicketId, category }
     awaySince: null,
+    receiptRows: [],           // [{ photoAttached, amount }] -- optional, only shown for category 'materials'
     selectedTicketId: null,
     miles: null,
     jobSearchQuery: '',
@@ -467,6 +468,21 @@
     state.page = 'leaving-resume';
     render();
   }
+  function openUrgentJobsFromTile() {
+    if (state.openActivity) return;
+    state.page = 'urgent-jobs';
+    render();
+  }
+  function openToDoFromTile() {
+    if (state.openActivity) return;
+    state.jobSearchQuery = '';
+    state.page = 'leaving-job';
+    render();
+  }
+  function openDoneJobsFromTile() {
+    state.page = 'done-jobs';
+    render();
+  }
   function openActivityPicker() {
     if (lockedTicket() || state.openActivity) return;
     state.jobSearchQuery = '';
@@ -480,7 +496,7 @@
 
   function pickTravelJob(id) {
     const j = job(id);
-    state.openActivity = { kind: 'Travel', label: 'Travelling', note: `Job #${j.number} — ${j.address}`, destinationTicketId: id };
+    state.openActivity = { kind: 'Travel', label: 'Travelling', note: `Job #${j.number} — ${j.address}`, destinationTicketId: id, category: 'job' };
     state.awaySince = nowHHMM();
     state.selectedTicketId = id;
     state.miles = null;
@@ -489,25 +505,31 @@
   }
   function confirmMaterials() {
     if (!state.materialsQuery.trim()) return;
-    state.openActivity = { kind: 'Travel', label: 'Travelling', note: state.materialsQuery.trim(), destinationTicketId: null };
+    state.openActivity = { kind: 'Travel', label: 'Travelling', note: state.materialsQuery.trim(), destinationTicketId: null, category: 'materials' };
     state.awaySince = nowHHMM();
     state.page = 'dashboard';
     render();
   }
   function pickStoreSuggestion(name) { state.materialsQuery = name; render(); }
   function confirmOffice() {
-    state.openActivity = { kind: 'Travel', label: 'Travelling', note: 'Going to the office', destinationTicketId: null };
+    state.openActivity = { kind: 'Travel', label: 'Travelling', note: 'Going to the office', destinationTicketId: null, category: 'office' };
     state.awaySince = nowHHMM();
     state.page = 'dashboard';
     render();
   }
   function confirmLunch() {
-    state.openActivity = { kind: 'Break', label: 'On break', note: state.materialsQuery.trim() || 'Lunch', destinationTicketId: null };
+    state.openActivity = { kind: 'Break', label: 'On break', note: state.materialsQuery.trim() || 'Lunch', destinationTicketId: null, category: 'lunch' };
     state.awaySince = nowHHMM();
     state.page = 'dashboard';
     render();
   }
-  function endActivity() { state.openActivity = null; state.awaySince = null; render(); }
+  function endActivity() { state.openActivity = null; state.awaySince = null; state.receiptRows = []; render(); }
+
+  // ---- Optional purchase-side receipt capture (materials trips only) ----
+  function addReceiptRow() { state.receiptRows.push({ photoAttached: false, amount: '' }); render(); }
+  function updateReceiptAmount(index, value) { state.receiptRows[index].amount = value; render(); }
+  function toggleReceiptPhoto(index) { state.receiptRows[index].photoAttached = !state.receiptRows[index].photoAttached; render(); }
+  function removeReceiptRow(index) { state.receiptRows.splice(index, 1); render(); }
   function arriveAtDestination() {
     if (!state.openActivity || !state.openActivity.destinationTicketId) return;
     state.selectedTicketId = state.openActivity.destinationTicketId;
@@ -660,7 +682,7 @@
     jobs = freshJobsState();
     clearInterval(clockTimer);
     Object.assign(state, {
-      todayShift: null, page: 'dashboard', openActivity: null, awaySince: null, selectedTicketId: null, miles: null,
+      todayShift: null, page: 'dashboard', openActivity: null, awaySince: null, receiptRows: [], selectedTicketId: null, miles: null,
       jobSearchQuery: '', materialsQuery: '', idleSince: null, idleSeconds: 0, inProgressSeconds: 0, breakSeconds: 0,
       stopSheetOpen: false, materialsAskOpen: false, stopReasonPicked: null, stopNote: '',
       showCompleteConfirm: false, completeNote: '', completePhotoAttached: false, checklistChecked: {},
@@ -764,6 +786,22 @@
             <button class="back-btn" onclick="endActivity()">✓ I'm Back</button>
           </div>
         </div>`;
+      // Purchase-side materials tracking -- optional, never blocks "I'm
+      // Back". One row per physical receipt (a materials run can span two
+      // shops/two receipts).
+      if (away.category === 'materials') {
+        html += `
+        <div style="background:var(--app-white);border:1px solid var(--app-slate200);border-radius:12px;padding:10px 14px;margin-bottom:10px">
+          <p style="margin:0 0 8px;font-size:12px;font-weight:700;color:var(--app-slate500)">Receipts (optional — one row per receipt)</p>
+          ${state.receiptRows.map((row, i) => `
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+              <button onclick="toggleReceiptPhoto(${i})" style="padding:7px 12px;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;background:${row.photoAttached ? 'var(--app-green50)' : 'var(--app-slate100)'};color:${row.photoAttached ? 'var(--app-green600)' : 'var(--app-slate600)'}">${row.photoAttached ? '✓ Photo attached' : '📷 Add photo'}</button>
+              <input type="number" min="0" step="0.01" placeholder="£ total" value="${row.amount}" oninput="updateReceiptAmount(${i}, this.value)" style="width:90px;padding:7px 10px;border-radius:8px;border:1px solid var(--app-slate200);font-size:12px" />
+              <button onclick="removeReceiptRow(${i})" aria-label="Remove receipt" style="width:30px;height:30px;flex-shrink:0;border:none;background:var(--app-red100);color:var(--app-red600);border-radius:8px;font-size:13px;cursor:pointer">✕</button>
+            </div>`).join('')}
+          <button onclick="addReceiptRow()" style="width:100%;padding:8px;border-radius:8px;border:1px dashed var(--app-slate300);background:var(--app-slate50);color:var(--app-slate500);font-size:12px;font-weight:600;cursor:pointer">+ Add ${state.receiptRows.length > 0 ? 'another' : 'a'} receipt</button>
+        </div>`;
+      }
     } else {
       html += `
         <div class="shift-status-row${state.todayShift.lateFlag ? ' late' : ''}">
@@ -800,10 +838,10 @@
     html += `
       <div class="tiles">
         <div class="tile" style="background:var(--app-teal600)"><div class="n">${inProgress.length}</div><div class="l">Working On Now</div></div>
-        <div class="tile" style="background:var(--app-red500)"><div class="n">${urgent.length}</div><div class="l">Urgent</div></div>
-        <div class="tile" style="background:var(--app-blue500)"><div class="n">${todo.length}</div><div class="l">To do</div></div>
+        <button class="tile" style="background:var(--app-red500);border:none;cursor:${away ? 'default' : 'pointer'};font-family:inherit" ${away ? 'disabled' : ''} onclick="openUrgentJobsFromTile()"><div class="n">${urgent.length}</div><div class="l">Urgent</div></button>
+        <button class="tile" style="background:var(--app-blue500);border:none;cursor:${away ? 'default' : 'pointer'};font-family:inherit" ${away ? 'disabled' : ''} onclick="openToDoFromTile()"><div class="n">${todo.length}</div><div class="l">To do</div></button>
         <button class="tile" style="background:var(--app-amber500);border:none;cursor:${away ? 'default' : 'pointer'};font-family:inherit" ${away ? 'disabled' : ''} onclick="openResumeJobsFromTile()"><div class="n">${onHold.length}</div><div class="l">On hold</div></button>
-        <div class="tile" style="background:var(--app-slate500)"><div class="n">${done.length}</div><div class="l">Done</div></div>
+        <button class="tile" style="background:var(--app-slate500);border:none;cursor:pointer;font-family:inherit" onclick="openDoneJobsFromTile()"><div class="n">${done.length}</div><div class="l">Done</div></button>
       </div>
     `;
     return html;
@@ -895,6 +933,39 @@
       }`;
   }
 
+  // Urgent tile's own job list -- same "tap a card, land straight on the
+  // ready-to-start job screen" pattern as Resume Jobs above.
+  function urgentJobsPageHtml() {
+    const urgent = jobs.filter(j => j.status === 'Assigned' && j.urgent);
+    return `
+      <p class="sheet-title">Urgent Jobs</p>
+      ${urgent.length === 0 ? `<div class="empty-list">Nothing urgent right now.</div>`
+        : urgent.map(j => `
+          <button class="hold-card" onclick="selectResumeJob(${j.id})">
+            <p class="num">Job #${j.number} · ${j.category}</p>
+            <p class="addr">${j.address}</p>
+            <p class="desc">${j.desc}${j.room ? ' — ' + j.room : ''}</p>
+          </button>`).join('')
+      }`;
+  }
+
+  // Done tile's own read-only history list, most recently completed
+  // first. Tapping a card opens the normal ticket overlay -- a Completed
+  // ticket there only ever shows the outcome (note + photo), no buttons.
+  function doneJobsPageHtml() {
+    const done = jobs.filter(j => j.status === 'Completed');
+    return `
+      <p class="sheet-title">Done Jobs</p>
+      ${done.length === 0 ? `<div class="empty-list">No completed jobs yet.</div>`
+        : done.map(j => `
+          <button class="hold-card" onclick="selectResumeJob(${j.id})">
+            <p class="num">Job #${j.number} · ${j.category}</p>
+            <p class="addr">${j.address}</p>
+            <p class="desc">${j.desc}${j.room ? ' — ' + j.room : ''}</p>
+          </button>`).join('')
+      }`;
+  }
+
   // ---- Ticket overlay (mirrors the real selectedTicket screen, unified across Assigned / In Progress / On Hold) ----
   function ticketOverlayHtml(j) {
     const locked = lockedTicket() && lockedTicket().id === j.id;
@@ -976,6 +1047,17 @@
           </div>
           ${state.miles === null ? `<p style="margin:-10px 0 16px;font-size:11.5px;font-weight:800;color:var(--app-red500)">Enter miles driven, or 0 if you're already at this property.</p>` : ''}
           <button class="btn-primary" ${state.miles === null ? 'disabled' : ''} onclick="startWork()">✓ Arrived — start work</button>
+        </div>`;
+    } else if (j.status === 'Completed') {
+      // Reference view only -- reached from the Done tile's job list, not
+      // an active job screen, so this is deliberately just the outcome
+      // (note + photo), no buttons of any kind.
+      body += `
+        <div class="section-card">
+          <div class="paused-note" style="background:var(--app-green50);border-color:var(--app-green600)">
+            <p class="lbl" style="color:var(--app-green600)">Completed</p>
+            <p class="txt" style="color:var(--app-green900, #14532d)">${j.completionNote || 'Job completed.'}</p>
+          </div>
         </div>`;
     }
 
@@ -1082,6 +1164,8 @@
       case 'leaving-office': bodyHtml = leavingOfficePageHtml(); showBack = true; onBack = 'backToChoices()'; break;
       case 'leaving-lunch': bodyHtml = leavingLunchPageHtml(); showBack = true; onBack = 'backToChoices()'; break;
       case 'leaving-resume': bodyHtml = leavingResumePageHtml(); showBack = true; onBack = 'backToChoices()'; break;
+      case 'urgent-jobs': bodyHtml = urgentJobsPageHtml(); showBack = true; onBack = 'backToDashboard()'; break;
+      case 'done-jobs': bodyHtml = doneJobsPageHtml(); showBack = true; onBack = 'backToDashboard()'; break;
       default: bodyHtml = dashboardBodyHtml(); showBack = false;
     }
 
