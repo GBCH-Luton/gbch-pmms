@@ -247,38 +247,42 @@ export default function AdminDashboard({ profile }) {
   // Property-visit logging (see [[feedback_clocking_vs_logging_terminology]]
   // -- "logging", never "clocking", for a sub-day trip). Reuses
   // pmms.activity_log the exact same way builders' own "Going to Another
-  // Job" travel does (see add_activity_log_visit_columns.sql): an open row
-  // with activity_category = 'visit' means she's away right now, which is
-  // what makes her show up as "Away -- visiting X" on Where's the Team in
-  // real time. Mileage is captured when she finishes the visit, not when
-  // she leaves for it -- same reasoning as a builder's own mileage-on-
-  // arrival (the real distance is only known once it's actually driven).
-  // Deliberately NOT framed as "arriving" anywhere -- unlike a builder's
-  // one-way trip to a specific next job, she might go on to another
-  // property, back to the office, or straight home, so "finish this
-  // visit and log what you drove" makes no assumption about where she's
-  // headed next.
-  const [openVisit, setOpenVisit] = useState(null)
-  const [visitPickerOpen, setVisitPickerOpen] = useState(false)
-  const [visitProperties, setVisitProperties] = useState([])
-  const [visitPropertyId, setVisitPropertyId] = useState('')
-  const [visitOtherMode, setVisitOtherMode] = useState(false)
-  const [visitOtherText, setVisitOtherText] = useState('')
-  const [visitError, setVisitError] = useState('')
-  const [visitSaving, setVisitSaving] = useState(false)
+  // Job" travel does: an open row means she's away right now, which is
+  // what makes her show up as "Away" on Where's the Team in real time.
+  //
+  // Each trip is a two-phase state machine within ONE row (see
+  // add_activity_log_arrived_at.sql), not two chained rows:
+  //   started_at -> arrived_at   = travelling (drive time, mileage
+  //                                 captured here, same reasoning as a
+  //                                 builder's own mileage-on-arrival --
+  //                                 the real distance is only known once
+  //                                 it's actually driven)
+  //   arrived_at -> ended_at     = on site (only for activity_category
+  //                                 'visit', i.e. a property -- 'visit_
+  //                                 office'/'visit_other' have no on-site
+  //                                 phase, arriving just closes the leg)
+  // This is what lets hours-travelling, hours-on-site, and visit count
+  // all be computed later without guessing. Finishing a property visit
+  // re-opens the destination picker immediately (openLeg -> travelPicker)
+  // so the next leg starts right away -- Office / Lunch Break / Another
+  // Property / Other / (if this is that continuation) done for now with
+  // no further leg logged, since going home was never a tracked business
+  // trip to begin with, same as a builder's own commute isn't.
+  const [openLeg, setOpenLeg] = useState(null)
+  const [travelPickerOpen, setTravelPickerOpen] = useState(false)
+  const [travelDestType, setTravelDestType] = useState(null) // 'property' | 'other' | null (office/lunch/done fire immediately, no sub-step)
+  const [travelShowDoneOption, setTravelShowDoneOption] = useState(false)
+  const [travelProperties, setTravelProperties] = useState([])
+  const [travelPropertyId, setTravelPropertyId] = useState('')
+  const [travelOtherText, setTravelOtherText] = useState('')
+  const [travelError, setTravelError] = useState('')
+  const [travelSaving, setTravelSaving] = useState(false)
   const [arrivalOpen, setArrivalOpen] = useState(false)
   const [arrivalMiles, setArrivalMiles] = useState(null)
-  // 'office' | 'home' | null -- closing a visit only ever recorded WHEN
-  // it ended, not WHERE she ended up, so Where's the Team flipped straight
-  // to a bare "Available" with no way to tell "back at the office,
-  // working" from "gone home, done for the day" apart. Required alongside
-  // mileage, same as mileage itself, and saved to activity_log.end_note
-  // (add_activity_log_end_note.sql) so it shows up on the "back from the
-  // visit" line the same way the destination already does on the "left
-  // for a visit" line.
-  const [arrivalLocation, setArrivalLocation] = useState(null)
   const [arrivalError, setArrivalError] = useState('')
   const [arrivalSaving, setArrivalSaving] = useState(false)
+  const [finishSaving, setFinishSaving] = useState(false)
+  const [finishError, setFinishError] = useState('')
 
   // Keyed on profile.id, not a plain mount-only []  -- View As swaps the
   // Supabase session (and this shell's `profile` prop) onto the
@@ -293,7 +297,7 @@ export default function AdminDashboard({ profile }) {
   useEffect(() => {
     if (!showsDailyClockingUI) { setDailyShiftLoading(false); return }
     fetchDailyShift()
-    fetchOpenVisit()
+    fetchOpenLeg()
     supabase.schema('pmms').from('settings').select('setting_value').eq('setting_key', 'daily_clock_in_deadline').maybeSingle()
       .then(({ data }) => { if (data?.setting_value) setDailyClockInDeadline(data.setting_value) })
     supabase.schema('pmms').from('settings').select('setting_value').eq('setting_key', 'daily_clock_out_reminder_time').maybeSingle()
@@ -375,87 +379,141 @@ export default function AdminDashboard({ profile }) {
     setDailyShift(data)
   }
 
-  async function fetchOpenVisit() {
+  async function fetchOpenLeg() {
     const { data } = await supabase
       .schema('pmms')
       .from('activity_log')
-      .select('id, note, started_at, destination_property_id')
+      .select('id, activity_category, note, started_at, arrived_at, destination_property_id')
       .eq('staff_id', profile.id)
-      .eq('activity_category', 'visit')
+      .in('activity_category', ['visit', 'visit_office', 'visit_other', 'lunch'])
       .is('ended_at', null)
       .order('started_at', { ascending: false })
       .limit(1)
       .maybeSingle()
-    setOpenVisit(data || null)
+    setOpenLeg(data || null)
   }
 
-  async function openVisitPicker() {
-    setVisitError('')
-    setVisitPropertyId('')
-    setVisitOtherMode(false)
-    setVisitOtherText('')
-    setVisitPickerOpen(true)
-    if (visitProperties.length === 0) {
+  // showDone: whether this picker is a continuation right after Finishing
+  // a Visit (adds a 5th "done for now" choice) vs a fresh open from the
+  // baseline Start Travel button (just the 4 real destination types).
+  async function openTravelPicker(showDone) {
+    setTravelError('')
+    setTravelDestType(null)
+    setTravelPropertyId('')
+    setTravelOtherText('')
+    setTravelShowDoneOption(!!showDone)
+    setTravelPickerOpen(true)
+    if (travelProperties.length === 0) {
       const { data } = await supabase.schema('pmms').from('properties').select('id, address, high_vulnerability').order('address')
-      setVisitProperties(data || [])
+      setTravelProperties(data || [])
     }
   }
 
-  async function handleStartVisit() {
-    const destinationProperty = visitProperties.find(p => String(p.id) === visitPropertyId)
-    const label = visitOtherMode ? visitOtherText.trim() : destinationProperty?.address
-    if (!label) { setVisitError(visitOtherMode ? "Enter where you're heading." : 'Pick a property.'); return }
+  function closeTravelPicker() {
+    setTravelPickerOpen(false)
+  }
 
-    setVisitError('')
-    setVisitSaving(true)
+  async function startTravelLeg(category, destinationPropertyId, label) {
+    setTravelError('')
+    setTravelSaving(true)
+    const payload = {
+      staff_id: profile.id,
+      activity_type: category === 'lunch' ? 'Break' : 'Travel',
+      activity_category: category,
+      started_at: new Date().toISOString(),
+    }
+    if (category !== 'lunch') { payload.destination_property_id = destinationPropertyId; payload.note = label }
     const { data, error } = await supabase
       .schema('pmms')
       .from('activity_log')
-      .insert({
-        staff_id: profile.id,
-        activity_type: 'Travel',
-        activity_category: 'visit',
-        destination_property_id: visitOtherMode ? null : (destinationProperty?.id ?? null),
-        note: label,
-        started_at: new Date().toISOString(),
-      })
-      .select('id, note, started_at, destination_property_id')
+      .insert(payload)
+      .select('id, activity_category, note, started_at, arrived_at, destination_property_id')
       .single()
 
-    setVisitSaving(false)
-    if (error) { setVisitError(error.message); return }
-    setOpenVisit(data)
-    setVisitPickerOpen(false)
+    setTravelSaving(false)
+    if (error) { setTravelError(error.message); return }
+    setOpenLeg(data)
+    setTravelPickerOpen(false)
+  }
+
+  // Office/Lunch/Done need no further input, so they fire immediately on
+  // tap -- Property/Other reveal a sub-step (search box or free-text
+  // input) below and wait for an explicit Start Travel tap instead.
+  function chooseDestType(type) {
+    setTravelError('')
+    if (type === 'office') { startTravelLeg('visit_office', null, 'the office'); return }
+    if (type === 'lunch') { startTravelLeg('lunch', null, null); return }
+    if (type === 'done') { setTravelPickerOpen(false); return }
+    setTravelDestType(type)
+  }
+
+  async function confirmTravelSubStep() {
+    if (travelDestType === 'property') {
+      const p = travelProperties.find(x => String(x.id) === travelPropertyId)
+      if (!p) { setTravelError('Pick a property.'); return }
+      await startTravelLeg('visit', p.id, p.address)
+    } else if (travelDestType === 'other') {
+      const text = travelOtherText.trim()
+      if (!text) { setTravelError("Enter where you're heading."); return }
+      await startTravelLeg('visit_other', null, text)
+    }
   }
 
   function openArrival() {
     setArrivalMiles(null)
-    setArrivalLocation(null)
     setArrivalError('')
     setArrivalOpen(true)
   }
 
+  // Property destinations only close the TRAVEL phase here (arrived_at
+  // set, ended_at stays null) and move into the on-site phase -- Office/
+  // Other have no on-site phase, so arriving closes the whole leg.
   async function submitArrival() {
     if (arrivalMiles === null) { setArrivalError("Enter miles driven, or 0 if you didn't drive."); return }
-    if (!arrivalLocation) { setArrivalError("Let us know where you are now."); return }
     setArrivalError('')
     setArrivalSaving(true)
-    const endNote = arrivalLocation === 'office' ? 'now at the office' : 'heading home for the day'
-    const { error } = await supabase
+    const isProperty = openLeg.activity_category === 'visit'
+    const now = new Date().toISOString()
+    const update = isProperty
+      ? { arrived_at: now, mileage_logged: arrivalMiles }
+      : { arrived_at: now, ended_at: now, mileage_logged: arrivalMiles }
+    const { data, error } = await supabase
       .schema('pmms')
       .from('activity_log')
-      .update({ ended_at: new Date().toISOString(), mileage_logged: arrivalMiles, end_note: endNote })
-      .eq('id', openVisit.id)
+      .update(update)
+      .eq('id', openLeg.id)
+      .select('id, activity_category, note, started_at, arrived_at, destination_property_id')
+      .single()
 
     setArrivalSaving(false)
     if (error) { setArrivalError(error.message); return }
-    setOpenVisit(null)
     setArrivalOpen(false)
+    setOpenLeg(isProperty ? data : null)
+  }
+
+  // Mileage was already captured on arrival -- this just closes the
+  // on-site phase and hands straight into the destination picker for
+  // whatever's next, per the flow the user asked for.
+  async function handleFinishVisit() {
+    setFinishError('')
+    setFinishSaving(true)
+    const { error } = await supabase.schema('pmms').from('activity_log').update({ ended_at: new Date().toISOString() }).eq('id', openLeg.id)
+    setFinishSaving(false)
+    if (error) { setFinishError(error.message); return }
+    setOpenLeg(null)
+    openTravelPicker(true)
+  }
+
+  async function handleBackFromLunch() {
+    setFinishError('')
+    const { error } = await supabase.schema('pmms').from('activity_log').update({ ended_at: new Date().toISOString() }).eq('id', openLeg.id)
+    if (error) { setFinishError(error.message); return }
+    setOpenLeg(null)
   }
 
   function attemptDailyClockOut() {
     setClockOutForDayError('')
-    if (openVisit) { setClockOutForDayError('Finish logging your current visit before clocking out for the day.'); return }
+    if (openLeg) { setClockOutForDayError('Finish logging your current trip before clocking out for the day.'); return }
     if (ukTimeHHMM() < dailyClockOutDeadline) {
       setEarlyLeaveReason('')
       setEarlyLeavePromptOpen(true)
@@ -1063,37 +1121,64 @@ export default function AdminDashboard({ profile }) {
               </div>
               {clockOutForDayError && <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: COLORS.red500, fontWeight: 600 }}>{clockOutForDayError}</p>}
 
-              {/* Log a Visit -- see [[feedback_clocking_vs_logging_terminology]].
-                  Mirrors BuilderDashboard.jsx's own "Going to Another Job":
-                  pick a destination before leaving (open activity_log row,
-                  shows as "Away" on Where's the Team live), enter mileage
-                  on arrival rather than guessing beforehand. */}
+              {/* Travel/visit logging -- see [[feedback_clocking_vs_logging_terminology]].
+                  Each trip is a two-phase row: travelling (started_at ->
+                  arrived_at, mileage captured on arrival) then, for a
+                  property, on site (arrived_at -> ended_at). Finishing a
+                  visit re-opens this same picker for whatever's next. */}
               <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: `1px solid ${dailyShift.late_flag ? COLORS.amber200 : COLORS.slate200}` }}>
-                {openVisit ? (
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
-                    <span style={{ fontSize: '13px', fontWeight: 600, color: COLORS.blue700 }}>
-                      📍 Away — visiting {openVisit.note} since {formatUKDateTime(openVisit.started_at).split(' ').slice(-1)[0]}
-                    </span>
-                    <button
-                      onClick={openArrival}
-                      style={{ padding: '7px 12px', background: COLORS.blue600, color: COLORS.white, border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
-                    >
-                      ✓ Finish Visit — Log Mileage
-                    </button>
-                  </div>
+                {openLeg ? (
+                  openLeg.activity_category === 'lunch' ? (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+                      <span style={{ fontSize: '13px', fontWeight: 600, color: COLORS.violet600 }}>
+                        🍽 On lunch break since {formatUKDateTime(openLeg.started_at).split(' ').slice(-1)[0]}
+                      </span>
+                      <button
+                        onClick={handleBackFromLunch}
+                        style={{ padding: '7px 12px', background: COLORS.blue600, color: COLORS.white, border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
+                      >
+                        ✓ Back from Lunch
+                      </button>
+                    </div>
+                  ) : openLeg.activity_category === 'visit' && openLeg.arrived_at ? (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+                      <span style={{ fontSize: '13px', fontWeight: 600, color: COLORS.blue700 }}>
+                        📍 At {openLeg.note} since {formatUKDateTime(openLeg.arrived_at).split(' ').slice(-1)[0]}
+                      </span>
+                      <button
+                        onClick={handleFinishVisit}
+                        disabled={finishSaving}
+                        style={{ padding: '7px 12px', background: COLORS.blue600, color: COLORS.white, border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: finishSaving ? 'not-allowed' : 'pointer', opacity: finishSaving ? 0.7 : 1 }}
+                      >
+                        {finishSaving ? 'Finishing…' : '✓ Finished Visit'}
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+                      <span style={{ fontSize: '13px', fontWeight: 600, color: COLORS.blue700 }}>
+                        🚗 Travelling — heading to {openLeg.note} since {formatUKDateTime(openLeg.started_at).split(' ').slice(-1)[0]}
+                      </span>
+                      <button
+                        onClick={openArrival}
+                        style={{ padding: '7px 12px', background: COLORS.blue600, color: COLORS.white, border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
+                      >
+                        ✓ Arrived
+                      </button>
+                    </div>
+                  )
                 ) : (
                   <button
-                    onClick={openVisitPicker}
+                    onClick={() => openTravelPicker(false)}
                     style={{ padding: '7px 12px', background: COLORS.white, color: COLORS.blue700, border: `1px solid ${COLORS.blue200}`, borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
                   >
-                    📍 Log a Visit
+                    🚗 Start Travel
                   </button>
                 )}
+                {finishError && <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: COLORS.red500, fontWeight: 600 }}>{finishError}</p>}
 
                 {arrivalOpen && (
                   <div style={{ marginTop: '10px', background: COLORS.white, border: `1px solid ${COLORS.slate300}`, borderRadius: '12px', padding: '14px' }}>
-                    <p style={{ margin: '0 0 10px 0', fontSize: '13px', fontWeight: 700, color: COLORS.slate900 }}>Miles driven for this visit</p>
-                    <p style={{ margin: '0 0 10px 0', fontSize: '11.5px', color: COLORS.slate500 }}>Whatever you drove for this trip — there and back, or one-way if you're heading somewhere else next.</p>
+                    <p style={{ margin: '0 0 10px 0', fontSize: '13px', fontWeight: 700, color: COLORS.slate900 }}>Miles driven for this trip</p>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', overflow: 'hidden' }}>
                       <button
                         onClick={() => setArrivalMiles(m => Math.max(0, (m ?? 0) - 0.5))}
@@ -1115,34 +1200,6 @@ export default function AdminDashboard({ profile }) {
                         +
                       </button>
                     </div>
-
-                    <p style={{ margin: '14px 0 8px 0', fontSize: '13px', fontWeight: 700, color: COLORS.slate900 }}>Where are you now?</p>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <button
-                        onClick={() => setArrivalLocation('office')}
-                        style={{
-                          flex: 1, padding: '10px', borderRadius: '10px', fontSize: '12.5px', fontWeight: 700, cursor: 'pointer',
-                          background: arrivalLocation === 'office' ? COLORS.blue600 : COLORS.white,
-                          color: arrivalLocation === 'office' ? COLORS.white : COLORS.slate600,
-                          border: `1px solid ${arrivalLocation === 'office' ? COLORS.blue600 : COLORS.slate200}`,
-                        }}
-                      >
-                        🏢 Back at the Office
-                      </button>
-                      <button
-                        onClick={() => setArrivalLocation('home')}
-                        style={{
-                          flex: 1, padding: '10px', borderRadius: '10px', fontSize: '12.5px', fontWeight: 700, cursor: 'pointer',
-                          background: arrivalLocation === 'home' ? COLORS.blue600 : COLORS.white,
-                          color: arrivalLocation === 'home' ? COLORS.white : COLORS.slate600,
-                          border: `1px solid ${arrivalLocation === 'home' ? COLORS.blue600 : COLORS.slate200}`,
-                        }}
-                      >
-                        🏠 Home for the Day
-                      </button>
-                    </div>
-                    <p style={{ margin: '6px 0 0 0', fontSize: '11px', color: COLORS.slate400 }}>Going straight to another property instead? Finish this visit, then tap Log a Visit again.</p>
-
                     {arrivalError && <p style={{ margin: '8px 0 0 0', fontSize: '12px', color: COLORS.red500, fontWeight: 600 }}>{arrivalError}</p>}
                     <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
                       <button onClick={() => setArrivalOpen(false)} style={{ flex: 1, padding: '10px', background: COLORS.slate100, color: COLORS.slate600, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
@@ -1153,61 +1210,76 @@ export default function AdminDashboard({ profile }) {
                         disabled={arrivalSaving}
                         style={{ flex: 2, padding: '10px', background: COLORS.blue600, color: COLORS.white, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: arrivalSaving ? 'not-allowed' : 'pointer', opacity: arrivalSaving ? 0.7 : 1 }}
                       >
-                        {arrivalSaving ? 'Saving…' : 'Finish Visit'}
+                        {arrivalSaving ? 'Saving…' : 'Confirm Arrival'}
                       </button>
                     </div>
                   </div>
                 )}
 
-                {visitPickerOpen && (
+                {travelPickerOpen && (
                   <div style={{ marginTop: '10px', background: COLORS.white, border: `1px solid ${COLORS.slate300}`, borderRadius: '12px', padding: '14px' }}>
                     <p style={{ margin: '0 0 10px 0', fontSize: '13px', fontWeight: 700, color: COLORS.slate900 }}>Where are you heading?</p>
-                    {!visitOtherMode ? (
-                      <>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      {[
+                        ['property', '📍 A Property'],
+                        ['office', '🏢 The Office'],
+                        ['lunch', '🍽 Lunch Break'],
+                        ['other', '✏️ Other'],
+                        ...(travelShowDoneOption ? [['done', '✓ Nothing else — done for now']] : []),
+                      ].map(([type, label]) => (
+                        <button
+                          key={type}
+                          onClick={() => chooseDestType(type)}
+                          disabled={travelSaving}
+                          style={{
+                            padding: '8px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: 700,
+                            cursor: travelSaving ? 'not-allowed' : 'pointer',
+                            background: travelDestType === type ? COLORS.blue600 : COLORS.white,
+                            color: travelDestType === type ? COLORS.white : COLORS.slate600,
+                            border: `1px solid ${travelDestType === type ? COLORS.blue600 : COLORS.slate200}`,
+                          }}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {travelDestType === 'property' && (
+                      <div style={{ marginTop: '10px' }}>
                         <Suspense fallback={<div style={{ height: '44px', borderRadius: '10px', background: COLORS.slate100 }} />}>
                           <PropertySearchSelect
-                            properties={visitProperties}
-                            value={visitPropertyId}
-                            onChange={setVisitPropertyId}
+                            properties={travelProperties}
+                            value={travelPropertyId}
+                            onChange={setTravelPropertyId}
                             placeholder="Search properties..."
                           />
                         </Suspense>
-                        <button
-                          onClick={() => { setVisitOtherMode(true); setVisitPropertyId('') }}
-                          style={{ marginTop: '8px', background: 'none', border: 'none', padding: 0, fontSize: '12px', fontWeight: 700, color: COLORS.slate500, textDecoration: 'underline', cursor: 'pointer' }}
-                        >
-                          Not a property? Log it as text instead
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <input
-                          type="text"
-                          value={visitOtherText}
-                          onChange={(e) => setVisitOtherText(e.target.value)}
-                          placeholder="Where are you heading..."
-                          style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '14px', boxSizing: 'border-box' }}
-                        />
-                        <button
-                          onClick={() => { setVisitOtherMode(false); setVisitOtherText('') }}
-                          style={{ marginTop: '8px', background: 'none', border: 'none', padding: 0, fontSize: '12px', fontWeight: 700, color: COLORS.slate500, textDecoration: 'underline', cursor: 'pointer' }}
-                        >
-                          Search properties instead
-                        </button>
-                      </>
+                      </div>
                     )}
-                    {visitError && <p style={{ margin: '8px 0 0 0', fontSize: '12px', color: COLORS.red500, fontWeight: 600 }}>{visitError}</p>}
+                    {travelDestType === 'other' && (
+                      <input
+                        type="text"
+                        value={travelOtherText}
+                        onChange={(e) => setTravelOtherText(e.target.value)}
+                        placeholder="Where are you heading..."
+                        style={{ marginTop: '10px', width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '14px', boxSizing: 'border-box' }}
+                      />
+                    )}
+
+                    {travelError && <p style={{ margin: '8px 0 0 0', fontSize: '12px', color: COLORS.red500, fontWeight: 600 }}>{travelError}</p>}
                     <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
-                      <button onClick={() => setVisitPickerOpen(false)} style={{ flex: 1, padding: '10px', background: COLORS.slate100, color: COLORS.slate600, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
+                      <button onClick={closeTravelPicker} style={{ flex: 1, padding: '10px', background: COLORS.slate100, color: COLORS.slate600, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
                         Cancel
                       </button>
-                      <button
-                        onClick={handleStartVisit}
-                        disabled={visitSaving}
-                        style={{ flex: 2, padding: '10px', background: COLORS.blue600, color: COLORS.white, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: visitSaving ? 'not-allowed' : 'pointer', opacity: visitSaving ? 0.7 : 1 }}
-                      >
-                        {visitSaving ? 'Starting…' : 'Start Visit'}
-                      </button>
+                      {(travelDestType === 'property' || travelDestType === 'other') && (
+                        <button
+                          onClick={confirmTravelSubStep}
+                          disabled={travelSaving}
+                          style={{ flex: 2, padding: '10px', background: COLORS.blue600, color: COLORS.white, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: travelSaving ? 'not-allowed' : 'pointer', opacity: travelSaving ? 0.7 : 1 }}
+                        >
+                          {travelSaving ? 'Starting…' : 'Start Travel'}
+                        </button>
+                      )}
                     </div>
                   </div>
                 )}

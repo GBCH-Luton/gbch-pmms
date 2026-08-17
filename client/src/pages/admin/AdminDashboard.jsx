@@ -212,7 +212,7 @@ function TeamWhereabouts({ profile, onNavigate }) {
 
     const [{ data: attendanceData }, { data: activityData }, { data: openSessions }, { data: auditData }, { data: onHoldShortTrips }] = await Promise.all([
       supabase.schema('pmms').from('daily_attendance').select('id, staff_id, clock_in_at, late_flag, clock_out_at, early_leave_reason').or(`work_date.eq.${todayKey},clock_out_at.is.null`),
-      supabase.schema('pmms').from('activity_log').select('id, staff_id, activity_type, activity_category, note, end_note, started_at, ended_at, ticket_id, destination_ticket_id').or(`started_at.gte.${todayKey}T00:00:00,ended_at.is.null`),
+      supabase.schema('pmms').from('activity_log').select('id, staff_id, activity_type, activity_category, note, end_note, started_at, arrived_at, ended_at, ticket_id, destination_ticket_id').or(`started_at.gte.${todayKey}T00:00:00,ended_at.is.null`),
       supabase.schema('pmms').from('work_sessions').select('id, ticket_id, builder_id').is('ended_at', null),
       // Job start/resume/complete/pause/no-access events -- these were
       // previously invisible here entirely (this panel only ever read
@@ -272,7 +272,15 @@ function TeamWhereabouts({ profile, onNavigate }) {
       } else if (shift && !shift.clock_out_at) {
         if (openActivity) {
           const meta = activityCategoryMeta(openActivity.activity_type, openActivity.activity_category)
-          status = `${meta.label}${openActivity.note ? `: ${openActivity.note}` : ''}`
+          // A property visit is travelling until arrived_at is set, then
+          // on site -- travelLabel only exists on the 'visit' category
+          // meta, so this is a no-op fallback to the plain label for
+          // every other category (including visit_office/visit_other,
+          // whose `label` already reads as travel since they have no
+          // on-site phase).
+          const isOnSite = openActivity.activity_category === 'visit' && openActivity.arrived_at
+          const displayLabel = isOnSite ? meta.label : (meta.travelLabel || meta.label)
+          status = `${displayLabel}${openActivity.note ? `: ${openActivity.note}` : ''}`
           tone = openActivity.activity_category ? `away-${openActivity.activity_category}` : 'away'
         } else if (shortTripTicket) {
           status = `${shortTripTicket.hold_reason} (Job #${shortTripTicket.ticket_number})`
@@ -327,6 +335,16 @@ function TeamWhereabouts({ profile, onNavigate }) {
         text: `${meta.leftVerb}${a.note ? `: ${a.note}` : ''}`,
         ticketNumber: (destinationTicket ?? ticket)?.ticket_number,
       })
+      // Property visits split into travel -> arrival -> finish -- arriveVerb
+      // only exists on the 'visit' category meta, so this is a no-op for
+      // every other category (builders' own included).
+      if (a.arrived_at && meta.arriveVerb) {
+        entries.push({
+          id: `${a.id}-arrive`, time: a.arrived_at, staffId: a.staff_id, staffName: b.name, tone: entryTone,
+          text: meta.arriveVerb,
+          ticketNumber: (destinationTicket ?? ticket)?.ticket_number,
+        })
+      }
       if (a.ended_at) {
         entries.push({
           id: `${a.id}-end`, time: a.ended_at, staffId: a.staff_id, staffName: b.name, tone: 'back',

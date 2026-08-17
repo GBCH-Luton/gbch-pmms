@@ -364,7 +364,7 @@ export default function AdminClocking({ profile, onNavigate }) {
     const { data: activityData } = await supabase
       .schema('pmms')
       .from('activity_log')
-      .select('id, staff_id, activity_type, activity_category, note, started_at, ended_at')
+      .select('id, staff_id, activity_type, activity_category, note, started_at, arrived_at, ended_at')
       .or(`started_at.gte.${todayKey}T00:00:00,ended_at.is.null`)
       .order('started_at', { ascending: true })
 
@@ -453,7 +453,9 @@ export default function AdminClocking({ profile, onNavigate }) {
       } else if (shift && !shift.clock_out_at) {
         if (openActivityForBuilder) {
           awayMeta = activityCategoryMeta(openActivityForBuilder.activity_type, openActivityForBuilder.activity_category)
-          currentStatus = `${awayMeta.label}${openActivityForBuilder.note ? `: ${openActivityForBuilder.note}` : ''}`
+          const isOnSite = openActivityForBuilder.activity_category === 'visit' && openActivityForBuilder.arrived_at
+          const displayLabel = isOnSite ? awayMeta.label : (awayMeta.travelLabel || awayMeta.label)
+          currentStatus = `${displayLabel}${openActivityForBuilder.note ? `: ${openActivityForBuilder.note}` : ''}`
         } else if (shortTripTicket) {
           currentStatus = `${shortTripTicket.hold_reason} (Job #${shortTripTicket.ticket_number})`
         } else if (openSessionTicket) {
@@ -683,7 +685,7 @@ export default function AdminClocking({ profile, onNavigate }) {
         supabase
           .schema('pmms')
           .from('activity_log')
-          .select('id, activity_type, activity_category, note, end_note, started_at, ended_at, destination_ticket_id')
+          .select('id, activity_type, activity_category, note, end_note, started_at, arrived_at, ended_at, destination_ticket_id')
           .eq('staff_id', staffId)
           .gte('started_at', lowerBound)
           .lte('started_at', upperBound)
@@ -1483,6 +1485,7 @@ export default function AdminClocking({ profile, onNavigate }) {
                 const meta = activityCategoryMeta(a.activity_type, a.activity_category)
                 const tone = a.activity_category ? `away-${a.activity_category}` : 'away'
                 events.push({ time: a.started_at, label: `${meta.leftVerb.charAt(0).toUpperCase()}${meta.leftVerb.slice(1)}${a.note ? `: ${a.note}` : ''}`, tone, ticketNumber: a.destinationTicketNumber })
+                if (a.arrived_at && meta.arriveVerb) events.push({ time: a.arrived_at, label: `${meta.arriveVerb.charAt(0).toUpperCase()}${meta.arriveVerb.slice(1)}`, tone })
                 if (a.ended_at) events.push({ time: a.ended_at, label: `${meta.backVerb.charAt(0).toUpperCase()}${meta.backVerb.slice(1)}${a.end_note ? `: ${a.end_note}` : ''}`, tone: 'back' })
               })
               historyJobEvents.forEach(a => {

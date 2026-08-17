@@ -71,7 +71,25 @@ export const ACTIVITY_CATEGORY_META = {
   materials: { label: 'Buying materials', leftVerb: 'left for materials', backVerb: 'back from materials run', dot: COLORS.pink600, chipBg: COLORS.pink100, chipFg: COLORS.pink600 },
   job: { label: 'Heading to another job', leftVerb: 'left site — heading to another job', backVerb: 'arrived on site', dot: COLORS.indigo700, chipBg: COLORS.indigo100, chipFg: COLORS.indigo700 },
   office: { label: 'At the office', leftVerb: 'left for the office', backVerb: 'back from the office', dot: COLORS.purple600, chipBg: COLORS.purple50, chipFg: COLORS.purple600 },
-  visit: { label: 'Visiting a property', leftVerb: 'left for a property visit', backVerb: 'back from the visit', dot: COLORS.blue600, chipBg: COLORS.blue100, chipFg: COLORS.blue700 },
+  // Kathryn's property-visit legs (Log a Visit) split into two phases
+  // within one activity_log row -- travel (started_at -> arrived_at) then
+  // on site (arrived_at -> ended_at) -- so `travelLabel`/`arriveVerb` cover
+  // the mid-point (arriving at the property) and `label`/`backVerb` cover
+  // the on-site phase and its own finish, on top of the leftVerb/label
+  // pair every other category already has for its single phase. Callers
+  // that don't know about the extra fields (every builder-side category
+  // above) just never read them.
+  visit: {
+    label: 'Visiting a property', travelLabel: 'Travelling to a property',
+    leftVerb: 'left for a property visit', arriveVerb: 'arrived at the property', backVerb: 'finished the property visit',
+    dot: COLORS.blue600, chipBg: COLORS.blue100, chipFg: COLORS.blue700,
+  },
+  // Travel-only legs with no on-site phase -- unlike builders' own
+  // `office` above (which means "away from site, at the office, now
+  // back"), for Kathryn the office IS home base, so arriving there just
+  // closes the trip -- distinct key so the wording doesn't collide.
+  visit_office: { label: 'Travelling to the office', leftVerb: 'left for the office', backVerb: 'arrived at the office', dot: COLORS.purple600, chipBg: COLORS.purple50, chipFg: COLORS.purple600 },
+  visit_other: { label: 'Travelling', leftVerb: 'left', backVerb: 'arrived', dot: COLORS.slate500, chipBg: COLORS.slate100, chipFg: COLORS.slate600 },
 }
 // activity_category is null on rows written before this column existed --
 // falls back to the old generic Travel/Break split rather than guessing.
