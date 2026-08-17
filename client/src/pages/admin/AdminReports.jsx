@@ -79,6 +79,12 @@ const AI_EXAMPLE_QUESTIONS = [
   'How many housekeeping visits are overdue or delayed right now?',
   'Does urgent priority actually get resolved faster than standard?',
   'How many hours did each staff member work this week?',
+  'How much rent is tied up in void properties right now?',
+  'How many properties have been added to the portfolio this month?',
+  'Which landlords have the most open tickets against their properties?',
+  "What's our average response time this month?",
+  "What's our average ticket turnaround time this month?",
+  'How many tickets were completed this week vs last week?',
 ]
 
 // Matched first, before ever calling Claude -- these questions stay
@@ -113,6 +119,17 @@ const AI_PATTERNS = [
   { test: /housekeeping visit|routine visit.*(overdue|delayed|missed)/i, key: 'missedHousekeepingVisits' },
   { test: /urgent.*(faster|resolv)|priority.*(faster|resolv)/i, key: 'priorityResolutionSpeed' },
   { test: /how many hours|hours worked/i, key: 'hoursWorkedByStaff' },
+  { test: /void.*rent|rent.*void/i, key: 'voidRentExposure' },
+  { test: /properties.*added|added.*portfolio|portfolio.*grow/i, key: 'portfolioGrowth' },
+  { test: /landlord.*(most|open)|which landlord/i, key: 'landlordOpenTickets' },
+  { test: /average response time|response time.*month/i, key: 'avgResponseTime' },
+  { test: /average.*turnaround|turnaround.*month/i, key: 'avgTurnaroundTime' },
+  // Same key/pattern as ticketVolumeTrend above on purpose -- "raised...
+  // this week vs last week" and "completed...this week vs last week" are
+  // the same shape of question, just a different metric word. The runner
+  // itself re-scans the question text for "completed" (see below), same
+  // parameterised idiom as aiExtractPeriod/aiExtractStaffName, rather than
+  // forking into a near-duplicate pattern+runner pair.
 ]
 
 // Scans the raw question text for a period phrase -- "this week" is the
@@ -413,22 +430,29 @@ async function aiRunOldestOpenTickets() {
   }
 }
 
-async function aiRunTicketVolumeTrend() {
+// Answers both "raised...this week vs last week" and "completed...this
+// week vs last week" -- the question text decides which date column
+// (created_at vs completed_at) to trend, same idiom as aiExtractPeriod
+// re-scanning the raw text rather than needing a second near-identical
+// pattern+runner pair for what's really the same question shape.
+async function aiRunTicketVolumeTrend(questionText) {
+  const metric = questionText.toLowerCase().includes('completed') ? 'completed' : 'raised'
+  const dateCol = metric === 'completed' ? 'completed_at' : 'created_at'
   const today = todayIso()
   const thisWeekStart = mondayOfWeek(today)
   const lastWeekStart = shiftDateKey(thisWeekStart, -7)
   const lastWeekEnd = shiftDateKey(thisWeekStart, -1)
 
-  const { data } = await supabase.schema('pmms').from('tickets').select('created_at').gte('created_at', `${lastWeekStart}T00:00:00`)
+  const { data } = await supabase.schema('pmms').from('tickets').select(dateCol).gte(dateCol, `${lastWeekStart}T00:00:00`)
   const rows_ = data || []
-  const thisWeekCount = rows_.filter(t => t.created_at >= `${thisWeekStart}T00:00:00`).length
-  const lastWeekCount = rows_.filter(t => t.created_at >= `${lastWeekStart}T00:00:00` && t.created_at <= `${lastWeekEnd}T23:59:59`).length
+  const thisWeekCount = rows_.filter(t => t[dateCol] >= `${thisWeekStart}T00:00:00`).length
+  const lastWeekCount = rows_.filter(t => t[dateCol] >= `${lastWeekStart}T00:00:00` && t[dateCol] <= `${lastWeekEnd}T23:59:59`).length
   const diff = thisWeekCount - lastWeekCount
   const trendWord = diff > 0 ? `up ${diff}` : diff < 0 ? `down ${Math.abs(diff)}` : 'unchanged'
 
   return {
-    summary: `${thisWeekCount} ticket${thisWeekCount === 1 ? '' : 's'} raised this week vs ${lastWeekCount} last week (${trendWord}).`,
-    columns: ['Week', 'Tickets raised'],
+    summary: `${thisWeekCount} ticket${thisWeekCount === 1 ? '' : 's'} ${metric} this week vs ${lastWeekCount} last week (${trendWord}).`,
+    columns: ['Week', `Tickets ${metric}`],
     rows: [{ label: 'Last week', value: lastWeekCount }, { label: 'This week', value: thisWeekCount }],
   }
 }
@@ -619,6 +643,105 @@ async function aiRunHoursWorkedByStaff(questionText, builders) {
   }
 }
 
+// Weekly rent value, not a certainty of "lost income" -- rent_amount is a
+// single weekly figure per property (see PropertyLeaseLegalTab.jsx), not
+// per-room, so a property with several rooms and only one void isn't
+// necessarily losing the whole figure. Framed as "rent tied up" rather
+// than asserting a loss the data can't actually prove.
+async function aiRunVoidRentExposure() {
+  const { data: rooms } = await supabase.schema('pmms').from('property_rooms').select('property_id').eq('current_status', 'Void')
+  if (!rooms?.length) return { summary: 'No void rooms right now.', rows: [] }
+
+  const propertyIds = [...new Set(rooms.map(r => r.property_id))]
+  const { data: properties } = await supabase.schema('pmms').from('properties').select('id, address, rent_amount').in('id', propertyIds)
+  const withRent = (properties || []).filter(p => p.rent_amount != null && p.rent_amount > 0)
+  if (!withRent.length) {
+    return { summary: `${propertyIds.length} propert${propertyIds.length === 1 ? 'y has' : 'ies have'} a void room right now, but no weekly rent figure is recorded for any of them.`, rows: [] }
+  }
+
+  const totalWeekly = withRent.reduce((sum, p) => sum + Number(p.rent_amount), 0)
+  const rows = withRent.map(p => ({ label: p.address, value: Number(p.rent_amount) })).sort((a, b) => b.value - a.value).slice(0, 8)
+
+  return {
+    summary: `£${totalWeekly.toFixed(0)}/week in rent sits across ${withRent.length} propert${withRent.length === 1 ? 'y' : 'ies'} currently showing a void room.`,
+    columns: ['Property', 'Weekly rent (£)'], rows,
+  }
+}
+
+async function aiRunPortfolioGrowth() {
+  const monthStart = firstOfMonth(todayIso())
+  const { data: addedThisMonth } = await supabase.schema('pmms').from('properties').select('address, created_at').gte('created_at', `${monthStart}T00:00:00`)
+  const { data: allProperties } = await supabase.schema('pmms').from('properties').select('id')
+  const added = addedThisMonth || []
+  const total = allProperties?.length || 0
+
+  if (!added.length) return { summary: `No properties added to the portfolio this month. ${total} propert${total === 1 ? 'y' : 'ies'} total.`, rows: [] }
+
+  return {
+    summary: `${added.length} propert${added.length === 1 ? 'y has' : 'ies have'} been added to the portfolio this month, out of ${total} total.`,
+    columns: ['Property', 'Added'],
+    rows: added.map(p => ({ label: p.address, value: formatUKDate(p.created_at) })),
+  }
+}
+
+async function aiRunLandlordOpenTickets() {
+  const { data: openTickets } = await supabase.schema('pmms').from('tickets').select('property_id').not('status', 'in', '("Completed","Archived","Cancelled")')
+  if (!openTickets?.length) return { summary: 'No open tickets right now.', rows: [] }
+
+  const withProps = await attachProperties(openTickets, 'landlord_company, landlord_name')
+  const counts = {}
+  withProps.forEach(t => {
+    const landlord = t.property?.landlord_company || t.property?.landlord_name
+    if (landlord) counts[landlord] = (counts[landlord] || 0) + 1
+  })
+  const rows = Object.entries(counts).map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value).slice(0, 8)
+  if (!rows.length) return { summary: 'No open tickets are on properties with a landlord recorded.', rows: [] }
+
+  return {
+    summary: `${rows[0].label} has the most open tickets against their properties, ${rows[0].value}.`,
+    columns: ['Landlord', 'Open tickets'], rows,
+  }
+}
+
+// Reuses computeAvgResponseMs (shared.jsx) -- same raised-to-first-
+// assignment definition already shown as a KPI tile lower on this page,
+// just scoped to this month and made askable.
+async function aiRunAvgResponseTimeThisMonth() {
+  const monthStart = firstOfMonth(todayIso())
+  const { data } = await supabase.schema('pmms').from('tickets').select('created_at, first_assigned_at').gte('first_assigned_at', `${monthStart}T00:00:00`)
+  const avgMs = computeAvgResponseMs(data)
+  if (avgMs == null) return { summary: 'No tickets assigned yet this month.', rows: [] }
+
+  return {
+    summary: `Average response time this month (raised to first assignment) is ${formatDuration(avgMs)}, across ${data.length} ticket${data.length === 1 ? '' : 's'}.`,
+    stats: [
+      { label: 'Avg. response time', value: formatDuration(avgMs), colour: COLORS.blue600 },
+      { label: 'Tickets assigned', value: data.length, colour: COLORS.slate500 },
+    ],
+  }
+}
+
+// Reuses computeAvgTurnaroundMs -- same definition as this page's own
+// "Avg. Turnaround" KPI tile, scoped to this month and made askable.
+async function aiRunAvgTurnaroundTimeThisMonth() {
+  const monthStart = firstOfMonth(todayIso())
+  const { data } = await supabase.schema('pmms').from('tickets')
+    .select('created_at, completed_at')
+    .in('status', ['Completed', 'Archived'])
+    .gte('completed_at', `${monthStart}T00:00:00`)
+  const completed = data || []
+  const avgMs = computeAvgTurnaroundMs(completed)
+  if (avgMs == null) return { summary: 'No tickets completed yet this month.', rows: [] }
+
+  return {
+    summary: `Average ticket turnaround this month (raised to completed) is ${formatDuration(avgMs)}, across ${completed.length} job${completed.length === 1 ? '' : 's'}.`,
+    stats: [
+      { label: 'Avg. turnaround', value: formatDuration(avgMs), colour: COLORS.purple600 },
+      { label: 'Jobs completed', value: completed.length, colour: COLORS.slate500 },
+    ],
+  }
+}
+
 const AI_RUNNERS = {
   topProperties: aiRunTopProperties, complianceOverdue: aiRunComplianceOverdue, topCategory: aiRunTopCategory,
   topCategoryThisMonth: aiRunTopCategoryThisMonth, topBuilders: aiRunTopBuilders,
@@ -630,6 +753,8 @@ const AI_RUNNERS = {
   voidTurnaround: aiRunVoidTurnaround, missedClockOuts: aiRunMissedClockOuts,
   missedHousekeepingVisits: aiRunMissedHousekeepingVisits, priorityResolutionSpeed: aiRunPriorityResolutionSpeed,
   hoursWorkedByStaff: aiRunHoursWorkedByStaff,
+  voidRentExposure: aiRunVoidRentExposure, portfolioGrowth: aiRunPortfolioGrowth, landlordOpenTickets: aiRunLandlordOpenTickets,
+  avgResponseTime: aiRunAvgResponseTimeThisMonth, avgTurnaroundTime: aiRunAvgTurnaroundTimeThisMonth,
 }
 
 export default function AdminReports({ profile, onNavigate }) {
