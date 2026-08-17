@@ -56,6 +56,12 @@ const fieldSelectStyle = { width: '100%', height: '44px', padding: '0 12px', bor
 const fieldLabelStyle = { margin: '0 0 8px 0', fontSize: '11px', fontWeight: 600, color: COLORS.slate500, textTransform: 'uppercase', letterSpacing: '0.06em' }
 
 export default function AdminRaiseTicket({ profile, onNavigate }) {
+  // Landlord Liaison Manager can raise a ticket, but assigning it to a
+  // builder is the real Maintenance Manager's call, not hers -- she has no
+  // builders of her own, and the category she picks can route the ticket
+  // into any division. Leaving it unassigned (Pending) is the same outcome
+  // a builder-side "Log a Ticket" flow already produces.
+  const canAssignBuilder = profile.division !== 'Landlord Liaison'
   const [loggingMode, setLoggingMode] = useState('maintenance') // 'maintenance' | 'compliance'
 
   const [ticketProperties, setTicketProperties] = useState([])
@@ -148,7 +154,12 @@ export default function AdminRaiseTicket({ profile, onNavigate }) {
     setAutoSuggestedBuilderId(null)
     setEstimatedMinutes('')
 
-    if (!category) { setBuilders([]); return }
+    // canAssignBuilder === false means the picker itself is hidden (see
+    // above) -- skip the fetch/auto-suggest entirely, not just the UI,
+    // otherwise this would silently set assignedBuilderId behind a picker
+    // she can't see, and the ticket would submit "Assigned" without her
+    // ever having chosen anyone.
+    if (!category || !canAssignBuilder) { setBuilders([]); return }
     let cancelled = false
     fetchAssignableStaffForCategory(category, { ignoreSkills }).then(async (list) => {
       if (cancelled) return
@@ -709,26 +720,30 @@ export default function AdminRaiseTicket({ profile, onNavigate }) {
             <div style={{ background: SECTION_BG[0], padding: '20px', borderBottom: '1px solid rgba(15,23,42,0.06)' }}>
               <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: COLORS.slate900 }}>5. Assignment &amp; Details</p>
 
-              <p style={fieldLabelStyle}>Assign to builder</p>
-              <select
-                value={assignedBuilderId}
-                onChange={(e) => setAssignedBuilderId(e.target.value)}
-                style={{ ...fieldSelectStyle, marginBottom: '4px' }}
-              >
-                <option value="">Leave unassigned</option>
-                {builders.map(b => (
-                  <option key={b.id} value={b.id} style={b.availability !== 'Available' ? { color: COLORS.slate400 } : undefined}>{builderOptionLabel(b)}</option>
-                ))}
-              </select>
-              {assignedBuilderId && assignedBuilderId === autoSuggestedBuilderId && (
-                <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 600, color: COLORS.slate500 }}>
-                  Auto-suggested (least-busy eligible builder) — change or clear to assign manually.
-                </p>
+              {canAssignBuilder && (
+                <>
+                  <p style={fieldLabelStyle}>Assign to builder</p>
+                  <select
+                    value={assignedBuilderId}
+                    onChange={(e) => setAssignedBuilderId(e.target.value)}
+                    style={{ ...fieldSelectStyle, marginBottom: '4px' }}
+                  >
+                    <option value="">Leave unassigned</option>
+                    {builders.map(b => (
+                      <option key={b.id} value={b.id} style={b.availability !== 'Available' ? { color: COLORS.slate400 } : undefined}>{builderOptionLabel(b)}</option>
+                    ))}
+                  </select>
+                  {assignedBuilderId && assignedBuilderId === autoSuggestedBuilderId && (
+                    <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 600, color: COLORS.slate500 }}>
+                      Auto-suggested (least-busy eligible builder) — change or clear to assign manually.
+                    </p>
+                  )}
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 10px 0', fontSize: '12px', fontWeight: 600, color: COLORS.slate500, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={ignoreSkills} onChange={(e) => setIgnoreSkills(e.target.checked)} />
+                    Show all builders (ignore skills)
+                  </label>
+                </>
               )}
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 10px 0', fontSize: '12px', fontWeight: 600, color: COLORS.slate500, cursor: 'pointer' }}>
-                <input type="checkbox" checked={ignoreSkills} onChange={(e) => setIgnoreSkills(e.target.checked)} />
-                Show all builders (ignore skills)
-              </label>
               {assignedBuilderId && (
                 <>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 14px 0', fontSize: '13px', fontWeight: 600, color: COLORS.slate900, cursor: 'pointer' }}>
@@ -1011,26 +1026,30 @@ export default function AdminRaiseTicket({ profile, onNavigate }) {
             <div style={{ background: SECTION_BG[1], padding: '20px' }}>
               <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: COLORS.slate900 }}>4. Assignment, Details &amp; Submit</p>
 
-              <p style={fieldLabelStyle}>Assign to builder</p>
-              <select
-                value={assignedBuilderId}
-                onChange={(e) => setAssignedBuilderId(e.target.value)}
-                style={{ ...fieldSelectStyle, marginBottom: '4px' }}
-              >
-                <option value="">Leave unassigned</option>
-                {builders.map(b => (
-                  <option key={b.id} value={b.id} style={b.availability !== 'Available' ? { color: COLORS.slate400 } : undefined}>{builderOptionLabel(b)}</option>
-                ))}
-              </select>
-              {assignedBuilderId && assignedBuilderId === autoSuggestedBuilderId && (
-                <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 600, color: COLORS.slate500 }}>
-                  Auto-suggested (least-busy eligible builder) — change or clear to assign manually.
-                </p>
+              {canAssignBuilder && (
+                <>
+                  <p style={fieldLabelStyle}>Assign to builder</p>
+                  <select
+                    value={assignedBuilderId}
+                    onChange={(e) => setAssignedBuilderId(e.target.value)}
+                    style={{ ...fieldSelectStyle, marginBottom: '4px' }}
+                  >
+                    <option value="">Leave unassigned</option>
+                    {builders.map(b => (
+                      <option key={b.id} value={b.id} style={b.availability !== 'Available' ? { color: COLORS.slate400 } : undefined}>{builderOptionLabel(b)}</option>
+                    ))}
+                  </select>
+                  {assignedBuilderId && assignedBuilderId === autoSuggestedBuilderId && (
+                    <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 600, color: COLORS.slate500 }}>
+                      Auto-suggested (least-busy eligible builder) — change or clear to assign manually.
+                    </p>
+                  )}
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 10px 0', fontSize: '12px', fontWeight: 600, color: COLORS.slate500, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={ignoreSkills} onChange={(e) => setIgnoreSkills(e.target.checked)} />
+                    Show all builders (ignore skills)
+                  </label>
+                </>
               )}
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 10px 0', fontSize: '12px', fontWeight: 600, color: COLORS.slate500, cursor: 'pointer' }}>
-                <input type="checkbox" checked={ignoreSkills} onChange={(e) => setIgnoreSkills(e.target.checked)} />
-                Show all builders (ignore skills)
-              </label>
               {assignedBuilderId && (
                 <>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 14px 0', fontSize: '13px', fontWeight: 600, color: COLORS.slate900, cursor: 'pointer' }}>
