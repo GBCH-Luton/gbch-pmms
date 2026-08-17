@@ -5,7 +5,7 @@ import { distanceMetres, googleMapsLink, googleMapsEmbedLink, googleMapsRouteEmb
 import { attachProperties } from '../../lib/properties'
 import {
   thStyle, tdStyle, actionBtnStyle, filterSelectStyle, formatUKDate, formatUKDateTime, toUkDateTimeInputValue, ukDateTimeInputValueToMs,
-  ukDateKey, ukTimeHHMM, minutesLate, shiftDateKey,
+  ukDateKey, ukTimeHHMM, minutesLate, shiftDateKey, mondayOfWeek,
   modalOverlayStyle, modalCardStyle, modalTitleStyle, modalLabelStyle,
   modalErrorStyle, modalCancelBtnStyle, modalConfirmBtnStyle, fetchAssignableBuilders, fetchAssignableStaffForDivision, fetchAssignableStaffForRole, fetchLastEndedSessionsToday, SHORT_TRIP_REASONS, STAFF_AVAILABILITY_STYLES,
   activityCategoryMeta, ACTIVITY_CATEGORY_META,
@@ -164,6 +164,11 @@ export default function AdminClocking({ profile, onNavigate }) {
   const [historyLoading, setHistoryLoading] = useState(false)
 
   const [monthlyMonth, setMonthlyMonth] = useState(ukDateKey().slice(0, 7))
+  // 'today' | 'week' | 'month' -- 'month' still uses the arbitrary-month
+  // picker below (payroll-style lookback to any past month), the other
+  // two are always relative to right now, same pattern as
+  // BuilderProfilePage.jsx's own attendance period picker.
+  const [hoursPeriod, setHoursPeriod] = useState('month')
   const [monthlyRows, setMonthlyRows] = useState([])
   const [monthlyLoading, setMonthlyLoading] = useState(true)
 
@@ -248,7 +253,7 @@ export default function AdminClocking({ profile, onNavigate }) {
   // whenever the month picker changes.
   useEffect(() => {
     if (builders.length > 0) fetchMonthlyHours()
-  }, [monthlyMonth, builders])
+  }, [hoursPeriod, monthlyMonth, builders])
 
   // Waits on `allStaff` (populated by fetchAll) for the same reason as
   // fetchMonthlyHours above -- refires whenever that list first loads in,
@@ -257,72 +262,124 @@ export default function AdminClocking({ profile, onNavigate }) {
     if (allStaff.length > 0) fetchCompletedRowsForDate(completedDate)
   }, [completedDate, allStaff])
 
+  // "In Transit": time clocked in that isn't accounted for by a job or
+  // a declared Leaving
+  // Site/Log a Visit activity. Computed as total clocked minus on-job
+  // minus declared, not tracked as its own state -- builders don't get a
+  // new button or flow, this is purely a reporting rollup over data that
+  // already exists. Shares the Travel & Visits breakdown below (both are
+  // "hours over a period" reports over the same three data sources), and
+  // both now respond to the same Today/This Week/This Month period
+  // picker instead of being locked to a calendar month.
   async function fetchMonthlyHours() {
     setMonthlyLoading(true)
-    const [year, month] = monthlyMonth.split('-').map(Number)
-    const firstDay = `${monthlyMonth}-01`
-    const lastDayDate = new Date(year, month, 0)
-    const lastDay = `${lastDayDate.getFullYear()}-${String(lastDayDate.getMonth() + 1).padStart(2, '0')}-${String(lastDayDate.getDate()).padStart(2, '0')}`
+    const todayKey = ukDateKey()
+
+    let from, to
+    if (hoursPeriod === 'today') {
+      from = todayKey; to = todayKey
+    } else if (hoursPeriod === 'week') {
+      from = mondayOfWeek(todayKey); to = todayKey
+    } else {
+      const [year, month] = monthlyMonth.split('-').map(Number)
+      from = `${monthlyMonth}-01`
+      const lastDayDate = new Date(year, month, 0)
+      to = `${lastDayDate.getFullYear()}-${String(lastDayDate.getMonth() + 1).padStart(2, '0')}-${String(lastDayDate.getDate()).padStart(2, '0')}`
+    }
+    const rangeStartIso = `${from}T00:00:00`
+    const rangeEndIso = `${shiftDateKey(to, 1)}T00:00:00`
+
+    // A row with no end yet is only "live" (counted up to now) if it
+    // started today -- a still-open row from an earlier day in the range
+    // is a genuine gap (forgotten clock-out, an activity nobody closed
+    // out) and stays excluded rather than guessed at, same convention
+    // `hasIncomplete` already used for the month-only version of this.
+    function liveAwareDurationMs(startIso, endIso, dateKeyForRow) {
+      if (endIso) return new Date(endIso).getTime() - new Date(startIso).getTime()
+      if (dateKeyForRow === todayKey) return Date.now() - new Date(startIso).getTime()
+      return null
+    }
 
     const { data } = await supabase
       .schema('pmms')
       .from('daily_attendance')
       .select('staff_id, work_date, clock_in_at, clock_out_at')
-      .gte('work_date', firstDay)
-      .lte('work_date', lastDay)
+      .gte('work_date', from)
+      .lte('work_date', to)
 
-    // Travel & Visits rollup -- see [[project_landlord_liaison_division]]:
-    // each completed activity_log row splits into travel time and, for a
-    // property, on-site time, so hours travelling / on site / office and
-    // visit count can all be reported without guessing. Scoped to the
-    // same month as the attendance query above and merged into the same
-    // rows so "office" time can be derived as whatever's left of the
-    // day's clocked hours once travel/on-site/lunch are subtracted --
-    // builders never produce these categories (only Log a Visit does),
-    // so they naturally end up with zeros here, not a special case.
+    // On-job time, for the In Transit subtraction -- deliberately every
+    // work_session in range, not just completed ones, so a builder
+    // currently mid-job today still counts their time so far rather than
+    // reading as falsely "in transit" until they finish.
+    const { data: sessionData } = await supabase
+      .schema('pmms')
+      .from('work_sessions')
+      .select('builder_id, started_at, ended_at')
+      .gte('started_at', rangeStartIso)
+      .lt('started_at', rangeEndIso)
+
+    // Declared away-time (materials/office/lunch/job-to-job travel, plus
+    // Kathryn's Log a Visit categories) -- see
+    // [[project_landlord_liaison_division]] for the visit/visit_office/
+    // visit_other/lunch split used below. ACTIVITY_CATEGORY_META's own
+    // keys are the source of truth for which categories exist, so a
+    // future category doesn't need a second list updated here too.
     const { data: activityData } = await supabase
       .schema('pmms')
       .from('activity_log')
       .select('staff_id, activity_category, started_at, arrived_at, ended_at, mileage_logged')
-      .in('activity_category', ['visit', 'visit_office', 'visit_other', 'lunch'])
-      .gte('started_at', `${firstDay}T00:00:00`)
-      .lt('started_at', `${shiftDateKey(lastDay, 1)}T00:00:00`)
-      .not('ended_at', 'is', null)
+      .in('activity_category', Object.keys(ACTIVITY_CATEGORY_META))
+      .gte('started_at', rangeStartIso)
+      .lt('started_at', rangeEndIso)
 
     setMonthlyRows(builders.map(b => {
       const shifts = (data || []).filter(s => s.staff_id === b.id)
-      // Still-open shifts (forgotten clock-out, or today if viewing the
-      // current month) are excluded from the total and flagged instead,
-      // rather than silently counted as zero or guessed at.
-      const totalMs = shifts.reduce((sum, s) => s.clock_out_at ? sum + (new Date(s.clock_out_at) - new Date(s.clock_in_at)) : sum, 0)
+      let totalMs = 0, hasIncomplete = false
+      shifts.forEach(s => {
+        const d = liveAwareDurationMs(s.clock_in_at, s.clock_out_at, s.work_date)
+        if (d == null) { hasIncomplete = true; return }
+        totalMs += d
+      })
+
+      const sessions = (sessionData || []).filter(s => s.builder_id === b.id)
+      let onJobMs = 0
+      sessions.forEach(s => {
+        const d = liveAwareDurationMs(s.started_at, s.ended_at, ukDateKey(new Date(s.started_at).getTime()))
+        if (d != null) onJobMs += d
+      })
 
       const legs = (activityData || []).filter(a => a.staff_id === b.id)
-      let visitCount = 0, travelMs = 0, onSiteMs = 0, lunchMs = 0, miles = 0
+      let visitCount = 0, travelMs = 0, onSiteMs = 0, lunchMs = 0, declaredMs = 0, miles = 0
       legs.forEach(a => {
-        const start = new Date(a.started_at).getTime()
-        const end = new Date(a.ended_at).getTime()
+        const dateKey = ukDateKey(new Date(a.started_at).getTime())
+        const legMs = liveAwareDurationMs(a.started_at, a.ended_at, dateKey)
+        if (legMs == null) return
+        declaredMs += legMs
+
         if (a.activity_category === 'lunch') {
-          lunchMs += (end - start)
+          lunchMs += legMs
         } else if (a.activity_category === 'visit') {
-          visitCount += 1
-          const arrived = a.arrived_at ? new Date(a.arrived_at).getTime() : end
-          travelMs += (arrived - start)
-          onSiteMs += (end - arrived)
+          if (a.ended_at) visitCount += 1
+          const arrivedIso = a.arrived_at || a.ended_at
+          const arrivedMs = arrivedIso ? liveAwareDurationMs(a.started_at, arrivedIso, dateKey) : legMs
+          travelMs += (arrivedMs ?? legMs)
+          onSiteMs += legMs - (arrivedMs ?? legMs)
           miles += a.mileage_logged || 0
-        } else {
-          // visit_office / visit_other -- travel-only, no on-site phase.
-          travelMs += (end - start)
+        } else if (a.activity_category === 'visit_office' || a.activity_category === 'visit_other') {
+          travelMs += legMs
           miles += a.mileage_logged || 0
         }
       })
       const officeMs = Math.max(0, totalMs - travelMs - onSiteMs - lunchMs)
+      const inTransitMs = Math.max(0, totalMs - onJobMs - declaredMs)
 
       return {
         staffId: b.id,
         staffName: b.name,
         daysWorked: new Set(shifts.map(s => s.work_date)).size,
         totalMs,
-        hasIncomplete: shifts.some(s => !s.clock_out_at),
+        hasIncomplete,
+        onJobMs, inTransitMs,
         visitCount, travelMs, onSiteMs, lunchMs, officeMs, miles,
       }
     }))
@@ -1347,21 +1404,43 @@ export default function AdminClocking({ profile, onNavigate }) {
         </div>
       </div>
 
-      {/* Section 4: Monthly Hours -- payroll-style rollup, summed from
-          daily_attendance across the whole selected month. */}
+      {/* Section 4: Hours Summary -- payroll-style rollup, summed from
+          daily_attendance/work_sessions/activity_log over Today / This
+          Week / an arbitrary picked month. "In Transit" is time clocked
+          in that's neither on a job nor a declared activity -- a report,
+          not a new tracked state, so nothing about how builders use the
+          app changes. */}
       <div style={sectionCardStyle({ marginTop: '20px' })}>
         <SectionAccent color={COLORS.pink600} />
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px', marginBottom: '14px' }}>
           <div>
-            <h2 style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: 800, color: COLORS.slate900 }}>Monthly Hours</h2>
-            <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate500 }}>Total daily-attendance hours per builder for the selected month.</p>
+            <h2 style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: 800, color: COLORS.slate900 }}>Hours Summary</h2>
+            <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate500 }}>Total hours per builder, split into on-job and in-transit (clocked in, no job or trip logged) time.</p>
           </div>
-          <input
-            type="month"
-            value={monthlyMonth}
-            onChange={(e) => setMonthlyMonth(e.target.value)}
-            style={{ ...filterSelectStyle, cursor: 'pointer' }}
-          />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            {[['today', 'Today'], ['week', 'This Week'], ['month', 'This Month']].map(([key, label]) => (
+              <button
+                key={key}
+                onClick={() => setHoursPeriod(key)}
+                style={{
+                  ...actionBtnStyle,
+                  background: hoursPeriod === key ? COLORS.pink600 : COLORS.white,
+                  color: hoursPeriod === key ? COLORS.white : COLORS.slate600,
+                  borderColor: hoursPeriod === key ? COLORS.pink600 : COLORS.slate200,
+                }}
+              >
+                {label}
+              </button>
+            ))}
+            {hoursPeriod === 'month' && (
+              <input
+                type="month"
+                value={monthlyMonth}
+                onChange={(e) => setMonthlyMonth(e.target.value)}
+                style={{ ...filterSelectStyle, cursor: 'pointer' }}
+              />
+            )}
+          </div>
         </div>
 
         {monthlyLoading ? (
@@ -1374,12 +1453,14 @@ export default function AdminClocking({ profile, onNavigate }) {
                   <th style={thStyle}>Builder</th>
                   <th style={thStyle}>Days Worked</th>
                   <th style={thStyle}>Total Hours</th>
+                  <th style={thStyle}>On Job</th>
+                  <th style={thStyle}>In Transit</th>
                 </tr>
               </thead>
               <tbody>
                 {monthlyRows.length === 0 && (
                   <tr>
-                    <td colSpan={3} style={{ padding: '32px', textAlign: 'center', color: COLORS.slate400, fontWeight: 600 }}>No attendance recorded this month.</td>
+                    <td colSpan={5} style={{ padding: '32px', textAlign: 'center', color: COLORS.slate400, fontWeight: 600 }}>No attendance recorded for this period.</td>
                   </tr>
                 )}
                 {monthlyRows.map(r => (
@@ -1390,6 +1471,8 @@ export default function AdminClocking({ profile, onNavigate }) {
                       {formatDuration(r.totalMs)}
                       {r.hasIncomplete && <span style={{ display: 'block', fontSize: '10px', fontWeight: 700, color: COLORS.amber700 }}>⚠ Has a shift with no clock-out -- excluded from total</span>}
                     </td>
+                    <td style={{ ...tdStyle, fontFamily: 'monospace' }}>{formatDuration(r.onJobMs)}</td>
+                    <td style={{ ...tdStyle, fontFamily: 'monospace' }}>{formatDuration(r.inTransitMs)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -1403,14 +1486,15 @@ export default function AdminClocking({ profile, onNavigate }) {
           Only ever populated for staff who actually use Log a Visit --
           builders don't produce these categories, so they're filtered
           out below rather than cluttering the table with zero rows.
-          Shares monthlyMonth with Monthly Hours above rather than its
-          own picker, since both are the same month-scoped rollup. */}
+          Shares the Hours Summary's period picker above (Today/This
+          Week/This Month) rather than its own -- both are the same
+          period-scoped rollup over the same underlying data. */}
       {monthlyRows.some(r => r.visitCount > 0 || r.travelMs > 0) && (
         <div style={sectionCardStyle({ marginTop: '20px' })}>
           <SectionAccent color={COLORS.blue600} />
           <h2 style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: 800, color: COLORS.slate900 }}>Travel &amp; Visits</h2>
           <p style={{ margin: '0 0 14px 0', fontSize: '13px', color: COLORS.slate500 }}>
-            Property visits logged via "Log a Visit" for the selected month. Office hours are whatever's left of the day's clocked time once travel, on-site, and lunch are subtracted.
+            Property visits logged via "Log a Visit" for the selected period. Office hours are whatever's left of the day's clocked time once travel, on-site, and lunch are subtracted.
           </p>
 
           {monthlyLoading ? (
