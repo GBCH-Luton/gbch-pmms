@@ -281,21 +281,24 @@ export default function AdminClocking({ profile, onNavigate }) {
   // same three data sources), and both now respond to the same
   // Today/This Week/This Month period picker instead of being locked to
   // a calendar month.
+  // Shared by fetchMonthlyHours (the query bounds) and isUnderExpectedHours
+  // (the red-highlight threshold below) so they can never disagree about
+  // what period is actually selected.
+  function hoursRangeFor(period) {
+    const todayKey = ukDateKey()
+    if (period === 'today') return { from: todayKey, to: todayKey }
+    if (period === 'week') return { from: mondayOfWeek(todayKey), to: todayKey }
+    const [year, month] = monthlyMonth.split('-').map(Number)
+    const from = `${monthlyMonth}-01`
+    const lastDayDate = new Date(year, month, 0)
+    const to = `${lastDayDate.getFullYear()}-${String(lastDayDate.getMonth() + 1).padStart(2, '0')}-${String(lastDayDate.getDate()).padStart(2, '0')}`
+    return { from, to }
+  }
+
   async function fetchMonthlyHours() {
     setMonthlyLoading(true)
     const todayKey = ukDateKey()
-
-    let from, to
-    if (hoursPeriod === 'today') {
-      from = todayKey; to = todayKey
-    } else if (hoursPeriod === 'week') {
-      from = mondayOfWeek(todayKey); to = todayKey
-    } else {
-      const [year, month] = monthlyMonth.split('-').map(Number)
-      from = `${monthlyMonth}-01`
-      const lastDayDate = new Date(year, month, 0)
-      to = `${lastDayDate.getFullYear()}-${String(lastDayDate.getMonth() + 1).padStart(2, '0')}-${String(lastDayDate.getDate()).padStart(2, '0')}`
-    }
+    const { from, to } = hoursRangeFor(hoursPeriod)
     const rangeStartIso = `${from}T00:00:00`
     const rangeEndIso = `${shiftDateKey(to, 1)}T00:00:00`
 
@@ -1001,13 +1004,30 @@ export default function AdminClocking({ profile, onNavigate }) {
     return hoursSortDirection === 'asc' ? cmp : -cmp
   })
 
-  // A day averaging under 8 hours for the selected period is worth a
-  // manager's attention at a glance -- guarded on daysWorked so someone
-  // with nothing recorded this period (on leave, hasn't started yet)
-  // reads as blank, not a false flag.
-  const UNDER_DAY_MS = 8 * 3600000
-  function isUnderDayAverage(r) {
-    return r.daysWorked > 0 && (r.totalMs / r.daysWorked) < UNDER_DAY_MS
+  // Expected-hours threshold: 8h for Today, 40h for a full elapsed week,
+  // and -- the actual point of this -- a correct figure for This Month
+  // regardless of whether it's 28 or 31 days long, since it's built from
+  // real elapsed weekdays rather than a hardcoded number. Counts Mon-Fri
+  // only (standard working week, confirmed with the user), capped at
+  // today so a period that isn't over yet (partway through this week or
+  // month) is compared against what's actually elapsed so far, not the
+  // whole period's eventual total.
+  const HOURS_PER_WEEKDAY_MS = 8 * 3600000
+  function countElapsedWeekdays(from, to) {
+    const todayKey = ukDateKey()
+    const cappedTo = to < todayKey ? to : todayKey
+    if (cappedTo < from) return 0
+    let count = 0
+    for (let cursor = from; cursor <= cappedTo; cursor = shiftDateKey(cursor, 1)) {
+      const dow = new Date(`${cursor}T00:00:00Z`).getUTCDay()
+      if (dow !== 0 && dow !== 6) count += 1
+    }
+    return count
+  }
+  function isUnderExpectedHours(r) {
+    const { from, to } = hoursRangeFor(hoursPeriod)
+    const expectedWeekdays = countElapsedWeekdays(from, to)
+    return expectedWeekdays > 0 && r.totalMs < expectedWeekdays * HOURS_PER_WEEKDAY_MS
   }
 
   if (loading) return (
@@ -1538,7 +1558,7 @@ export default function AdminClocking({ profile, onNavigate }) {
                     >
                       <td style={tdStyle}>{r.staffName}</td>
                       <td style={tdStyle}>{r.daysWorked}</td>
-                      <td style={{ ...tdStyle, fontWeight: 700, fontFamily: 'monospace', color: isUnderDayAverage(r) ? COLORS.red600 : COLORS.slate900 }}>
+                      <td style={{ ...tdStyle, fontWeight: 700, fontFamily: 'monospace', color: isUnderExpectedHours(r) ? COLORS.red600 : COLORS.slate900 }}>
                         {formatDuration(r.totalMs)}
                         {r.hasIncomplete && <span style={{ display: 'block', fontSize: '10px', fontWeight: 700, color: COLORS.amber700 }}>⚠ Has a shift with no clock-out -- excluded from total</span>}
                       </td>
