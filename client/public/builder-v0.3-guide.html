@@ -920,15 +920,35 @@
           <button class="btn-stop" onclick="openStopSheet()">⏹ Stop</button>
         </div>`;
     } else if (j.status === 'On Hold' && SHORT_TRIP_REASONS.includes(j.holdReason)) {
+      // The "Away" timer shows for all 3 short trips, but only "Getting
+      // materials myself" and "Going to the Office" are a genuine driving
+      // errand -- those two get the same mileage stepper as a real hold
+      // resume below, instead of resumeShortBreak()'s single button doing
+      // nothing with mileage. "Lunch Break" keeps the simple button.
       body += `
         <div class="timer-box" style="background:var(--app-purple600)">
           <p class="eyebrow">Away — ${j.holdReason}</p>
           <p class="n" id="breakClock">${fmtElapsed(state.breakSeconds)}</p>
           <p class="l">Time since you left</p>
-        </div>
+        </div>`;
+      if (j.holdReason === 'Lunch Break') {
+        body += `
         <div class="section-card">
           <button class="btn-resume-short" onclick="resumeShortBreak()">▶ Resume Job</button>
         </div>`;
+      } else {
+        body += `
+        <div class="section-card">
+          <p class="miles-label">Mileage</p>
+          <div class="miles-row">
+            <button class="miles-btn" onclick="bumpMiles(-0.5)">−</button>
+            <input type="number" step="0.5" value="${state.miles ?? ''}" oninput="state.miles=this.value===''?null:(parseFloat(this.value)||0); render()" />
+            <button class="miles-btn" onclick="bumpMiles(0.5)">+</button>
+          </div>
+          ${state.miles === null ? `<p style="margin:-10px 0 16px;font-size:11.5px;font-weight:800;color:var(--app-red500)">Enter miles driven, or 0 if you're already at this property.</p>` : ''}
+          <button class="btn-primary" ${state.miles === null ? 'disabled' : ''} onclick="restartAfterHold()">✓ Arrived — restart work</button>
+        </div>`;
+      }
     } else if (j.status === 'On Hold') {
       body += `
         <div class="section-card">
