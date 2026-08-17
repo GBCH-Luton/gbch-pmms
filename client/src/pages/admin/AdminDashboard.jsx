@@ -317,7 +317,14 @@ function TeamWhereabouts({ profile, onNavigate }) {
         entries.push({
           id: `${a.id}-end`, time: a.ended_at, staffId: a.staff_id, staffName: b.name, tone: 'back',
           text: meta.backVerb,
-          ticketNumber: ticket?.ticket_number,
+          // Same preference as the "left site" line above -- for a
+          // 'job'-category trip the destination is the job they actually
+          // arrived at, not whatever job (if any) they left from. Using
+          // `ticket` alone here meant "arrived on site" showed no job
+          // number at all whenever they'd been idle (not mid another job)
+          // before heading out, since a.ticket_id is only ever set when a
+          // job was in progress at the moment the trip started.
+          ticketNumber: (destinationTicket ?? ticket)?.ticket_number,
         })
       }
     })
