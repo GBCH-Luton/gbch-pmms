@@ -70,7 +70,11 @@ function DashboardSection({ id, title, background, alertCount = 0, defaultCollap
 // column up to match the taller one, it never caps the taller one, so a
 // long team log needs an explicit height on both cards (not just grid
 // stretch) to actually scroll internally instead of growing the row.
-const DASHBOARD_TOP_CARD_HEIGHT = '420px'
+// Fallback only, used before the `dashboard_top_card_height_px` setting
+// (AdminSettings.jsx's Dashboard Metrics section) has loaded -- both
+// DailyBriefing and TeamWhereabouts below take an explicit `height` prop
+// from the main AdminDashboard component once that setting resolves.
+const DASHBOARD_TOP_CARD_HEIGHT = '250px'
 
 // Shared fixed height for both cards' grey header band. Without this, the
 // two bands render different heights (Where's the Team's header row also
@@ -150,7 +154,7 @@ function DailyBriefing({ lines, height = DASHBOARD_TOP_CARD_HEIGHT }) {
 // (per-job, for "On Job #N"), and pmms.activity_log (Leaving Site/I'm Back,
 // each now carrying the ticket_id that was In Progress when the builder
 // stepped away, so "left site"/"returned" can show which job it was).
-function TeamWhereabouts({ profile, onNavigate }) {
+function TeamWhereabouts({ profile, onNavigate, height = DASHBOARD_TOP_CARD_HEIGHT }) {
   const [loading, setLoading] = useState(true)
   const [builders, setBuilders] = useState([])
   const [statusByStaffId, setStatusByStaffId] = useState({})
@@ -418,7 +422,7 @@ function TeamWhereabouts({ profile, onNavigate }) {
     <div style={{
       borderRadius: '16px', background: COLORS.white, overflow: 'hidden',
       border: `1px solid ${COLORS.slate200}`, boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
-      height: DASHBOARD_TOP_CARD_HEIGHT, display: 'flex', flexDirection: 'column',
+      height, display: 'flex', flexDirection: 'column',
     }}>
       <div style={{ height: DASHBOARD_CARD_HEADER_HEIGHT, boxSizing: 'border-box', padding: '0 20px', display: 'flex', flexDirection: 'column', justifyContent: 'center', background: COLORS.slate50, borderBottom: `1px solid ${COLORS.slate200}` }}>
         {/* Title+subtitle live in their own column, kept separate from the
@@ -556,6 +560,12 @@ export default function AdminDashboard({ profile, onNavigate }) {
   const [p1Threshold, setP1Threshold] = useState(70)
   const [p2Threshold, setP2Threshold] = useState(40)
   const [totalTicketsPeriod, setTotalTicketsPeriod] = useState('all_time')
+  // Controls Daily Briefing/Where's the Team's shared card height (see
+  // AdminSettings.jsx's Dashboard Metrics section) -- 250px default,
+  // configurable so a division that barely uses one of the two cards
+  // (e.g. Landlord Liaison, whose briefing/team list is short) isn't
+  // stuck scrolling a mostly-empty tall card.
+  const [topCardHeightPx, setTopCardHeightPx] = useState(250)
   const [loading, setLoading] = useState(true)
 
   // Daily Briefing / Where's the Team split, dragged via the handle
@@ -632,6 +642,7 @@ export default function AdminDashboard({ profile, onNavigate }) {
     fetchHousekeepingCounts().then(setHousekeepingCounts)
     fetchPriorityThresholds().then(({ p1, p2 }) => { setP1Threshold(p1); setP2Threshold(p2) })
     fetchTotalTicketsPeriod()
+    fetchTopCardHeight()
   }
 
   async function fetchTickets() {
@@ -662,6 +673,16 @@ export default function AdminDashboard({ profile, onNavigate }) {
       .eq('setting_key', 'dashboard_total_tickets_period')
       .maybeSingle()
     if (data?.setting_value) setTotalTicketsPeriod(data.setting_value)
+  }
+
+  async function fetchTopCardHeight() {
+    const { data } = await supabase
+      .schema('pmms')
+      .from('settings')
+      .select('setting_value')
+      .eq('setting_key', 'dashboard_top_card_height_px')
+      .maybeSingle()
+    if (data?.setting_value != null) setTopCardHeightPx(Number(data.setting_value))
   }
 
   async function fetchPropertiesMetrics() {
@@ -962,7 +983,7 @@ export default function AdminDashboard({ profile, onNavigate }) {
         // lives in that stylesheet).
         <div ref={splitContainerRef} className="dashboard-split" style={{ display: 'flex', alignItems: 'stretch', gap: 0, marginBottom: '16px' }}>
           <div className="dashboard-split-panel" style={{ flex: `0 0 ${briefingSplitPct}%`, minWidth: 0 }}>
-            <DailyBriefing lines={briefingLines} />
+            <DailyBriefing lines={briefingLines} height={`${topCardHeightPx}px`} />
           </div>
           <div
             className="dashboard-split-handle"
@@ -975,7 +996,7 @@ export default function AdminDashboard({ profile, onNavigate }) {
             <div style={{ width: '4px', height: '40px', borderRadius: '999px', background: splitDragging ? COLORS.teal700 : COLORS.slate200 }} />
           </div>
           <div className="dashboard-split-panel" style={{ flex: `1 1 ${100 - briefingSplitPct}%`, minWidth: 0 }}>
-            <TeamWhereabouts profile={profile} onNavigate={onNavigate} />
+            <TeamWhereabouts profile={profile} onNavigate={onNavigate} height={`${topCardHeightPx}px`} />
           </div>
         </div>
       )}

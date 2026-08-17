@@ -184,6 +184,7 @@ export default function AdminSettings() {
 
   const [newPropertyWindowHours, setNewPropertyWindowHours] = useState(48)
   const [totalTicketsPeriod, setTotalTicketsPeriod] = useState('all_time')
+  const [dashboardCardHeightPx, setDashboardCardHeightPx] = useState(250)
   const [dashboardMetricsSaving, setDashboardMetricsSaving] = useState(false)
   const [dashboardMetricsSaved, setDashboardMetricsSaved] = useState(false)
 
@@ -268,6 +269,7 @@ export default function AdminSettings() {
       if (map.auto_clock_out_grace_minutes != null) setAutoClockOutGraceMinutes(Number(map.auto_clock_out_grace_minutes))
       if (map.new_property_window_hours != null) setNewPropertyWindowHours(map.new_property_window_hours)
       if (map.dashboard_total_tickets_period != null) setTotalTicketsPeriod(map.dashboard_total_tickets_period)
+      if (map.dashboard_top_card_height_px != null) setDashboardCardHeightPx(Number(map.dashboard_top_card_height_px))
       if (Array.isArray(map.divisions) && map.divisions.length > 0) setDivisions(map.divisions)
     }
     setLoading(false)
@@ -753,6 +755,7 @@ export default function AdminSettings() {
     setDashboardMetricsSaved(false)
     await saveSetting('new_property_window_hours', Number(newPropertyWindowHours))
     await saveSetting('dashboard_total_tickets_period', totalTicketsPeriod)
+    await saveSetting('dashboard_top_card_height_px', Number(dashboardCardHeightPx))
     setDashboardMetricsSaving(false)
     setDashboardMetricsSaved(true)
     setTimeout(() => setDashboardMetricsSaved(false), 2000)
@@ -1770,6 +1773,19 @@ export default function AdminSettings() {
             <option value="all_time">All Time</option>
           </select>
           <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: COLORS.slate400 }}>Controls what the "Total Tickets" dashboard tile counts, so it doesn't grow into an unwieldy all-time number.</p>
+        </div>
+
+        <div style={{ marginBottom: '16px' }}>
+          <label style={fieldLabelStyle}>Daily Briefing / Where's the Team card height (px)</label>
+          <input
+            type="number"
+            min="150"
+            step="10"
+            value={dashboardCardHeightPx}
+            onChange={(e) => setDashboardCardHeightPx(e.target.value)}
+            style={{ ...inputStyle, maxWidth: '160px' }}
+          />
+          <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: COLORS.slate400 }}>Height of the two side-by-side cards at the top of the dashboard. Content inside scrolls once it runs past this, rather than growing the card.</p>
         </div>
 
         <button onClick={saveDashboardMetrics} disabled={dashboardMetricsSaving} style={{ ...saveBtnStyle, opacity: dashboardMetricsSaving ? 0.6 : 1, cursor: dashboardMetricsSaving ? 'not-allowed' : 'pointer' }}>
