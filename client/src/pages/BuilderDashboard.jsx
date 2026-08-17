@@ -4326,31 +4326,6 @@ export default function BuilderDashboard({ profile }) {
                       </div>
                     )}
 
-                    {ticketIssueTag && (() => {
-                      const baseScore = calculatePriorityScore(ticketCategory, ticketIssueTag)
-                      const vulnBonus = selectedTicketProperty?.high_vulnerability ? 30 : 0
-                      const total = baseScore + vulnBonus
-                      const isP1 = total >= p1Threshold
-                      return (
-                        <div style={{ marginTop: '12px', padding: '14px', borderRadius: '10px', background: COLORS.white, border: `1px solid ${COLORS.slate200}` }}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', paddingBottom: '8px', borderBottom: `1px solid ${COLORS.slate200}` }}>
-                            <span style={{ fontSize: '12px', fontWeight: 600, color: COLORS.slate900 }}>Real-time Priority Engine</span>
-                            <span style={{ fontSize: '12px', fontWeight: 700, fontFamily: 'monospace', color: COLORS.white, background: isP1 ? COLORS.red600 : COLORS.slate600, padding: '4px 10px', borderRadius: '6px' }}>{total} Points</span>
-                          </div>
-                          <p style={{ margin: '0 0 8px 0', fontSize: '11px', fontWeight: 700, color: isP1 ? COLORS.red600 : COLORS.slate600, textTransform: 'uppercase' }}>
-                            {isP1 ? '⚠ P1 Critical — will trigger emergency escalation' : 'Routine severity tier'}
-                          </p>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: COLORS.slate500, marginBottom: '4px' }}>
-                            <span>{isUnlistedTag(ticketIssueTag) ? 'Unlisted issue fallback baseline' : 'Diagnostic baseline score'}</span>
-                            <strong style={{ color: COLORS.slate900, fontFamily: 'monospace', fontWeight: 600 }}>{baseScore} pts</strong>
-                          </div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: COLORS.slate500 }}>
-                            <span>Property vulnerability adjustment</span>
-                            <strong style={{ color: COLORS.slate900, fontFamily: 'monospace', fontWeight: 600 }}>+{vulnBonus} pts</strong>
-                          </div>
-                        </div>
-                      )
-                    })()}
                   </div>
                 )}
 
