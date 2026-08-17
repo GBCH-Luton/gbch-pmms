@@ -1089,7 +1089,7 @@
           ${state.materialsUsedRows.map((row, i) => `
             <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
               <input type="text" value="${row.name}" oninput="updateMaterialsUsedRow(${i}, 'name', this.value)" placeholder="What (e.g. 15mm elbow, screws)..." style="flex:1;padding:10px 12px;border-radius:10px;border:1px solid var(--app-slate200);font-size:13px" />
-              <input type="text" value="${row.quantity}" oninput="updateMaterialsUsedRow(${i}, 'quantity', this.value)" placeholder="Qty" style="width:80px;padding:10px;border-radius:10px;border:1px solid var(--app-slate200);font-size:13px" />
+              <input type="number" min="0" step="any" value="${row.quantity}" oninput="updateMaterialsUsedRow(${i}, 'quantity', this.value)" placeholder="Qty" style="width:80px;padding:10px;border-radius:10px;border:1px solid var(--app-slate200);font-size:13px" />
               <button onclick="removeMaterialsUsedRow(${i})" aria-label="Remove" style="width:36px;height:36px;flex-shrink:0;border:none;background:var(--app-red100);color:var(--app-red600);border-radius:8px;font-size:15px;cursor:pointer">✕</button>
             </div>`).join('')}
           <button onclick="addMaterialsUsedRow()" style="width:100%;padding:10px;border-radius:10px;border:1px dashed var(--app-slate300);background:var(--app-slate50);color:var(--app-slate500);font-size:13px;font-weight:600;cursor:pointer;margin-bottom:10px">+ Add ${state.materialsUsedRows.length > 0 ? 'another' : 'a'} material</button>

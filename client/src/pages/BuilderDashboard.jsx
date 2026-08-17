@@ -1221,15 +1221,17 @@ export default function BuilderDashboard({ profile }) {
 
     await postAuditEvent(selectedTicket.id, 'Status Changed', `${previousStatus} → Completed — ${note.trim()}`)
 
-    // Optional -- what this job actually used, free text. Rows left
-    // completely blank are silently skipped, same convention as the
-    // receipts rows on "I'm Back".
+    // Optional -- what this job actually used. Name is free text, quantity
+    // is a real number (see alter_ticket_materials_used_quantity_numeric.sql
+    // -- was free text, let letters through where only a count made sense).
+    // Rows left completely blank are silently skipped, same convention as
+    // the receipts rows on "I'm Back".
     const materialsToLog = materialsUsedRows.filter(row => row.name.trim() !== '')
     if (materialsToLog.length > 0) {
       await supabase.schema('pmms').from('ticket_materials_used').insert(
         materialsToLog.map(row => ({
           ticket_id: selectedTicket.id, staff_id: profile.id,
-          name: row.name.trim(), quantity: row.quantity.trim() || '1',
+          name: row.name.trim(), quantity: row.quantity.trim() !== '' ? Number(row.quantity) : 1,
         }))
       )
       setMaterialsUsedRows([])
@@ -2820,7 +2822,9 @@ export default function BuilderDashboard({ profile }) {
                       style={{ flex: 1, padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', fontFamily: 'inherit', boxSizing: 'border-box' }}
                     />
                     <input
-                      type="text"
+                      type="number"
+                      min="0"
+                      step="any"
                       value={row.quantity}
                       onChange={(e) => updateMaterialsUsedRow(index, 'quantity', e.target.value)}
                       placeholder="Qty"
