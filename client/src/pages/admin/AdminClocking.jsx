@@ -823,10 +823,14 @@ export default function AdminClocking({ profile, onNavigate }) {
       ])]
       let ticketsById = {}
       if (ticketIds.length > 0) {
-        const { data: ticketRows } = await supabase.schema('pmms').from('tickets').select('id, ticket_number').in('id', ticketIds)
+        const { data: ticketRows } = await supabase.schema('pmms').from('tickets').select('id, ticket_number, status').in('id', ticketIds)
         ticketsById = Object.fromEntries((ticketRows || []).map(t => [t.id, t]))
       }
-      activity = (data || []).map(a => ({ ...a, destinationTicketNumber: a.destination_ticket_id ? ticketsById[a.destination_ticket_id]?.ticket_number : null }))
+      activity = (data || []).map(a => ({
+        ...a,
+        destinationTicketNumber: a.destination_ticket_id ? ticketsById[a.destination_ticket_id]?.ticket_number : null,
+        destinationTicketStatus: a.destination_ticket_id ? ticketsById[a.destination_ticket_id]?.status : null,
+      }))
       jobEvents = (auditData || []).map(a => ({ ...a, ticketNumber: a.ticket_id ? ticketsById[a.ticket_id]?.ticket_number : null }))
     }
 
@@ -1753,7 +1757,20 @@ export default function AdminClocking({ profile, onNavigate }) {
                 const tone = a.activity_category ? `away-${a.activity_category}` : 'away'
                 events.push({ time: a.started_at, label: `${meta.leftVerb.charAt(0).toUpperCase()}${meta.leftVerb.slice(1)}${a.note ? `: ${a.note}` : ''}`, tone, ticketNumber: a.destinationTicketNumber })
                 if (a.arrived_at && meta.arriveVerb) events.push({ time: a.arrived_at, label: `${meta.arriveVerb.charAt(0).toUpperCase()}${meta.arriveVerb.slice(1)}`, tone })
-                if (a.ended_at) events.push({ time: a.ended_at, label: `${meta.backVerb.charAt(0).toUpperCase()}${meta.backVerb.slice(1)}${a.end_note ? `: ${a.end_note}` : ''}`, tone: 'back' })
+                if (a.ended_at) {
+                  // "Going to Another Job" closes the same way whether he
+                  // actually tapped "I've arrived -- start work" (ticket
+                  // moves off Assigned/Pending) or just tapped the generic
+                  // "I'm back" also used for materials/lunch/office trips
+                  // (ticket never moves) -- distinguish using the
+                  // destination ticket's current status rather than always
+                  // assuming arrival meant work started.
+                  const backLabel = a.activity_category === 'job'
+                    ? (a.destinationTicketStatus && a.destinationTicketStatus !== 'Assigned' && a.destinationTicketStatus !== 'Pending'
+                      ? 'Arrived and started work' : "Came back — didn't start the job")
+                    : `${meta.backVerb.charAt(0).toUpperCase()}${meta.backVerb.slice(1)}${a.end_note ? `: ${a.end_note}` : ''}`
+                  events.push({ time: a.ended_at, label: backLabel, tone: 'back' })
+                }
               })
               historyJobEvents.forEach(a => {
                 const tone = a.summary.includes('Completed') ? 'done'

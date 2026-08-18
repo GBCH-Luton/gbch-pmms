@@ -246,7 +246,7 @@ function TeamWhereabouts({ profile, onNavigate, height = DASHBOARD_TOP_CARD_HEIG
     ])]
     let ticketsById = {}
     if (ticketIds.length > 0) {
-      const { data: ticketRows } = await supabase.schema('pmms').from('tickets').select('id, ticket_number').in('id', ticketIds)
+      const { data: ticketRows } = await supabase.schema('pmms').from('tickets').select('id, ticket_number, status').in('id', ticketIds)
       ticketsById = Object.fromEntries((ticketRows || []).map(t => [t.id, t]))
     }
 
@@ -354,9 +354,21 @@ function TeamWhereabouts({ profile, onNavigate, height = DASHBOARD_TOP_CARD_HEIG
         })
       }
       if (a.ended_at) {
+        // "Going to Another Job" closes the same way whether he actually
+        // tapped "I've arrived -- start work" (destination ticket moves
+        // off Assigned/Pending) or just tapped the generic "I'm back"
+        // also used for materials/lunch/office trips (ticket never
+        // moves) -- both only ever set ended_at, so this used to always
+        // read as "arrived on site" even when no work ever happened.
+        // Distinguish using the destination ticket's current status
+        // rather than assuming arrival always meant work started.
+        const endText = a.activity_category === 'job'
+          ? (destinationTicket && destinationTicket.status !== 'Assigned' && destinationTicket.status !== 'Pending'
+            ? 'arrived and started work' : "came back — didn't start the job")
+          : `${meta.backVerb}${a.end_note ? `: ${a.end_note}` : ''}`
         entries.push({
           id: `${a.id}-end`, time: a.ended_at, staffId: a.staff_id, staffName: b.name, tone: 'back',
-          text: `${meta.backVerb}${a.end_note ? `: ${a.end_note}` : ''}`,
+          text: endText,
           // Same preference as the "left site" line above -- for a
           // 'job'-category trip the destination is the job they actually
           // arrived at, not whatever job (if any) they left from. Using
