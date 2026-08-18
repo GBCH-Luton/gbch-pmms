@@ -67,8 +67,77 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    gap: 28px;
     padding: 12px;
+    overflow: hidden;
   }
+  @media (max-width: 860px) {
+    .wrap { flex-direction: column; height: auto; min-height: 100vh; overflow: visible; padding: 16px 12px; }
+  }
+
+  /* ---------------- Live log panel ---------------- */
+  .log-panel {
+    flex: none;
+    width: 340px;
+    max-width: 100%;
+    height: min(640px, calc(100vh - 24px));
+    display: flex;
+    flex-direction: column;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    overflow: hidden;
+  }
+  .log-panel-head {
+    padding: 14px 18px;
+    background: var(--app-slate50);
+    border-bottom: 1px solid var(--border);
+  }
+  .log-panel-head .eyebrow {
+    margin: 0 0 4px;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  .log-panel-head p.sub { margin: 0; font-size: 12px; color: var(--text-muted); }
+  .log-body {
+    flex: 1;
+    min-height: 120px;
+    max-height: 560px;
+    overflow-y: auto;
+    padding: 6px 18px 14px;
+  }
+  .log-empty {
+    margin: 20px 0 0;
+    font-size: 12.5px;
+    color: var(--app-slate400);
+    font-style: italic;
+    text-align: center;
+  }
+  .log-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 9px 0;
+    border-top: 1px solid var(--app-slate100);
+  }
+  .log-row:first-child { border-top: none; }
+  .log-time {
+    font-family: ui-monospace, monospace;
+    font-size: 11px;
+    color: var(--app-slate400);
+    flex-shrink: 0;
+    width: 38px;
+    padding-top: 1px;
+  }
+  .log-dot {
+    width: 7px; height: 7px; border-radius: 50%; margin-top: 5px; flex-shrink: 0;
+    background: var(--accent);
+  }
+  .log-text { font-size: 12.5px; color: var(--app-slate900); line-height: 1.45; }
 
   /* ---------------- Phone frame ---------------- */
   .phone-shell {
@@ -352,6 +421,14 @@
       <div class="phone-screen" id="screen"></div>
     </div>
   </div>
+
+  <div class="log-panel">
+    <div class="log-panel-head">
+      <p class="eyebrow">📋 Live Log</p>
+      <p class="sub">Every action on the left, in order</p>
+    </div>
+    <div class="log-body" id="eventLog"></div>
+  </div>
 </div>
 
 <script>
@@ -428,9 +505,15 @@
     earlyLeaveReason: '',
     clockOutForDayError: '',
     menuOpen: false,
+    events: [],                // [{ time: Date, text }] -- newest first, mirrors Where's the Team's log
   };
 
   let clockTimer = null;
+
+  // Every meaningful state change (not every render) gets one line here --
+  // same idea as Where's the Team's own log, just for this one simulated
+  // builder instead of a whole team.
+  function logEvent(text) { state.events.unshift({ time: new Date(), text }); }
 
   function fmtElapsed(s) {
     const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
@@ -460,6 +543,7 @@
   function handleClockInForDay() {
     const now = new Date();
     state.todayShift = { clockInAt: now, lateFlag: nowHHMM() > DAILY_CLOCK_IN_DEADLINE };
+    logEvent(state.todayShift.lateFlag ? 'clocked in for the day (late)' : 'clocked in for the day');
     startIdleClock();
     render();
   }
@@ -496,9 +580,10 @@
   function backToDashboard() { state.page = 'dashboard'; render(); }
 
   function pickTravelJob(id) {
-    const j = job(id);
-    state.openActivity = { kind: 'Travel', label: 'Travelling', note: `Job #${j.number} — ${j.address}`, destinationTicketId: id, category: 'job' };
-    state.awaySince = nowHHMM();
+    // Picking a job here is navigation, not a commitment -- same as
+    // tapping into Urgent/To Do just to look. Nothing is logged and no
+    // "Away" state opens until he actually taps "Arrived -- Start Work"
+    // on the ticket screen (see startWork()).
     state.selectedTicketId = id;
     state.miles = null;
     state.page = 'dashboard';
@@ -509,6 +594,7 @@
     state.openActivity = { kind: 'Travel', label: 'Travelling', note: state.materialsQuery.trim(), destinationTicketId: null, category: 'materials' };
     state.awaySince = nowHHMM();
     state.page = 'dashboard';
+    logEvent(`left site — buying materials: ${state.openActivity.note}`);
     render();
   }
   function pickStoreSuggestion(name) { state.materialsQuery = name; render(); }
@@ -516,15 +602,25 @@
     state.openActivity = { kind: 'Travel', label: 'Travelling', note: 'Going to the office', destinationTicketId: null, category: 'office' };
     state.awaySince = nowHHMM();
     state.page = 'dashboard';
+    logEvent('left site — heading to the office');
     render();
   }
   function confirmLunch() {
     state.openActivity = { kind: 'Break', label: 'On break', note: state.materialsQuery.trim() || 'Lunch', destinationTicketId: null, category: 'lunch' };
     state.awaySince = nowHHMM();
     state.page = 'dashboard';
+    logEvent('started lunch break');
     render();
   }
-  function endActivity() { state.openActivity = null; state.awaySince = null; state.receiptRows = []; render(); }
+  function endActivity() {
+    // Captured before clearing -- the log line needs to know what kind of
+    // trip is ending (lunch reads "back from lunch", everything else just
+    // "I'm Back").
+    const category = state.openActivity ? state.openActivity.category : null;
+    state.openActivity = null; state.awaySince = null; state.receiptRows = [];
+    logEvent(category === 'lunch' ? 'back from lunch' : "tapped I'm Back — trip ended");
+    render();
+  }
 
   // ---- Optional purchase-side receipt capture (materials trips only) ----
   function addReceiptRow() { state.receiptRows.push({ photoAttached: false, amount: '' }); render(); }
@@ -548,26 +644,20 @@
   // ================= Ticket overlay actions =================
   function closeTicket() {
     if (lockedTicket()) return; // Back hidden while locked, matches real closeTicket()
-    // Backing out of a "going to this job" screen before actually starting
-    // it means the trip didn't happen (wrong tap, changed their mind) --
-    // end the still-open activity now, rather than leaving a stray
-    // "travelling to Job #N" record behind with no way to correct it later.
-    const j = job(state.selectedTicketId);
-    if (j && j.status === 'Assigned' && state.openActivity && state.openActivity.destinationTicketId === j.id) {
-      state.openActivity = null;
-      state.awaySince = null;
-    }
+    // Nothing to clean up here any more -- picking a job under "Going to
+    // Another Job" no longer opens an activity on selection (see
+    // pickTravelJob), so backing out before tapping "Arrived -- Start
+    // Work" simply never created anything to begin with.
     state.selectedTicketId = null;
     render();
   }
 
   function startWork() {
     const j = job(state.selectedTicketId);
-    const matched = state.openActivity && state.openActivity.destinationTicketId === j.id;
-    if (matched) state.openActivity = null;
     j.status = 'In Progress';
     j.mileageLogged = state.miles;
     state.inProgressSeconds = 0;
+    logEvent(`started work on Job #${j.number} (${state.miles ?? 0} mi logged)`);
     startWorkClock();
     render();
   }
@@ -576,6 +666,7 @@
     j.status = 'In Progress';
     j.holdReason = null; j.holdNote = null;
     state.inProgressSeconds = 0;
+    logEvent(`back on site — resumed Job #${j.number}`);
     startWorkClock();
     render();
   }
@@ -585,6 +676,7 @@
     j.mileageLogged = state.miles;
     j.holdReason = null; j.holdNote = null;
     state.inProgressSeconds = 0;
+    logEvent(`back on site — resumed Job #${j.number} (${state.miles ?? 0} mi logged)`);
     startWorkClock();
     render();
   }
@@ -620,6 +712,7 @@
     j.holdReason = reason;
     j.holdNote = state.stopNote.trim();
     const shortTrip = SHORT_TRIP_REASONS.includes(reason);
+    logEvent(`paused Job #${j.number} — ${reason}${j.holdNote ? ': ' + j.holdNote : ''}`);
     state.stopSheetOpen = false; state.materialsAskOpen = false; state.stopReasonPicked = null; state.stopNote = '';
     if (shortTrip) {
       state.breakSeconds = 0;
@@ -642,6 +735,7 @@
     j.status = 'Completed';
     j.needsFollowup = state.followUpNeeded;
     j.followupNote = state.followUpNeeded ? state.followUpNote.trim() : null;
+    logEvent(`completed Job #${j.number}${j.needsFollowup ? ' — flagged for follow-up' : ''}`);
     clearInterval(clockTimer);
     state.selectedTicketId = null;
     state.showCompleteConfirm = false;
@@ -678,11 +772,13 @@
   }
   function cancelClockOutConfirm() { state.clockOutConfirmOpen = false; render(); }
   function finishClockOutForDay() {
+    logEvent(state.earlyLeaveReason ? `clocked out for the day — left early: ${state.earlyLeaveReason}` : 'clocked out for the day');
     clearInterval(clockTimer);
     state.todayShift = null;
     state.earlyLeavePromptOpen = false;
     state.clockOutConfirmOpen = false;
     state.clockOutForDayError = '';
+    state.earlyLeaveReason = '';
     render();
   }
 
@@ -696,6 +792,7 @@
       showCompleteConfirm: false, completeNote: '', completePhotoAttached: false, checklistChecked: {}, materialsUsedRows: [],
       followUpNeeded: false, followUpNote: '',
       clockOutConfirmOpen: false, earlyLeavePromptOpen: false, earlyLeaveReason: '', clockOutForDayError: '', menuOpen: false,
+      events: [],
     });
     render();
   }
@@ -1152,8 +1249,29 @@
     `;
   }
 
+  // ================= Log panel (right of the phone) =================
+  // Independent of which phone screen is showing -- called first so it
+  // still updates even on render()'s early returns below (gate screen,
+  // ticket overlay).
+  function renderLog() {
+    const host = document.getElementById('eventLog');
+    if (!host) return;
+    if (state.events.length === 0) {
+      host.innerHTML = '<p class="log-empty">Nothing logged yet — clock in on the left to begin.</p>';
+      return;
+    }
+    host.innerHTML = state.events.map(e => `
+      <div class="log-row">
+        <span class="log-time">${fmtTime(e.time)}</span>
+        <span class="log-dot"></span>
+        <span class="log-text">${e.text}</span>
+      </div>
+    `).join('');
+  }
+
   // ================= Render =================
   function render() {
+    renderLog();
     const screen = document.getElementById('screen');
 
     if (!state.todayShift) {

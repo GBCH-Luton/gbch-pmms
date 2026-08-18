@@ -907,6 +907,23 @@ export default function BuilderDashboard({ profile }) {
       return
     }
     setActivityError('')
+
+    // Going to Another Job is navigation, not a commitment -- picking a
+    // job here (like tapping into Urgent/To Do) just opens it to look at.
+    // Nothing gets logged until he actually taps "Arrived -- Start Work"
+    // on that screen (handleClockIn), the same moment a directly-opened
+    // job would log. No activity_log row, no "Away" status, and nothing
+    // to clean up if he backs out -- closeTicket()'s old auto-clear
+    // existed only to paper over the previous start-on-pick behaviour and
+    // no longer applies to this path.
+    if (travelMode === 'job') {
+      const destinationTicket = tickets.find(t => t.id === destinationId)
+      if (!destinationTicket) { setActivityError('Could not find that job.'); return }
+      setSelectedTicket(destinationTicket)
+      setPage('jobs')
+      return
+    }
+
     setStartingActivity(true)
     // Non-blocking, unlike the daily clock-in GPS fix -- a bad signal
     // moment shouldn't stop someone from logging that they're leaving.
@@ -916,26 +933,17 @@ export default function BuilderDashboard({ profile }) {
     // were mid-way through (if any) when they stepped away, so managers
     // can see "left site" and "returned" against a job number later.
     const inProgressTicket = tickets.find(t => t.status === 'In Progress')
-    const destinationTicket = travelMode === 'job' ? tickets.find(t => t.id === destinationId) : null
-    // The note stays a plain readable string ("Job #38 -- 12 Stanley
-    // Road") so every existing display that just shows `.note` (Team
-    // Whereabouts, the History modal, the day banner) already reads
-    // correctly with no changes -- destination_ticket_id is there
-    // separately for making it clickable.
     const note = activityType === 'Break'
       ? (activityNote.trim() || 'Lunch')
-      : travelMode === 'job'
-        ? `Job #${destinationTicket.ticket_number} — ${destinationTicket.property?.address || 'address unknown'}`
-        : travelMode === 'office'
-          ? 'Going to the office'
-          : activityNote.trim()
+      : travelMode === 'office'
+        ? 'Going to the office'
+        : activityNote.trim()
 
     // Distinct from activity_type ('Travel'/'Break') -- lets admin-side
     // displays and duration reporting tell "Buying Materials" apart from
-    // "Going to Another Job"/"Going to the Office" instead of all three
-    // collapsing into one generic "Travelling" label.
+    // "Going to the Office" instead of both collapsing into one generic
+    // "Travelling" label.
     const category = activityType === 'Break' ? 'lunch'
-      : travelMode === 'job' ? 'job'
       : travelMode === 'office' ? 'office'
       : 'materials'
 
@@ -951,7 +959,7 @@ export default function BuilderDashboard({ profile }) {
         started_lat: position?.latitude ?? null,
         started_lng: position?.longitude ?? null,
         ticket_id: inProgressTicket?.id ?? null,
-        destination_ticket_id: destinationTicket?.id ?? null,
+        destination_ticket_id: null,
       })
       .select('id, activity_type, activity_category, note, started_at, destination_ticket_id, ticket_id')
       .single()
@@ -959,13 +967,6 @@ export default function BuilderDashboard({ profile }) {
     setStartingActivity(false)
     if (error) { setActivityError(error.message); return }
     setOpenActivity(data)
-    // Going to Another Job jumps straight to the (now mileage-only) job
-    // screen rather than waiting for a separate "I've arrived" tap later --
-    // see the plan's "Arrival flow" decision. Every other destination just
-    // returns to the dashboard, where the away-banner takes over.
-    if (destinationTicket) {
-      setSelectedTicket(destinationTicket)
-    }
     setPage('jobs')
   }
 
@@ -1074,20 +1075,6 @@ export default function BuilderDashboard({ profile }) {
 
     if (sessionError) {
       console.error('Failed to start work session:', sessionError)
-    }
-
-    // Closes the loop on "Going to Another Job" -- if this arrival is the
-    // exact destination that travel entry named, end it automatically
-    // instead of leaving the "Away" banner stuck showing after he's
-    // already started working (and without making him tap "I'm Back"
-    // separately first).
-    if (openActivity?.activity_type === 'Travel' && openActivity.destination_ticket_id === selectedTicket.id) {
-      await supabase
-        .schema('pmms')
-        .from('activity_log')
-        .update({ ended_at: now, ended_lat: position?.latitude ?? null, ended_lng: position?.longitude ?? null })
-        .eq('id', openActivity.id)
-      setOpenActivity(null)
     }
 
     // idleSince is captured from the render that created this closure, i.e.
@@ -1825,14 +1812,10 @@ export default function BuilderDashboard({ profile }) {
     setSelectedTicket(lockedTicket || t)
   }
   function closeTicket() {
-    // Backing out of a "going to this job" screen before actually starting
-    // it means the trip didn't happen (wrong tap, changed their mind) --
-    // end the still-open activity_log entry now, rather than leaving a
-    // stray "travelling to Job #N" record behind with no way for the
-    // builder to correct it later.
-    if (!lockedTicket && selectedTicket?.status === 'Assigned' && openActivity?.activity_type === 'Travel' && openActivity.destination_ticket_id === selectedTicket.id) {
-      handleEndActivity()
-    }
+    // Nothing to clean up here any more -- picking a job under "Going to
+    // Another Job" no longer writes an activity_log row on selection (see
+    // handleStartActivity), so backing out of this screen before tapping
+    // "Arrived -- Start Work" simply never created a record to begin with.
     setSelectedTicket(lockedTicket || null)
   }
 
