@@ -24,7 +24,7 @@ import { logLoginEvent } from '../lib/loginEvents'
 import { uploadTicketAttachments, formatUploadProgress } from '../lib/ticketAttachments'
 import { fetchMaintenanceCategories, sortedCategoryEntries, isUnlistedTag, unlistedTagFor, unlistedLabelFor, calculatePriorityScore } from '../lib/maintenanceCategories'
 import { attachBuilderSafeProperties } from '../lib/properties'
-import { statusColour, statusLabel, postSystemComment, postAuditEvent, KpiTiles, resolveStaffPhotoUrl, suggestAutoAssignBuilder, createNotification, fetchManagersForDivision, sendPushNotification } from './admin/shared'
+import { statusColour, statusLabel, postSystemComment, postAuditEvent, KpiTiles, resolveStaffPhotoUrl, suggestAutoAssignBuilder, createNotification, fetchManagersForDivision, sendPushNotification, floorContextOptions, floorContextLabel } from './admin/shared'
 import { NavIcon } from '../lib/icons'
 import PropertySearchSelect from '../components/PropertySearchSelect'
 import VoiceInputButton from '../components/VoiceInputButton'
@@ -269,6 +269,7 @@ function NewReportForm({ profile, onSubmitted }) {
   const [properties, setProperties] = useState([])
   const [propertyId, setPropertyId] = useState('')
   const [room, setRoom] = useState(null)
+  const [roomContext, setRoomContext] = useState(null)
   const [otherArea, setOtherArea] = useState('')
   const [maintenanceCategories, setMaintenanceCategories] = useState({})
   const [category, setCategory] = useState(null)
@@ -290,7 +291,8 @@ function NewReportForm({ profile, onSubmitted }) {
 
   function roomString() {
     if (room === 'Other Area...') return otherArea
-    return room
+    if (room === 'Garden') return room
+    return roomContext ? `${room} (${roomContext})` : room
   }
 
   async function handleSubmit() {
@@ -360,10 +362,11 @@ function NewReportForm({ profile, onSubmitted }) {
     setSubmitting(false)
     setUploadProgress(null)
     setSuccess(`Thanks — your report has been logged as Job #${data[0].ticket_number}. Our team will review and assign it.`)
-    setPropertyId(''); setRoom(null); setOtherArea(''); setCategory(null); setIssueTag(null); setIssueOther('')
+    setPropertyId(''); setRoom(null); setRoomContext(null); setOtherArea(''); setCategory(null); setIssueTag(null); setIssueOther('')
     setNotes(''); setMediaFiles([])
   }
 
+  const selectedProperty = properties.find(p => String(p.id) === String(propertyId))
   const step2Complete = !!room && (room !== 'Other Area...' || otherArea.trim())
   const canSubmit = propertyId && step2Complete && category && issueTag && (!isUnlistedTag(issueTag) || issueOther.trim()) && !submitting
 
@@ -379,16 +382,44 @@ function NewReportForm({ profile, onSubmitted }) {
   return (
     <div style={{ maxWidth: '640px', ...cardStyle }}>
       <p style={fieldLabelStyle}>1. Property</p>
-      <PropertySearchSelect properties={properties} value={propertyId} onChange={(id) => { setPropertyId(id); setRoom(null); setCategory(null); setIssueTag(null) }} />
+      <PropertySearchSelect properties={properties} value={propertyId} onChange={(id) => { setPropertyId(id); setRoom(null); setRoomContext(null); setCategory(null); setIssueTag(null) }} />
 
       {propertyId && (
         <div style={{ marginTop: '20px' }}>
           <p style={fieldLabelStyle}>2. Room / Area</p>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
             {ROOM_OPTIONS.map(r => (
-              <button key={r} onClick={() => { setRoom(r); setOtherArea('') }} style={choiceBtn(room === r)}>{r}</button>
+              <button
+                key={r}
+                onClick={() => {
+                  setRoom(r)
+                  setOtherArea('')
+                  const opts = floorContextOptions(selectedProperty)
+                  // A single-option property (e.g. a true one-floor house)
+                  // has nothing to actually choose -- auto-fill it same as
+                  // Flat already defaulted to its first option, just
+                  // without leaving the picker up for a choice that isn't
+                  // really one.
+                  setRoomContext(opts.length === 1 || selectedProperty?.layout_type === 'Flat' ? opts[0] : null)
+                }}
+                style={choiceBtn(room === r)}
+              >
+                {r}
+              </button>
             ))}
           </div>
+
+          {room && room !== 'Other Area...' && room !== 'Garden' && floorContextOptions(selectedProperty).length > 1 && (
+            <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: `1px dashed ${COLORS.slate200}` }}>
+              <p style={fieldLabelStyle}>{floorContextLabel(selectedProperty)}</p>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                {floorContextOptions(selectedProperty).map(ctx => (
+                  <button key={ctx} onClick={() => setRoomContext(ctx)} style={choiceBtn(roomContext === ctx)}>{ctx}</button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {room === 'Other Area...' && (
             <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
               <input type="text" value={otherArea} onChange={(e) => setOtherArea(e.target.value)} placeholder="Describe the area" style={{ ...inputStyle, flex: 1 }} />

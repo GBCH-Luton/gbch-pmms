@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { COLORS } from '../../lib/colors'
-import { fetchAssignableStaffForCategory, suggestAutoAssignBuilder, builderOptionLabel, createNotification, sendPushNotification, pushEmergencyAlert, priorityTierLabel, fetchPriorityThresholds, EVENTS_FEATURE_ENABLED, postSystemComment } from './shared'
+import { fetchAssignableStaffForCategory, suggestAutoAssignBuilder, builderOptionLabel, createNotification, sendPushNotification, pushEmergencyAlert, priorityTierLabel, fetchPriorityThresholds, EVENTS_FEATURE_ENABLED, postSystemComment, floorContextOptions, floorContextLabel } from './shared'
 import { fetchComplianceCheckTypes } from '../../lib/compliance'
 import { fetchMaintenanceCategories, sortedCategoryEntries, UNLISTED_MARKER_PREFIX, isUnlistedTag, unlistedTagFor, unlistedLabelFor, calculatePriorityScore } from '../../lib/maintenanceCategories'
 import { fetchDivisions } from '../../lib/divisions'
@@ -13,18 +13,6 @@ import VoiceInputButton from '../../components/VoiceInputButton'
 import TicketMediaPicker from '../../components/TicketMediaPicker'
 
 const ROOM_OPTIONS = ['Kitchen', 'Bathroom', 'Communal Area', 'Bedroom', 'Hallways / Stairs', 'Garden', 'Other Area...']
-
-function floorContextOptions(property) {
-  if (!property) return ['Ground Floor', 'First Floor']
-  if (property.layout_type === 'Flat') return ['Main Flat Space', 'En-Suite Area']
-  if (property.layout_type === '1-Floor') return ['Ground Floor']
-  if (property.layout_type === '3-Floors') return ['Ground Floor', 'First Floor', 'Second Floor']
-  return ['Ground Floor', 'First Floor'] // '2-Floors' (the DB default) plus any property with no Floor Layout set yet
-}
-
-function floorContextLabel(property) {
-  return (property?.layout_type === 'Flat' ? 'Which part of the flat?' : 'Which floor?') + ' (optional)'
-}
 
 function choiceButtonStyle(active, align = 'left') {
   return {

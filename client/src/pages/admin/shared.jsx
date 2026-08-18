@@ -1128,6 +1128,26 @@ export function resolveCategoryDivision(category, categoriesSettingsRow) {
   return categoriesSettingsRow?.setting_value?.[category]?.division || 'Maintenance'
 }
 
+// Shared between AdminRaiseTicket.jsx and SubmitterDashboard.jsx's own
+// report form -- was only ever defined in the admin form, so a submitter
+// had no way to say which floor/part of the flat an issue was in even
+// though the data (property.layout_type) has been available to her via
+// builder_properties() all along. Optional, not required -- most
+// properties don't have real Floor Layout data entered yet (see
+// PropertyCoreTab.jsx), so forcing a guess out of whoever's reporting
+// just to get past this step isn't worth it.
+export function floorContextOptions(property) {
+  if (!property) return ['Ground Floor', 'First Floor']
+  if (property.layout_type === 'Flat') return ['Main Flat Space', 'En-Suite Area']
+  if (property.layout_type === '1-Floor') return ['Ground Floor']
+  if (property.layout_type === '3-Floors') return ['Ground Floor', 'First Floor', 'Second Floor']
+  return ['Ground Floor', 'First Floor'] // '2-Floors' (the DB default) plus any property with no Floor Layout set yet
+}
+
+export function floorContextLabel(property) {
+  return (property?.layout_type === 'Flat' ? 'Which part of the flat?' : 'Which floor?') + ' (optional)'
+}
+
 // ignoreSkills: true bypasses the skill-narrowing below entirely -- the
 // override a manager reaches for when they need to assign outside a
 // builder's tagged skills (Raise Ticket, Pipeline's reassign/bulk-reassign)
