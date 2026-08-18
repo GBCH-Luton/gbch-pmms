@@ -13,6 +13,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { COLORS } from '../../lib/colors'
 import { attachProperties } from '../../lib/properties'
+import PropertySearchSelect from '../../components/PropertySearchSelect'
 import {
   priorityTierLabel, priorityBadgeStyle, statusColour, statusLabel, formatUKDate, fetchPriorityThresholds,
 } from './shared'
@@ -29,6 +30,7 @@ export default function AdminLandlordLiaison({ onNavigate }) {
   const [loading, setLoading] = useState(true)
   const [p1Threshold, setP1Threshold] = useState(70)
   const [p2Threshold, setP2Threshold] = useState(40)
+  const [propertyFilter, setPropertyFilter] = useState('') // '' = All Properties, matches PropertySearchSelect's own cleared state
 
   useEffect(() => {
     fetchAll()
@@ -69,18 +71,34 @@ export default function AdminLandlordLiaison({ onNavigate }) {
     </div>
   )
 
+  // One shared property filter for both sections below -- picking a
+  // property here narrows both its open tickets and its directory entry
+  // at once, since both sections are really just two views onto the same
+  // set of properties.
+  const propertyOptions = [...new Map([
+    ...tickets.filter(t => t.property).map(t => [t.property_id, t.property]),
+    ...directory.map(p => [p.id, { id: p.id, address: p.address }]),
+  ]).values()].sort((a, b) => a.address.localeCompare(b.address))
+
+  const filteredTickets = propertyFilter ? tickets.filter(t => String(t.property_id) === String(propertyFilter)) : tickets
+  const filteredDirectory = propertyFilter ? directory.filter(p => String(p.id) === String(propertyFilter)) : directory
+
   return (
     <div>
       <h1 style={{ margin: '0 0 16px 0', fontSize: '20px', fontWeight: 800, color: COLORS.slate900 }}>Landlord Liaison</h1>
 
+      <div style={{ maxWidth: '360px', marginBottom: '16px' }}>
+        <PropertySearchSelect properties={propertyOptions} value={propertyFilter} onChange={setPropertyFilter} placeholder="All Properties" />
+      </div>
+
       <div style={cardStyle}>
-        <p style={sectionTitleStyle}>Open Tickets ({tickets.length})</p>
+        <p style={sectionTitleStyle}>Open Tickets ({filteredTickets.length})</p>
         <p style={sectionSubtitleStyle}>Every open ticket logged under the Landlord Liaison category, highest priority first.</p>
-        {tickets.length === 0 && (
-          <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>Nothing open right now.</p>
+        {filteredTickets.length === 0 && (
+          <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>{propertyFilter ? 'Nothing open for this property.' : 'Nothing open right now.'}</p>
         )}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {tickets.map(t => {
+          {filteredTickets.map(t => {
             const tier = priorityTierLabel(t.priority_score, p1Threshold, p2Threshold)
             const tierStyle = priorityBadgeStyle(tier)
             return (
@@ -104,13 +122,13 @@ export default function AdminLandlordLiaison({ onNavigate }) {
       </div>
 
       <div style={cardStyle}>
-        <p style={sectionTitleStyle}>Landlord Directory ({directory.length})</p>
+        <p style={sectionTitleStyle}>Landlord Directory ({filteredDirectory.length})</p>
         <p style={sectionSubtitleStyle}>Every property with landlord contact details on file. Tap one to open its Lease &amp; Legal tab.</p>
-        {directory.length === 0 && (
-          <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>No landlord contact details recorded yet.</p>
+        {filteredDirectory.length === 0 && (
+          <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>{propertyFilter ? 'No landlord contact details on file for this property.' : 'No landlord contact details recorded yet.'}</p>
         )}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {directory.map(p => (
+          {filteredDirectory.map(p => (
             <button
               key={p.id}
               onClick={() => onNavigate?.('properties', { propertyId: p.id, tab: 'Lease & Legal' })}
