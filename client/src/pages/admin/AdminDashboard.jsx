@@ -1,9 +1,14 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, lazy, Suspense } from 'react'
 import { supabase } from '../../lib/supabase'
 import { COLORS } from '../../lib/colors'
 import { priorityTierLabel, fetchFlaggedClockingCount, isTicketStuck, KpiTiles, fetchComplianceAgingCounts, fetchVoidAgingCounts, fetchGardenReviewAging, fetchHousekeepingCounts, computeAvgResponseMs, formatDuration, fetchPriorityThresholds, fetchAssignableBuilders, fetchAssignableStaffForDivision, fetchAssignableStaffForRole, fetchLastEndedSessionsToday, ukDateKey, formatUKDateTime, minutesLate, SHORT_TRIP_REASONS, activityCategoryMeta, ACTIVITY_CATEGORY_META, LANDLORD_LIAISON_PAGE_ENABLED } from './shared'
 import { NavIcon } from '../../lib/icons'
 import { googleMapsLink } from '../../lib/geo'
+
+// Lazy -- pulls in Leaflet (a real map-tile/JS dependency), only worth
+// loading once someone actually clicks the map pin, not on every visit to
+// a dashboard every admin/manager sees by default.
+const StaffLocationsMapModal = lazy(() => import('../../components/StaffLocationsMapModal'))
 
 const DEFAULT_NEW_PROPERTY_WINDOW_HOURS = 48
 
@@ -161,6 +166,7 @@ function TeamWhereabouts({ profile, onNavigate, height = DASHBOARD_TOP_CARD_HEIG
   const [logEntries, setLogEntries] = useState([])
   const [filterStaffId, setFilterStaffId] = useState('All')
   const [divisionFilter, setDivisionFilter] = useState('All')
+  const [mapModalOpen, setMapModalOpen] = useState(false)
 
   // Polled every 45s, same cadence and reasoning as BuilderDashboard.jsx's
   // own notifications/available-jobs polling -- nothing here pushes, so
@@ -215,8 +221,8 @@ function TeamWhereabouts({ profile, onNavigate, height = DASHBOARD_TOP_CARD_HEIG
     const deadline = deadlineRow?.setting_value || '09:00'
 
     const [{ data: attendanceData }, { data: activityData }, { data: openSessions }, { data: auditData }, { data: onHoldShortTrips }] = await Promise.all([
-      supabase.schema('pmms').from('daily_attendance').select('id, staff_id, clock_in_at, late_flag, clock_out_at, early_leave_reason').or(`work_date.eq.${todayKey},clock_out_at.is.null`),
-      supabase.schema('pmms').from('activity_log').select('id, staff_id, activity_type, activity_category, note, end_note, started_at, arrived_at, ended_at, ticket_id, destination_ticket_id').or(`started_at.gte.${todayKey}T00:00:00,ended_at.is.null`),
+      supabase.schema('pmms').from('daily_attendance').select('id, staff_id, clock_in_at, late_flag, clock_out_at, early_leave_reason, clock_in_lat, clock_in_lng').or(`work_date.eq.${todayKey},clock_out_at.is.null`),
+      supabase.schema('pmms').from('activity_log').select('id, staff_id, activity_type, activity_category, note, end_note, started_at, started_lat, started_lng, arrived_at, ended_at, ticket_id, destination_ticket_id, destination_property_id').or(`started_at.gte.${todayKey}T00:00:00,ended_at.is.null`),
       supabase.schema('pmms').from('work_sessions').select('id, ticket_id, builder_id').is('ended_at', null),
       // Job start/resume/complete/pause/no-access events -- these were
       // previously invisible here entirely (this panel only ever read
@@ -246,8 +252,23 @@ function TeamWhereabouts({ profile, onNavigate, height = DASHBOARD_TOP_CARD_HEIG
     ])]
     let ticketsById = {}
     if (ticketIds.length > 0) {
-      const { data: ticketRows } = await supabase.schema('pmms').from('tickets').select('id, ticket_number, status').in('id', ticketIds)
+      const { data: ticketRows } = await supabase.schema('pmms').from('tickets').select('id, ticket_number, status, property_id').in('id', ticketIds)
       ticketsById = Object.fromEntries((ticketRows || []).map(t => [t.id, t]))
+    }
+
+    // Property coordinates, for the map -- covers both "on a job right
+    // now" (that ticket's property) and "arrived at a property visit"
+    // (Kathryn's Log a Visit destination_property_id). Everyone else's
+    // location comes from a GPS fix already captured elsewhere (clock-in,
+    // trip start, last job's clock-out), no property lookup needed.
+    const propertyIds = [...new Set([
+      ...Object.values(ticketsById).map(t => t.property_id).filter(Boolean),
+      ...(activityData || []).map(a => a.destination_property_id).filter(Boolean),
+    ])]
+    let propertiesById = {}
+    if (propertyIds.length > 0) {
+      const { data: propertyRows } = await supabase.schema('pmms').from('properties').select('id, address, latitude, longitude').in('id', propertyIds)
+      propertiesById = Object.fromEntries((propertyRows || []).map(p => [p.id, p]))
     }
 
     // "Available" on its own says nothing about how long, or where he was
@@ -303,13 +324,46 @@ function TeamWhereabouts({ profile, onNavigate, height = DASHBOARD_TOP_CARD_HEIG
       }
 
       let idleSince = null, idleLat = null, idleLng = null
+      const lastEnded = lastEndedByBuilder[b.id]
       if (tone === 'available') {
-        const lastEnded = lastEndedByBuilder[b.id]
         idleSince = lastEnded?.ended_at || shift?.clock_in_at || null
         idleLat = lastEnded?.clock_out_lat ?? null
         idleLng = lastEnded?.clock_out_lng ?? null
       }
-      statuses[b.id] = { status, tone, idleSince, idleLat, idleLng }
+
+      // Best available "where are they right now" for the map -- there's
+      // no live tracking, so this is always a last-known fix: the
+      // property they're actively on a job at, the property they've
+      // arrived at on a visit, where their current trip started from, or
+      // (idle) wherever their last job/clock-in put them. Falls back to
+      // clock_in coordinates when idle and no job has ended yet today --
+      // idleLat/idleLng above deliberately don't do this (that's the
+      // "how long has he been idle" line, clock-in isn't an idle moment),
+      // but the map still wants a pin for someone who's simply not done
+      // anything yet.
+      // mapAddress only ever comes from an actual property lookup (on a
+      // job, or arrived at a visit) -- a GPS fix from clock-in/trip-start
+      // is just coordinates, no address to show without reverse-geocoding
+      // it, so it stays null and the map just won't show an address line.
+      let mapLat = null, mapLng = null, mapAddress = null
+      if (tone === 'job' && openSession) {
+        const ticket = ticketsById[openSession.ticket_id]
+        const property = ticket?.property_id ? propertiesById[ticket.property_id] : null
+        mapLat = property?.latitude ?? null
+        mapLng = property?.longitude ?? null
+        mapAddress = property?.address ?? null
+      } else if (openActivity) {
+        const isOnSite = openActivity.activity_category === 'visit' && openActivity.arrived_at
+        const destinationProperty = isOnSite && openActivity.destination_property_id ? propertiesById[openActivity.destination_property_id] : null
+        mapLat = destinationProperty?.latitude ?? openActivity.started_lat ?? null
+        mapLng = destinationProperty?.longitude ?? openActivity.started_lng ?? null
+        mapAddress = destinationProperty?.address ?? null
+      } else if (tone === 'available') {
+        mapLat = idleLat ?? shift?.clock_in_lat ?? null
+        mapLng = idleLng ?? shift?.clock_in_lng ?? null
+      }
+
+      statuses[b.id] = { status, tone, idleSince, idleLat, idleLng, mapLat, mapLng, mapAddress }
     })
     setStatusByStaffId(statuses)
 
@@ -450,6 +504,15 @@ function TeamWhereabouts({ profile, onNavigate, height = DASHBOARD_TOP_CARD_HEIG
     ? visibleBuilders.filter(b => { const tone = (statusByStaffId[b.id] || {}).tone; return tone !== 'off' && tone !== 'leave' })
     : visibleBuilders
 
+  // Same "who's actually on shift" set the chips already use -- the map
+  // is a visualisation of that exact list, not a different scope. Staff
+  // with no known fix yet (mapLat/mapLng null) are still included here;
+  // the modal itself is what filters those out of the pin count.
+  const staffLocations = chipBuilders.map(b => {
+    const s = statusByStaffId[b.id] || { status: 'Off shift' }
+    return { id: b.id, name: b.name, status: s.status, lat: s.mapLat, lng: s.mapLng, address: s.mapAddress }
+  })
+
   return (
     <div style={{
       borderRadius: '16px', background: COLORS.white, overflow: 'hidden',
@@ -467,7 +530,13 @@ function TeamWhereabouts({ profile, onNavigate, height = DASHBOARD_TOP_CARD_HEIG
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap' }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-              <span style={{ color: COLORS.teal700, fontSize: '14px', lineHeight: 1 }}>📍</span>
+              <button
+                onClick={() => setMapModalOpen(true)}
+                title="See everyone's last known location on a map"
+                style={{ background: 'none', border: 'none', padding: 0, margin: 0, color: COLORS.teal700, fontSize: '14px', lineHeight: 1, cursor: 'pointer' }}
+              >
+                📍
+              </button>
               <span style={{ fontSize: 'clamp(11px, 1vw, 12px)', fontWeight: 800, color: COLORS.teal700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Where's the Team</span>
             </div>
             <p style={{ margin: 0, fontSize: 'clamp(10px, 0.9vw, 11px)', color: COLORS.slate500 }}>Live status and every trip logged today.</p>
@@ -575,6 +644,12 @@ function TeamWhereabouts({ profile, onNavigate, height = DASHBOARD_TOP_CARD_HEIG
         </>
       )}
       </div>
+
+      {mapModalOpen && (
+        <Suspense fallback={null}>
+          <StaffLocationsMapModal open={mapModalOpen} onClose={() => setMapModalOpen(false)} staff={staffLocations} />
+        </Suspense>
+      )}
     </div>
   )
 }
