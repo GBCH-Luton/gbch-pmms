@@ -675,7 +675,7 @@ export default function AdminDashboard({ profile }) {
 
   const navButtonStyle = (active) => ({
     display: 'flex', alignItems: 'center', gap: '10px', width: '100%', textAlign: 'left', padding: '6px 12px', marginBottom: '1px',
-    borderRadius: '8px', border: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: active ? 700 : 400,
+    borderRadius: '8px', border: 'none', cursor: 'pointer', fontSize: 'clamp(12.5px, 1vw, 14px)', fontWeight: active ? 700 : 400,
     background: active ? COLORS.greenDark : 'transparent', color: COLORS.white, fontFamily: 'inherit',
   })
   const navIconStyle = { width: '18px', flexShrink: 0, textAlign: 'center', fontSize: '14px', lineHeight: 1 }
@@ -790,7 +790,7 @@ export default function AdminDashboard({ profile }) {
           style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'none', border: 'none', padding: '16px 20px', cursor: 'pointer', borderBottom: '1px solid rgba(255,255,255,0.1)', width: '100%', textAlign: 'left', justifyContent: isCollapsed ? 'center' : 'flex-start' }}
         >
           <img src={gbchLogo} alt="GBCH" style={{ height: '32px', flexShrink: 0 }} />
-          {!isCollapsed && <span style={{ fontSize: '15px', fontWeight: 800, color: COLORS.white, whiteSpace: 'nowrap' }}>PMMS</span>}
+          {!isCollapsed && <span style={{ fontSize: 'clamp(13px, 1.1vw, 15px)', fontWeight: 800, color: COLORS.white, whiteSpace: 'nowrap' }}>PMMS</span>}
         </button>
 
         {!isCollapsed && impersonationMarker && (
@@ -843,7 +843,7 @@ export default function AdminDashboard({ profile }) {
                       <button
                         key={child.key}
                         onClick={() => goToPage(child.key)}
-                        style={{ ...navButtonStyle(currentPage === child.key), paddingLeft: '34px', fontSize: '13px' }}
+                        style={{ ...navButtonStyle(currentPage === child.key), paddingLeft: '34px', fontSize: 'clamp(11.5px, 0.9vw, 13px)' }}
                       >
                         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{child.label}</span>
                       </button>
@@ -1051,7 +1051,7 @@ export default function AdminDashboard({ profile }) {
       <div
         className="admin-sidebar-desktop"
         style={{
-          width: sidebarCollapsed ? '64px' : '240px', minWidth: sidebarCollapsed ? '64px' : '240px',
+          width: sidebarCollapsed ? '64px' : 'clamp(180px, 15vw, 240px)', minWidth: sidebarCollapsed ? '64px' : '180px',
           background: COLORS.brandNavy, display: 'flex', flexDirection: 'column', position: 'sticky',
           top: 'var(--pmms-banner-offset, 0px)', height: 'calc(100vh - var(--pmms-banner-offset, 0px))',
           transition: 'width 0.2s ease, min-width 0.2s ease',

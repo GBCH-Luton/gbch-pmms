@@ -276,10 +276,10 @@ export function KpiTiles({ kpis, onTileClick, columns }) {
         <button
           key={kpi.label}
           onClick={() => onTileClick?.(kpi)}
-          style={{ ...(columns ? {} : { flex: '1 1 160px' }), background: kpi.colour, borderRadius: '16px', padding: '16px', border: 'none', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', textAlign: 'center' }}
+          style={{ ...(columns ? {} : { flex: '1 1 clamp(110px, 14vw, 160px)' }), background: kpi.colour, borderRadius: '16px', padding: 'clamp(10px, 1.6vw, 16px)', border: 'none', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', textAlign: 'center' }}
         >
-          <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{kpi.label}</p>
-          <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: COLORS.white }}>{kpi.value}</p>
+          <p style={{ margin: '0 0 6px 0', fontSize: 'clamp(10px, 0.9vw, 11px)', fontWeight: 700, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{kpi.label}</p>
+          <p style={{ margin: 0, fontSize: 'clamp(20px, 2.6vw, 28px)', fontWeight: 800, color: COLORS.white }}>{kpi.value}</p>
         </button>
       ))}
     </div>

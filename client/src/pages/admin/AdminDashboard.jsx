@@ -28,12 +28,12 @@ function DashboardSection({ id, title, background, alertCount = 0, defaultCollap
         data-dashboard-section={id}
         style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px',
-          padding: '10px 20px', cursor: 'pointer', userSelect: 'none',
+          padding: 'clamp(8px, 1vw, 10px) clamp(14px, 2vw, 20px)', cursor: 'pointer', userSelect: 'none',
           background: COLORS.sectionHeaderBg, borderBottom: `1px solid ${COLORS.slate200}`,
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <p style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: COLORS.slate900 }}>{title}</p>
+          <p style={{ margin: 0, fontSize: 'clamp(12px, 1vw, 13px)', fontWeight: 600, color: COLORS.slate900 }}>{title}</p>
           {collapsed && alertCount > 0 && (
             <span style={{
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: '20px', height: '20px',
@@ -50,7 +50,7 @@ function DashboardSection({ id, title, background, alertCount = 0, defaultCollap
       </div>
       <div style={{ display: 'grid', gridTemplateRows: collapsed ? '0fr' : '1fr', transition: 'grid-template-rows 0.22s ease' }}>
         <div style={{ overflow: 'hidden' }}>
-          <div style={{ background, display: 'flex', gap: '12px', flexWrap: 'wrap', padding: '20px' }}>
+          <div style={{ background, display: 'flex', gap: '12px', flexWrap: 'wrap', padding: 'clamp(12px, 2vw, 20px)' }}>
             {children}
           </div>
         </div>
@@ -119,9 +119,9 @@ function DailyBriefing({ lines, height = DASHBOARD_TOP_CARD_HEIGHT }) {
       <div style={{ height: DASHBOARD_CARD_HEADER_HEIGHT, boxSizing: 'border-box', padding: '0 20px', display: 'flex', flexDirection: 'column', justifyContent: 'center', background: COLORS.slate50, borderBottom: `1px solid ${COLORS.slate200}` }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
           <span style={{ color: COLORS.indigo700, display: 'flex' }}><NavIcon name="sunrise" size={16} /></span>
-          <span style={{ fontSize: '12px', fontWeight: 800, color: COLORS.indigo700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Daily Briefing</span>
+          <span style={{ fontSize: 'clamp(11px, 1vw, 12px)', fontWeight: 800, color: COLORS.indigo700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Daily Briefing</span>
         </div>
-        <p style={{ margin: 0, fontSize: '11px', color: COLORS.slate500 }}>
+        <p style={{ margin: 0, fontSize: 'clamp(10px, 0.9vw, 11px)', color: COLORS.slate500 }}>
           What's worth a look across the dashboard this morning.
         </p>
       </div>
@@ -436,9 +436,9 @@ function TeamWhereabouts({ profile, onNavigate, height = DASHBOARD_TOP_CARD_HEIG
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
               <span style={{ color: COLORS.teal700, fontSize: '14px', lineHeight: 1 }}>📍</span>
-              <span style={{ fontSize: '12px', fontWeight: 800, color: COLORS.teal700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Where's the Team</span>
+              <span style={{ fontSize: 'clamp(11px, 1vw, 12px)', fontWeight: 800, color: COLORS.teal700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Where's the Team</span>
             </div>
-            <p style={{ margin: 0, fontSize: '11px', color: COLORS.slate500 }}>Live status and every trip logged today.</p>
+            <p style={{ margin: 0, fontSize: 'clamp(10px, 0.9vw, 11px)', color: COLORS.slate500 }}>Live status and every trip logged today.</p>
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
             {!profile.division && (
