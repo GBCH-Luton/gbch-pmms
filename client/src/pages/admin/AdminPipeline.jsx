@@ -26,6 +26,26 @@ const expandValueStyle = { margin: '0 0 10px 0', fontSize: '13px', fontWeight: 6
 const expandSectionStyle = { background: COLORS.white, borderRadius: '12px', padding: '16px', border: `1px solid ${COLORS.slate200}` }
 const expandSectionTitleStyle = { margin: '0 0 12px 0', fontSize: '11px', fontWeight: 800, color: COLORS.slate500, textTransform: 'uppercase', letterSpacing: '0.05em' }
 
+// An unlisted-category issue_tag is stored as a plain string, e.g.
+// "[Unlisted: Plumbing] burst pipe under the sink" (see
+// unlistedTagFor/handleSubmit in SubmitterDashboard.jsx and
+// AdminRaiseTicket.jsx) -- flagged in amber/bold so it's obvious at a
+// glance this ticket didn't match a real catalogued subcategory, without
+// needing to open the row to find out.
+const UNLISTED_TAG_PATTERN = /^(\[Unlisted:[^\]]*\])\s*(.*)$/
+function renderIssueTag(tag) {
+  if (!tag) return '—'
+  const match = tag.match(UNLISTED_TAG_PATTERN)
+  if (!match) return tag
+  const [, bracket, rest] = match
+  return (
+    <>
+      <span style={{ color: COLORS.amber700, fontWeight: 800 }}>{bracket}</span>
+      {rest ? ` ${rest}` : ''}
+    </>
+  )
+}
+
 // Actual hands-on-the-job time, not wall-clock turnaround -- same
 // work_sessions-summed definition as the Clocking page's "Total Time"
 // column and Sign-Off's workedMsByTicket, so this always matches what a
@@ -1268,7 +1288,7 @@ export default function AdminPipeline({
                         </span>
                       </td>
                       <td style={tdStyle}>
-                        <span style={{ color: COLORS.slate600 }}>{t.issue_tag || '—'}</span>
+                        <span style={{ color: COLORS.slate600 }}>{renderIssueTag(t.issue_tag)}</span>
                       </td>
                       <td style={tdStyle}>
                         <span style={{ display: 'inline-block', fontSize: '11px', fontWeight: 800, color: tierStyle.color, background: tierStyle.bg, padding: '3px 10px', borderRadius: '20px' }}>
