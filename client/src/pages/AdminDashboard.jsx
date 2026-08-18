@@ -41,6 +41,7 @@ const AdminBuilderGuide = lazy(() => import('./admin/AdminBuilderGuide'))
 const AdminBuilderGuideV2 = lazy(() => import('./admin/AdminBuilderGuideV2'))
 const AdminBuilderGuideV03 = lazy(() => import('./admin/AdminBuilderGuideV03'))
 const AdminHousekeepingGuide = lazy(() => import('./admin/AdminHousekeepingGuide'))
+const AdminLogAVisitGuide = lazy(() => import('./admin/AdminLogAVisitGuide'))
 const AdminHousekeeping = lazy(() => import('./admin/AdminHousekeeping'))
 const AdminEvents = lazy(() => import('./admin/AdminEvents'))
 const AdminViewAs = lazy(() => import('./admin/AdminViewAs'))
@@ -96,6 +97,7 @@ const NAV_ITEMS = [
       { key: 'builder-guide-v2', label: 'Builder v.2', Component: AdminBuilderGuideV2, adminOnly: true },
       { key: 'builder-guide-v03', label: 'Builder v0.3', Component: AdminBuilderGuideV03, adminOnly: true },
       { key: 'housekeeper-guide', label: 'Housekeeper', Component: AdminHousekeepingGuide, adminOnly: true },
+      { key: 'log-a-visit-guide', label: 'Log a Visit', Component: AdminLogAVisitGuide, adminOnly: true },
     ],
   },
   // Trial section, admin-only while it's being tried out and shown to

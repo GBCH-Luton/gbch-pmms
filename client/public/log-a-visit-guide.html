@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PMMS Log a Visit Simulator</title>
+<style>
+  :root {
+    --bg: #f1f5f9;
+    --page-max: 980px;
+    --card-bg: #ffffff;
+    --frame-bg: #e2e8f0;
+    --border: #e2e8f0;
+    --border-strong: #cbd5e1;
+    --text: #0f172a;
+    --text-muted: #64748b;
+    --text-faint: #94a3b8;
+    --slate50: #f8fafc;
+    --slate100: #f1f5f9;
+    --blue: #2563eb;
+    --blue-dark: #1d4ed8;
+    --blue-light: #dbeafe;
+    --blue-border: #bfdbfe;
+    --blue-text-on-light: #1d4ed8;
+    --teal: #0d9488;
+    --amber-bg: #fffbeb;
+    --amber-border: #fcd34d;
+    --amber-text: #92400e;
+    --red: #ef4444;
+    --green-dot: #16a34a;
+    --shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+    --shadow-lg: 0 10px 30px rgba(15, 23, 42, 0.12);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0b1220;
+      --card-bg: #16202f;
+      --frame-bg: #0f1826;
+      --border: #263349;
+      --border-strong: #324058;
+      --text: #e6edf7;
+      --text-muted: #93a2ba;
+      --text-faint: #6b7c96;
+      --slate50: #101a29;
+      --slate100: #16202f;
+      --blue: #4d8dff;
+      --blue-dark: #7aabff;
+      --blue-light: rgba(77, 141, 255, 0.16);
+      --blue-border: rgba(77, 141, 255, 0.38);
+      --blue-text-on-light: #9dc0ff;
+      --teal: #2dd4bf;
+      --amber-bg: rgba(217, 158, 6, 0.14);
+      --amber-border: rgba(217, 158, 6, 0.4);
+      --amber-text: #f2c14e;
+      --red: #ff6b6b;
+      --green-dot: #34d399;
+      --shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+      --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.45);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0b1220;
+    --card-bg: #16202f;
+    --frame-bg: #0f1826;
+    --border: #263349;
+    --border-strong: #324058;
+    --text: #e6edf7;
+    --text-muted: #93a2ba;
+    --text-faint: #6b7c96;
+    --slate50: #101a29;
+    --slate100: #16202f;
+    --blue: #4d8dff;
+    --blue-dark: #7aabff;
+    --blue-light: rgba(77, 141, 255, 0.16);
+    --blue-border: rgba(77, 141, 255, 0.38);
+    --blue-text-on-light: #9dc0ff;
+    --teal: #2dd4bf;
+    --amber-bg: rgba(217, 158, 6, 0.14);
+    --amber-border: rgba(217, 158, 6, 0.4);
+    --amber-text: #f2c14e;
+    --red: #ff6b6b;
+    --green-dot: #34d399;
+    --shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.45);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: var(--page-max); margin: 0 auto; padding: 28px 20px 60px; }
+
+  header.top { margin-bottom: 22px; }
+  .eyebrow {
+    font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--teal); margin: 0 0 6px;
+  }
+  h1 { font-size: 22px; font-weight: 800; margin: 0 0 8px; letter-spacing: -0.01em; }
+  .lede { font-size: 13.5px; color: var(--text-muted); max-width: 620px; line-height: 1.55; margin: 0 0 14px; }
+
+  .safe-banner {
+    display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;
+    background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px;
+    padding: 12px 16px; box-shadow: var(--shadow);
+  }
+  .safe-banner p { margin: 0; font-size: 12.5px; color: var(--text-muted); }
+  .safe-banner strong { color: var(--text); }
+  button.reset {
+    flex-shrink: 0; padding: 9px 14px; border-radius: 9px; border: 1px solid var(--border-strong);
+    background: var(--slate50); color: var(--text); font-size: 12.5px; font-weight: 700; cursor: pointer;
+  }
+  button.reset:hover { border-color: var(--text-faint); }
+
+  .columns { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr); gap: 22px; margin-top: 22px; }
+  @media (max-width: 760px) { .columns { grid-template-columns: 1fr; } }
+
+  .panel-label {
+    font-size: 11px; font-weight: 800; letter-spacing: 0.07em; text-transform: uppercase;
+    color: var(--text-faint); margin: 0 0 10px; display: flex; align-items: center; gap: 6px;
+  }
+
+  /* Left: faithful phone/page frame */
+  .device-frame {
+    background: var(--frame-bg); border-radius: 20px; padding: 16px; box-shadow: var(--shadow-lg);
+    border: 1px solid var(--border);
+  }
+  .device-chrome {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 12px; padding: 0 2px;
+  }
+  .device-chrome .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border-strong); }
+  .device-chrome span.url {
+    font-size: 11px; color: var(--text-faint); font-family: ui-monospace, monospace;
+    margin-left: 4px;
+  }
+  .page-surface { background: var(--bg); border-radius: 12px; padding: 16px; min-height: 360px; }
+
+  /* Card replicating the real "Your Day" card */
+  .yourday-card {
+    border-radius: 12px; padding: 14px 16px; margin-bottom: 14px;
+    background: var(--slate50); border: 1px solid var(--border);
+    transition: background 0.2s ease, border-color 0.2s ease;
+  }
+  .yourday-card.late { background: var(--amber-bg); border-color: var(--amber-border); }
+  .yourday-title {
+    margin: 0 0 10px; font-size: 11px; font-weight: 800; color: var(--text-faint);
+    text-transform: uppercase; letter-spacing: 0.06em;
+  }
+  .row-between { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .status-text { font-size: 13px; font-weight: 600; color: var(--text-muted); }
+  .status-text.late { color: var(--amber-text); }
+  .status-text.blue { color: var(--blue-text-on-light); }
+  .link-btn {
+    padding: 6px 4px; background: none; color: var(--text-muted); border: none; font-size: 12px;
+    font-weight: 700; text-decoration: underline; cursor: pointer;
+  }
+  .link-btn:disabled { cursor: not-allowed; opacity: 0.6; }
+  .btn-solid {
+    padding: 7px 12px; border-radius: 8px; border: none; font-size: 12px; font-weight: 700; cursor: pointer;
+  }
+  .btn-solid.teal { background: var(--teal); color: #fff; }
+  .btn-solid.blue { background: var(--blue); color: #fff; }
+  .btn-outline {
+    padding: 7px 12px; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer;
+    background: var(--card-bg); color: var(--blue-text-on-light); border: 1px solid var(--blue-border);
+  }
+  .err-text { margin: 6px 0 0; font-size: 12px; color: var(--red); font-weight: 600; }
+  .divider { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+  .divider.late { border-top-color: var(--amber-border); }
+
+  .subpanel {
+    margin-top: 10px; background: var(--card-bg); border: 1px solid var(--border-strong);
+    border-radius: 12px; padding: 14px;
+  }
+  .subpanel p.title { margin: 0 0 10px; font-size: 13px; font-weight: 700; color: var(--text); }
+  .search-input, .text-input {
+    width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border-strong);
+    font-size: 13.5px; background: var(--card-bg); color: var(--text); box-sizing: border-box;
+  }
+  .search-input:focus, .text-input:focus { outline: 2px solid var(--blue-border); outline-offset: 1px; }
+  .results {
+    margin-top: 6px; max-height: 170px; overflow-y: auto; border: 1px solid var(--border);
+    border-radius: 10px; display: none;
+  }
+  .results.open { display: block; }
+  .result-row {
+    display: block; width: 100%; text-align: left; padding: 9px 12px; border: none;
+    border-bottom: 1px solid var(--border); background: none; color: var(--text); font-size: 13px; cursor: pointer;
+  }
+  .result-row:last-child { border-bottom: none; }
+  .result-row:hover { background: var(--slate100); }
+  .toggle-link {
+    margin-top: 8px; background: none; border: none; padding: 0; font-size: 12px; font-weight: 700;
+    color: var(--text-muted); text-decoration: underline; cursor: pointer; display: block;
+  }
+  .picked-chip {
+    margin-top: 8px; display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px;
+    font-weight: 700; color: var(--blue-text-on-light); background: var(--blue-light);
+    padding: 6px 10px; border-radius: 999px;
+  }
+  .subpanel-actions { display: flex; gap: 8px; margin-top: 12px; }
+  .btn-cancel {
+    flex: 1; padding: 10px; background: var(--slate100); color: var(--text-muted); border: none;
+    border-radius: 10px; font-size: 13px; font-weight: 700; cursor: pointer;
+  }
+  .btn-confirm {
+    flex: 2; padding: 10px; background: var(--blue); color: #fff; border: none; border-radius: 10px;
+    font-size: 13px; font-weight: 700; cursor: pointer;
+  }
+  .btn-confirm:disabled { opacity: 0.6; cursor: not-allowed; }
+
+  .stepper { display: flex; align-items: center; gap: 12px; }
+  .stepper button {
+    width: 36px; height: 36px; border-radius: 50%; background: var(--text-muted); color: #fff;
+    border: none; font-size: 16px; font-weight: 700; cursor: pointer; flex-shrink: 0;
+  }
+  .stepper input {
+    flex: 1; min-width: 0; text-align: center; padding: 8px; border-radius: 10px;
+    border: 1px solid var(--border-strong); font-size: 15px; font-weight: 700;
+    background: var(--card-bg); color: var(--text);
+  }
+
+  .loc-row { display: flex; gap: 8px; }
+  .loc-btn {
+    flex: 1; padding: 10px; border-radius: 10px; font-size: 12.5px; font-weight: 700; cursor: pointer;
+    background: var(--card-bg); color: var(--text-muted); border: 1px solid var(--border-strong);
+  }
+  .loc-btn.selected { background: var(--blue); color: #fff; border-color: var(--blue); }
+  .hint { margin: 6px 0 0; font-size: 11px; color: var(--text-faint); }
+
+  /* Right: Where's the Team live preview */
+  .team-card {
+    background: var(--card-bg); border: 1px solid var(--border); border-radius: 16px;
+    padding: 16px; box-shadow: var(--shadow);
+  }
+  .chip {
+    display: inline-flex; flex-direction: column; gap: 2px; padding: 8px 13px; border-radius: 999px;
+    font-size: 12.5px; font-weight: 700; background: var(--slate100); transition: background 0.25s ease;
+  }
+  .chip.blue { background: var(--blue-light); }
+  .chip-row { display: flex; align-items: center; gap: 7px; }
+  .chip-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-faint); flex-shrink: 0; }
+  .chip-dot.pulse {
+    background: var(--blue); box-shadow: 0 0 0 0 var(--blue-border); animation: pulse 1.8s infinite;
+  }
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.45); }
+    70% { box-shadow: 0 0 0 7px rgba(37, 99, 235, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0); }
+  }
+  .chip-name { color: var(--text); }
+  .chip-status { color: var(--blue-text-on-light); }
+  .chip.slate .chip-status { color: var(--text-faint); }
+
+  .timeline { margin-top: 18px; }
+  .timeline-title {
+    font-size: 11px; font-weight: 800; color: var(--text-faint); text-transform: uppercase;
+    letter-spacing: 0.06em; margin: 0 0 8px;
+  }
+  .tl-row { display: flex; gap: 10px; padding: 8px 0; border-top: 1px solid var(--border); align-items: flex-start; }
+  .tl-row:first-child { border-top: none; }
+  .tl-time {
+    font-family: ui-monospace, monospace; font-size: 11px; color: var(--text-faint);
+    flex-shrink: 0; width: 40px; padding-top: 1px;
+  }
+  .tl-dot { width: 7px; height: 7px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; background: var(--blue); }
+  .tl-text { font-size: 12.5px; color: var(--text-muted); flex: 1; }
+  .tl-empty { font-size: 12.5px; color: var(--text-faint); font-style: italic; }
+
+  .note-box {
+    margin-top: 18px; background: var(--slate50); border: 1px dashed var(--border-strong);
+    border-radius: 12px; padding: 12px 14px; font-size: 12px; color: var(--text-muted); line-height: 1.5;
+  }
+  .note-box strong { color: var(--text); }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="top">
+    <p class="eyebrow">📍 Landlord Liaison &middot; Prototype</p>
+    <h1>Log a Visit Simulator</h1>
+    <p class="lede">
+      A click-through copy of the real Start Travel &rarr; Arrived &rarr; Finished Visit flow
+      on Kathryn's Clocking page, plus a live preview of how each phase shows up on Where's the Team.
+    </p>
+    <div class="safe-banner">
+      <p><strong>Nothing here is connected to PMMS or Supabase.</strong> Every click below only changes state in this page &mdash; safe to click through as many times as you like.</p>
+      <button class="reset" id="resetBtn">&#8635; Reset simulator</button>
+    </div>
+  </header>
+
+  <div class="columns">
+    <div>
+      <p class="panel-label">🕐 Clocking page &mdash; her view</p>
+      <div class="device-frame">
+        <div class="device-chrome">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          <span class="url">pmms.greenbridgehousing.com/?page=clocking</span>
+        </div>
+        <div class="page-surface">
+          <div id="yourDayCard"></div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <p class="panel-label">📍 Where's the Team &mdash; live preview</p>
+      <div class="team-card">
+        <div id="teamChip"></div>
+        <div class="timeline">
+          <p class="timeline-title">Today's log</p>
+          <div id="timeline"></div>
+        </div>
+      </div>
+      <div class="note-box">
+        <strong>Why this matters:</strong> splitting travel from on-site time (rather than one
+        blob from "left" to "back") is what lets hours travelling, hours on site, and visit count
+        all get computed later &mdash; and it updates live on the real Dashboard the same way it
+        works for builders on a job.
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var PROPERTIES = [
+    "12 Oak Street, Luton, LU1 3JD",
+    "45 Birch Avenue, Bedford, MK41 7QP",
+    "8 Elm Close, Luton, LU2 0HG",
+    "23 Maple Drive, Dunstable, LU5 4RT",
+    "67 Cedar Road, Luton, LU3 2ND",
+    "5 Willow Court, Bedford, MK42 9LF",
+    "34 Ashford Grove, Luton, LU4 8PQ",
+    "19 Hawthorn Way, Leighton Buzzard, LU7 1AB",
+    "2 Chestnut Terrace, Luton, LU1 5EW",
+    "88 Rowan Street, Bedford, MK40 3XY"
+  ];
+
+  // Each trip is one "leg" object, mirroring the real activity_log row:
+  // { type: 'visit' | 'visit_office' | 'visit_other' | 'lunch',
+  //   note, startedAt, arrivedAt, milesLogged }
+  // A property leg (type 'visit') has two phases within that one object --
+  // travelling until arrivedAt is set, then on site until it's cleared
+  // (finished). Office/Other close the moment arrivedAt is set. Lunch has
+  // neither arrival nor mileage, just start/stop.
+  var initialState = function () {
+    return {
+      clockedIn: false,
+      clockInAt: null,
+      openLeg: null,
+      picker: { open: false, showDone: false, destType: null, query: "", picked: null, otherText: "" },
+      arrival: { open: false, miles: null },
+      clockOutError: "",
+      events: [] // { time: Date, text: string }
+    };
+  };
+  var state = initialState();
+
+  function fmtTime(d) {
+    return d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+  }
+  function log(text) {
+    state.events.unshift({ time: new Date(), text: text });
+  }
+
+  // ---- actions ----
+  function clockIn() {
+    state.clockedIn = true;
+    state.clockInAt = new Date();
+    log("clocked in");
+    render();
+  }
+  function attemptClockOut() {
+    state.clockOutError = "";
+    if (state.openLeg) {
+      state.clockOutError = "Finish logging your current trip before clocking out for the day.";
+      render();
+      return;
+    }
+    log("clocked out");
+    state = Object.assign(initialState(), { events: state.events });
+    render();
+  }
+  function openPicker(showDone) {
+    state.picker = { open: true, showDone: !!showDone, destType: null, query: "", picked: null, otherText: "" };
+    render();
+  }
+  function closePicker() {
+    state.picker.open = false;
+    render();
+  }
+  function pickProperty(addr) {
+    state.picker.picked = addr;
+    state.picker.query = addr;
+    render();
+  }
+  function chooseDestType(type) {
+    if (type === "office") { startTravelLeg("visit_office", "the office"); return; }
+    if (type === "lunch") { startLunch(); return; }
+    if (type === "done") { state.picker.open = false; render(); return; }
+    state.picker.destType = type;
+    render();
+  }
+  function startTravelLeg(type, label) {
+    state.openLeg = { type: type, note: label, startedAt: new Date(), arrivedAt: null, milesLogged: null };
+    state.picker.open = false;
+    var verb = type === "visit" ? "left for a property visit" : (type === "visit_office" ? "left for the office" : "left");
+    log(verb + ": " + label);
+    render();
+  }
+  function startLunch() {
+    state.openLeg = { type: "lunch", note: null, startedAt: new Date(), arrivedAt: null, milesLogged: null };
+    state.picker.open = false;
+    log("started lunch break");
+    render();
+  }
+  function confirmTravelSubStep() {
+    var p = state.picker;
+    if (p.destType === "property") {
+      if (!p.picked) return;
+      startTravelLeg("visit", p.picked);
+    } else if (p.destType === "other") {
+      var text = p.otherText.trim();
+      if (!text) return;
+      startTravelLeg("visit_other", text);
+    }
+  }
+  function openArrival() {
+    state.arrival = { open: true, miles: null };
+    render();
+  }
+  function closeArrival() {
+    state.arrival.open = false;
+    render();
+  }
+  function stepMiles(delta) {
+    var cur = state.arrival.miles == null ? 0 : state.arrival.miles;
+    state.arrival.miles = Math.max(0, Math.round((cur + delta) * 10) / 10);
+    render();
+  }
+  function confirmArrival() {
+    if (state.arrival.miles == null) return;
+    var miles = state.arrival.miles;
+    var leg = state.openLeg;
+    leg.milesLogged = miles;
+    leg.arrivedAt = new Date();
+    state.arrival.open = false;
+    if (leg.type === "visit") {
+      log("arrived at the property (" + miles + " mi logged)");
+    } else {
+      var verb = leg.type === "visit_office" ? "arrived at the office" : "arrived";
+      log(verb + " (" + miles + " mi logged)");
+      state.openLeg = null;
+    }
+    render();
+  }
+  function finishVisit() {
+    log("finished the property visit");
+    state.openLeg = null;
+    openPicker(true);
+  }
+  function backFromLunch() {
+    log("back from lunch");
+    state.openLeg = null;
+    render();
+  }
+
+  // ---- render helpers ----
+  function el(html) {
+    var t = document.createElement("template");
+    t.innerHTML = html.trim();
+    return t.content.firstChild;
+  }
+
+  function renderYourDay() {
+    var host = document.getElementById("yourDayCard");
+    host.innerHTML = "";
+
+    if (!state.clockedIn) {
+      host.appendChild(el(
+        '<div class="yourday-card">' +
+          '<p class="yourday-title">Your Day</p>' +
+          '<div class="row-between">' +
+            '<span class="status-text">Not clocked in for today yet.</span>' +
+            '<button class="btn-solid teal" id="btnClockIn">&#10003; Clock In for the Day</button>' +
+          '</div>' +
+        '</div>'
+      ));
+      document.getElementById("btnClockIn").onclick = clockIn;
+      return;
+    }
+
+    var card = el(
+      '<div class="yourday-card">' +
+        '<p class="yourday-title">Your Day</p>' +
+        '<div class="row-between">' +
+          '<span class="status-text">&#128994; Clocked in since ' + fmtTime(state.clockInAt) + '</span>' +
+          '<button class="link-btn" id="btnClockOut">Clock Out for the Day</button>' +
+        '</div>' +
+        (state.clockOutError ? '<p class="err-text">' + state.clockOutError + '</p>' : '') +
+        '<div class="divider" id="travelSection"></div>' +
+      '</div>'
+    );
+    host.appendChild(card);
+    document.getElementById("btnClockOut").onclick = attemptClockOut;
+    renderTravelSection();
+  }
+
+  function renderTravelSection() {
+    var host = document.getElementById("travelSection");
+    if (!host) return;
+    host.innerHTML = "";
+
+    var leg = state.openLeg;
+    if (!leg) {
+      host.appendChild(el('<button class="btn-outline" id="btnStartTravel">&#128663; Start Travel</button>'));
+      document.getElementById("btnStartTravel").onclick = function () { openPicker(false); };
+    } else if (leg.type === "lunch") {
+      host.appendChild(el(
+        '<div class="row-between">' +
+          '<span class="status-text blue">&#127860; On lunch break since ' + fmtTime(leg.startedAt) + '</span>' +
+          '<button class="btn-solid blue" id="btnBackLunch">&#10003; Back from Lunch</button>' +
+        '</div>'
+      ));
+      document.getElementById("btnBackLunch").onclick = backFromLunch;
+    } else if (leg.type === "visit" && leg.arrivedAt) {
+      host.appendChild(el(
+        '<div class="row-between">' +
+          '<span class="status-text blue">&#128205; At ' + leg.note + ' since ' + fmtTime(leg.arrivedAt) + '</span>' +
+          '<button class="btn-solid blue" id="btnFinishVisit">&#10003; Finished Visit</button>' +
+        '</div>'
+      ));
+      document.getElementById("btnFinishVisit").onclick = finishVisit;
+    } else {
+      host.appendChild(el(
+        '<div class="row-between">' +
+          '<span class="status-text blue">&#128663; Travelling &mdash; heading to ' + leg.note + ' since ' + fmtTime(leg.startedAt) + '</span>' +
+          '<button class="btn-solid blue" id="btnArrived">&#10003; Arrived</button>' +
+        '</div>'
+      ));
+      document.getElementById("btnArrived").onclick = openArrival;
+    }
+
+    if (state.arrival.open) host.appendChild(renderArrivalPanel());
+    if (state.picker.open) host.appendChild(renderPickerPanel());
+  }
+
+  function renderPickerPanel() {
+    var p = state.picker;
+    var destOptions = [
+      ["property", "📍 A Property"],
+      ["office", "🏢 The Office"],
+      ["lunch", "🍽 Lunch Break"],
+      ["other", "✏️ Other"]
+    ];
+    if (p.showDone) destOptions.push(["done", "&#10003; Nothing else &mdash; done for now"]);
+
+    var pillsHtml = destOptions.map(function (opt) {
+      var selected = p.destType === opt[0] ? " selected" : "";
+      return '<button type="button" class="loc-btn' + selected + '" data-type="' + opt[0] + '" style="flex:none;padding:8px 12px;">' + opt[1] + '</button>';
+    }).join("");
+
+    var panel = el(
+      '<div class="subpanel">' +
+        '<p class="title">Where are you heading?</p>' +
+        '<div class="loc-row" style="flex-wrap:wrap;" id="destPills">' + pillsHtml + '</div>' +
+        '<div id="pickerSubStep"></div>' +
+        '<div class="subpanel-actions">' +
+          '<button class="btn-cancel" id="btnPickCancel">Cancel</button>' +
+          '<button class="btn-confirm" id="btnStartTravelLeg" style="display:none;">Start Travel</button>' +
+        '</div>' +
+      '</div>'
+    );
+
+    setTimeout(function () {
+      var pills = document.getElementById("destPills");
+      Array.prototype.forEach.call(pills.querySelectorAll("button"), function (btn) {
+        btn.onclick = function () { chooseDestType(btn.getAttribute("data-type")); };
+      });
+
+      var subStep = document.getElementById("pickerSubStep");
+      var startBtn = document.getElementById("btnStartTravelLeg");
+
+      if (p.destType === "property") {
+        var filtered = p.query.trim()
+          ? PROPERTIES.filter(function (a) { return a.toLowerCase().indexOf(p.query.trim().toLowerCase()) !== -1; })
+          : PROPERTIES;
+        subStep.innerHTML =
+          '<div style="margin-top:10px;">' +
+          '<input class="search-input" id="searchInput" placeholder="Search properties..." value="' + (p.picked ? p.picked : p.query) + '" />' +
+          '<div class="results ' + (p.query && !p.picked ? "open" : "") + '" id="resultsBox">' +
+            (filtered.length === 0
+              ? '<div class="result-row" style="cursor:default;color:var(--text-faint);font-style:italic;">No matching properties</div>'
+              : filtered.map(function (a) { return '<button type="button" class="result-row">' + a + '</button>'; }).join("")) +
+          '</div></div>';
+        var input = document.getElementById("searchInput");
+        input.oninput = function (e) { p.picked = null; p.query = e.target.value; render(); };
+        input.onfocus = function () { if (p.picked) { p.picked = null; p.query = ""; render(); } };
+        var results = document.getElementById("resultsBox");
+        Array.prototype.forEach.call(results.querySelectorAll(".result-row"), function (btn, i) {
+          if (filtered[i]) btn.onclick = function () { pickProperty(filtered[i]); };
+        });
+        startBtn.style.display = "";
+        startBtn.disabled = !p.picked;
+      } else if (p.destType === "other") {
+        subStep.innerHTML = '<input class="text-input" id="otherInput" placeholder="Where are you heading..." value="' + p.otherText + '" style="margin-top:10px;" />';
+        document.getElementById("otherInput").oninput = function (e) { p.otherText = e.target.value; render(); };
+        startBtn.style.display = "";
+        startBtn.disabled = p.otherText.trim().length === 0;
+      }
+
+      document.getElementById("btnPickCancel").onclick = closePicker;
+      startBtn.onclick = confirmTravelSubStep;
+    }, 0);
+
+    return panel;
+  }
+
+  function renderArrivalPanel() {
+    var a = state.arrival;
+    var panel = el(
+      '<div class="subpanel">' +
+        '<p class="title">Miles driven for this trip</p>' +
+        '<div class="stepper">' +
+          '<button id="milesMinus" type="button">&minus;</button>' +
+          '<input type="number" step="0.5" id="milesInput" value="' + (a.miles == null ? "" : a.miles) + '" />' +
+          '<button id="milesPlus" type="button">+</button>' +
+        '</div>' +
+        '<div class="subpanel-actions">' +
+          '<button class="btn-cancel" id="btnArrivalCancel">Cancel</button>' +
+          '<button class="btn-confirm" id="btnConfirmArrival">Confirm Arrival</button>' +
+        '</div>' +
+      '</div>'
+    );
+    setTimeout(function () {
+      document.getElementById("milesMinus").onclick = function () { stepMiles(-0.5); };
+      document.getElementById("milesPlus").onclick = function () { stepMiles(0.5); };
+      document.getElementById("milesInput").oninput = function (e) {
+        a.miles = e.target.value === "" ? null : (parseFloat(e.target.value) || 0);
+      };
+      document.getElementById("btnArrivalCancel").onclick = closeArrival;
+      var confirmBtn = document.getElementById("btnConfirmArrival");
+      confirmBtn.disabled = a.miles == null;
+      confirmBtn.onclick = confirmArrival;
+    }, 0);
+    return panel;
+  }
+
+  function renderTeamChip() {
+    var host = document.getElementById("teamChip");
+    var name = "Kathryn";
+    var chipClass = "chip", dotClass = "chip-dot", statusText = "Off shift", statusClass = "";
+    var leg = state.openLeg;
+
+    if (!state.clockedIn) {
+      statusText = "Off shift";
+    } else if (leg && leg.type === "lunch") {
+      chipClass = "chip blue"; dotClass = "chip-dot pulse"; statusClass = "chip-status";
+      statusText = "On lunch break";
+    } else if (leg && leg.type === "visit" && leg.arrivedAt) {
+      chipClass = "chip blue"; dotClass = "chip-dot pulse"; statusClass = "chip-status";
+      statusText = "Visiting a property: " + leg.note;
+    } else if (leg) {
+      chipClass = "chip blue"; dotClass = "chip-dot pulse"; statusClass = "chip-status";
+      var travelLabel = leg.type === "visit" ? "Travelling to a property"
+        : leg.type === "visit_office" ? "Travelling to the office"
+        : "Travelling";
+      statusText = travelLabel + ": " + leg.note;
+    } else {
+      chipClass = "chip blue"; statusClass = "chip-status";
+      statusText = "Available";
+    }
+
+    host.innerHTML =
+      '<div class="' + chipClass + '">' +
+        '<div class="chip-row">' +
+          '<span class="' + dotClass + '"></span>' +
+          '<span class="chip-name">' + name + '</span>' +
+          '<span class="' + statusClass + '">' + statusText + '</span>' +
+        '</div>' +
+      '</div>';
+  }
+
+  function renderTimeline() {
+    var host = document.getElementById("timeline");
+    if (state.events.length === 0) {
+      host.innerHTML = '<p class="tl-empty">Nothing logged yet &mdash; try clocking in on the left.</p>';
+      return;
+    }
+    host.innerHTML = state.events.map(function (e) {
+      return '<div class="tl-row">' +
+        '<span class="tl-time">' + fmtTime(e.time) + '</span>' +
+        '<span class="tl-dot"></span>' +
+        '<span class="tl-text"><strong>Kathryn</strong> &mdash; ' + e.text + '</span>' +
+      '</div>';
+    }).join("");
+  }
+
+  function render() {
+    renderYourDay();
+    renderTeamChip();
+    renderTimeline();
+  }
+
+  document.getElementById("resetBtn").onclick = function () {
+    state = initialState();
+    render();
+  };
+
+  render();
+})();
+</script>
+
+</body>
+</html>
