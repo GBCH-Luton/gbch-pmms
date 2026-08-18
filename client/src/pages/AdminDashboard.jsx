@@ -176,7 +176,14 @@ export default function AdminDashboard({ profile }) {
   // persistent rail competing for screen space. Persisted the same way the
   // dashboard's per-section collapse state already is.
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
-    try { return localStorage.getItem('pmms_sidebar_collapsed') === 'true' } catch { return false }
+    // Collapsed by default for anyone who's never touched the toggle --
+    // only an explicit 'false' (they expanded it themselves at some
+    // point) overrides that, so an existing user's own choice still
+    // sticks either way.
+    try {
+      const stored = localStorage.getItem('pmms_sidebar_collapsed')
+      return stored === null ? true : stored === 'true'
+    } catch { return true }
   })
 
   function toggleSidebarCollapsed() {
