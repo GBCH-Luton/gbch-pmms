@@ -593,13 +593,20 @@ function PipelineList({ profile, onGoToSignOff }) {
   // PIPELINE_FILTERS.Active's own comment). Auto-routing means sitting
   // unassigned should now be the rare exception, not a normal first stage,
   // so that tile is worded as a flag rather than an expected step.
+  const needsConfirmationCount = tickets.filter(PIPELINE_FILTERS.Completed).length
+
   const kpis = [
     { label: 'Total', value: tickets.filter(PIPELINE_FILTERS.All).length, colour: COLORS.slate500, key: 'All' },
     { label: 'Not Picked Up Yet', value: tickets.filter(PIPELINE_FILTERS.Pending).length, colour: COLORS.red600, key: 'Pending' },
     { label: 'Assigned, Not Started', value: tickets.filter(PIPELINE_FILTERS.Assigned).length, colour: COLORS.blue500, key: 'Assigned' },
     { label: 'In Progress', value: tickets.filter(PIPELINE_FILTERS.InProgress).length, colour: COLORS.teal600, key: 'InProgress' },
     { label: 'On Hold', value: tickets.filter(PIPELINE_FILTERS.OnHold).length, colour: COLORS.amber600, key: 'OnHold' },
-    { label: 'Needs Your Confirmation', value: tickets.filter(PIPELINE_FILTERS.Completed).length, colour: COLORS.purple600, key: 'Completed' },
+    // Red, not purple, once there's actually something waiting on her --
+    // this is the one tile that means "you're the reason this job hasn't
+    // closed out", same urgency framing as "Not Picked Up Yet" above.
+    // Stays purple at zero so the row isn't all-red when there's nothing
+    // to act on.
+    { label: 'Needs Your Confirmation', value: needsConfirmationCount, colour: needsConfirmationCount > 0 ? COLORS.red600 : COLORS.purple600, key: 'Completed' },
     { label: 'Closed', value: tickets.filter(PIPELINE_FILTERS.Archived).length, colour: COLORS.green600, key: 'Archived' },
   ]
 
