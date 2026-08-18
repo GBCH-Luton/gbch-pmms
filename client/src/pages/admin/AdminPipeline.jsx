@@ -375,7 +375,7 @@ export default function AdminPipeline({
       .schema('pmms')
       .from('tickets')
       .select(`
-        id, ticket_number, status, category, description, room, priority_score, priority_override, mileage_logged,
+        id, ticket_number, status, category, issue_tag, description, room, priority_score, priority_override, mileage_logged,
         no_access_flag, no_access_note, hold_reason, hold_note, completion_note, photo_url, completion_photo_url,
         needs_followup, followup_note,
         signoff_flagged, signoff_note, signoff_resolved, signoff_good_standard, signoff_clean,
@@ -926,7 +926,7 @@ export default function AdminPipeline({
     switch (column) {
       case 'ticketNumber': return t.ticket_number || 0
       case 'property': return (t.property?.address || '').toLowerCase()
-      case 'room': return (t.room || '').toLowerCase()
+      case 'issueTag': return (t.issue_tag || '').toLowerCase()
       case 'priority': return t.priority_score || 0
       case 'status': return (t.status || '').toLowerCase()
       case 'builder': return (t.builderName || '').toLowerCase()
@@ -1209,7 +1209,7 @@ export default function AdminPipeline({
                 </th>
                 <th style={{ ...thStyle, cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('ticketNumber')}>Ticket #{sortArrow('ticketNumber')}</th>
                 <th style={{ ...thStyle, cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('property')}>Property{sortArrow('property')}</th>
-                <th style={{ ...thStyle, cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('room')}>Area{sortArrow('room')}</th>
+                <th style={{ ...thStyle, cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('issueTag')}>Subcategory{sortArrow('issueTag')}</th>
                 <th style={{ ...thStyle, cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('priority')}>Priority{sortArrow('priority')}</th>
                 <th style={{ ...thStyle, cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('status')}>Status{sortArrow('status')}</th>
                 <th style={{ ...thStyle, cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort('builder')}>Builder{sortArrow('builder')}</th>
@@ -1268,7 +1268,7 @@ export default function AdminPipeline({
                         </span>
                       </td>
                       <td style={tdStyle}>
-                        <span style={{ color: COLORS.slate600 }}>{t.room || '—'}</span>
+                        <span style={{ color: COLORS.slate600 }}>{t.issue_tag || '—'}</span>
                       </td>
                       <td style={tdStyle}>
                         <span style={{ display: 'inline-block', fontSize: '11px', fontWeight: 800, color: tierStyle.color, background: tierStyle.bg, padding: '3px 10px', borderRadius: '20px' }}>
