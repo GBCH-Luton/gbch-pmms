@@ -1251,7 +1251,7 @@ export default function AdminAccess({ profile }) {
   const [customRolesError, setCustomRolesError] = useState('')
   const [divisions, setDivisions] = useState(DEFAULT_DIVISIONS)
 
-  const [roleFilter, setRoleFilter] = useState('All')
+  const [roleFilter, setRoleFilter] = useState('Admin')
   const [modalStaff, setModalStaff] = useState(undefined) // undefined = closed, null = add, object = edit
   const [resetPasswordTarget, setResetPasswordTarget] = useState(null)
   const [toggleActiveErrors, setToggleActiveErrors] = useState({})
