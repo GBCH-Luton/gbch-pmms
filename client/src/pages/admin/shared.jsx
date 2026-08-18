@@ -267,9 +267,17 @@ export function isTicketStuck(ticket, thresholdsSetting, nowMs = Date.now(), p1T
 // lays out as 5-then-4 rather than however many happen to fit. Omitted
 // (every other KpiTiles call site), behaviour is unchanged.
 export function KpiTiles({ kpis, onTileClick, columns }) {
+  // `columns` used to mean a literal fixed column count
+  // (`repeat(N, 1fr)`) -- rigid on a narrow screen, since N equal-width
+  // columns don't reflow, they just get squeezed until every label wraps
+  // onto three lines. auto-fit + minmax keeps the same "grid, not
+  // flex-wrap" layout callers asked for (a tidy row-aligned block, unlike
+  // the flex mode's own looser wrap) while letting the column count drop
+  // on its own as the container narrows -- same minmax range the flex
+  // mode already uses, so both modes size tiles consistently.
   return (
     <div style={columns
-      ? { display: 'grid', gridTemplateColumns: `repeat(${columns}, 1fr)`, gap: '12px', marginBottom: '16px' }
+      ? { display: 'grid', gridTemplateColumns: `repeat(auto-fit, minmax(clamp(110px, 14vw, 160px), 1fr))`, gap: '12px', marginBottom: '16px' }
       : { display: 'flex', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }
     }>
       {kpis.map((kpi) => (
