@@ -482,6 +482,9 @@ function PipelineList({ profile, onGoToSignOff }) {
   const [tickets, setTickets] = useState([])
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('All')
+  const [propertyFilter, setPropertyFilter] = useState('') // '' = All Properties, matches PropertySearchSelect's own cleared state
+  const [fromDate, setFromDate] = useState('')
+  const [toDate, setToDate] = useState('')
   const [viewingTicket, setViewingTicket] = useState(null)
   const [detailLoading, setDetailLoading] = useState(false)
 
@@ -494,7 +497,7 @@ function PipelineList({ profile, onGoToSignOff }) {
     const { data, error } = await supabase
       .schema('pmms')
       .from('tickets')
-      .select('id, ticket_number, status, category, issue_tag, room, created_at, property_id')
+      .select('id, ticket_number, status, category, issue_tag, room, created_at, completed_at, property_id')
       .eq('raised_by', profile.id)
       .order('created_at', { ascending: false })
 
@@ -600,7 +603,35 @@ function PipelineList({ profile, onGoToSignOff }) {
     { label: 'Closed', value: tickets.filter(PIPELINE_FILTERS.Archived).length, colour: COLORS.green600, key: 'Archived' },
   ]
 
-  const filteredTickets = tickets.filter(PIPELINE_FILTERS[statusFilter])
+  // Options come from her own tickets, not a full property list -- this
+  // filter only ever needs to narrow reports she's actually raised, so
+  // there's no reason to fetch/show properties she has nothing logged
+  // against (same reasoning attachBuilderSafeProperties already applies:
+  // scope to what's actually in play, not the whole portfolio).
+  const propertyOptions = [...new Map(
+    tickets.filter(t => t.property).map(t => [t.property.id, t.property])
+  ).values()].sort((a, b) => a.address.localeCompare(b.address))
+
+  // Same idea as the admin Pipeline's own date range: "Completed"/"Closed"
+  // means "when did this actually finish", not "when did I raise it" --
+  // everything else still filters on when she reported it.
+  const dateField = (statusFilter === 'Completed' || statusFilter === 'Archived') ? 'completed_at' : 'created_at'
+
+  const filteredTickets = tickets.filter(PIPELINE_FILTERS[statusFilter]).filter(t => {
+    if (propertyFilter && String(t.property_id) !== String(propertyFilter)) return false
+    if (fromDate && (!t[dateField] || new Date(t[dateField]).getTime() < new Date(fromDate).getTime())) return false
+    if (toDate && (!t[dateField] || new Date(t[dateField]).getTime() > new Date(toDate).getTime() + 86400000 - 1)) return false
+    return true
+  })
+
+  const filtersActive = statusFilter !== 'All' || propertyFilter || fromDate || toDate
+
+  function clearAllFilters() {
+    setStatusFilter('All')
+    setPropertyFilter('')
+    setFromDate('')
+    setToDate('')
+  }
 
   if (tickets.length === 0) {
     return (
@@ -617,11 +648,25 @@ function PipelineList({ profile, onGoToSignOff }) {
         onTileClick={(kpi) => (kpi.key === 'Completed' ? onGoToSignOff?.() : setStatusFilter(kpi.key))}
       />
 
-      {statusFilter !== 'All' && (
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+        <div style={{ minWidth: '220px', flex: '1 1 220px' }}>
+          <PropertySearchSelect properties={propertyOptions} value={propertyFilter} onChange={setPropertyFilter} placeholder="All Properties" />
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span style={{ fontSize: '12px', fontWeight: 700, color: COLORS.slate400 }}>
+            {(statusFilter === 'Completed' || statusFilter === 'Archived') ? 'Completed' : 'Raised'}
+          </span>
+          <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} style={{ ...inputStyle, width: 'auto', height: '40px' }} />
+          <span style={{ fontSize: '12px', fontWeight: 700, color: COLORS.slate400 }}>to</span>
+          <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} style={{ ...inputStyle, width: 'auto', height: '40px' }} />
+        </div>
+      </div>
+
+      {filtersActive && (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', background: COLORS.teal50, border: `1px solid ${COLORS.teal300}`, borderRadius: '10px', padding: '10px 16px', marginBottom: '16px' }}>
           <span style={{ fontSize: '13px', fontWeight: 700, color: COLORS.teal700 }}>Showing: {statusFilter} ({filteredTickets.length})</span>
-          <button onClick={() => setStatusFilter('All')} style={{ background: 'none', border: 'none', color: COLORS.teal700, fontSize: '13px', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}>
-            Clear filter
+          <button onClick={clearAllFilters} style={{ background: 'none', border: 'none', color: COLORS.teal700, fontSize: '13px', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}>
+            Clear filters
           </button>
         </div>
       )}
