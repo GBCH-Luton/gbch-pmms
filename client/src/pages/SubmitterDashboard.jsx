@@ -297,6 +297,10 @@ function NewReportForm({ profile, onSubmitted }) {
 
   async function handleSubmit() {
     setError('')
+    if (mediaFiles.length === 0) {
+      setError('Please add at least one photo of the issue.')
+      return
+    }
     setSubmitting(true)
 
     const finalIssueTag = isUnlistedTag(issueTag) ? `[Unlisted: ${category}] ${issueOther}` : issueTag
@@ -368,7 +372,7 @@ function NewReportForm({ profile, onSubmitted }) {
 
   const selectedProperty = properties.find(p => String(p.id) === String(propertyId))
   const step2Complete = !!room && (room !== 'Other Area...' || otherArea.trim())
-  const canSubmit = propertyId && step2Complete && category && issueTag && (!isUnlistedTag(issueTag) || issueOther.trim()) && !submitting
+  const canSubmit = propertyId && step2Complete && category && issueTag && (!isUnlistedTag(issueTag) || issueOther.trim()) && mediaFiles.length > 0 && !submitting
 
   if (success) {
     return (
@@ -471,7 +475,7 @@ function NewReportForm({ profile, onSubmitted }) {
             <VoiceInputButton onResult={(text) => setNotes(prev => prev ? `${prev} ${text}` : text)} />
           </div>
 
-          <p style={{ ...fieldLabelStyle, marginTop: '16px' }}>Photos / videos (optional)</p>
+          <p style={{ ...fieldLabelStyle, marginTop: '16px' }}>Photo of the issue (required)</p>
           <TicketMediaPicker files={mediaFiles} onChange={setMediaFiles} inputId="submitter-ticket-media-input" />
         </div>
       )}
