@@ -275,25 +275,29 @@ function TeamWhereabouts({ profile, onNavigate, height = DASHBOARD_TOP_CARD_HEIG
         tone = 'leave'
       } else if (shift && !shift.clock_out_at) {
         if (openActivity) {
-          const meta = activityCategoryMeta(openActivity.activity_type, openActivity.activity_category)
-          // A property visit is travelling until arrived_at is set, then
-          // on site -- travelLabel only exists on the 'visit' category
-          // meta, so this is a no-op fallback to the plain label for
-          // every other category (including visit_office/visit_other,
-          // whose `label` already reads as travel since they have no
-          // on-site phase).
-          const isOnSite = openActivity.activity_category === 'visit' && openActivity.arrived_at
-          const displayLabel = isOnSite ? meta.label : (meta.travelLabel || meta.label)
-          status = `${displayLabel}${openActivity.note ? `: ${openActivity.note}` : ''}`
+          // The pill itself only ever needs to say "Away" -- which
+          // property/job/note they're away for is already in the
+          // timeline log below, so cramming it into the pill too (as
+          // this used to) just made it wrap/overflow. Tone still varies
+          // by category (see toneDot/chipStyle below), so the colour
+          // still hints at what kind of "away" it is even though the
+          // text doesn't.
+          status = 'Away'
           tone = openActivity.activity_category ? `away-${openActivity.activity_category}` : 'away'
         } else if (shortTripTicket) {
-          status = `${shortTripTicket.hold_reason} (Job #${shortTripTicket.ticket_number})`
+          status = 'Away'
           tone = 'away'
         } else if (openSession) {
-          status = `On Job #${ticketsById[openSession.ticket_id]?.ticket_number ?? '?'}`
+          status = 'On Job'
           tone = 'job'
         } else {
-          status = 'Available'
+          // "Idle" not "Available" -- this chip only ever appears for
+          // someone already known to be on shift with nothing open (see
+          // chipBuilders' off/leave filter below), so "Available" was
+          // redundant with the section itself. How long and where they
+          // were last seen now surface as an annotation on their most
+          // recent log entry below instead of a second line on the chip.
+          status = 'Idle'
           tone = 'available'
         }
       }
@@ -408,6 +412,22 @@ function TeamWhereabouts({ profile, onNavigate, height = DASHBOARD_TOP_CARD_HEIG
     ? logEntries.filter(e => divisionScopedStaffIds.has(e.staffId))
     : logEntries.filter(e => e.staffId === filterStaffId)
 
+  // The chip no longer shows idle duration/last-seen -- it now surfaces as
+  // an annotation on whichever log entry made that person idle in the
+  // first place (their last completed job, or their clock-in if they
+  // haven't done a job yet today). logEntries is already sorted newest
+  // first, so the first entry matching a given idle staffId is exactly
+  // that entry, by construction -- idleSince is computed from the same
+  // two sources (fetchLastEndedSessionsToday / shift.clock_in_at) that
+  // produce those entries.
+  const idleAnnotationByEntryId = {}
+  visibleBuilders.forEach(b => {
+    const s = statusByStaffId[b.id]
+    if (s?.tone !== 'available' || !s.idleSince) return
+    const match = logEntries.find(e => e.staffId === b.id)
+    if (match) idleAnnotationByEntryId[match.id] = s
+  })
+
   // The status-chip row is meant as "who's actually on shift right now" --
   // Off shift (never clocked in / already clocked out) and On Leave/Sick
   // clutter that with people who aren't part of today's picture. Only
@@ -475,29 +495,16 @@ function TeamWhereabouts({ profile, onNavigate, height = DASHBOARD_TOP_CARD_HEIG
             {chipBuilders.map(b => {
               const s = statusByStaffId[b.id] || { status: 'Off shift', tone: 'off' }
               const c = chipStyle[s.tone]
-              const idleMs = s.idleSince ? Date.now() - new Date(s.idleSince).getTime() : null
               return (
-                <div key={b.id} style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '2px', padding: '7px 12px', borderRadius: idleMs != null ? '14px' : '999px', background: c.bg, fontSize: '12px', fontWeight: 700 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
-                    <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: c.fg }} />
-                    <span
-                      onClick={() => onNavigate?.('builders', { staffId: b.id })}
-                      style={{ color: COLORS.slate900, cursor: onNavigate ? 'pointer' : 'default' }}
-                    >
-                      {b.name.split(' ')[0]}
-                    </span>
-                    <span style={{ color: c.fg }}>{s.status}</span>
-                  </div>
-                  {idleMs != null && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10.5px', fontWeight: 700, color: c.fg, opacity: 0.85 }}>
-                      <span>idle {formatDuration(idleMs)}</span>
-                      {s.idleLat != null && s.idleLng != null && (
-                        <a href={googleMapsLink(s.idleLat, s.idleLng)} target="_blank" rel="noreferrer" style={{ color: c.fg }}>
-                          📍 last seen
-                        </a>
-                      )}
-                    </div>
-                  )}
+                <div key={b.id} style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: '7px', padding: '7px 12px', borderRadius: '999px', background: c.bg, fontSize: '12px', fontWeight: 700 }}>
+                  <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: c.fg }} />
+                  <span
+                    onClick={() => onNavigate?.('builders', { staffId: b.id })}
+                    style={{ color: COLORS.slate900, cursor: onNavigate ? 'pointer' : 'default' }}
+                  >
+                    {b.name.split(' ')[0]}
+                  </span>
+                  <span style={{ color: c.fg }}>{s.status}</span>
                 </div>
               )
             })}
@@ -531,6 +538,22 @@ function TeamWhereabouts({ profile, onNavigate, height = DASHBOARD_TOP_CARD_HEIG
                       style={{ fontSize: '12.5px', fontWeight: 700, color: COLORS.blue700, cursor: onNavigate ? 'pointer' : 'default' }}
                     >
                       {' '}(Job #{e.ticketNumber})
+                    </span>
+                  )}
+                  {idleAnnotationByEntryId[e.id] && (
+                    <span style={{ fontSize: '12px', color: COLORS.slate400, fontWeight: 600 }}>
+                      {' '}&middot; idle {formatDuration(Date.now() - new Date(idleAnnotationByEntryId[e.id].idleSince).getTime())}
+                      {idleAnnotationByEntryId[e.id].idleLat != null && idleAnnotationByEntryId[e.id].idleLng != null && (
+                        <>
+                          {' '}&middot;{' '}
+                          <a
+                            href={googleMapsLink(idleAnnotationByEntryId[e.id].idleLat, idleAnnotationByEntryId[e.id].idleLng)}
+                            target="_blank" rel="noreferrer" style={{ color: COLORS.slate400 }}
+                          >
+                            📍 last seen
+                          </a>
+                        </>
+                      )}
                     </span>
                   )}
                 </div>
