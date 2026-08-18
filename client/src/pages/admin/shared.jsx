@@ -1426,16 +1426,18 @@ export async function suggestAutoAssignBuilder(category, { candidates: preFetche
   const candidates = preFetched ?? await fetchAssignableStaffForCategory(category)
   if (candidates.length === 0) return null
 
-  const { data: allOpenRows } = await supabase
-    .schema('pmms')
-    .from('tickets')
-    .select('assigned_builder_id')
-    .not('status', 'in', OPEN_TICKET_STATUS_EXCLUSION)
+  // RPC, not a direct table read -- a submitter's session can only see
+  // tickets she raised herself (submitter_select_own RLS), so a raw
+  // `.from('tickets')` query here came back empty under her session and
+  // this always fell back to picking the alphabetically-first eligible
+  // candidate instead of the genuinely least-busy one. The RPC is
+  // SECURITY DEFINER and returns only an aggregate count per builder --
+  // no ticket details -- so it works the same for every caller
+  // regardless of their own row-level access to tickets.
+  const { data: openCounts } = await supabase.schema('pmms').rpc('open_ticket_counts_by_builder')
 
   const openCountByBuilder = {}
-  ;(allOpenRows || []).forEach(t => {
-    if (t.assigned_builder_id) openCountByBuilder[t.assigned_builder_id] = (openCountByBuilder[t.assigned_builder_id] || 0) + 1
-  })
+  ;(openCounts || []).forEach(row => { openCountByBuilder[row.builder_id] = Number(row.open_count) })
 
   return candidates.reduce((best, c) =>
     (openCountByBuilder[c.id] || 0) < (openCountByBuilder[best.id] || 0) ? c : best
