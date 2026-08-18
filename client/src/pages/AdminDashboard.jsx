@@ -67,11 +67,11 @@ const NAV_ITEMS = [
   { key: 'voids', label: 'Voids', icon: 'key', Component: AdminVoids, divisions: ['Maintenance'] },
   // Division dashboards, grouped together in this order.
   { key: 'compliance', label: 'Compliance', icon: 'shield', Component: AdminCompliance, divisions: ['Maintenance', 'Compliance'] },
-  // Maintenance-only (not 'Landlord Liaison' itself) -- unlike Compliance/
-  // Housekeeping, the Landlord Liaison Manager doesn't get this nav item;
-  // she already has Pipeline for the same tickets, this is Admin/unscoped
-  // Maintenance Manager oversight only.
-  ...(LANDLORD_LIAISON_PAGE_ENABLED ? [{ key: 'landlord-liaison', label: 'Landlord Liaison', icon: 'building', Component: AdminLandlordLiaison, divisions: ['Maintenance'] }] : []),
+  // Restored for the Landlord Liaison Manager herself 2026-08-18 (was
+  // Maintenance-only oversight since 2026-08-15) -- same as Compliance/
+  // Housekeeping's own nav items, now visible to Admin/unscoped
+  // Maintenance Manager oversight AND the Landlord Liaison Manager.
+  ...(LANDLORD_LIAISON_PAGE_ENABLED ? [{ key: 'landlord-liaison', label: 'Landlord Liaison', icon: 'building', Component: AdminLandlordLiaison, divisions: ['Maintenance', 'Landlord Liaison'] }] : []),
   // Was divisionOnly (Housekeeping Manager/Admin only) until the main
   // dashboard grew its own Housekeeping KPI section for Admin/unscoped
   // Maintenance Manager oversight -- broadened to match Compliance's own
