@@ -55,7 +55,17 @@ function DashboardSection({ id, title, background, alertCount = 0, defaultCollap
       </div>
       <div style={{ display: 'grid', gridTemplateRows: collapsed ? '0fr' : '1fr', transition: 'grid-template-rows 0.22s ease' }}>
         <div style={{ overflow: 'hidden' }}>
-          <div style={{ background, display: 'flex', gap: '12px', flexWrap: 'wrap', padding: 'clamp(12px, 2vw, 20px)' }}>
+          {/* alignItems: flex-start, explicit -- flex's own default
+              (stretch) will inflate a single child to match whatever
+              height this row's cross-axis ends up computing to, rather
+              than the child's own natural content height, if anything
+              upstream (the grid-rows transition wrapper above included)
+              ever resolves an ambiguous/taller height. flex-start pins
+              this to always be exactly the content's real height,
+              regardless of what's going on further up the tree (found
+              live -- a tall empty gap sat under Ticket Pipeline's tiles
+              that no padding/margin value here could account for). */}
+          <div style={{ background, display: 'flex', alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap', padding: 'clamp(12px, 2vw, 20px)' }}>
             {children}
           </div>
         </div>
@@ -1239,60 +1249,19 @@ export default function AdminDashboard({ profile, onNavigate }) {
       </DashboardSection>
 
       <DashboardSection id="sign-off-mileage" title="Sign-Off & Mileage" background={COLORS.slate50} alertCount={flaggedLocationsCount} defaultCollapsed>
-        <button
-          onClick={() => onNavigate?.('sign-off')}
-          style={{
-            flex: '1 1 220px', background: pendingSignOffCount > 0 ? COLORS.red600 : COLORS.blue600, borderRadius: '16px', padding: '16px',
-            border: 'none', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', textAlign: 'center',
-          }}
-        >
-          <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Pending Sign-Off</p>
-          <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: COLORS.white }}>{pendingSignOffCount}</p>
-        </button>
-
-        <button
-          onClick={() => onNavigate?.('builders')}
-          style={{
-            flex: '1 1 220px', background: COLORS.sky500, borderRadius: '16px', padding: '16px',
-            border: 'none', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', textAlign: 'center',
-          }}
-        >
-          <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Fleet Mileage (This Month)</p>
-          <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: COLORS.white }}>{fleetMileageThisMonth.toFixed(1)}</p>
-        </button>
-
-        <button
-          onClick={() => onNavigate?.('clocking')}
-          style={{
-            flex: '1 1 220px', background: COLORS.violet600, borderRadius: '16px', padding: '16px',
-            border: 'none', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', textAlign: 'center',
-          }}
-        >
-          <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Currently Clocked In</p>
-          <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: COLORS.white }}>{clockedInCount}</p>
-        </button>
-
-        <button
-          onClick={() => onNavigate?.('clocking')}
-          style={{
-            flex: '1 1 220px', background: COLORS.red600, borderRadius: '16px', padding: '16px',
-            border: 'none', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', textAlign: 'center',
-          }}
-        >
-          <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Flagged Locations</p>
-          <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: COLORS.white }}>{flaggedLocationsCount}</p>
-        </button>
-
-        <button
-          onClick={() => onNavigate?.('reports')}
-          style={{
-            flex: '1 1 220px', background: COLORS.teal600, borderRadius: '16px', padding: '16px',
-            border: 'none', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', textAlign: 'center',
-          }}
-        >
-          <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Avg. Response Time</p>
-          <p style={{ margin: 0, fontSize: '28px', fontWeight: 800, color: COLORS.white }}>{avgResponseMs != null ? formatDuration(avgResponseMs) : 'N/A'}</p>
-        </button>
+        <div style={{ width: '100%' }}>
+          <KpiTiles
+            kpis={[
+              { label: 'Pending Sign-Off', value: pendingSignOffCount, colour: pendingSignOffCount > 0 ? COLORS.red600 : COLORS.blue600, navTo: 'sign-off' },
+              { label: 'Fleet Mileage (This Month)', value: fleetMileageThisMonth.toFixed(1), colour: COLORS.sky500, navTo: 'builders' },
+              { label: 'Currently Clocked In', value: clockedInCount, colour: COLORS.violet600, navTo: 'clocking' },
+              { label: 'Flagged Locations', value: flaggedLocationsCount, colour: COLORS.red600, navTo: 'clocking' },
+              { label: 'Avg. Response Time', value: avgResponseMs != null ? formatDuration(avgResponseMs) : 'N/A', colour: COLORS.teal600, navTo: 'reports' },
+            ]}
+            columns={5}
+            onTileClick={(kpi) => onNavigate?.(kpi.navTo)}
+          />
+        </div>
       </DashboardSection>
     </div>
   )
