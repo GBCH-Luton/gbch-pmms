@@ -1185,6 +1185,15 @@ export function floorContextLabel(property) {
   return (property?.layout_type === 'Flat' ? 'Which part of the flat?' : 'Which floor?') + ' (optional)'
 }
 
+// Shared between SubmitterDashboard.jsx (where these are asked) and
+// AdminPipeline.jsx (where the answers need to be visible to a manager) --
+// see add_submitter_signoff_quality_check.sql.
+export const SIGNOFF_QUESTIONS = [
+  { key: 'resolved', field: 'signoff_resolved', label: 'Was the issue resolved?' },
+  { key: 'goodStandard', field: 'signoff_good_standard', label: 'Was the work done to a good standard?' },
+  { key: 'clean', field: 'signoff_clean', label: 'Was the property left clean and tidy?' },
+]
+
 // ignoreSkills: true bypasses the skill-narrowing below entirely -- the
 // override a manager reaches for when they need to assign outside a
 // builder's tagged skills (Raise Ticket, Pipeline's reassign/bulk-reassign)

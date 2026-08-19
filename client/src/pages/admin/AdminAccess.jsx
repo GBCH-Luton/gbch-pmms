@@ -1252,6 +1252,8 @@ export default function AdminAccess({ profile }) {
   const [divisions, setDivisions] = useState(DEFAULT_DIVISIONS)
 
   const [roleFilter, setRoleFilter] = useState('Admin')
+  const [nameFilter, setNameFilter] = useState('')
+  const [sortBy, setSortBy] = useState('name')
   const [modalStaff, setModalStaff] = useState(undefined) // undefined = closed, null = add, object = edit
   const [resetPasswordTarget, setResetPasswordTarget] = useState(null)
   const [toggleActiveErrors, setToggleActiveErrors] = useState({})
@@ -1405,10 +1407,18 @@ export default function AdminAccess({ profile }) {
   // they're active -- deactivated staff never show in this list regardless
   // of tab, so a long list doesn't end up a mix of active and inactive.
   // They live in the separate "Deactivated Staff" section below instead.
+  const SORTERS = {
+    name: (a, b) => a.name.localeCompare(b.name),
+    role: (a, b) => (a.role || '').localeCompare(b.role || '') || a.name.localeCompare(b.name),
+    status: (a, b) => Number(isOnDuty(b.id)) - Number(isOnDuty(a.id)) || a.name.localeCompare(b.name),
+  }
+
   const filteredStaff = (roleFilter === 'All' ? relevantStaff
     : roleFilter === 'Unassigned' ? unassignedStaff
     : staffList.filter(s => s.role === roleFilter)
   ).filter(s => s.active !== false)
+    .filter(s => !nameFilter.trim() || s.name.toLowerCase().includes(nameFilter.trim().toLowerCase()))
+    .sort(SORTERS[sortBy])
 
   const deactivatedStaff = staffList.filter(s => s.active === false)
 
@@ -1497,6 +1507,18 @@ export default function AdminAccess({ profile }) {
                 {filterTabs.map(tab => (
                   <option key={tab} value={tab}>{tab}</option>
                 ))}
+              </select>
+              <input
+                type="text"
+                value={nameFilter}
+                onChange={(e) => setNameFilter(e.target.value)}
+                placeholder="Search by name..."
+                style={{ ...inputStyle, width: '160px' }}
+              />
+              <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={filterSelectStyle}>
+                <option value="name">Sort: Name (A-Z)</option>
+                <option value="role">Sort: Role</option>
+                <option value="status">Sort: On Duty first</option>
               </select>
             </div>
             <button

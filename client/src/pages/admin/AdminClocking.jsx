@@ -809,7 +809,7 @@ export default function AdminClocking({ profile, onNavigate, initialReopenHistor
         supabase
           .schema('pmms')
           .from('activity_log')
-          .select('id, activity_type, activity_category, note, end_note, started_at, arrived_at, ended_at, destination_ticket_id')
+          .select('id, activity_type, activity_category, note, end_note, started_at, arrived_at, ended_at, destination_ticket_id, mileage_logged')
           .eq('staff_id', staffId)
           .gte('started_at', lowerBound)
           .lte('started_at', upperBound)
@@ -1769,7 +1769,7 @@ export default function AdminClocking({ profile, onNavigate, initialReopenHistor
                 const meta = activityCategoryMeta(a.activity_type, a.activity_category)
                 const tone = a.activity_category ? `away-${a.activity_category}` : 'away'
                 events.push({ time: a.started_at, label: `${meta.leftVerb.charAt(0).toUpperCase()}${meta.leftVerb.slice(1)}${a.note ? `: ${a.note}` : ''}`, tone, ticketNumber: a.destinationTicketNumber })
-                if (a.arrived_at && meta.arriveVerb) events.push({ time: a.arrived_at, label: `${meta.arriveVerb.charAt(0).toUpperCase()}${meta.arriveVerb.slice(1)}`, tone })
+                if (a.arrived_at && meta.arriveVerb) events.push({ time: a.arrived_at, label: `${meta.arriveVerb.charAt(0).toUpperCase()}${meta.arriveVerb.slice(1)}${a.mileage_logged != null ? ` (${a.mileage_logged} mi)` : ''}`, tone })
                 if (a.ended_at) {
                   // "Going to Another Job" closes the same way whether he
                   // actually tapped "I've arrived -- start work" (ticket

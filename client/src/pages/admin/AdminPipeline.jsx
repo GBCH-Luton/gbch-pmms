@@ -18,7 +18,7 @@ import {
   modalTextareaStyle, modalErrorStyle, modalCancelBtnStyle, modalConfirmBtnStyle, radioRowStyle,
   roleBadgeStyle, postSystemComment, postAuditEvent, fetchAssignableBuilders, fetchAssignableStaffForDivision, fetchAssignableStaffForCategory, STAFF_AVAILABILITY_STYLES,
   createNotification, sendPushNotification, pushEmergencyAlert, resolveCategoryDivision, isTicketStuck, KpiTiles, fetchPriorityThresholds,
-  EVENTS_FEATURE_ENABLED,
+  EVENTS_FEATURE_ENABLED, SIGNOFF_QUESTIONS,
 } from './shared'
 
 const expandLabelStyle = { margin: '0 0 2px 0', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.04em' }
@@ -1478,7 +1478,7 @@ export default function AdminPipeline({
 
                             <div style={expandSectionStyle}>
                               <p style={expandSectionTitleStyle}>Notes &amp; Flags</p>
-                              {!t.no_access_flag && !(t.status === 'On Hold' && t.hold_reason) && !t.completion_note && !t.cancel_reason && !t.needs_followup && !t.signoff_flagged && (
+                              {!t.no_access_flag && !(t.status === 'On Hold' && t.hold_reason) && !t.completion_note && !t.cancel_reason && !t.needs_followup && !t.signoff_flagged && t.signoff_resolved == null && (
                                 <p style={{ fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic', margin: 0 }}>No notes on this ticket</p>
                               )}
 
@@ -1499,6 +1499,28 @@ export default function AdminPipeline({
                                       t.signoff_clean === false && 'Not left clean',
                                     ].filter(Boolean).join(' · ')}
                                   </p>
+                                </div>
+                              )}
+
+                              {/* Full 3-question record, shown regardless of
+                                  flagged status -- previously only the "No"
+                                  answers surfaced anywhere for a manager; the
+                                  normal all-Yes path left no visible trace at
+                                  all once archived. */}
+                              {t.signoff_resolved != null && (
+                                <div style={{ padding: '8px 10px', background: COLORS.slate50, border: `1px solid ${COLORS.slate200}`, borderRadius: '8px', marginBottom: '8px' }}>
+                                  <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 800, color: COLORS.slate500, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Submitter's Sign-off Check</p>
+                                  {SIGNOFF_QUESTIONS.map(q => (
+                                    <div key={q.key} style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', fontSize: '12px', marginBottom: '2px' }}>
+                                      <span style={{ color: COLORS.slate600 }}>{q.label}</span>
+                                      <span style={{ fontWeight: 700, color: t[q.field] === false ? COLORS.red600 : COLORS.green600 }}>{t[q.field] === false ? 'No' : 'Yes'}</span>
+                                    </div>
+                                  ))}
+                                  {/* Raiser-only sign-off means whoever answered
+                                      these 3 questions is always the ticket's own
+                                      raiser -- see add_raiser_only_signoff.sql. */}
+                                  <div style={{ borderTop: `1px solid ${COLORS.slate200}`, margin: '6px 0' }} />
+                                  <p style={{ margin: 0, fontSize: '11px', fontWeight: 700, color: COLORS.slate500 }}>Signed off by: {raisedByLabel(t)}</p>
                                 </div>
                               )}
 

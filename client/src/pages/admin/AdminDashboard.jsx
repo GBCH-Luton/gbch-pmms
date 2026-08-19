@@ -232,7 +232,7 @@ function TeamWhereabouts({ profile, onNavigate, height = DASHBOARD_TOP_CARD_HEIG
 
     const [{ data: attendanceData }, { data: activityData }, { data: openSessions }, { data: auditData }, { data: onHoldShortTrips }] = await Promise.all([
       supabase.schema('pmms').from('daily_attendance').select('id, staff_id, clock_in_at, late_flag, clock_out_at, early_leave_reason, clock_in_lat, clock_in_lng').or(`work_date.eq.${todayKey},clock_out_at.is.null`),
-      supabase.schema('pmms').from('activity_log').select('id, staff_id, activity_type, activity_category, note, end_note, started_at, started_lat, started_lng, arrived_at, ended_at, ticket_id, destination_ticket_id, destination_property_id').or(`started_at.gte.${todayKey}T00:00:00,ended_at.is.null`),
+      supabase.schema('pmms').from('activity_log').select('id, staff_id, activity_type, activity_category, note, end_note, started_at, started_lat, started_lng, arrived_at, ended_at, ticket_id, destination_ticket_id, destination_property_id, mileage_logged').or(`started_at.gte.${todayKey}T00:00:00,ended_at.is.null`),
       supabase.schema('pmms').from('work_sessions').select('id, ticket_id, builder_id').is('ended_at', null),
       // Job start/resume/complete/pause/no-access events -- these were
       // previously invisible here entirely (this panel only ever read
@@ -409,11 +409,15 @@ function TeamWhereabouts({ profile, onNavigate, height = DASHBOARD_TOP_CARD_HEIG
       })
       // Property visits split into travel -> arrival -> finish -- arriveVerb
       // only exists on the 'visit' category meta, so this is a no-op for
-      // every other category (builders' own included).
+      // every other category (builders' own included). Mileage is logged
+      // at this exact moment (see Log a Visit's arrival step) but was
+      // only ever surfaced in Clocking's own Travel & Visits rollup --
+      // shown here too now so it's visible in the live feed, not just
+      // the monthly summary.
       if (a.arrived_at && meta.arriveVerb) {
         entries.push({
           id: `${a.id}-arrive`, time: a.arrived_at, staffId: a.staff_id, staffName: b.name, tone: entryTone,
-          text: meta.arriveVerb,
+          text: `${meta.arriveVerb}${a.mileage_logged != null ? ` (${a.mileage_logged} mi)` : ''}`,
           ticketNumber: (destinationTicket ?? ticket)?.ticket_number,
         })
       }

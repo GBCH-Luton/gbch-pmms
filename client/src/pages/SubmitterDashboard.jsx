@@ -24,7 +24,7 @@ import { logLoginEvent } from '../lib/loginEvents'
 import { uploadTicketAttachments, formatUploadProgress } from '../lib/ticketAttachments'
 import { fetchMaintenanceCategories, sortedCategoryEntries, isUnlistedTag, unlistedTagFor, unlistedLabelFor, calculatePriorityScore } from '../lib/maintenanceCategories'
 import { attachBuilderSafeProperties } from '../lib/properties'
-import { statusColour, statusLabel, postSystemComment, postAuditEvent, KpiTiles, resolveStaffPhotoUrl, suggestAutoAssignBuilder, createNotification, fetchManagersForDivision, sendPushNotification, floorContextOptions, floorContextLabel } from './admin/shared'
+import { statusColour, statusLabel, postSystemComment, postAuditEvent, KpiTiles, resolveStaffPhotoUrl, suggestAutoAssignBuilder, createNotification, fetchManagersForDivision, sendPushNotification, floorContextOptions, floorContextLabel, SIGNOFF_QUESTIONS } from './admin/shared'
 import { NavIcon } from '../lib/icons'
 import PropertySearchSelect from '../components/PropertySearchSelect'
 import VoiceInputButton from '../components/VoiceInputButton'
@@ -552,7 +552,7 @@ function PipelineList({ profile, onGoToSignOff }) {
     const { data } = await supabase
       .schema('pmms')
       .from('tickets')
-      .select('id, ticket_number, status, category, room, description, photo_url, completion_note, completion_photo_url, created_at, completed_at, property_id')
+      .select('id, ticket_number, status, category, room, description, photo_url, completion_note, completion_photo_url, created_at, completed_at, property_id, signoff_submitted_at, signoff_resolved, signoff_good_standard, signoff_clean, signoff_note, signoff_flagged')
       .eq('id', ticket.id)
       .maybeSingle()
 
@@ -612,6 +612,27 @@ function PipelineList({ profile, onGoToSignOff }) {
                 {viewingTicket.completion_note && (
                   <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate600, background: COLORS.slate50, borderRadius: '8px', padding: '10px 12px' }}>{viewingTicket.completion_note}</p>
                 )}
+              </>
+            )}
+
+            {viewingTicket.signoff_submitted_at && (
+              <>
+                <p style={{ margin: '20px 0 6px 0', fontSize: '10px', fontWeight: 800, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Your Sign-off Check
+                </p>
+                <div style={{ background: COLORS.slate50, borderRadius: '8px', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {SIGNOFF_QUESTIONS.map(q => (
+                    <div key={q.key} style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', fontSize: '13px' }}>
+                      <span style={{ color: COLORS.slate600 }}>{q.label}</span>
+                      <span style={{ fontWeight: 700, color: viewingTicket[q.field] === false ? COLORS.red600 : COLORS.green600 }}>
+                        {viewingTicket[q.field] === false ? 'No' : 'Yes'}
+                      </span>
+                    </div>
+                  ))}
+                  {viewingTicket.signoff_note && (
+                    <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: COLORS.slate600 }}>{viewingTicket.signoff_note}</p>
+                  )}
+                </div>
               </>
             )}
           </div>
@@ -754,12 +775,8 @@ function PipelineList({ profile, onGoToSignOff }) {
 // archiving and notifies the ticket's division manager(s) instead, with a
 // required note on what's wrong. The ticket stays in the Sign-Off list
 // (still status 'Completed') so the submitter can come back and try again
-// once it's addressed.
-const SIGNOFF_QUESTIONS = [
-  { key: 'resolved', label: 'Was the issue resolved?' },
-  { key: 'goodStandard', label: 'Was the work done to a good standard?' },
-  { key: 'clean', label: 'Was the property left clean and tidy?' },
-]
+// once it's addressed. SIGNOFF_QUESTIONS itself now lives in ./admin/shared
+// so AdminPipeline.jsx can show the same answers to a manager.
 
 function SignOffList({ profile, onChanged }) {
   const [tickets, setTickets] = useState([])
