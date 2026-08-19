@@ -273,21 +273,29 @@ export function KpiTiles({ kpis, onTileClick, columns }) {
   // onto three lines. auto-fit + minmax keeps the same "grid, not
   // flex-wrap" layout callers asked for (a tidy row-aligned block, unlike
   // the flex mode's own looser wrap) while letting the column count drop
-  // on its own as the container narrows -- same minmax range the flex
-  // mode already uses, so both modes size tiles consistently.
+  // on its own as the container narrows.
+  //
+  // The minmax max is a fixed px cap, not 1fr -- on a wide screen with
+  // few tiles (e.g. 8 tiles -> 5 columns), 1fr stretched every column to
+  // fill the entire leftover row width, ballooning each tile far past
+  // what its actual content needed (found live -- a 5-column row on a
+  // ~1500px dashboard made each tile ~300px wide). A fixed max keeps
+  // tiles compact regardless of how much spare row width there is; any
+  // leftover space just sits empty after the last tile instead of
+  // inflating every one.
   return (
     <div style={columns
-      ? { display: 'grid', gridTemplateColumns: `repeat(auto-fit, minmax(clamp(110px, 14vw, 160px), 1fr))`, gap: '12px', marginBottom: '16px' }
-      : { display: 'flex', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }
+      ? { display: 'grid', gridTemplateColumns: `repeat(auto-fit, minmax(clamp(90px, 10vw, 120px), 130px))`, gap: '10px', marginBottom: '16px' }
+      : { display: 'flex', flexWrap: 'wrap', gap: '10px', marginBottom: '16px' }
     }>
       {kpis.map((kpi) => (
         <button
           key={kpi.label}
           onClick={() => onTileClick?.(kpi)}
-          style={{ ...(columns ? {} : { flex: '1 1 clamp(110px, 14vw, 160px)' }), background: kpi.colour, borderRadius: '16px', padding: 'clamp(10px, 1.6vw, 16px)', border: 'none', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', textAlign: 'center' }}
+          style={{ ...(columns ? {} : { flex: '1 1 clamp(90px, 10vw, 130px)' }), background: kpi.colour, borderRadius: '14px', padding: 'clamp(5px, 0.8vw, 7px) clamp(8px, 1.2vw, 12px)', border: 'none', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', textAlign: 'center' }}
         >
-          <p style={{ margin: '0 0 6px 0', fontSize: 'clamp(10px, 0.9vw, 11px)', fontWeight: 700, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{kpi.label}</p>
-          <p style={{ margin: 0, fontSize: 'clamp(20px, 2.6vw, 28px)', fontWeight: 800, color: COLORS.white }}>{kpi.value}</p>
+          <p style={{ margin: '0 0 2px 0', fontSize: 'clamp(9px, 0.8vw, 10px)', lineHeight: 1.1, fontWeight: 700, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{kpi.label}</p>
+          <p style={{ margin: 0, fontSize: 'clamp(18px, 2vw, 22px)', lineHeight: 1.1, fontWeight: 800, color: COLORS.white }}>{kpi.value}</p>
         </button>
       ))}
     </div>
