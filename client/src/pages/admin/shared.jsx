@@ -275,17 +275,15 @@ export function KpiTiles({ kpis, onTileClick, columns }) {
   // the flex mode's own looser wrap) while letting the column count drop
   // on its own as the container narrows.
   //
-  // The minmax max is a fixed px cap, not 1fr -- on a wide screen with
-  // few tiles (e.g. 8 tiles -> 5 columns), 1fr stretched every column to
-  // fill the entire leftover row width, ballooning each tile far past
-  // what its actual content needed (found live -- a 5-column row on a
-  // ~1500px dashboard made each tile ~300px wide). A fixed max keeps
-  // tiles compact regardless of how much spare row width there is; any
-  // leftover space just sits empty after the last tile instead of
-  // inflating every one.
+  // The minmax max is 1fr again -- a fixed px cap left dead empty space
+  // on the right of the row on a wide screen once the tile count's own
+  // natural width didn't reach the container's full width (found live).
+  // Tiles filling the row was never the problem; the excess height/
+  // padding was -- that's handled below via tighter padding and explicit
+  // line-height, independent of how wide each column stretches.
   return (
     <div style={columns
-      ? { display: 'grid', gridTemplateColumns: `repeat(auto-fit, minmax(clamp(90px, 10vw, 120px), 130px))`, gap: '10px', marginBottom: '16px' }
+      ? { display: 'grid', gridTemplateColumns: `repeat(auto-fit, minmax(clamp(90px, 10vw, 120px), 1fr))`, gap: '10px', marginBottom: '16px' }
       : { display: 'flex', flexWrap: 'wrap', gap: '10px', marginBottom: '16px' }
     }>
       {kpis.map((kpi) => (
