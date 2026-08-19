@@ -910,12 +910,19 @@ export default function AdminPipeline({
     // manager scans daily, but still fully visible by filtering Status to
     // Cancelled specifically (the option is still right there in the
     // dropdown), never actually removed from the data.
-    if (statusFilter === 'All' && t.status === 'Cancelled') return false
+    //
+    // Both exclusions are skipped when needsFollowupFilter is on -- the
+    // "Needs Follow-up" KPI tile counts every flagged ticket regardless of
+    // status (a flag doesn't stop mattering just because the ticket itself
+    // got archived), so clicking through must show the exact same set the
+    // tile counted. Found live: tile said 3, list showed only 2 -- #268 is
+    // Archived and was getting silently dropped here.
+    if (statusFilter === 'All' && t.status === 'Cancelled' && !needsFollowupFilter) return false
     // Same treatment for Archived (signed-off, locked, done) -- same reason:
     // it's finished work, not something a manager scanning the default list
     // needs to see every day. Still reachable via Status > Archived, or via
     // CompletedAll (which deliberately includes it -- see below).
-    if (statusFilter === 'All' && t.status === 'Archived') return false
+    if (statusFilter === 'All' && t.status === 'Archived' && !needsFollowupFilter) return false
     // Not a real ticket status -- a dropdown/KPI-tile value meaning
     // "Completed, whether or not it's since been signed off (Archived)",
     // so the Dashboard/Pipeline "Completed" tiles can count and link to
