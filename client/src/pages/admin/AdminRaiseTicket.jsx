@@ -44,12 +44,27 @@ const fieldSelectStyle = { width: '100%', height: '44px', padding: '0 12px', bor
 const fieldLabelStyle = { margin: '0 0 8px 0', fontSize: '11px', fontWeight: 600, color: COLORS.slate500, textTransform: 'uppercase', letterSpacing: '0.06em' }
 
 export default function AdminRaiseTicket({ profile, onNavigate }) {
-  // Landlord Liaison Manager can raise a ticket, but assigning it to a
-  // builder is the real Maintenance Manager's call, not hers -- she has no
-  // builders of her own, and the category she picks can route the ticket
-  // into any division. Leaving it unassigned (Pending) is the same outcome
-  // a builder-side "Log a Ticket" flow already produces.
+  // Landlord Liaison Manager can raise a ticket, but picking WHO handles it
+  // is the real division manager's call, not hers -- she has no visibility
+  // into another division's staff, and the category she picks can route
+  // the ticket anywhere. The picker's hidden for her; resolveAssignment()
+  // below auto-assigns behind the scenes instead (see its own comment).
   const canAssignBuilder = profile.division !== 'Landlord Liaison'
+
+  // When the picker's hidden (above), nothing ever sets assignedBuilderId
+  // for her -- without this every one of her tickets would sit Pending
+  // forever instead of routing the way it should. Mirrors exactly how
+  // SubmitterDashboard.jsx's own report form auto-assigns: same RPC-backed
+  // suggestAutoAssignBuilder(), no human confirmation needed, since she's
+  // in the same position a submitter is (flagging something she found,
+  // not making an assignment call herself). Found live via ticket #310.
+  async function resolveAssignment(category) {
+    if (canAssignBuilder) {
+      return { builderId: assignedBuilderId || null, assignType: assignedBuilderId && assignedBuilderId === autoSuggestedBuilderId ? 'Auto' : 'Manual' }
+    }
+    const suggested = await suggestAutoAssignBuilder(category)
+    return { builderId: suggested?.id || null, assignType: suggested ? 'Auto' : 'Manual' }
+  }
   const [loggingMode, setLoggingMode] = useState('maintenance') // 'maintenance' | 'compliance'
 
   const [ticketProperties, setTicketProperties] = useState([])
@@ -247,6 +262,8 @@ export default function AdminRaiseTicket({ profile, onNavigate }) {
     setTicketDuplicateWarning(null)
     setTicketSubmitting(true)
 
+    const { builderId: resolvedBuilderId, assignType: resolvedAssignType } = await resolveAssignment(ticketCategory)
+
     const { data, error } = await supabase
       .schema('pmms')
       .from('tickets')
@@ -258,17 +275,13 @@ export default function AdminRaiseTicket({ profile, onNavigate }) {
         description: finalIssueTag,
         priority_score: priorityScore,
         priority_override: priorityOverride || null,
-        assigned_builder_id: assignedBuilderId || null,
-        // Auto only when the admin left the auto-suggested builder in
-        // place -- picking anyone else (or clearing it) makes this a
-        // deliberate manual choice, same distinction AdminPipeline's
-        // Assign Type filter already relies on elsewhere.
-        assign_type: assignedBuilderId && assignedBuilderId === autoSuggestedBuilderId ? 'Auto' : 'Manual',
-        estimated_minutes: assignedBuilderId && estimatedMinutes !== '' ? Number(estimatedMinutes) : null,
+        assigned_builder_id: resolvedBuilderId,
+        assign_type: resolvedAssignType,
+        estimated_minutes: canAssignBuilder && resolvedBuilderId && estimatedMinutes !== '' ? Number(estimatedMinutes) : null,
         department: department || null,
         event_id: selectedEventId || null,
-        status: assignedBuilderId ? 'Assigned' : 'Pending',
-        first_assigned_at: assignedBuilderId ? new Date().toISOString() : null,
+        status: resolvedBuilderId ? 'Assigned' : 'Pending',
+        first_assigned_at: resolvedBuilderId ? new Date().toISOString() : null,
         raised_by: profile.id,
         raised_by_name: profile.name,
         created_at: new Date().toISOString(),
@@ -297,12 +310,12 @@ export default function AdminRaiseTicket({ profile, onNavigate }) {
     setTicketSubmitting(false)
     setTicketUploadProgress(null)
 
-    if (assignedBuilderId) {
-      await createNotification(assignedBuilderId, data[0].id, `You've been assigned Job #${data[0].ticket_number} at ${selectedTicketProperty?.address || 'a property'}.`)
+    if (resolvedBuilderId) {
+      await createNotification(resolvedBuilderId, data[0].id, `You've been assigned Job #${data[0].ticket_number} at ${selectedTicketProperty?.address || 'a property'}.`)
       if (sendPushOnAssign) {
-        await sendPushNotification([assignedBuilderId], 'New job assigned', `Job #${data[0].ticket_number} at ${selectedTicketProperty?.address || 'a property'}.`)
+        await sendPushNotification([resolvedBuilderId], 'New job assigned', `Job #${data[0].ticket_number} at ${selectedTicketProperty?.address || 'a property'}.`)
       }
-    } else if (!autoSuggestedBuilderId) {
+    } else if (!canAssignBuilder || !autoSuggestedBuilderId) {
       // Nobody eligible for this category at all (not just "admin chose to
       // leave it blank") -- worth a visible note on the ticket itself,
       // since an empty picker alone is easy to miss in hindsight.
@@ -389,6 +402,8 @@ export default function AdminRaiseTicket({ profile, onNavigate }) {
         photoUrl = await getSignedUrl('ticket-photos', path)
       }
 
+      const { builderId: resolvedBuilderId, assignType: resolvedAssignType } = await resolveAssignment(category)
+
       const { data, error } = await supabase
         .schema('pmms')
         .from('tickets')
@@ -401,12 +416,12 @@ export default function AdminRaiseTicket({ profile, onNavigate }) {
           priority_score: score,
           photo_url: photoUrl,
           priority_override: priorityOverride || null,
-          assigned_builder_id: assignedBuilderId || null,
-          assign_type: assignedBuilderId && assignedBuilderId === autoSuggestedBuilderId ? 'Auto' : 'Manual',
-          estimated_minutes: assignedBuilderId && estimatedMinutes !== '' ? Number(estimatedMinutes) : null,
+          assigned_builder_id: resolvedBuilderId,
+          assign_type: resolvedAssignType,
+          estimated_minutes: canAssignBuilder && resolvedBuilderId && estimatedMinutes !== '' ? Number(estimatedMinutes) : null,
           department: department || null,
-          status: assignedBuilderId ? 'Assigned' : 'Pending',
-          first_assigned_at: assignedBuilderId ? new Date().toISOString() : null,
+          status: resolvedBuilderId ? 'Assigned' : 'Pending',
+          first_assigned_at: resolvedBuilderId ? new Date().toISOString() : null,
           raised_by: profile.id,
           raised_by_name: profile.name,
           created_at: new Date().toISOString(),
@@ -420,12 +435,12 @@ export default function AdminRaiseTicket({ profile, onNavigate }) {
         return
       }
 
-      if (assignedBuilderId) {
-        await createNotification(assignedBuilderId, data[0].id, `You've been assigned Job #${data[0].ticket_number} at ${selectedTicketProperty?.address || 'a property'}.`)
+      if (resolvedBuilderId) {
+        await createNotification(resolvedBuilderId, data[0].id, `You've been assigned Job #${data[0].ticket_number} at ${selectedTicketProperty?.address || 'a property'}.`)
         if (sendPushOnAssign) {
-          await sendPushNotification([assignedBuilderId], 'New job assigned', `Job #${data[0].ticket_number} at ${selectedTicketProperty?.address || 'a property'}.`)
+          await sendPushNotification([resolvedBuilderId], 'New job assigned', `Job #${data[0].ticket_number} at ${selectedTicketProperty?.address || 'a property'}.`)
         }
-      } else if (!autoSuggestedBuilderId) {
+      } else if (!canAssignBuilder || !autoSuggestedBuilderId) {
         await postSystemComment(data[0].id, profile, 'No eligible builder was found for this category at the time this ticket was raised. Needs manual assignment.')
       }
 
