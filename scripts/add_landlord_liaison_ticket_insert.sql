@@ -19,4 +19,20 @@ create policy "landlord_liaison_insert_any_division" on pmms.tickets
     and raised_by = pmms.current_staff_id()
   );
 
+-- The INSERT policy above wasn't actually enough on its own: the client
+-- (AdminRaiseTicket.jsx) chains .select('id, ticket_number') after
+-- .insert(...), which PostgREST executes as INSERT ... RETURNING --
+-- Postgres treats a RETURNING clause as an implicit SELECT of the new
+-- row, so it ALSO needs a matching SELECT policy or the insert throws
+-- the exact same "violates row-level security policy" error even though
+-- the row was allowed in. Confirmed via direct SQL: the same insert
+-- succeeded once RETURNING was dropped, and failed with it present.
+create policy "landlord_liaison_select_own_raised" on pmms.tickets
+  for select to authenticated
+  using (
+    pmms.current_access_level() = 'manager'
+    and pmms.current_division() = 'Landlord Liaison'
+    and raised_by = pmms.current_staff_id()
+  );
+
 notify pgrst, 'reload schema';
