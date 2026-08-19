@@ -599,7 +599,18 @@ function TeamWhereabouts({ profile, onNavigate, height = DASHBOARD_TOP_CARD_HEIG
                   >
                     {b.name.split(' ')[0]}
                   </span>
-                  <span style={{ color: c.fg }}>{s.status}</span>
+                  <span style={{ color: c.fg }}>
+                    {s.status}
+                    {/* Idle duration lives here on the chip itself, not just
+                        as a log-entry annotation below -- the feed caps at
+                        40 entries across everyone, so on a busy day an idle
+                        person's own clock-in line (the entry the annotation
+                        was attached to) can scroll off entirely, making
+                        someone idle since first thing in the morning look
+                        unexplained. Found live: Craig idle with no visible
+                        clock-in anywhere in the feed. */}
+                    {s.tone === 'available' && s.idleSince && ` · idle ${formatDuration(Date.now() - new Date(s.idleSince).getTime())}`}
+                  </span>
                 </div>
               )
             })}
