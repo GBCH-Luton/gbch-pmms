@@ -1077,6 +1077,26 @@ export default function BuilderDashboard({ profile }) {
       console.error('Failed to start work session:', sessionError)
     }
 
+    // Defensive, not load-bearing under current code -- picking a
+    // destination under "Going to Another Job" no longer writes a travel
+    // record at all (see handleStartActivity), so openActivity should
+    // never actually be set here. Kept as insurance against a stale
+    // cached app bundle creating one the old way: found live 2026-08-19,
+    // a builder's session ran the pre-fix code long enough to create one
+    // of these, then picked up the current code before actually
+    // arriving -- with no closing logic left anywhere at that point, it
+    // stayed open forever and showed him as permanently "Away" despite
+    // being on the job. Costs nothing when openActivity is null (the
+    // normal case), and prevents this exact stuck state if it isn't.
+    if (openActivity?.activity_type === 'Travel' && openActivity.activity_category === 'job' && openActivity.destination_ticket_id === selectedTicket.id) {
+      await supabase
+        .schema('pmms')
+        .from('activity_log')
+        .update({ ended_at: now, ended_lat: position?.latitude ?? null, ended_lng: position?.longitude ?? null })
+        .eq('id', openActivity.id)
+      setOpenActivity(null)
+    }
+
     // idleSince is captured from the render that created this closure, i.e.
     // the moment right before this job started -- see computeIdleSince.
     if (idleSince) {
