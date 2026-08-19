@@ -34,6 +34,27 @@ export default function StaffLocationsMapModal({ open, onClose, staff }) {
 
     const located = (staff || []).filter(s => s.lat != null && s.lng != null)
 
+    // Two people can genuinely share one exact spot (e.g. a manager
+    // visiting the same property a housekeeper is already on a job at --
+    // found live) -- Leaflet stacks markers with identical coordinates
+    // exactly on top of each other, silently hiding all but the last one
+    // added. Spread same-spot markers into a small ring around the real
+    // point instead, so every pin stays visible and clickable.
+    const groups = {}
+    located.forEach(s => {
+      const key = `${s.lat.toFixed(5)},${s.lng.toFixed(5)}`
+      ;(groups[key] ||= []).push(s)
+    })
+    const OFFSET_DEGREES = 0.00012 // ~13m at this latitude, enough to separate pins without drifting off the real location
+    const offsetLocated = located.map(s => {
+      const key = `${s.lat.toFixed(5)},${s.lng.toFixed(5)}`
+      const group = groups[key]
+      if (group.length === 1) return s
+      const indexInGroup = group.indexOf(s)
+      const angle = (2 * Math.PI * indexInGroup) / group.length
+      return { ...s, lat: s.lat + OFFSET_DEGREES * Math.sin(angle), lng: s.lng + OFFSET_DEGREES * Math.cos(angle) }
+    })
+
     const map = L.map(mapContainerRef.current, { center: FALLBACK_CENTER, zoom: FALLBACK_ZOOM })
     mapRef.current = map
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -41,7 +62,7 @@ export default function StaffLocationsMapModal({ open, onClose, staff }) {
       maxZoom: 19,
     }).addTo(map)
 
-    located.forEach(s => {
+    offsetLocated.forEach(s => {
       // Tooltip, not popup -- shows on hover (a popup needs a click to
       // open), which is what a quick "who's this pin" glance wants.
       const label = `<b>${s.name}</b><br/>${s.status}${s.address ? `<br/>${s.address}` : ''}`
@@ -50,8 +71,8 @@ export default function StaffLocationsMapModal({ open, onClose, staff }) {
         .bindTooltip(label, { direction: 'top', offset: [0, -20] })
     })
 
-    if (located.length > 0) {
-      map.fitBounds(located.map(s => [s.lat, s.lng]), { padding: [40, 40], maxZoom: 15 })
+    if (offsetLocated.length > 0) {
+      map.fitBounds(offsetLocated.map(s => [s.lat, s.lng]), { padding: [40, 40], maxZoom: 15 })
     }
 
     // Leaflet measures its container on init -- inside a freshly-opened

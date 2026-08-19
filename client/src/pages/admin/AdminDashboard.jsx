@@ -341,16 +341,24 @@ function TeamWhereabouts({ profile, onNavigate, height = DASHBOARD_TOP_CARD_HEIG
         idleLng = lastEnded?.clock_out_lng ?? null
       }
 
+      // Same "last completed job's clock-out, or this morning's clock-in"
+      // fix used below for an Idle person, but computed unconditionally --
+      // a short trip (Lunch Break / Getting materials myself / Going to
+      // the Office, via Builder v2's Stop-sheet) never captures its own
+      // GPS fix at the moment it starts (unlike "Going to Another
+      // Job"/Log a Visit travel, which do), so it needs this same
+      // fallback too. Found live: Donoghue (Lunch Break) and Da Silva
+      // (Getting materials myself) had no pin at all on the map despite
+      // both having a perfectly good last-known fix on file.
+      const lastKnownLat = lastEnded?.clock_out_lat ?? shift?.clock_in_lat ?? null
+      const lastKnownLng = lastEnded?.clock_out_lng ?? shift?.clock_in_lng ?? null
+
       // Best available "where are they right now" for the map -- there's
       // no live tracking, so this is always a last-known fix: the
       // property they're actively on a job at, the property they've
       // arrived at on a visit, where their current trip started from, or
-      // (idle) wherever their last job/clock-in put them. Falls back to
-      // clock_in coordinates when idle and no job has ended yet today --
-      // idleLat/idleLng above deliberately don't do this (that's the
-      // "how long has he been idle" line, clock-in isn't an idle moment),
-      // but the map still wants a pin for someone who's simply not done
-      // anything yet.
+      // (idle, or a short trip with no fix of its own) wherever their
+      // last job/clock-in put them.
       // mapAddress only ever comes from an actual property lookup (on a
       // job, or arrived at a visit) -- a GPS fix from clock-in/trip-start
       // is just coordinates, no address to show without reverse-geocoding
@@ -368,9 +376,9 @@ function TeamWhereabouts({ profile, onNavigate, height = DASHBOARD_TOP_CARD_HEIG
         mapLat = destinationProperty?.latitude ?? openActivity.started_lat ?? null
         mapLng = destinationProperty?.longitude ?? openActivity.started_lng ?? null
         mapAddress = destinationProperty?.address ?? null
-      } else if (tone === 'available') {
-        mapLat = idleLat ?? shift?.clock_in_lat ?? null
-        mapLng = idleLng ?? shift?.clock_in_lng ?? null
+      } else if (tone === 'available' || (tone === 'away' && shortTripTicket)) {
+        mapLat = lastKnownLat
+        mapLng = lastKnownLng
       }
 
       statuses[b.id] = { status, tone, idleSince, idleLat, idleLng, mapLat, mapLng, mapAddress }
