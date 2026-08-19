@@ -20,7 +20,7 @@ import { COLORS } from '../../lib/colors'
 import { normalizeCustomRoles } from '../../lib/roles'
 import { attachProperties } from '../../lib/properties'
 import BuilderProfilePage from './BuilderProfilePage'
-import { thStyle, tdStyle, actionBtnStyle, STAFF_AVAILABILITY_OPTIONS, STAFF_AVAILABILITY_STYLES, Avatar, computeDutyStatus, fetchAssignableStaffForCategory } from './shared'
+import { thStyle, tdStyle, actionBtnStyle, filterSelectStyle, STAFF_AVAILABILITY_OPTIONS, STAFF_AVAILABILITY_STYLES, Avatar, computeDutyStatus, fetchAssignableStaffForCategory } from './shared'
 
 // Kept in sync with AdminAccess.jsx's own BUILT_IN_ROLES -- 'Cleaner' was
 // removed from both 2026-08-14 (superseded by the 'Housekeeper' custom role).
@@ -125,6 +125,9 @@ export default function AdminBuilders({ profile, initialStaffId, onInitialStaffI
   const [loading, setLoading] = useState(true)
   const [selectedStaffId, setSelectedStaffId] = useState(null)
   const [roleFilter, setRoleFilter] = useState('All')
+  const [nameFilter, setNameFilter] = useState('')
+  const [sortBy, setSortBy] = useState('name')
+  const [sortDir, setSortDir] = useState('asc')
 
   useEffect(() => {
     fetchData()
@@ -271,7 +274,36 @@ export default function AdminBuilders({ profile, initialStaffId, onInitialStaffI
   // person with that role was just deactivated), fall back to "All" rather
   // than silently showing an empty table with no visible way back.
   const effectiveRoleFilter = rolesInUse.includes(roleFilter) ? roleFilter : 'All'
-  const radarStaff = effectiveRoleFilter === 'All' ? activeRelevantStaff : activeRelevantStaff.filter(s => s.role === effectiveRoleFilter)
+  const roleFilteredStaff = effectiveRoleFilter === 'All' ? activeRelevantStaff : activeRelevantStaff.filter(s => s.role === effectiveRoleFilter)
+  const nameFilteredStaff = roleFilteredStaff.filter(s => !nameFilter.trim() || s.name.toLowerCase().includes(nameFilter.trim().toLowerCase()))
+
+  // Sort needs each row's computed duty info (badge label, active job
+  // count), not just raw staff fields, so it's resolved once here rather
+  // than re-calling dutyFor() inside the comparator on every render.
+  const SORTERS = {
+    name: (a, b) => a.name.localeCompare(b.name),
+    availability: (a, b) => (a.availability || '').localeCompare(b.availability || '') || a.name.localeCompare(b.name),
+    duty: (a, b) => a._duty.badge.label.localeCompare(b._duty.badge.label) || a.name.localeCompare(b.name),
+    activeJobs: (a, b) => a._duty.activeJobs.length - b._duty.activeJobs.length || a.name.localeCompare(b.name),
+  }
+  const radarStaff = nameFilteredStaff
+    .map(s => ({ ...s, _duty: dutyFor(s.id) }))
+    .sort(SORTERS[sortBy])
+  if (sortDir === 'desc') radarStaff.reverse()
+
+  function toggleSort(key) {
+    if (sortBy === key) { setSortDir(d => d === 'asc' ? 'desc' : 'asc'); return }
+    setSortBy(key)
+    setSortDir('asc')
+  }
+
+  function sortableTh(label, key) {
+    return (
+      <th style={{ ...thStyle, cursor: 'pointer', userSelect: 'none' }} onClick={() => toggleSort(key)}>
+        {label}{sortBy === key ? (sortDir === 'asc' ? ' ▲' : ' ▼') : ''}
+      </th>
+    )
+  }
 
   return (
     <div>
@@ -279,15 +311,6 @@ export default function AdminBuilders({ profile, initialStaffId, onInitialStaffI
         <h1 style={{ margin: '0 0 4px 0', fontSize: '18px', fontWeight: 800, color: COLORS.slate900 }}>Live Field Radar</h1>
         <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate500 }}>Real-time duty status and current assignment for every active staff member.</p>
       </div>
-
-      {/* Hidden only for a manager explicitly scoped to a division other
-          than Housekeeping -- same allow-list convention as the nav item
-          gating in AdminDashboard.jsx (isNavItemVisible's `divisions`
-          shape), applied inline here since this is a section within a
-          page rather than a whole page. */}
-      {(profile.role === 'admin' || !profile.division || profile.division === 'Housekeeping') && (
-        <OfficeCleaningRotaSection />
-      )}
 
       {/* KPI tiles */}
       <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
@@ -309,20 +332,20 @@ export default function AdminBuilders({ profile, initialStaffId, onInitialStaffI
         </div>
       </div>
 
-      {/* Role filter */}
-      <div style={{ display: 'flex', gap: '4px', marginBottom: '14px', flexWrap: 'wrap', borderBottom: `1px solid ${COLORS.slate200}` }}>
-        {filterTabs.map(tab => (
-          <button
-            key={tab}
-            onClick={() => setRoleFilter(tab)}
-            style={{
-              padding: '8px 14px', background: 'none', border: 'none', borderBottom: effectiveRoleFilter === tab ? `2px solid ${COLORS.teal700}` : '2px solid transparent',
-              color: effectiveRoleFilter === tab ? COLORS.teal700 : COLORS.slate500, fontSize: '13px', fontWeight: 700, cursor: 'pointer', marginBottom: '-1px', whiteSpace: 'nowrap',
-            }}
-          >
-            {tab}
-          </button>
-        ))}
+      {/* Role filter + name search */}
+      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '14px' }}>
+        <select value={effectiveRoleFilter} onChange={(e) => setRoleFilter(e.target.value)} style={filterSelectStyle}>
+          {filterTabs.map(tab => (
+            <option key={tab} value={tab}>{tab}</option>
+          ))}
+        </select>
+        <input
+          type="text"
+          value={nameFilter}
+          onChange={(e) => setNameFilter(e.target.value)}
+          placeholder="Search by name..."
+          style={{ flex: '1 1 auto', padding: '9px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', fontFamily: 'inherit', boxSizing: 'border-box' }}
+        />
       </div>
 
       <div style={{ background: COLORS.white, borderRadius: '16px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
@@ -330,11 +353,11 @@ export default function AdminBuilders({ profile, initialStaffId, onInitialStaffI
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: COLORS.slate50, borderBottom: `1px solid ${COLORS.slate200}` }}>
-                <th style={thStyle}>Staff</th>
-                <th style={thStyle}>Availability</th>
-                <th style={thStyle}>Duty Status</th>
+                {sortableTh('Staff', 'name')}
+                {sortableTh('Availability', 'availability')}
+                {sortableTh('Duty Status', 'duty')}
                 <th style={thStyle}>Current Assignment</th>
-                <th style={thStyle}>Active Jobs</th>
+                {sortableTh('Active Jobs', 'activeJobs')}
                 <th style={{ ...thStyle, textAlign: 'right' }}>Profile</th>
               </tr>
             </thead>
@@ -347,7 +370,7 @@ export default function AdminBuilders({ profile, initialStaffId, onInitialStaffI
                 </tr>
               )}
               {radarStaff.map(b => {
-                const { activeJobs, inProgressJob, badge } = dutyFor(b.id)
+                const { activeJobs, inProgressJob, badge } = b._duty
                 const availStyle = STAFF_AVAILABILITY_STYLES[b.availability] || STAFF_AVAILABILITY_STYLES.Available
                 return (
                   <tr key={b.id} style={{ borderBottom: `1px solid ${COLORS.slate100}` }}>
@@ -411,6 +434,19 @@ export default function AdminBuilders({ profile, initialStaffId, onInitialStaffI
           </table>
         </div>
       </div>
+
+      {/* Hidden only for a manager explicitly scoped to a division other
+          than Housekeeping -- same allow-list convention as the nav item
+          gating in AdminDashboard.jsx (isNavItemVisible's `divisions`
+          shape), applied inline here since this is a section within a
+          page rather than a whole page. Moved to the bottom of the page
+          2026-08-19 so the Live Field Radar (the day-to-day thing this
+          page is for) isn't pushed below the fold by a rota edit form. */}
+      {(profile.role === 'admin' || !profile.division || profile.division === 'Housekeeping') && (
+        <div style={{ marginTop: '20px' }}>
+          <OfficeCleaningRotaSection />
+        </div>
+      )}
     </div>
   )
 }
