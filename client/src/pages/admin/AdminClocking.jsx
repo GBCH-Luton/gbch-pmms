@@ -107,7 +107,7 @@ function sectionCardStyle(extra) {
   return { position: 'relative', overflow: 'hidden', background: COLORS.white, borderRadius: '16px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', ...extra }
 }
 
-export default function AdminClocking({ profile, onNavigate }) {
+export default function AdminClocking({ profile, onNavigate, initialReopenHistory, onInitialReopenHistoryConsumed }) {
   const [loading, setLoading] = useState(true)
   const [liveSessions, setLiveSessions] = useState([])
   const [completedRows, setCompletedRows] = useState([])
@@ -162,6 +162,19 @@ export default function AdminClocking({ profile, onNavigate }) {
   const [historyActivity, setHistoryActivity] = useState([])
   const [historyJobEvents, setHistoryJobEvents] = useState([])
   const [historyLoading, setHistoryLoading] = useState(false)
+
+  // Reopens this exact modal (same staff, same date) when arriving back
+  // via a "← Back to Clocking" link from a ticket a History row jumped
+  // to -- otherwise the link would only return to a bare Clocking page,
+  // losing the modal state that got you to that ticket in the first
+  // place. Consumed immediately so it doesn't keep reopening on every
+  // later re-render of this page.
+  useEffect(() => {
+    if (!initialReopenHistory) return
+    setHistoryModal({ staffId: initialReopenHistory.staffId, staffName: initialReopenHistory.staffName })
+    setHistoryDate(initialReopenHistory.date)
+    onInitialReopenHistoryConsumed?.()
+  }, [initialReopenHistory])
 
   const [monthlyMonth, setMonthlyMonth] = useState(ukDateKey().slice(0, 7))
   // 'today' | 'week' | 'month' -- 'month' still uses the arbitrary-month
@@ -1102,7 +1115,7 @@ export default function AdminClocking({ profile, onNavigate }) {
                 <div>
                   <strong style={{ display: 'block', fontSize: '13px', color: COLORS.slate900 }}>{row.builderName}</strong>
                   <span
-                    onClick={onNavigate ? () => onNavigate('pipeline', { ticketNumber: row.ticket.ticket_number }) : undefined}
+                    onClick={onNavigate ? () => onNavigate('pipeline', { ticketNumber: row.ticket.ticket_number, returnTo: { label: 'Clocking', page: 'clocking', opts: {} } }) : undefined}
                     style={{ fontSize: '12px', color: onNavigate ? COLORS.blue700 : COLORS.slate500, cursor: onNavigate ? 'pointer' : 'default', fontWeight: onNavigate ? 600 : 400 }}
                   >
                     #{row.ticket.ticket_number} · {row.ticket.property?.address} — {row.ticket.room || '—'} → {row.ticket.description}
@@ -1377,7 +1390,7 @@ export default function AdminClocking({ profile, onNavigate }) {
                 <tr key={row.ticket.id} style={{ borderBottom: `1px solid ${COLORS.slate100}` }}>
                   <td
                     style={{ ...tdStyle, ...(onNavigate ? { cursor: 'pointer' } : {}) }}
-                    onClick={onNavigate ? () => onNavigate('pipeline', { ticketNumber: row.ticket.ticket_number }) : undefined}
+                    onClick={onNavigate ? () => onNavigate('pipeline', { ticketNumber: row.ticket.ticket_number, returnTo: { label: 'Clocking', page: 'clocking', opts: {} } }) : undefined}
                   >
                     <span style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: COLORS.slate400 }}>#{row.ticket.ticket_number}</span>
                     <span style={{ display: 'block', fontWeight: 700, color: onNavigate ? COLORS.blue700 : COLORS.slate900 }}>{row.ticket.property?.address}</span>
@@ -1799,7 +1812,13 @@ export default function AdminClocking({ profile, onNavigate }) {
                         {e.label}
                         {e.ticketNumber != null && (
                           <span
-                            onClick={onNavigate ? () => onNavigate('pipeline', { ticketNumber: e.ticketNumber }) : undefined}
+                            onClick={onNavigate ? () => onNavigate('pipeline', {
+                              ticketNumber: e.ticketNumber,
+                              returnTo: {
+                                label: 'Clocking', page: 'clocking',
+                                opts: { reopenHistory: { staffId: historyModal.staffId, staffName: historyModal.staffName, date: historyDate } },
+                              },
+                            }) : undefined}
                             style={{ color: COLORS.blue700, cursor: onNavigate ? 'pointer' : 'default' }}
                           >
                             {' '}(Job #{e.ticketNumber})

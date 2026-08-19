@@ -92,7 +92,7 @@ function TicketWorkedTime({ ticketId }) {
 }
 
 export default function AdminPipeline({
-  profile, onTicketsChanged, initialStatusFilter, initialPriorityFilter, initialStuckFilter, initialNeedsFollowupFilter, initialTicketNumberSearch,
+  profile, onTicketsChanged, onNavigate, returnTo, initialStatusFilter, initialPriorityFilter, initialStuckFilter, initialNeedsFollowupFilter, initialTicketNumberSearch,
   initialCategoryFilter, initialDivisionFilter, initialBuilderFilter, initialPropertyFilter, initialFromDate, initialToDate,
   onInitialFilterConsumed,
 }) {
@@ -1054,6 +1054,22 @@ export default function AdminPipeline({
 
   return (
     <div>
+
+      {/* Only ever set when arriving via a "jump to this ticket" link from
+          somewhere else (e.g. Clocking's History modal) -- normal sidebar
+          navigation to Pipeline never sets this, since goToPage's own
+          history "replace" (not "push") means the browser's own Back
+          button doesn't retrace those jumps either. Without this there
+          was simply no way back to whatever specific view you jumped
+          from, short of manually re-navigating and re-finding it. */}
+      {returnTo && (
+        <button
+          onClick={() => onNavigate?.(returnTo.page, returnTo.opts)}
+          style={{ background: 'none', border: 'none', padding: 0, margin: '0 0 12px 0', color: COLORS.blue700, fontSize: '13px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+        >
+          ← Back to {returnTo.label}
+        </button>
+      )}
 
       <KpiTiles kpis={kpis} onTileClick={applyKpiFilter} />
 

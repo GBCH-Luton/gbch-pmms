@@ -211,6 +211,18 @@ export default function AdminDashboard({ profile }) {
   const [pipelineInitialProperty, setPipelineInitialProperty] = useState(null)
   const [pipelineInitialFromDate, setPipelineInitialFromDate] = useState(null)
   const [pipelineInitialToDate, setPipelineInitialToDate] = useState(null)
+  // Generic "jump out to X, then come back to exactly where you were"
+  // link -- goToPage's own history "replace" (not "push", deliberately,
+  // so normal sidebar clicks don't clutter the browser's Back button)
+  // means there's otherwise no way back from a link like Clocking's
+  // History modal opening a ticket in Pipeline. { label, page, opts }
+  // -- opts is whatever goToPage(page, opts) would normally take, so the
+  // "back" link is just another goToPage call, same as any nav click.
+  const [returnTo, setReturnTo] = useState(null)
+  // Clocking-specific: reopens the History modal for a given staff/date
+  // when arriving via a returnTo link, rather than just landing back on
+  // a bare Clocking page with the modal closed again.
+  const [clockingInitialReopenHistory, setClockingInitialReopenHistory] = useState(null)
   const [propertiesInitialFilter, setPropertiesInitialFilter] = useState(null)
   const [complianceInitialTierFilter, setComplianceInitialTierFilter] = useState(null)
   const [voidsInitialTierFilter, setVoidsInitialTierFilter] = useState(null)
@@ -632,6 +644,13 @@ export default function AdminDashboard({ profile }) {
       return next
     }, { replace: true })
     setSidebarOpen(false)
+    // Always decided fresh per call -- every navigation either carries its
+    // own returnTo or it doesn't, never inherited from whatever the last
+    // one happened to set.
+    setReturnTo(opts.returnTo || null)
+    if (key === 'clocking' && opts.reopenHistory) {
+      setClockingInitialReopenHistory(opts.reopenHistory)
+    }
     if (key === 'pipeline' && opts.statusFilter) {
       setPipelineInitialFilter(opts.statusFilter)
     }
@@ -1344,6 +1363,9 @@ export default function AdminDashboard({ profile }) {
               profile={profile}
               onTicketsChanged={refreshCounts}
               onNavigate={goToPage}
+              returnTo={returnTo}
+              initialReopenHistory={currentPage === 'clocking' ? clockingInitialReopenHistory : null}
+              onInitialReopenHistoryConsumed={() => setClockingInitialReopenHistory(null)}
               initialStatusFilter={currentPage === 'pipeline' ? pipelineInitialFilter : null}
               initialPriorityFilter={currentPage === 'pipeline' ? pipelineInitialPriorityFilter : null}
               initialStuckFilter={currentPage === 'pipeline' ? pipelineInitialStuckFilter : null}
