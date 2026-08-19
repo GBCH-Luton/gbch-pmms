@@ -423,9 +423,15 @@ function TeamWhereabouts({ profile, onNavigate, height = DASHBOARD_TOP_CARD_HEIG
       // shown here too now so it's visible in the live feed, not just
       // the monthly summary.
       if (a.arrived_at && meta.arriveVerb) {
+        // "arrived at the property" named no property at all -- a Log a
+        // Visit trip has no ticket to fall back on for that (destinationTicket
+        // is only set for 'job'-category travel), so the address was the
+        // only way to say where. propertiesById is already fetched above
+        // for the map.
+        const destinationProperty = a.destination_property_id ? propertiesById[a.destination_property_id] : null
         entries.push({
           id: `${a.id}-arrive`, time: a.arrived_at, staffId: a.staff_id, staffName: b.name, tone: entryTone,
-          text: `${meta.arriveVerb}${a.mileage_logged != null ? ` (${a.mileage_logged} mi)` : ''}`,
+          text: `${meta.arriveVerb}${destinationProperty ? ` — ${destinationProperty.address}` : ''}${a.mileage_logged != null ? ` (${a.mileage_logged} mi)` : ''}`,
           ticketNumber: (destinationTicket ?? ticket)?.ticket_number,
         })
       }
