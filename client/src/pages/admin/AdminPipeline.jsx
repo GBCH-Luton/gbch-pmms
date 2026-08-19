@@ -46,6 +46,21 @@ function renderIssueTag(tag) {
   )
 }
 
+// No human raised these -- check-office-cleaning-due (the 08:30 weekday
+// cron) inserts them directly with no raised_by/raised_by_name at all
+// (see scripts/add_office_cleaning_cron.sql), so they'd otherwise show
+// the same "Unknown" a genuinely missing raiser would -- misleading,
+// since there's nothing actually wrong with these, they just don't have
+// a person behind them. Matched on the exact category/issue_tag/
+// assign_type combination that function writes, not just "no raiser",
+// so a real ticket with a missing raiser for some other reason still
+// correctly reads "Unknown".
+function raisedByLabel(t) {
+  if (t.raised_by_name) return t.raised_by_name
+  if (t.category === 'Cleaning Rota' && t.issue_tag === 'Office Daily Clean' && t.assign_type === 'Auto') return 'Daily Cleaning Rota'
+  return 'Unknown'
+}
+
 // Actual hands-on-the-job time, not wall-clock turnaround -- same
 // work_sessions-summed definition as the Clocking page's "Total Time"
 // column and Sign-Off's workedMsByTicket, so this always matches what a
@@ -1365,7 +1380,7 @@ export default function AdminPipeline({
                               <p style={expandValueStyle}>#{t.ticket_number} — {t.category}</p>
 
                               <p style={expandLabelStyle}>Raised By</p>
-                              <p style={expandValueStyle}>{t.raised_by_name || 'Unknown'}</p>
+                              <p style={expandValueStyle}>{raisedByLabel(t)}</p>
 
                               {isCompliance && (
                                 <span style={{ display: 'inline-block', fontSize: '9px', fontWeight: 800, color: COLORS.orange700, background: COLORS.orange50, border: `1px solid ${COLORS.orange200}`, padding: '2px 6px', borderRadius: '20px', marginBottom: '8px' }}>
