@@ -34,7 +34,7 @@ const expandToggleBtnStyle = { width: '32px', height: '32px', borderRadius: '8px
 const orderInputStyle = { width: '40px', height: '32px', padding: 0, borderRadius: '8px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', fontWeight: 700, color: COLORS.slate600, textAlign: 'center', boxSizing: 'border-box', flexShrink: 0 }
 const removeBtnStyle = { padding: '8px 14px', background: COLORS.white, color: COLORS.red600, border: `1px solid ${COLORS.red200}`, borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', flexShrink: 0, marginLeft: 'auto' }
 
-const SECTION_IDS = ['priority-thresholds', 'issue-scores', 'compliance-types', 'clocking-rules', 'daily-attendance', 'stuck-ticket-alerts', 'compliance-alerts', 'dashboard-metrics']
+const SECTION_IDS = ['priority-thresholds', 'issue-scores', 'compliance-types', 'clocking-rules', 'daily-attendance', 'stuck-ticket-alerts', 'compliance-alerts', 'dashboard-metrics', 'appearance']
 
 function SettingsSection({ title, subtitle, headerExtra, open, onToggle, children }) {
   return (
@@ -188,6 +188,14 @@ export default function AdminSettings() {
   const [dashboardMetricsSaving, setDashboardMetricsSaving] = useState(false)
   const [dashboardMetricsSaved, setDashboardMetricsSaved] = useState(false)
 
+  // Default 9 -- a little taller than KpiTiles' own hardcoded fallback
+  // (7px, see shared.jsx) so tiles read as tiles rather than flat
+  // buttons out of the box, per the user's own complaint. This is the
+  // knob for that going forward instead of a code change each time.
+  const [kpiTilePaddingPx, setKpiTilePaddingPx] = useState(9)
+  const [appearanceSaving, setAppearanceSaving] = useState(false)
+  const [appearanceSaved, setAppearanceSaved] = useState(false)
+
   // Left blank ('') rather than defaulted -- a real query with unpriced
   // usage must show as "cost unknown" (see AdminReports.jsx's AI Usage
   // table), not silently report $0. Rates are per Anthropic's published
@@ -270,6 +278,7 @@ export default function AdminSettings() {
       if (map.new_property_window_hours != null) setNewPropertyWindowHours(map.new_property_window_hours)
       if (map.dashboard_total_tickets_period != null) setTotalTicketsPeriod(map.dashboard_total_tickets_period)
       if (map.dashboard_top_card_height_px != null) setDashboardCardHeightPx(Number(map.dashboard_top_card_height_px))
+      if (map.kpi_tile_padding_px != null) setKpiTilePaddingPx(Number(map.kpi_tile_padding_px))
       if (Array.isArray(map.divisions) && map.divisions.length > 0) setDivisions(map.divisions)
     }
     setLoading(false)
@@ -759,6 +768,15 @@ export default function AdminSettings() {
     setDashboardMetricsSaving(false)
     setDashboardMetricsSaved(true)
     setTimeout(() => setDashboardMetricsSaved(false), 2000)
+  }
+
+  async function saveAppearance() {
+    setAppearanceSaving(true)
+    setAppearanceSaved(false)
+    await saveSetting('kpi_tile_padding_px', Number(kpiTilePaddingPx))
+    setAppearanceSaving(false)
+    setAppearanceSaved(true)
+    setTimeout(() => setAppearanceSaved(false), 2000)
   }
 
   async function saveAiPricing() {
@@ -1792,6 +1810,35 @@ export default function AdminSettings() {
           {dashboardMetricsSaving ? 'Saving...' : 'Save Dashboard Metrics'}
         </button>
         {dashboardMetricsSaved && <span style={savedTagStyle}>✓ Saved</span>}
+      </SettingsSection>
+
+      {/* Appearance -- KPI tile sizing lived as hardcoded values in
+          shared.jsx's KpiTiles until this, meaning every tweak needed a
+          code change and a deploy. This is the self-service version. */}
+      <SettingsSection
+        title="Appearance"
+        subtitle="Controls how KPI tiles look across the whole app -- the dashboard, Pipeline, Sign-Off, and every division page."
+        open={!!openSections['appearance']}
+        onToggle={() => toggleSection('appearance')}
+      >
+        <div style={{ marginBottom: '16px' }}>
+          <label style={fieldLabelStyle}>KPI tile height (padding, px)</label>
+          <input
+            type="number"
+            min="4"
+            max="24"
+            step="1"
+            value={kpiTilePaddingPx}
+            onChange={(e) => setKpiTilePaddingPx(e.target.value)}
+            style={{ ...inputStyle, maxWidth: '160px' }}
+          />
+          <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: COLORS.slate400 }}>Higher = taller, more spaced-out tiles (feels more like a card); lower = flatter, more compact (feels more like a button). Still shrinks further on narrow screens regardless of this value.</p>
+        </div>
+
+        <button onClick={saveAppearance} disabled={appearanceSaving} style={{ ...saveBtnStyle, opacity: appearanceSaving ? 0.6 : 1, cursor: appearanceSaving ? 'not-allowed' : 'pointer' }}>
+          {appearanceSaving ? 'Saving...' : 'Save Appearance'}
+        </button>
+        {appearanceSaved && <span style={savedTagStyle}>✓ Saved</span>}
       </SettingsSection>
 
       {/* Section 7: AI Usage Pricing */}

@@ -2,6 +2,7 @@
 // admin/* page components, so the pipeline table, builder profile modal,
 // and dashboard KPIs all render tickets/priorities/dates identically.
 
+import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { COLORS } from '../../lib/colors'
 import { distanceMetres, ensurePropertyCoords } from '../../lib/geo'
@@ -266,7 +267,37 @@ export function isTicketStuck(ticket, thresholdsSetting, nowMs = Date.now(), p1T
 // KPI tiles) to a fixed-column CSS grid instead, so a 9-tile set reliably
 // lays out as 5-then-4 rather than however many happen to fit. Omitted
 // (every other KpiTiles call site), behaviour is unchanged.
+// Module-level, not per-component-instance -- a dashboard page can render
+// several KpiTiles at once (Ticket Pipeline, Sign-Off & Mileage, etc.),
+// and there's no reason each should run its own fetch/subscribe cycle for
+// a value that's identical across all of them. First instance to mount
+// kicks off the fetch; every other instance mounting while it's in
+// flight awaits the same promise instead of firing a duplicate query.
+let cachedKpiTilePaddingPx = null
+let kpiTilePaddingFetchPromise = null
+function fetchKpiTilePaddingPx() {
+  if (cachedKpiTilePaddingPx != null) return Promise.resolve(cachedKpiTilePaddingPx)
+  if (!kpiTilePaddingFetchPromise) {
+    kpiTilePaddingFetchPromise = supabase.schema('pmms').from('settings').select('setting_value').eq('setting_key', 'kpi_tile_padding_px').maybeSingle()
+      .then(({ data }) => {
+        cachedKpiTilePaddingPx = Number(data?.setting_value) || 9
+        return cachedKpiTilePaddingPx
+      })
+  }
+  return kpiTilePaddingFetchPromise
+}
+
 export function KpiTiles({ kpis, onTileClick, columns }) {
+  // Starts at the same default the Settings page ships with (9) so there's
+  // no visible flash/resize once the real fetched value (usually also 9,
+  // until someone actually changes it) lands a moment later.
+  const [tilePaddingPx, setTilePaddingPx] = useState(cachedKpiTilePaddingPx ?? 9)
+  useEffect(() => {
+    let cancelled = false
+    fetchKpiTilePaddingPx().then(px => { if (!cancelled) setTilePaddingPx(px) })
+    return () => { cancelled = true }
+  }, [])
+
   // `columns` used to mean a literal fixed column count
   // (`repeat(N, 1fr)`) -- rigid on a narrow screen, since N equal-width
   // columns don't reflow, they just get squeezed until every label wraps
@@ -290,7 +321,7 @@ export function KpiTiles({ kpis, onTileClick, columns }) {
         <button
           key={kpi.label}
           onClick={() => onTileClick?.(kpi)}
-          style={{ ...(columns ? {} : { flex: '1 1 clamp(90px, 10vw, 130px)' }), background: kpi.colour, borderRadius: '14px', padding: 'clamp(5px, 0.8vw, 7px) clamp(8px, 1.2vw, 12px)', border: 'none', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', textAlign: 'center' }}
+          style={{ ...(columns ? {} : { flex: '1 1 clamp(90px, 10vw, 130px)' }), background: kpi.colour, borderRadius: '14px', padding: `clamp(5px, 0.8vw, ${tilePaddingPx}px) clamp(8px, 1.2vw, 12px)`, border: 'none', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', textAlign: 'center' }}
         >
           <p style={{ margin: '0 0 2px 0', fontSize: 'clamp(9px, 0.8vw, 10px)', lineHeight: 1.1, fontWeight: 700, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{kpi.label}</p>
           <p style={{ margin: 0, fontSize: 'clamp(18px, 2vw, 22px)', lineHeight: 1.1, fontWeight: 800, color: COLORS.white }}>{kpi.value}</p>
