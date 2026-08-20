@@ -350,6 +350,20 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
 
     if (error) { setEditError(error.message); return }
 
+    // A change here is exactly "activated/deactivated/reactivated" -- the
+    // thing that previously left no trail at all (see
+    // scripts/add_property_status_history.sql). Only logged when the
+    // status actually changed, not on every save of this modal.
+    if (editStatus !== selectedProperty.status) {
+      await supabase.schema('pmms').from('property_status_history').insert({
+        property_id: selectedProperty.id,
+        from_status: selectedProperty.status || null,
+        to_status: editStatus,
+        changed_by: profile.id,
+        changed_by_name: profile.name,
+      })
+    }
+
     const updated = { ...selectedProperty, address: editAddress.trim(), postcode: editPostcode.trim() || null, town: editTown || null, property_type: editType, status: editStatus }
     setSelectedProperty(updated)
     setProperties(prev => prev.map(p => p.id === updated.id ? updated : p))
@@ -371,7 +385,7 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
     if (!addAddress.trim()) { setAddError('Address is required.'); return }
 
     setAddSaving(true)
-    const { error } = await supabase
+    const { data, error } = await supabase
       .schema('pmms')
       .from('properties')
       .insert({
@@ -381,10 +395,21 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
         property_type: addType,
         status: addStatus,
       })
+      .select('id')
 
     setAddSaving(false)
 
     if (error) { setAddError(error.message); return }
+
+    if (data?.[0]?.id) {
+      await supabase.schema('pmms').from('property_status_history').insert({
+        property_id: data[0].id,
+        from_status: null,
+        to_status: addStatus,
+        changed_by: profile.id,
+        changed_by_name: profile.name,
+      })
+    }
 
     setShowAddModal(false)
     await fetchProperties()

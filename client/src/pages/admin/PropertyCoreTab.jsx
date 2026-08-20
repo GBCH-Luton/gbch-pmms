@@ -17,7 +17,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { COLORS } from '../../lib/colors'
-import { modalLabelStyle, modalErrorStyle, fetchAssignableStaffForCategory } from './shared'
+import { modalLabelStyle, modalErrorStyle, fetchAssignableStaffForCategory, modalOverlayStyle, modalCardStyle, modalTitleStyle, formatUKDateTime } from './shared'
 import { compressImage } from '../../lib/imageCompression'
 import { getSignedUrl } from '../../lib/storage'
 
@@ -360,9 +360,82 @@ function CleanerAssignmentSection({ property, onSave, readOnly = false }) {
   )
 }
 
+const STATUS_HISTORY_STYLES = {
+  Inactive: { bg: COLORS.stone200, color: COLORS.stone600 },
+  Void: { bg: COLORS.red100, color: COLORS.red600 },
+  Procured: { bg: COLORS.slate100, color: COLORS.slate500 },
+  Internal: { bg: COLORS.violet100, color: COLORS.violet600 },
+}
+const statusPillStyle = (status) => STATUS_HISTORY_STYLES[status] || { bg: COLORS.green100, color: COLORS.green600 } // Occupied / Live
+
+// Same "History" modal pattern as PropertyRoomsTab.jsx's RoomHistoryModal
+// -- see scripts/add_property_status_history.sql for the table this reads.
+function PropertyStatusHistoryModal({ property, onClose }) {
+  const [history, setHistory] = useState(null)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    async function load() {
+      const { data, error: fetchError } = await supabase
+        .schema('pmms')
+        .from('property_status_history')
+        .select('*')
+        .eq('property_id', property.id)
+        .order('created_at', { ascending: false })
+
+      if (fetchError) { setError(fetchError.message); setHistory([]); return }
+      setHistory(data || [])
+    }
+    load()
+  }, [property.id])
+
+  return (
+    <div style={modalOverlayStyle}>
+      <div style={{ ...modalCardStyle, maxWidth: '480px' }}>
+        <p style={modalTitleStyle}>Status History — {property.address}</p>
+
+        <div style={{ marginTop: '12px', maxHeight: '400px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {error && <p style={modalErrorStyle}>{error}</p>}
+          {history === null && !error && (
+            <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate400 }}>Loading...</p>
+          )}
+          {history && history.length === 0 && (
+            <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>No status changes recorded for this property yet.</p>
+          )}
+          {history && history.map(h => (
+            <div key={h.id} style={{ border: `1px solid ${COLORS.slate200}`, borderRadius: '10px', padding: '10px 12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  {h.from_status && (
+                    <>
+                      <span style={{ fontSize: '11px', fontWeight: 800, padding: '2px 10px', borderRadius: '20px', ...statusPillStyle(h.from_status) }}>{h.from_status}</span>
+                      <span style={{ fontSize: '12px', color: COLORS.slate400 }}>&rarr;</span>
+                    </>
+                  )}
+                  <span style={{ fontSize: '11px', fontWeight: 800, padding: '2px 10px', borderRadius: '20px', ...statusPillStyle(h.to_status) }}>{h.to_status}</span>
+                </div>
+                <span style={{ fontSize: '12px', color: COLORS.slate400 }}>{formatUKDateTime(h.created_at)}</span>
+              </div>
+              {h.changed_by_name && <p style={{ margin: 0, fontSize: '12px', color: COLORS.slate500 }}>by {h.changed_by_name}</p>}
+            </div>
+          ))}
+        </div>
+
+        <button
+          onClick={onClose}
+          style={{ width: '100%', marginTop: '16px', padding: '10px', background: COLORS.slate100, color: COLORS.slate600, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export default function PropertyCoreTab({ property, onFieldsSaved, profile }) {
   const [photoUploading, setPhotoUploading] = useState(false)
   const [photoError, setPhotoError] = useState('')
+  const [statusHistoryOpen, setStatusHistoryOpen] = useState(false)
   const isHousekeeping = profile?.division === 'Housekeeping'
   const readOnly = profile?.division === 'Landlord Liaison'
 
@@ -374,6 +447,20 @@ export default function PropertyCoreTab({ property, onFieldsSaved, profile }) {
       .eq('id', property.id)
 
     if (error) return error.message
+
+    // Same history trail as AdminProperties.jsx's own "Edit" modal (the
+    // other place status gets changed) -- see
+    // scripts/add_property_status_history.sql. Only fires when this save
+    // actually touched status and changed its value.
+    if ('status' in fields && fields.status !== property.status) {
+      await supabase.schema('pmms').from('property_status_history').insert({
+        property_id: property.id,
+        from_status: property.status || null,
+        to_status: fields.status,
+        changed_by: profile?.id,
+        changed_by_name: profile?.name,
+      })
+    }
 
     onFieldsSaved(fields)
     return null
@@ -461,6 +548,14 @@ export default function PropertyCoreTab({ property, onFieldsSaved, profile }) {
               { key: 'construction_type', label: 'Construction Type', type: 'select', options: CONSTRUCTION_TYPES },
             ]}
           />
+
+          <button
+            onClick={() => setStatusHistoryOpen(true)}
+            style={{ background: 'none', border: 'none', padding: 0, marginBottom: '16px', color: COLORS.blue700, fontSize: '12.5px', fontWeight: 700, cursor: 'pointer' }}
+          >
+            View Status History
+          </button>
+          {statusHistoryOpen && <PropertyStatusHistoryModal property={property} onClose={() => setStatusHistoryOpen(false)} />}
 
           <EditableSection
             title="Size & Structure"
