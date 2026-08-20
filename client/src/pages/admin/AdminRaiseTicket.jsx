@@ -232,6 +232,11 @@ export default function AdminRaiseTicket({ profile, onNavigate }) {
   async function handleSubmitTicket(skipDuplicateCheck) {
     setTicketError('')
 
+    if (ticketMediaFiles.length === 0) {
+      setTicketError('Please add at least one photo of the issue.')
+      return
+    }
+
     if (assignedBuilderId && estimatedMinutes === '') {
       setTicketError('Please enter an estimated time for this job.')
       return
@@ -791,7 +796,7 @@ export default function AdminRaiseTicket({ profile, onNavigate }) {
           {/* Step 6: Photo + Submit */}
           {ticketStep4Complete && (
             <div style={{ background: SECTION_BG[1], padding: '20px' }}>
-              <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: COLORS.slate900 }}>6. Photo &amp; Submit</p>
+              <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: COLORS.slate900 }}>6. Photo (required) &amp; Submit</p>
 
               <TicketMediaPicker files={ticketMediaFiles} onChange={setTicketMediaFiles} inputId="admin-ticket-photo-input" />
 
@@ -819,7 +824,8 @@ export default function AdminRaiseTicket({ profile, onNavigate }) {
                   </button>
                   <button
                     onClick={() => handleSubmitTicket(true)}
-                    style={{ width: '100%', height: '44px', background: COLORS.amber600, border: 'none', borderRadius: '10px', color: COLORS.white, fontSize: '13px', fontWeight: 600, cursor: 'pointer', boxSizing: 'border-box' }}
+                    disabled={ticketMediaFiles.length === 0}
+                    style={{ width: '100%', height: '44px', background: COLORS.amber600, border: 'none', borderRadius: '10px', color: COLORS.white, fontSize: '13px', fontWeight: 600, cursor: ticketMediaFiles.length === 0 ? 'not-allowed' : 'pointer', opacity: ticketMediaFiles.length === 0 ? 0.6 : 1, boxSizing: 'border-box' }}
                   >
                     It's separate — log it anyway
                   </button>
@@ -834,7 +840,7 @@ export default function AdminRaiseTicket({ profile, onNavigate }) {
                   )}
                   <button
                     onClick={() => handleSubmitTicket(false)}
-                    disabled={ticketSubmitting}
+                    disabled={ticketSubmitting || ticketMediaFiles.length === 0}
                     style={{
                       width: '100%',
                       height: '48px',
@@ -845,8 +851,8 @@ export default function AdminRaiseTicket({ profile, onNavigate }) {
                       borderRadius: '12px',
                       fontSize: '14px',
                       fontWeight: 600,
-                      cursor: ticketSubmitting ? 'not-allowed' : 'pointer',
-                      opacity: ticketSubmitting ? 0.6 : 1,
+                      cursor: (ticketSubmitting || ticketMediaFiles.length === 0) ? 'not-allowed' : 'pointer',
+                      opacity: (ticketSubmitting || ticketMediaFiles.length === 0) ? 0.6 : 1,
                       boxSizing: 'border-box',
                     }}
                   >
