@@ -221,7 +221,12 @@ export default function PropertyComplianceTab({ property, profile }) {
   async function handleUpload(certType, file) {
     // compressImage() is a no-op pass-through for PDFs -- certs can be
     // either a scanned PDF or a photo, per the input's accept attr.
-    const compressed = await compressImage(file)
+    let compressed
+    try {
+      compressed = await compressImage(file)
+    } catch (compressErr) {
+      return compressErr.message
+    }
     const path = `${property.id}/${certType}/${Date.now()}-${compressed.name}`
     const { error: uploadError } = await supabase.storage.from('property-docs').upload(path, compressed)
     if (uploadError) return `Upload failed: ${uploadError.message}`

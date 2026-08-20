@@ -473,7 +473,14 @@ export default function PropertyCoreTab({ property, onFieldsSaved, profile }) {
     setPhotoUploading(true)
     setPhotoError('')
 
-    const compressed = await compressImage(file)
+    let compressed
+    try {
+      compressed = await compressImage(file)
+    } catch (compressErr) {
+      setPhotoUploading(false)
+      setPhotoError(compressErr.message)
+      return
+    }
     const path = `${property.id}/${Date.now()}-${compressed.name}`
     const { error: uploadError } = await supabase.storage.from('property-photos').upload(path, compressed)
 

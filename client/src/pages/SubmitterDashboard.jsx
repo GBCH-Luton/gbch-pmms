@@ -285,6 +285,7 @@ function NewReportForm({ profile, onSubmitted }) {
   const [issueOther, setIssueOther] = useState('')
   const [notes, setNotes] = useState('')
   const [mediaFiles, setMediaFiles] = useState([])
+  const [hasBrokenMedia, setHasBrokenMedia] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(null)
   const [error, setError] = useState('')
@@ -382,7 +383,7 @@ function NewReportForm({ profile, onSubmitted }) {
 
   const selectedProperty = properties.find(p => String(p.id) === String(propertyId))
   const step2Complete = !!room && (room !== 'Other Area...' || otherArea.trim())
-  const canSubmit = propertyId && step2Complete && category && issueTag && (!isUnlistedTag(issueTag) || issueOther.trim()) && mediaFiles.length > 0 && !submitting
+  const canSubmit = propertyId && step2Complete && category && issueTag && (!isUnlistedTag(issueTag) || issueOther.trim()) && mediaFiles.length > 0 && !hasBrokenMedia && !submitting
 
   if (success) {
     return (
@@ -486,11 +487,12 @@ function NewReportForm({ profile, onSubmitted }) {
           </div>
 
           <p style={{ ...fieldLabelStyle, marginTop: '16px' }}>Photo of the issue (required)</p>
-          <TicketMediaPicker files={mediaFiles} onChange={setMediaFiles} inputId="submitter-ticket-media-input" />
+          <TicketMediaPicker files={mediaFiles} onChange={setMediaFiles} inputId="submitter-ticket-media-input" onBrokenChange={setHasBrokenMedia} />
         </div>
       )}
 
       {error && <p style={{ color: COLORS.red600, fontSize: '13px', fontWeight: 600, marginTop: '16px' }}>{error}</p>}
+      {hasBrokenMedia && <p style={{ color: COLORS.red600, fontSize: '13px', fontWeight: 600, marginTop: '16px' }}>Check your photo — one couldn't be loaded, so it can't be submitted yet.</p>}
 
       {issueTag && (
         <button onClick={handleSubmit} disabled={!canSubmit} style={{ ...choiceBtn(true), width: '100%', marginTop: '20px', opacity: canSubmit ? 1 : 0.5, cursor: canSubmit ? 'pointer' : 'not-allowed' }}>

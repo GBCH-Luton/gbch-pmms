@@ -114,7 +114,14 @@ function AssetFormModal({ property, asset, onClose, onSaved, onDeleted, readOnly
 
     setUploading(true)
     setError('')
-    const compressed = await compressImage(file)
+    let compressed
+    try {
+      compressed = await compressImage(file)
+    } catch (compressErr) {
+      setUploading(false)
+      setError(compressErr.message)
+      return
+    }
     const path = `${property.id}/assets/${Date.now()}-${compressed.name}`
     const { error: uploadError } = await supabase.storage.from('property-docs').upload(path, compressed)
     setUploading(false)

@@ -114,7 +114,14 @@ export default function PropertyInventoryTab({ property, profile }) {
     setPhotoUploading(true)
     setError('')
 
-    const compressed = await compressImage(file)
+    let compressed
+    try {
+      compressed = await compressImage(file)
+    } catch (compressErr) {
+      setPhotoUploading(false)
+      setError(compressErr.message)
+      return
+    }
     const path = `${property.id}/inventory-${Date.now()}-${compressed.name}`
     const { error: uploadError } = await supabase.storage.from('property-photos').upload(path, compressed)
 

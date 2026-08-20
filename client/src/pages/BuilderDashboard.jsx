@@ -293,6 +293,7 @@ export default function BuilderDashboard({ profile }) {
   // choice. Now the same multi-file/video TicketMediaPicker "raise a
   // ticket" already uses.
   const [completeMediaFiles, setCompleteMediaFiles] = useState([])
+  const [hasBrokenCompleteMedia, setHasBrokenCompleteMedia] = useState(false)
   const [completeUploadProgress, setCompleteUploadProgress] = useState(null)
   const [completeSubmitting, setCompleteSubmitting] = useState(false)
   const [completeError, setCompleteError] = useState('')
@@ -323,6 +324,7 @@ export default function BuilderDashboard({ profile }) {
   const [ticketIssueTag, setTicketIssueTag] = useState(null)
   const [ticketIssueOther, setTicketIssueOther] = useState('')
   const [ticketMediaFiles, setTicketMediaFiles] = useState([])
+  const [hasBrokenTicketMedia, setHasBrokenTicketMedia] = useState(false)
   const [ticketDuplicateWarning, setTicketDuplicateWarning] = useState(null)
   const [ticketSubmitting, setTicketSubmitting] = useState(false)
   const [ticketUploadProgress, setTicketUploadProgress] = useState(null)
@@ -1693,11 +1695,12 @@ export default function BuilderDashboard({ profile }) {
         // accept attr -- compressImage is a no-op for video, compressVideo
         // is a no-op for photos, so exactly one of the two actually runs.
         const isVideo = failedItem.mediaFile.type.startsWith('video/')
-        const compressedMedia = isVideo
-          ? await compressVideo(failedItem.mediaFile, { onProgress: pct => setComplianceUploadProgress({ index: 1, total: 1, stage: 'compressing', pct }) })
-          : await compressImage(failedItem.mediaFile)
-        const path = `${profile.id}/${Date.now()}-${compressedMedia.name}`
+        let path
         try {
+          const compressedMedia = isVideo
+            ? await compressVideo(failedItem.mediaFile, { onProgress: pct => setComplianceUploadProgress({ index: 1, total: 1, stage: 'compressing', pct }) })
+            : await compressImage(failedItem.mediaFile)
+          path = `${profile.id}/${Date.now()}-${compressedMedia.name}`
           await uploadFileWithProgress('ticket-photos', path, compressedMedia, pct => setComplianceUploadProgress({ index: 1, total: 1, stage: 'uploading', pct }))
         } catch (uploadErr) {
           setComplianceSubmitting(false)
@@ -2807,7 +2810,7 @@ export default function BuilderDashboard({ profile }) {
               style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '14px', fontFamily: 'inherit', boxSizing: 'border-box', resize: 'vertical' }}
             />
 
-            <TicketMediaPicker files={completeMediaFiles} onChange={setCompleteMediaFiles} inputId="complete-media-input" />
+            <TicketMediaPicker files={completeMediaFiles} onChange={setCompleteMediaFiles} inputId="complete-media-input" onBrokenChange={setHasBrokenCompleteMedia} />
             {completeUploadProgress && (
               <p style={{ margin: 0, fontSize: '12px', color: COLORS.slate500, fontWeight: 600 }}>{formatUploadProgress(completeUploadProgress)}</p>
             )}
@@ -2882,10 +2885,13 @@ export default function BuilderDashboard({ profile }) {
             {checklistIncomplete && (
               <p style={{ margin: 0, fontSize: '12px', color: COLORS.amber600 }}>Complete every checklist item before confirming.</p>
             )}
+            {hasBrokenCompleteMedia && (
+              <p style={{ margin: 0, fontSize: '12px', color: COLORS.red600, fontWeight: 700 }}>Check your photo — one couldn't be loaded, so it can't be submitted yet.</p>
+            )}
             <button
               onClick={() => handleComplete(completeNote, completeMediaFiles, isRoutineVisit ? routineVisitChecklistTemplate.map(label => ({ label, checked: !!checklistChecked[label] })) : undefined, followUpNeeded, followUpNote.trim())}
-              disabled={completeSubmitting || checklistIncomplete}
-              style={{ width: '100%', padding: '16px', background: COLORS.green600, color: COLORS.white, border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: 700, cursor: (completeSubmitting || checklistIncomplete) ? 'not-allowed' : 'pointer', opacity: (completeSubmitting || checklistIncomplete) ? 0.6 : 1 }}
+              disabled={completeSubmitting || checklistIncomplete || hasBrokenCompleteMedia}
+              style={{ width: '100%', padding: '16px', background: COLORS.green600, color: COLORS.white, border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: 700, cursor: (completeSubmitting || checklistIncomplete || hasBrokenCompleteMedia) ? 'not-allowed' : 'pointer', opacity: (completeSubmitting || checklistIncomplete || hasBrokenCompleteMedia) ? 0.6 : 1 }}
             >
               {completeSubmitting ? 'Submitting...' : '✓ Confirm complete'}
             </button>
@@ -4337,7 +4343,7 @@ export default function BuilderDashboard({ profile }) {
                   <div style={{ background: SECTION_BG[0], padding: '20px' }}>
                     <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: COLORS.slate900 }}>5. Photo &amp; Submit</p>
 
-                    <TicketMediaPicker files={ticketMediaFiles} onChange={setTicketMediaFiles} inputId="ticket-photo-input" />
+                    <TicketMediaPicker files={ticketMediaFiles} onChange={setTicketMediaFiles} inputId="ticket-photo-input" onBrokenChange={setHasBrokenTicketMedia} />
 
                     <div style={{ marginTop: '16px' }}>
                       <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 600, color: COLORS.slate500, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Reported by</p>
@@ -4363,7 +4369,8 @@ export default function BuilderDashboard({ profile }) {
                         </button>
                         <button
                           onClick={() => handleSubmitTicket(true)}
-                          style={{ width: '100%', height: '44px', background: COLORS.amber600, border: 'none', borderRadius: '10px', color: COLORS.white, fontSize: '13px', fontWeight: 600, cursor: 'pointer', boxSizing: 'border-box' }}
+                          disabled={hasBrokenTicketMedia}
+                          style={{ width: '100%', height: '44px', background: COLORS.amber600, border: 'none', borderRadius: '10px', color: COLORS.white, fontSize: '13px', fontWeight: 600, cursor: hasBrokenTicketMedia ? 'not-allowed' : 'pointer', opacity: hasBrokenTicketMedia ? 0.6 : 1, boxSizing: 'border-box' }}
                         >
                           It's separate — log it anyway
                         </button>
@@ -4376,9 +4383,12 @@ export default function BuilderDashboard({ profile }) {
                         {ticketSuccess && (
                           <p style={{ margin: '16px 0 0 0', fontSize: '13px', color: COLORS.green600, fontWeight: 600 }}>✓ Ticket submitted successfully</p>
                         )}
+                        {hasBrokenTicketMedia && (
+                          <p style={{ margin: '16px 0 0 0', fontSize: '13px', color: COLORS.red600, fontWeight: 700 }}>Check your photo — one couldn't be loaded, so it can't be submitted yet.</p>
+                        )}
                         <button
                           onClick={() => handleSubmitTicket(false)}
-                          disabled={ticketSubmitting}
+                          disabled={ticketSubmitting || hasBrokenTicketMedia}
                           style={{
                             width: '100%',
                             height: '48px',
@@ -4389,8 +4399,8 @@ export default function BuilderDashboard({ profile }) {
                             borderRadius: '12px',
                             fontSize: '14px',
                             fontWeight: 600,
-                            cursor: ticketSubmitting ? 'not-allowed' : 'pointer',
-                            opacity: ticketSubmitting ? 0.6 : 1,
+                            cursor: (ticketSubmitting || hasBrokenTicketMedia) ? 'not-allowed' : 'pointer',
+                            opacity: (ticketSubmitting || hasBrokenTicketMedia) ? 0.6 : 1,
                             boxSizing: 'border-box',
                           }}
                         >

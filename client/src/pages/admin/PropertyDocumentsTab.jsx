@@ -96,7 +96,14 @@ function DocumentFormModal({ property, profile, doc, onClose, onSaved }) {
     setError('')
     // compressImage() is a no-op pass-through for anything non-image --
     // this field accepts any file type, not just photos.
-    const compressed = await compressImage(file)
+    let compressed
+    try {
+      compressed = await compressImage(file)
+    } catch (compressErr) {
+      setUploading(false)
+      setError(compressErr.message)
+      return
+    }
     const path = `${property.id}/documents/${Date.now()}-${compressed.name}`
     const { error: uploadError } = await supabase.storage.from('property-docs').upload(path, compressed)
     setUploading(false)

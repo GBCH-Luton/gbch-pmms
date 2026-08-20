@@ -74,7 +74,12 @@ export function subscribeToDm(onInsert, onUpdate) {
 export async function postDm({ senderId, senderName, recipientId, body, photoFile }) {
   let photoUrl = null
   if (photoFile) {
-    const compressed = await compressImage(photoFile)
+    let compressed
+    try {
+      compressed = await compressImage(photoFile)
+    } catch (compressErr) {
+      return { error: compressErr.message }
+    }
     const path = `${senderId}/${Date.now()}-${compressed.name}`
     const { error: uploadError } = await supabase.storage.from('chat-photos').upload(path, compressed)
     if (uploadError) return { error: `Photo upload failed: ${uploadError.message}` }

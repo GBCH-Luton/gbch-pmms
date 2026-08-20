@@ -79,6 +79,7 @@ export default function AdminRaiseTicket({ profile, onNavigate }) {
   const [ticketIssueTag, setTicketIssueTag] = useState(null)
   const [ticketIssueOther, setTicketIssueOther] = useState('')
   const [ticketMediaFiles, setTicketMediaFiles] = useState([])
+  const [hasBrokenTicketMedia, setHasBrokenTicketMedia] = useState(false)
   const [ticketDuplicateWarning, setTicketDuplicateWarning] = useState(null)
   const [ticketSubmitting, setTicketSubmitting] = useState(false)
   const [ticketUploadProgress, setTicketUploadProgress] = useState(null)
@@ -397,7 +398,14 @@ export default function AdminRaiseTicket({ profile, onNavigate }) {
       if (failedItem.mediaFile) {
         // compressImage() is a no-op pass-through for video -- this field
         // can be either a photo or a video, per the input's accept attr.
-        const compressedMedia = await compressImage(failedItem.mediaFile)
+        let compressedMedia
+        try {
+          compressedMedia = await compressImage(failedItem.mediaFile)
+        } catch (compressErr) {
+          setComplianceSubmitting(false)
+          setTicketError(compressErr.message)
+          return
+        }
         const path = `${profile.id}/${Date.now()}-${compressedMedia.name}`
         const { error: uploadError } = await supabase.storage.from('ticket-photos').upload(path, compressedMedia)
         if (uploadError) {
@@ -799,7 +807,7 @@ export default function AdminRaiseTicket({ profile, onNavigate }) {
             <div style={{ background: SECTION_BG[1], padding: '20px' }}>
               <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: COLORS.slate900 }}>6. Photo (required) &amp; Submit</p>
 
-              <TicketMediaPicker files={ticketMediaFiles} onChange={setTicketMediaFiles} inputId="admin-ticket-photo-input" />
+              <TicketMediaPicker files={ticketMediaFiles} onChange={setTicketMediaFiles} inputId="admin-ticket-photo-input" onBrokenChange={setHasBrokenTicketMedia} />
 
               <div style={{ marginTop: '16px' }}>
                 <p style={fieldLabelStyle}>Raised by</p>
@@ -825,8 +833,8 @@ export default function AdminRaiseTicket({ profile, onNavigate }) {
                   </button>
                   <button
                     onClick={() => handleSubmitTicket(true)}
-                    disabled={ticketMediaFiles.length === 0}
-                    style={{ width: '100%', height: '44px', background: COLORS.amber600, border: 'none', borderRadius: '10px', color: COLORS.white, fontSize: '13px', fontWeight: 600, cursor: ticketMediaFiles.length === 0 ? 'not-allowed' : 'pointer', opacity: ticketMediaFiles.length === 0 ? 0.6 : 1, boxSizing: 'border-box' }}
+                    disabled={ticketMediaFiles.length === 0 || hasBrokenTicketMedia}
+                    style={{ width: '100%', height: '44px', background: COLORS.amber600, border: 'none', borderRadius: '10px', color: COLORS.white, fontSize: '13px', fontWeight: 600, cursor: (ticketMediaFiles.length === 0 || hasBrokenTicketMedia) ? 'not-allowed' : 'pointer', opacity: (ticketMediaFiles.length === 0 || hasBrokenTicketMedia) ? 0.6 : 1, boxSizing: 'border-box' }}
                   >
                     It's separate — log it anyway
                   </button>
@@ -839,9 +847,12 @@ export default function AdminRaiseTicket({ profile, onNavigate }) {
                   {ticketSuccess && (
                     <p style={{ margin: '16px 0 0 0', fontSize: '13px', color: COLORS.green600, fontWeight: 600 }}>{ticketSuccess}</p>
                   )}
+                  {hasBrokenTicketMedia && (
+                    <p style={{ margin: '16px 0 0 0', fontSize: '13px', color: COLORS.red500, fontWeight: 600 }}>Check your photo — one couldn't be loaded, so it can't be submitted yet.</p>
+                  )}
                   <button
                     onClick={() => handleSubmitTicket(false)}
-                    disabled={ticketSubmitting || ticketMediaFiles.length === 0}
+                    disabled={ticketSubmitting || ticketMediaFiles.length === 0 || hasBrokenTicketMedia}
                     style={{
                       width: '100%',
                       height: '48px',
@@ -852,8 +863,8 @@ export default function AdminRaiseTicket({ profile, onNavigate }) {
                       borderRadius: '12px',
                       fontSize: '14px',
                       fontWeight: 600,
-                      cursor: (ticketSubmitting || ticketMediaFiles.length === 0) ? 'not-allowed' : 'pointer',
-                      opacity: (ticketSubmitting || ticketMediaFiles.length === 0) ? 0.6 : 1,
+                      cursor: (ticketSubmitting || ticketMediaFiles.length === 0 || hasBrokenTicketMedia) ? 'not-allowed' : 'pointer',
+                      opacity: (ticketSubmitting || ticketMediaFiles.length === 0 || hasBrokenTicketMedia) ? 0.6 : 1,
                       boxSizing: 'border-box',
                     }}
                   >

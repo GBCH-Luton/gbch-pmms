@@ -85,7 +85,14 @@ export default function PropertyGardensTab({ property, onFieldsSaved, profile })
     setUploading(true)
     setPhotoError('')
 
-    const compressed = await compressImage(file)
+    let compressed
+    try {
+      compressed = await compressImage(file)
+    } catch (compressErr) {
+      setUploading(false)
+      setPhotoError(compressErr.message)
+      return
+    }
     const path = `${property.id}/garden-${side}-${Date.now()}-${compressed.name}`
     const { error: uploadError } = await supabase.storage.from('property-photos').upload(path, compressed)
 

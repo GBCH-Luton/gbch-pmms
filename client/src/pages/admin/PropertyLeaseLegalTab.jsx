@@ -201,7 +201,14 @@ function DocUpload({ label, urlKey, property, onSave, bucketFolder, readOnly = f
     setError('')
     // compressImage() is a no-op pass-through for PDFs -- lease/legal docs
     // can be either a scanned PDF or a photo, per the input's accept attr.
-    const compressed = await compressImage(file)
+    let compressed
+    try {
+      compressed = await compressImage(file)
+    } catch (compressErr) {
+      setUploading(false)
+      setError(compressErr.message)
+      return
+    }
     const path = `${property.id}/${bucketFolder}/${Date.now()}-${compressed.name}`
     const { error: uploadError } = await supabase.storage.from('property-docs').upload(path, compressed)
 

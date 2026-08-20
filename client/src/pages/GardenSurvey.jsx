@@ -67,7 +67,14 @@ export default function GardenSurvey() {
     setUploading(true)
     setError('')
 
-    const compressed = await compressImage(file)
+    let compressed
+    try {
+      compressed = await compressImage(file)
+    } catch (compressErr) {
+      setUploading(false)
+      setError(compressErr.message)
+      return
+    }
     const path = `${propertyId}/garden-${side}-${Date.now()}-${compressed.name}`
     const { error: uploadError } = await supabase.storage.from('property-photos').upload(path, compressed)
 

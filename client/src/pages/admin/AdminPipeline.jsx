@@ -690,7 +690,14 @@ export default function AdminPipeline({
 
     let photoUrl = null
     if (completePhotoFile) {
-      const compressed = await compressImage(completePhotoFile)
+      let compressed
+      try {
+        compressed = await compressImage(completePhotoFile)
+      } catch (compressErr) {
+        setCompleteSubmitting(false)
+        setCompleteError(compressErr.message)
+        return
+      }
       const path = `${profile.id}/${Date.now()}-${compressed.name}`
       const { error: uploadError } = await supabase.storage.from('ticket-photos').upload(path, compressed)
       if (uploadError) {

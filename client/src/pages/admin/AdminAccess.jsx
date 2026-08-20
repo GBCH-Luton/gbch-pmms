@@ -1058,7 +1058,14 @@ function StaffRecordEditorPanel({ staffList, onSaved }) {
 
     setUploadingPhoto(true)
     setError('')
-    const compressed = await compressImage(file)
+    let compressed
+    try {
+      compressed = await compressImage(file)
+    } catch (compressErr) {
+      setUploadingPhoto(false)
+      setError(compressErr.message)
+      return
+    }
     const path = `${selected ? selected.id : 'new'}/${Date.now()}-${compressed.name}`
     const { error: uploadError } = await supabase.storage.from('staff-photos').upload(path, compressed)
     setUploadingPhoto(false)
