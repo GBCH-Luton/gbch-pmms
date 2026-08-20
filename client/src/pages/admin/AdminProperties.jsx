@@ -34,6 +34,7 @@ import PropertyRestrictionsTab from './PropertyRestrictionsTab'
 import PropertyGardensTab from './PropertyGardensTab'
 import { fetchTowns, DEFAULT_TOWNS } from '../../lib/towns'
 import AttachmentMedia from '../../components/AttachmentMedia'
+import PrintablePropertyReport from '../../components/PrintablePropertyReport'
 
 const PROPERTY_TYPES = ['House', 'Flat', 'HMO', 'Commercial', 'Other']
 const ALL_PROFILE_TABS = ['Core', 'Compliance', 'Assets', 'Maintenance', 'Lease & Legal', 'Documents', 'Notes', 'Rooms', 'Restrictions', 'Gardens']
@@ -157,6 +158,8 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
   const [search, setSearch] = useState('')
   const [towns, setTowns] = useState(DEFAULT_TOWNS)
   const [townFilter, setTownFilter] = useState('')
+  const [reportOpen, setReportOpen] = useState(false)
+  const [reportSectionOpen, setReportSectionOpen] = useState(false)
 
   const [selectedProperty, setSelectedProperty] = useState(null)
   const [activeTab, setActiveTab] = useState('Core')
@@ -748,6 +751,50 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
             Clear filter
           </button>
         </div>
+      )}
+
+      {/* Same "own labeled section, not crammed into the filter row" treatment
+          as Pipeline's own Generate a Report (see AdminPipeline.jsx) --
+          indigo so it doesn't blend into the neutral filter controls above. */}
+      <div style={{ marginBottom: '16px' }}>
+        <button
+          onClick={() => setReportSectionOpen(prev => !prev)}
+          style={{
+            display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between', gap: '12px',
+            padding: '12px 16px', background: COLORS.indigo100, border: `1px solid ${COLORS.indigo700}`, borderRadius: '12px',
+            cursor: 'pointer', fontSize: '12.5px', fontWeight: 800, color: COLORS.indigo700, textTransform: 'uppercase', letterSpacing: '0.05em',
+            boxShadow: '0 1px 3px rgba(67,56,202,0.15)',
+          }}
+        >
+          <span>🖨️ Generate a Report</span>
+          <span style={{ fontSize: '13px', fontWeight: 700, color: COLORS.indigo700, textTransform: 'none', letterSpacing: 0 }}>
+            {reportSectionOpen ? '▲ Collapse' : '▼ Expand'}
+          </span>
+        </button>
+        {reportSectionOpen && (
+          <div style={{
+            display: 'flex', gap: '16px', flexWrap: 'wrap', alignItems: 'center',
+            marginTop: '8px', padding: '12px 16px', borderRadius: '12px',
+            border: `1px solid ${COLORS.indigo100}`, background: COLORS.white,
+          }}>
+            <p style={{ margin: 0, fontSize: '12px', color: COLORS.slate500 }}>Uses the search, town, and status filters set above.</p>
+            <button onClick={() => setReportOpen(true)} style={{ padding: '9px 16px', borderRadius: '10px', border: 'none', background: COLORS.indigo700, color: COLORS.white, fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
+              🖨️ Print / Export
+            </button>
+          </div>
+        )}
+      </div>
+
+      {reportOpen && (
+        <PrintablePropertyReport
+          properties={filteredProperties.map(p => ({
+            ...p,
+            openTicketsCount: openTicketCounts[p.id] || 0,
+            voidRoomsCount: voidRoomCounts[p.id] || 0,
+          }))}
+          filterLabel={activeFilterLabel || 'All Properties'}
+          onClose={() => setReportOpen(false)}
+        />
       )}
 
       {loadError ? (
