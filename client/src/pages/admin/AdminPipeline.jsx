@@ -1127,12 +1127,17 @@ export default function AdminPipeline({
             <option key={c} value={c}>{c}</option>
           ))}
         </select>
-        <select value={builderFilter} onChange={(e) => setBuilderFilter(e.target.value)} style={filterSelectStyle}>
-          <option value="All">All Builders</option>
-          {builders.map(b => (
-            <option key={b.id} value={b.id}>{b.name}</option>
-          ))}
-        </select>
+        {/* Landlord Liaison Manager never assigns builders herself (see
+            canAssignBuilder in AdminRaiseTicket.jsx) -- filtering by one
+            isn't a thing she'd ever reach for. */}
+        {profile.division !== 'Landlord Liaison' && (
+          <select value={builderFilter} onChange={(e) => setBuilderFilter(e.target.value)} style={filterSelectStyle}>
+            <option value="All">All Builders</option>
+            {builders.map(b => (
+              <option key={b.id} value={b.id}>{b.name}</option>
+            ))}
+          </select>
+        )}
         <select value={submitterFilter} onChange={(e) => setSubmitterFilter(e.target.value)} style={filterSelectStyle}>
           <option value="All">All Submitters</option>
           {submitterOptions.map(([id, name]) => (
@@ -1145,11 +1150,13 @@ export default function AdminPipeline({
           <option value="P2 Urgent">P2 Urgent</option>
           <option value="P3 Routine">P3 Routine</option>
         </select>
-        <select value={assignTypeFilter} onChange={(e) => setAssignTypeFilter(e.target.value)} style={filterSelectStyle}>
-          <option value="All">Auto + Manual</option>
-          <option value="Auto">Auto-assigned only</option>
-          <option value="Manual">Manually assigned only</option>
-        </select>
+        {profile.division !== 'Landlord Liaison' && (
+          <select value={assignTypeFilter} onChange={(e) => setAssignTypeFilter(e.target.value)} style={filterSelectStyle}>
+            <option value="All">Auto + Manual</option>
+            <option value="Auto">Auto-assigned only</option>
+            <option value="Manual">Manually assigned only</option>
+          </select>
+        )}
         {/* Same fromDate/toDate the "Generate a report" section below also
             uses for the export -- it's a real filter on the list too (see
             dateField in the filter above), not just a report parameter, so
@@ -1162,10 +1169,12 @@ export default function AdminPipeline({
           <span style={{ fontSize: '12px', fontWeight: 700, color: COLORS.slate400 }}>to</span>
           <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} style={filterSelectStyle} />
         </div>
-        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 12px', borderRadius: '10px', border: `1px solid ${COLORS.amber200}`, background: COLORS.amber50, color: COLORS.amber800, fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
-          <input type="checkbox" checked={stuckOnlyFilter} onChange={(e) => setStuckOnlyFilter(e.target.checked)} />
-          ⚠ Stuck only
-        </label>
+        {profile.division !== 'Landlord Liaison' && (
+          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 12px', borderRadius: '10px', border: `1px solid ${COLORS.amber200}`, background: COLORS.amber50, color: COLORS.amber800, fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
+            <input type="checkbox" checked={stuckOnlyFilter} onChange={(e) => setStuckOnlyFilter(e.target.checked)} />
+            ⚠ Stuck only
+          </label>
+        )}
         <label style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 12px', borderRadius: '10px', border: `1px solid ${COLORS.violet500}`, background: `${COLORS.violet500}14`, color: COLORS.violet600, fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
           <input type="checkbox" checked={needsFollowupFilter} onChange={(e) => setNeedsFollowupFilter(e.target.checked)} />
           ⚑ Needs follow-up only
