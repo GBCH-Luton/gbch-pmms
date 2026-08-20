@@ -1106,7 +1106,7 @@ export default function BuilderDashboard({ profile }) {
       }
     }
 
-    await postAuditEvent(selectedTicket.id, 'Status Changed', `${previousStatus} → In Progress (clocked in)`)
+    await postAuditEvent(selectedTicket.id, 'Status Changed', `${previousStatus} → In Progress (logged)`)
 
     await fetchTickets()
     setSelectedTicket(prev => ({ ...prev, status: 'In Progress' }))
