@@ -32,12 +32,13 @@ import PropertyNotesTab from './PropertyNotesTab'
 import PropertyRoomsTab from './PropertyRoomsTab'
 import PropertyRestrictionsTab from './PropertyRestrictionsTab'
 import PropertyGardensTab from './PropertyGardensTab'
+import PropertyInventoryTab from './PropertyInventoryTab'
 import { fetchTowns, DEFAULT_TOWNS } from '../../lib/towns'
 import AttachmentMedia from '../../components/AttachmentMedia'
 import PrintablePropertyReport from '../../components/PrintablePropertyReport'
 
 const PROPERTY_TYPES = ['House', 'Flat', 'HMO', 'Commercial', 'Other']
-const ALL_PROFILE_TABS = ['Core', 'Compliance', 'Assets', 'Maintenance', 'Lease & Legal', 'Documents', 'Notes', 'Rooms', 'Restrictions', 'Gardens']
+const ALL_PROFILE_TABS = ['Core', 'Compliance', 'Assets', 'Maintenance', 'Lease & Legal', 'Documents', 'Notes', 'Rooms', 'Restrictions', 'Gardens', 'Inventory']
 // Division-scoped managers only see the tabs relevant to what they
 // actually do -- everything else here is out of scope for their role,
 // even though the underlying RLS doesn't enforce this (see
@@ -698,6 +699,8 @@ export default function AdminProperties({ profile, initialPropertiesFilter, onPr
                 <PropertyRestrictionsTab property={selectedProperty} onFieldsSaved={handleCoreFieldsSaved} readOnly={profile.division === 'Housekeeping' || profile.division === 'Landlord Liaison'} />
               ) : effectiveActiveTab === 'Gardens' ? (
                 <PropertyGardensTab property={selectedProperty} onFieldsSaved={handleCoreFieldsSaved} profile={profile} />
+              ) : effectiveActiveTab === 'Inventory' ? (
+                <PropertyInventoryTab property={selectedProperty} profile={profile} />
               ) : null}
             </>
           )
