@@ -24,12 +24,13 @@ import { logLoginEvent } from '../lib/loginEvents'
 import { uploadTicketAttachments, formatUploadProgress } from '../lib/ticketAttachments'
 import { fetchMaintenanceCategories, sortedCategoryEntries, isUnlistedTag, unlistedTagFor, unlistedLabelFor, calculatePriorityScore } from '../lib/maintenanceCategories'
 import { attachBuilderSafeProperties } from '../lib/properties'
-import { statusColour, statusLabel, postSystemComment, postAuditEvent, KpiTiles, resolveStaffPhotoUrl, suggestAutoAssignBuilder, AUTO_ASSIGN_ON_RAISE_ENABLED, createNotification, fetchManagersForDivision, sendPushNotification, floorContextOptions, floorContextLabel, SIGNOFF_QUESTIONS } from './admin/shared'
+import { statusColour, statusLabel, postSystemComment, postAuditEvent, KpiTiles, resolveStaffPhotoUrl, suggestAutoAssignBuilder, AUTO_ASSIGN_ON_RAISE_ENABLED, GARDEN_SURVEY_CAMPAIGN_ENABLED, createNotification, fetchManagersForDivision, sendPushNotification, floorContextOptions, floorContextLabel, SIGNOFF_QUESTIONS } from './admin/shared'
 import { NavIcon } from '../lib/icons'
 import PropertySearchSelect from '../components/PropertySearchSelect'
 import VoiceInputButton from '../components/VoiceInputButton'
 import TicketMediaPicker from '../components/TicketMediaPicker'
 import TicketAttachmentGallery from '../components/TicketAttachmentGallery'
+import GardenSurvey from './GardenSurvey'
 import gbchLogo from '../assets/gbch-logo.svg'
 
 const ROOM_OPTIONS = ['Kitchen', 'Bathroom', 'Communal Area', 'Bedroom', 'Hallways / Stairs', 'Garden', 'Other Area...']
@@ -56,6 +57,12 @@ const NAV_ITEMS = [
   { key: 'pipeline', label: 'Pipeline', icon: 'pipeline' },
   { key: 'new', label: 'Report an Issue', icon: 'ticket' },
   { key: 'signoff', label: 'Sign Off', icon: 'check' },
+  // Temporary campaign item -- see GARDEN_SURVEY_CAMPAIGN_ENABLED
+  // (admin/shared.jsx) for how this gets pulled once every property's
+  // covered. No matching entry in lib/icons.jsx (not worth a permanent
+  // icon for a temporary item), so this one renders an emoji instead of
+  // NavIcon below.
+  ...(GARDEN_SURVEY_CAMPAIGN_ENABLED ? [{ key: 'gardens', label: 'Garden Check', icon: null, emoji: '🌿' }] : []),
 ]
 
 export default function SubmitterDashboard({ profile }) {
@@ -155,7 +162,7 @@ export default function SubmitterDashboard({ profile }) {
                 style={{ ...navButtonStyle(currentPage === item.key), justifyContent: isCollapsed ? 'center' : 'flex-start', padding: isCollapsed ? '8px 0' : '6px 12px' }}
               >
                 <span style={{ ...navIconStyle, position: 'relative' }}>
-                  <NavIcon name={item.icon} />
+                  {item.emoji ? <span style={{ fontSize: '15px', lineHeight: 1 }}>{item.emoji}</span> : <NavIcon name={item.icon} />}
                   {isCollapsed && alertCount > 0 && (
                     <span style={{ position: 'absolute', top: '-3px', right: '-1px', width: '8px', height: '8px', borderRadius: '50%', background: COLORS.red600, border: `1.5px solid ${COLORS.forestDark}` }} />
                   )}
@@ -249,6 +256,7 @@ export default function SubmitterDashboard({ profile }) {
           {currentPage === 'new' && <NewReportForm profile={profile} onSubmitted={() => goToPage('pipeline')} />}
           {currentPage === 'pipeline' && <PipelineList profile={profile} onGoToSignOff={() => goToPage('signoff')} />}
           {currentPage === 'signoff' && <SignOffList profile={profile} onChanged={fetchSignOffCount} />}
+          {currentPage === 'gardens' && GARDEN_SURVEY_CAMPAIGN_ENABLED && <GardenSurvey />}
         </div>
       </div>
 

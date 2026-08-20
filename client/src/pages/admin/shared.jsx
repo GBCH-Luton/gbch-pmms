@@ -61,6 +61,17 @@ export const LANDLORD_LIAISON_PAGE_ENABLED = true
 // rebuilding.
 export const AUTO_ASSIGN_ON_RAISE_ENABLED = false
 
+// Temporary garden survey campaign (2026-08-20) -- support workers (Ticket
+// Submitter role) visit properties daily and can record garden state/photos
+// while they're there, cheaper than waiting on an admin to do it via the
+// real Gardens tab. Gates the "Garden Check" nav item on SubmitterDashboard
+// (see GardenSurvey.jsx + pmms.garden_survey_properties()/
+// submit_garden_survey() in scripts/add_garden_survey_campaign.sql). Flip
+// to false once every property's been covered to pull the menu -- the
+// underlying data/functions stay in place, nothing to rebuild if a similar
+// sweep is ever needed again.
+export const GARDEN_SURVEY_CAMPAIGN_ENABLED = true
+
 export const GLOBAL_TRIAGE_THRESHOLD = 70
 export const P2_URGENT_THRESHOLD = 40
 
