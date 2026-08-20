@@ -24,7 +24,7 @@ import { logLoginEvent } from '../lib/loginEvents'
 import { uploadTicketAttachments, formatUploadProgress } from '../lib/ticketAttachments'
 import { fetchMaintenanceCategories, sortedCategoryEntries, isUnlistedTag, unlistedTagFor, unlistedLabelFor, calculatePriorityScore } from '../lib/maintenanceCategories'
 import { attachBuilderSafeProperties } from '../lib/properties'
-import { statusColour, statusLabel, postSystemComment, postAuditEvent, KpiTiles, resolveStaffPhotoUrl, suggestAutoAssignBuilder, createNotification, fetchManagersForDivision, sendPushNotification, floorContextOptions, floorContextLabel, SIGNOFF_QUESTIONS } from './admin/shared'
+import { statusColour, statusLabel, postSystemComment, postAuditEvent, KpiTiles, resolveStaffPhotoUrl, suggestAutoAssignBuilder, AUTO_ASSIGN_ON_RAISE_ENABLED, createNotification, fetchManagersForDivision, sendPushNotification, floorContextOptions, floorContextLabel, SIGNOFF_QUESTIONS } from './admin/shared'
 import { NavIcon } from '../lib/icons'
 import PropertySearchSelect from '../components/PropertySearchSelect'
 import VoiceInputButton from '../components/VoiceInputButton'
@@ -310,8 +310,10 @@ function NewReportForm({ profile, onSubmitted }) {
     // No assignment picker here (submitters never got one) -- routing
     // happens silently instead, same least-loaded-eligible-builder logic
     // as the admin raise-ticket form, just without the option to see or
-    // override it before submitting.
-    const suggested = await suggestAutoAssignBuilder(category)
+    // override it before submitting. Disabled 2026-08-20 on a management
+    // request (AUTO_ASSIGN_ON_RAISE_ENABLED, admin/shared.jsx) -- tickets
+    // land Pending/unassigned for a real manager to assign by hand instead.
+    const suggested = AUTO_ASSIGN_ON_RAISE_ENABLED ? await suggestAutoAssignBuilder(category) : null
 
     const { data, error: insertError } = await supabase
       .schema('pmms')

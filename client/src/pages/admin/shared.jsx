@@ -49,6 +49,18 @@ export const AI_TRIAL_FEATURE_ENABLED = false
 // also stay visible to the division manager themselves.
 export const LANDLORD_LIAISON_PAGE_ENABLED = true
 
+// Disabled 2026-08-20 on a management request -- tickets raised by anyone
+// without their own assignment picker (Ticket Submitter role, Landlord
+// Liaison Manager) no longer get silently routed to a builder via
+// suggestAutoAssignBuilder; they land Pending/unassigned for a real manager
+// to assign by hand instead, same as before the RLS fixes in
+// suggestAutoAssignBuilder's own history. Does NOT affect the pre-filled
+// suggestion shown to managers in AdminRaiseTicket's own picker (canAssignBuilder
+// === true) -- that one's always reviewed/overridable before submit, so it
+// wasn't in scope. Flip back to true to restore silent auto-assign with no
+// rebuilding.
+export const AUTO_ASSIGN_ON_RAISE_ENABLED = false
+
 export const GLOBAL_TRIAGE_THRESHOLD = 70
 export const P2_URGENT_THRESHOLD = 40
 
