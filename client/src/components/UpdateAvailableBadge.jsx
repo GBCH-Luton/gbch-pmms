@@ -8,13 +8,13 @@ import { COLORS } from '../lib/colors'
 // -- and surfaces this toast the moment the two differ, so a push actually
 // reaches whoever's already got PMMS open instead of relying on them knowing
 // to hard-refresh (found live: a fix went out but a tab left open overnight
-// kept behaving the old way). "Update" reloads; "Later" just dismisses this
-// toast for the rest of the tab's session -- neither ever reloads on its
-// own, since that would risk wiping out whatever someone's mid-typing the
-// moment a deploy happens to land.
+// kept behaving the old way). Clicking "Update" reloads; it never reloads on
+// its own, since that would risk wiping out whatever someone's mid-typing
+// the moment a deploy happens to land -- but there's no dismiss either, on
+// purpose, so it can't get waved away and forgotten before the tab ever
+// picks up the fix it's there for.
 export default function UpdateAvailableBadge() {
   const [available, setAvailable] = useState(false)
-  const [dismissed, setDismissed] = useState(false)
   const checkingRef = useRef(false)
   const knownRef = useRef(false)
 
@@ -45,7 +45,7 @@ export default function UpdateAvailableBadge() {
     }
   }, [])
 
-  if (!available || dismissed) return null
+  if (!available) return null
 
   return (
     <div
@@ -60,15 +60,6 @@ export default function UpdateAvailableBadge() {
       }}
     >
       <span style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>A new update is available</span>
-      <button
-        onClick={() => setDismissed(true)}
-        style={{
-          background: 'none', border: 'none', color: 'rgba(255,255,255,0.65)',
-          fontSize: '13px', fontWeight: 600, cursor: 'pointer', padding: '6px 4px',
-        }}
-      >
-        Later
-      </button>
       <button
         onClick={() => window.location.reload()}
         style={{
