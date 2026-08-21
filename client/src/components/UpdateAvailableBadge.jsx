@@ -5,14 +5,16 @@ import { COLORS } from '../lib/colors'
 // baked into the bundle as __BUILD_ID__ and also dropped as a plain
 // build-id.txt file alongside it. This polls that file -- once on load, again
 // whenever the tab regains focus, and every few minutes while it stays open
-// -- and surfaces this badge the moment the two differ, so a push actually
+// -- and surfaces this toast the moment the two differ, so a push actually
 // reaches whoever's already got PMMS open instead of relying on them knowing
 // to hard-refresh (found live: a fix went out but a tab left open overnight
-// kept behaving the old way). Deliberately a click, not an automatic reload
-// -- that would risk wiping out whatever someone's mid-typing the moment a
-// deploy happens to land.
+// kept behaving the old way). "Install Now" reloads; "Later" just dismisses
+// this toast for the rest of the tab's session -- neither ever reloads on
+// its own, since that would risk wiping out whatever someone's mid-typing
+// the moment a deploy happens to land.
 export default function UpdateAvailableBadge() {
   const [available, setAvailable] = useState(false)
+  const [dismissed, setDismissed] = useState(false)
   const checkingRef = useRef(false)
   const knownRef = useRef(false)
 
@@ -43,23 +45,41 @@ export default function UpdateAvailableBadge() {
     }
   }, [])
 
-  if (!available) return null
+  if (!available || dismissed) return null
 
   return (
-    <button
-      onClick={() => window.location.reload()}
-      title="A new version of PMMS is available — click to refresh"
-      aria-label="A new version of PMMS is available — click to refresh"
+    <div
+      role="status"
       style={{
         position: 'fixed', bottom: '20px', right: '20px', zIndex: 999999,
-        width: '52px', height: '52px', borderRadius: '50%', border: 'none',
-        background: COLORS.teal600, color: COLORS.white, cursor: 'pointer',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: '22px', lineHeight: 1, boxShadow: '0 4px 16px rgba(0,0,0,0.28)',
-        animation: 'pulse 2s ease-in-out infinite',
+        display: 'flex', alignItems: 'center', gap: '12px',
+        background: COLORS.slate900, color: COLORS.white,
+        borderRadius: '10px', padding: '10px 12px 10px 14px',
+        boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
+        fontFamily: 'system-ui, sans-serif', fontSize: '13px',
       }}
     >
-      🔄
-    </button>
+      <span style={{ fontSize: '16px', lineHeight: 1 }}>🔄</span>
+      <span style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>New update available</span>
+      <button
+        onClick={() => setDismissed(true)}
+        style={{
+          background: 'none', border: 'none', color: 'rgba(255,255,255,0.65)',
+          fontSize: '13px', fontWeight: 600, cursor: 'pointer', padding: '6px 4px',
+        }}
+      >
+        Later
+      </button>
+      <button
+        onClick={() => window.location.reload()}
+        style={{
+          background: COLORS.blue600, color: COLORS.white, border: 'none',
+          borderRadius: '6px', padding: '6px 12px', fontSize: '13px', fontWeight: 700,
+          cursor: 'pointer', whiteSpace: 'nowrap',
+        }}
+      >
+        Install Now
+      </button>
+    </div>
   )
 }
