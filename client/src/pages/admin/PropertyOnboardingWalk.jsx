@@ -34,6 +34,7 @@ export default function PropertyOnboardingWalk({ profile, onNavigate }) {
   const [roomIndex, setRoomIndex] = useState(0)
   const [openTickets, setOpenTickets] = useState([])
   const [error, setError] = useState('')
+  const [propertySearch, setPropertySearch] = useState('')
 
   // Per-room in-progress form state -- reset every time roomIndex changes.
   const [verdicts, setVerdicts] = useState({}) // { [itemKey]: 'pass'|'fail' }
@@ -198,10 +199,22 @@ export default function PropertyOnboardingWalk({ profile, onNavigate }) {
 
       {screen === 'picker' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {properties.length > 0 && (
+            <input
+              type="text"
+              value={propertySearch}
+              onChange={e => setPropertySearch(e.target.value)}
+              placeholder="Search by address..."
+              style={{ width: '100%', height: '44px', padding: '0 14px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', boxSizing: 'border-box', marginBottom: '4px' }}
+            />
+          )}
           {properties.length === 0 && (
             <div style={cardStyle}><p style={{ margin: 0, fontSize: '13px', color: COLORS.slate500 }}>No Procured properties waiting to be onboarded right now.</p></div>
           )}
-          {properties.map(p => {
+          {properties.length > 0 && properties.filter(p => p.address.toLowerCase().includes(propertySearch.trim().toLowerCase())).length === 0 && (
+            <div style={cardStyle}><p style={{ margin: 0, fontSize: '13px', color: COLORS.slate500 }}>No properties match "{propertySearch}".</p></div>
+          )}
+          {properties.filter(p => p.address.toLowerCase().includes(propertySearch.trim().toLowerCase())).map(p => {
             const pill = walkStatusPill(p.walk)
             return (
               <div key={p.id} style={{ ...cardStyle, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', cursor: 'pointer' }} onClick={() => openProperty(p)}>
