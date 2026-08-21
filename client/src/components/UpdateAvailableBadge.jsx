@@ -8,10 +8,10 @@ import { COLORS } from '../lib/colors'
 // -- and surfaces this toast the moment the two differ, so a push actually
 // reaches whoever's already got PMMS open instead of relying on them knowing
 // to hard-refresh (found live: a fix went out but a tab left open overnight
-// kept behaving the old way). "Install Now" reloads; "Later" just dismisses
-// this toast for the rest of the tab's session -- neither ever reloads on
-// its own, since that would risk wiping out whatever someone's mid-typing
-// the moment a deploy happens to land.
+// kept behaving the old way). "Update" reloads; "Later" just dismisses this
+// toast for the rest of the tab's session -- neither ever reloads on its
+// own, since that would risk wiping out whatever someone's mid-typing the
+// moment a deploy happens to land.
 export default function UpdateAvailableBadge() {
   const [available, setAvailable] = useState(false)
   const [dismissed, setDismissed] = useState(false)
@@ -59,8 +59,7 @@ export default function UpdateAvailableBadge() {
         fontFamily: 'system-ui, sans-serif', fontSize: '13px',
       }}
     >
-      <span style={{ fontSize: '16px', lineHeight: 1 }}>🔄</span>
-      <span style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>New update available</span>
+      <span style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>A new update is available</span>
       <button
         onClick={() => setDismissed(true)}
         style={{
@@ -74,11 +73,11 @@ export default function UpdateAvailableBadge() {
         onClick={() => window.location.reload()}
         style={{
           background: COLORS.blue600, color: COLORS.white, border: 'none',
-          borderRadius: '6px', padding: '6px 12px', fontSize: '13px', fontWeight: 700,
+          borderRadius: '6px', padding: '6px 14px', fontSize: '13px', fontWeight: 700,
           cursor: 'pointer', whiteSpace: 'nowrap',
         }}
       >
-        Install Now
+        Update
       </button>
     </div>
   )
