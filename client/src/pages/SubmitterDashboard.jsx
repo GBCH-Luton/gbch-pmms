@@ -388,7 +388,7 @@ function NewReportForm({ profile, onSubmitted }) {
 
   if (success) {
     return (
-      <div style={{ maxWidth: '640px', ...cardStyle }}>
+      <div style={{ maxWidth: '640px', margin: '0 auto', ...cardStyle }}>
         <p style={{ margin: '0 0 16px 0', fontSize: '14px', fontWeight: 600, color: COLORS.green700 }}>✓ {success}</p>
         <button onClick={() => setSuccess('')} style={{ ...choiceBtn(false), width: '100%' }}>Report Another Issue</button>
       </div>
@@ -396,7 +396,7 @@ function NewReportForm({ profile, onSubmitted }) {
   }
 
   return (
-    <div style={{ maxWidth: '640px', ...cardStyle }}>
+    <div style={{ maxWidth: '640px', margin: '0 auto', ...cardStyle }}>
       <p style={fieldLabelStyle}>1. Property</p>
       <PropertySearchSelect properties={properties} value={propertyId} onChange={(id) => { setPropertyId(id); setRoom(null); setRoomContext(null); setCategory(null); setIssueTag(null) }} />
 

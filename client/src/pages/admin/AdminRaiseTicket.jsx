@@ -491,7 +491,7 @@ export default function AdminRaiseTicket({ profile, onNavigate }) {
   const ticketStep4Complete = !!ticketIssueTag && (!isUnlistedTag(ticketIssueTag) || !!ticketIssueOther.trim())
 
   return (
-    <div style={{ maxWidth: '720px' }}>
+    <div style={{ maxWidth: '720px', margin: '0 auto' }}>
 
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
         <div>
