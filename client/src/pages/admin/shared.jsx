@@ -346,7 +346,16 @@ export function KpiTiles({ kpis, onTileClick, columns }) {
           onClick={() => onTileClick?.(kpi)}
           style={{ ...(columns ? {} : { flex: '1 1 clamp(90px, 10vw, 130px)' }), background: kpi.colour, borderRadius: '14px', padding: `clamp(5px, 0.8vw, ${tilePaddingPx}px) clamp(8px, 1.2vw, 12px)`, border: 'none', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', textAlign: 'center' }}
         >
-          <p style={{ margin: '0 0 2px 0', fontSize: 'clamp(9px, 0.8vw, 10px)', lineHeight: 1.1, fontWeight: 700, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{kpi.label}</p>
+          {/* minHeight reserves room for a 2-line label at this font's tallest
+              (clamp maxes at 10px * 1.1 line-height * 2 lines = 22px) --
+              without it, a KpiTiles block whose labels happen to fit on one
+              line (most of AdminDashboard's) renders visibly shorter than one
+              with longer labels that wrap (Submitter Pipeline's own
+              deliberately spelled-out wording, e.g. "Needs Your
+              Confirmation") even though every tile uses this same component.
+              Found live: submitter's tiles read as a different, smaller
+              style entirely next to the admin/manager dashboard's. */}
+          <p style={{ margin: '0 0 2px 0', fontSize: 'clamp(9px, 0.8vw, 10px)', lineHeight: 1.1, minHeight: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{kpi.label}</p>
           <p style={{ margin: 0, fontSize: 'clamp(18px, 2vw, 22px)', lineHeight: 1.1, fontWeight: 800, color: COLORS.white }}>{kpi.value}</p>
         </button>
       ))}
