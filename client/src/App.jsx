@@ -78,7 +78,25 @@ export default function App() {
         const suppressLog = event === 'SIGNED_IN' && consumeSuppressSignInLog()
         fetchProfile(session.user.email).then(resolvedProfile => {
           if (event === 'SIGNED_IN' && resolvedProfile && !suppressLog) {
-            logLoginEvent(resolvedProfile, session.user.email, 'Signed In')
+            // A genuine credentialed sign-in (not INITIAL_SESSION, which is
+            // what fires on an ordinary page load/refresh restoring an
+            // already-valid session) is the one moment literally every user
+            // passes through sooner or later -- including someone whose tab
+            // has been sitting open since before the last deploy, whose
+            // session just expired. Typing a password back in doesn't
+            // normally reload the page at all, so without this a tab that
+            // old could stay on old code indefinitely; the update-available
+            // toast can't rescue it either, since a tab that stale never
+            // loaded the code that runs that check in the first place.
+            // Found live: ticket #360's fix (and later #365/#366, #379)
+            // auto-assigning anyway, from a tab that had simply re-logged in
+            // rather than actually reloaded. window.location.reload() here
+            // forces a real fetch of the current bundle; the session itself
+            // is already persisted by Supabase, so the reload logs back in
+            // automatically without asking for the password again.
+            logLoginEvent(resolvedProfile, session.user.email, 'Signed In').then(() => {
+              window.location.reload()
+            })
           }
         })
       } else {
