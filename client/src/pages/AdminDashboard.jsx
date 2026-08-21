@@ -12,6 +12,7 @@ import { getImpersonationMarker, returnToAdmin } from '../lib/impersonation'
 import { countUnreadMessages } from '../lib/chat'
 import { countUnreadDms } from '../lib/dm'
 import { fetchDivisions } from '../lib/divisions'
+import { fetchOnboardingMetrics } from '../lib/onboarding'
 import { getCurrentPositionSafe } from '../lib/geo'
 // Lazy, not a direct import -- this shell loads eagerly for every admin/
 // manager, but the property picker it's for (Log a Visit) is only ever
@@ -211,6 +212,7 @@ export default function AdminDashboard({ profile }) {
   const [pendingSignOffCount, setPendingSignOffCount] = useState(0)
   const [totalTicketsCount, setTotalTicketsCount] = useState(0)
   const [chatUnreadTotal, setChatUnreadTotal] = useState(0)
+  const [onboardActionCount, setOnboardActionCount] = useState(0)
   const [pipelineInitialFilter, setPipelineInitialFilter] = useState(null)
   const [pipelineInitialPriorityFilter, setPipelineInitialPriorityFilter] = useState(null)
   const [pipelineInitialStuckFilter, setPipelineInitialStuckFilter] = useState(null)
@@ -616,6 +618,30 @@ export default function AdminDashboard({ profile }) {
     setPendingSignOffCount(count || 0)
   }, [profile.id])
 
+  // Actionable-for-THIS-viewer count, matching Sign-Off's badge convention
+  // (a queue of things they'd act on, not a global total) -- what counts as
+  // "actionable" differs by which of the two roles this nav item is for:
+  // properties ready to walk for the Maintenance Assistant, or properties
+  // waiting on her review for Landlord Liaison. Skipped entirely for
+  // everyone else (the nav item itself is invisible to them, see
+  // isNavItemVisible's visibleTo check) so this doesn't run a wasted query
+  // for every other admin/manager on every poll.
+  const fetchOnboardActionCount = useCallback(async () => {
+    if (profile.pmmsRole === 'Maintenance Assistant') {
+      const { toWalkIds } = await fetchOnboardingMetrics()
+      setOnboardActionCount(toWalkIds.size)
+    } else if (profile.division === 'Landlord Liaison') {
+      const { count } = await supabase
+        .schema('pmms')
+        .from('property_onboarding_walks')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'pending_liaison_review')
+      setOnboardActionCount(count || 0)
+    } else {
+      setOnboardActionCount(0)
+    }
+  }, [profile.pmmsRole, profile.division])
+
   const fetchTotalTicketsCount = useCallback(async () => {
     const { count } = await supabase
       .schema('pmms')
@@ -635,8 +661,8 @@ export default function AdminDashboard({ profile }) {
   }, [profile.division, profile.id])
 
   const refreshCounts = useCallback(async () => {
-    await Promise.all([fetchPendingSignOffCount(), fetchTotalTicketsCount(), fetchChatUnreadTotal()])
-  }, [fetchPendingSignOffCount, fetchTotalTicketsCount, fetchChatUnreadTotal])
+    await Promise.all([fetchPendingSignOffCount(), fetchTotalTicketsCount(), fetchChatUnreadTotal(), fetchOnboardActionCount()])
+  }, [fetchPendingSignOffCount, fetchTotalTicketsCount, fetchChatUnreadTotal, fetchOnboardActionCount])
 
   useEffect(() => {
     refreshCounts()
@@ -862,6 +888,7 @@ export default function AdminDashboard({ profile }) {
             const alertCount = item.key === 'sign-off' ? pendingSignOffCount
               : item.key === 'pipeline' ? totalTicketsCount
               : item.key === 'team-chat' ? chatUnreadTotal
+              : item.key === 'onboard-property' ? onboardActionCount
               : 0
 
             return (

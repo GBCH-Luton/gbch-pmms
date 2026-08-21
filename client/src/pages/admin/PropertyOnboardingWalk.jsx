@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { COLORS } from '../../lib/colors'
-import { statusColour, statusLabel } from './shared'
-import { ROOMS, CHECK_ITEMS, fetchOnboardingProperties, startOrResumeWalk, fetchWalkChecks, fetchPropertyOpenTickets, recordPass } from '../../lib/onboarding'
+import { statusColour, statusLabel, KpiTiles } from './shared'
+import { ROOMS, CHECK_ITEMS, fetchOnboardingProperties, fetchOnboardingMetrics, startOrResumeWalk, fetchWalkChecks, fetchPropertyOpenTickets, recordPass } from '../../lib/onboarding'
 import { raiseOnboardingTicket } from './onboardingTicket'
 import TicketMediaPicker from '../../components/TicketMediaPicker'
 import VoiceInputButton from '../../components/VoiceInputButton'
@@ -34,6 +34,8 @@ export default function PropertyOnboardingWalk({ profile, onNavigate }) {
   const [openTickets, setOpenTickets] = useState([])
   const [error, setError] = useState('')
   const [propertySearch, setPropertySearch] = useState('')
+  const [metrics, setMetrics] = useState(null)
+  const [tileFilter, setTileFilter] = useState(null) // null | 'toWalk' | 'walking' | 'waiting' | 'liaison'
 
   // Per-room in-progress form state -- reset every time roomIndex changes.
   const [verdicts, setVerdicts] = useState({}) // { [itemKey]: 'pass'|'fail' }
@@ -51,7 +53,9 @@ export default function PropertyOnboardingWalk({ profile, onNavigate }) {
 
   async function loadProperties() {
     setLoading(true)
-    setProperties(await fetchOnboardingProperties())
+    const [propertyList, metricsResult] = await Promise.all([fetchOnboardingProperties(), fetchOnboardingMetrics()])
+    setProperties(propertyList)
+    setMetrics(metricsResult)
     setLoading(false)
   }
 
@@ -192,33 +196,63 @@ export default function PropertyOnboardingWalk({ profile, onNavigate }) {
 
       {screen === 'picker' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {properties.length > 0 && (
-            <input
-              type="text"
-              value={propertySearch}
-              onChange={e => setPropertySearch(e.target.value)}
-              placeholder="Search by address..."
-              style={{ width: '100%', height: '44px', padding: '0 14px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', boxSizing: 'border-box', marginBottom: '4px' }}
+          {metrics && (
+            <KpiTiles
+              kpis={[
+                { label: 'To Walk', value: metrics.toWalkIds.size, colour: COLORS.slate500, key: 'toWalk' },
+                { label: 'Walking', value: metrics.walkingIds.size, colour: COLORS.amber600, key: 'walking' },
+                { label: 'Waiting On Tickets', value: metrics.waitingIds.size, colour: COLORS.red600, key: 'waiting' },
+                { label: 'With Landlord Liaison', value: metrics.liaisonIds.size, colour: COLORS.blue600, key: 'liaison' },
+                { label: 'Live (via this walk)', value: metrics.liveCount, colour: COLORS.green600, key: 'live' },
+              ]}
+              onTileClick={kpi => kpi.key !== 'live' && setTileFilter(prev => prev === kpi.key ? null : kpi.key)}
             />
           )}
-          {properties.length === 0 && (
-            <div style={cardStyle}><p style={{ margin: 0, fontSize: '13px', color: COLORS.slate500 }}>No Procured properties waiting to be onboarded right now.</p></div>
+
+          {tileFilter && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '-4px' }}>
+              <span style={{ fontSize: '12px', color: COLORS.slate500 }}>Filtered — click the tile again to clear.</span>
+              <button onClick={() => setTileFilter(null)} style={{ ...ghostBtn, height: '26px', padding: '0 10px', fontSize: '11.5px' }}>Clear</button>
+            </div>
           )}
-          {properties.length > 0 && properties.filter(p => p.address.toLowerCase().includes(propertySearch.trim().toLowerCase())).length === 0 && (
-            <div style={cardStyle}><p style={{ margin: 0, fontSize: '13px', color: COLORS.slate500 }}>No properties match "{propertySearch}".</p></div>
-          )}
-          {properties.filter(p => p.address.toLowerCase().includes(propertySearch.trim().toLowerCase())).map(p => {
-            const pill = walkStatusPill(p.walk)
-            return (
-              <div key={p.id} style={{ ...cardStyle, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', cursor: 'pointer' }} onClick={() => openProperty(p)}>
-                <div>
-                  <p style={{ margin: '0 0 4px 0', fontSize: '14px', fontWeight: 700, color: COLORS.slate900 }}>{p.address}</p>
-                  <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: '999px', fontSize: '11px', fontWeight: 700, background: pill.bg, color: pill.color }}>{pill.label}</span>
+
+          <input
+            type="text"
+            value={propertySearch}
+            onChange={e => setPropertySearch(e.target.value)}
+            placeholder="Search by address..."
+            style={{ width: '100%', height: '44px', padding: '0 14px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', boxSizing: 'border-box', marginBottom: '4px' }}
+          />
+          {(() => {
+            const filtered = properties
+              .filter(p => p.address.toLowerCase().includes(propertySearch.trim().toLowerCase()))
+              .filter(p => {
+                if (!tileFilter || !metrics) return true
+                if (tileFilter === 'toWalk') return metrics.toWalkIds.has(p.id)
+                if (tileFilter === 'walking') return metrics.walkingIds.has(p.id)
+                if (tileFilter === 'waiting') return metrics.waitingIds.has(p.id)
+                if (tileFilter === 'liaison') return metrics.liaisonIds.has(p.id)
+                return true
+              })
+            if (properties.length === 0) {
+              return <div style={cardStyle}><p style={{ margin: 0, fontSize: '13px', color: COLORS.slate500 }}>No Procured properties waiting to be onboarded right now.</p></div>
+            }
+            if (filtered.length === 0) {
+              return <div style={cardStyle}><p style={{ margin: 0, fontSize: '13px', color: COLORS.slate500 }}>No properties match.</p></div>
+            }
+            return filtered.map(p => {
+              const pill = walkStatusPill(p.walk)
+              return (
+                <div key={p.id} style={{ ...cardStyle, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', cursor: 'pointer' }} onClick={() => openProperty(p)}>
+                  <div>
+                    <p style={{ margin: '0 0 4px 0', fontSize: '14px', fontWeight: 700, color: COLORS.slate900 }}>{p.address}</p>
+                    <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: '999px', fontSize: '11px', fontWeight: 700, background: pill.bg, color: pill.color }}>{pill.label}</span>
+                  </div>
+                  <span style={{ fontSize: '13px', fontWeight: 700, color: COLORS.blue700 }}>{p.walk ? 'Continue →' : 'Start walk →'}</span>
                 </div>
-                <span style={{ fontSize: '13px', fontWeight: 700, color: COLORS.blue700 }}>{p.walk ? 'Continue →' : 'Start walk →'}</span>
-              </div>
-            )
-          })}
+              )
+            })
+          })()}
         </div>
       )}
 

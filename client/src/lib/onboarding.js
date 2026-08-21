@@ -130,6 +130,38 @@ export async function maybeAutoSubmitOnboardingWalk(propertyId) {
   }
 }
 
+function isRoomsComplete(checks, walkId) {
+  return ROOMS.every(room => CHECK_ITEMS.every(item =>
+    checks.some(c => c.walk_id === walkId && c.room === room && c.item_key === item.key)
+  ))
+}
+
+// Powers the Maintenance Assistant's KPI tiles (PropertyOnboardingWalk.jsx)
+// and the sidebar badge count (AdminDashboard.jsx shell) -- one query pass,
+// returning both a headline count and the actual property-id set for each
+// bucket, so a tile's number and what clicking it filters to can never
+// drift apart from each other.
+export async function fetchOnboardingMetrics() {
+  const { data: properties } = await supabase.schema('pmms').from('properties').select('id').eq('status', 'Procured')
+  const { data: walks } = await supabase.schema('pmms').from('property_onboarding_walks').select('id, property_id, status')
+
+  const activeWalks = (walks || []).filter(w => w.status === 'in_progress' || w.status === 'sent_back')
+  const walkIds = activeWalks.map(w => w.id)
+  const { data: checks } = walkIds.length
+    ? await supabase.schema('pmms').from('property_onboarding_checks').select('walk_id, room, item_key').in('walk_id', walkIds)
+    : { data: [] }
+
+  const nonApprovedWalkPropertyIds = new Set((walks || []).filter(w => w.status !== 'approved').map(w => w.property_id))
+
+  return {
+    toWalkIds: new Set((properties || []).filter(p => !nonApprovedWalkPropertyIds.has(p.id)).map(p => p.id)),
+    walkingIds: new Set(activeWalks.filter(w => !isRoomsComplete(checks || [], w.id)).map(w => w.property_id)),
+    waitingIds: new Set(activeWalks.filter(w => isRoomsComplete(checks || [], w.id)).map(w => w.property_id)),
+    liaisonIds: new Set((walks || []).filter(w => w.status === 'pending_liaison_review').map(w => w.property_id)),
+    liveCount: (walks || []).filter(w => w.status === 'approved').length,
+  }
+}
+
 export async function recordPass(walkId, room, itemKey, profile) {
   const { error } = await supabase
     .schema('pmms')
