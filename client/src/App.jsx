@@ -9,6 +9,7 @@ import Login from './pages/Login'
 import SetPassword from './pages/SetPassword'
 import SplashScreen from './pages/SplashScreen'
 import ImpersonationBanner from './components/ImpersonationBanner'
+import UpdateAvailableBadge from './components/UpdateAvailableBadge'
 
 // Lazy-loaded so an admin's browser never downloads the builder bundle (and
 // vice versa) -- each becomes its own chunk Vite fetches only once routing
@@ -199,6 +200,7 @@ export default function App() {
           need the banner. (Found live: submitter was missing here entirely
           -- View As a submitter never showed any way back, not flaky.) */}
       {(profile?.role === 'builder' || profile?.role === 'submitter') && <ImpersonationBanner />}
+      <UpdateAvailableBadge />
       <Suspense fallback={<SplashScreen />}>
       <Routes>
       <Route path="/login" element={!session ? <Login /> : <Navigate to={homeForRole()} replace />} />

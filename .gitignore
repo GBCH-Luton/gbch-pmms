@@ -7,6 +7,12 @@
 node_modules
 client/dist
 
+# Generated fresh every build (see vite.config.js's write-build-id plugin)
+# -- a real file on disk since Vite's dev/build both read from client/public
+# as-is, but its content is meaningless between builds so it shouldn't be
+# tracked.
+client/public/build-id.txt
+
 # Claude Code's own local tool state, not project source
 .claude/
 
