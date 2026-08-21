@@ -34,6 +34,7 @@ const AdminBuilders = lazy(() => import('./admin/AdminBuilders'))
 const AdminClocking = lazy(() => import('./admin/AdminClocking'))
 const AdminRaiseTicket = lazy(() => import('./admin/AdminRaiseTicket'))
 const AdminOnboardProperty = lazy(() => import('./admin/AdminOnboardProperty'))
+const PropertyDimensionsAssessment = lazy(() => import('./admin/PropertyDimensionsAssessment'))
 const AdminStock = lazy(() => import('./admin/AdminStock'))
 const AdminReports = lazy(() => import('./admin/AdminReports'))
 const AdminSettings = lazy(() => import('./admin/AdminSettings'))
@@ -76,6 +77,18 @@ const NAV_ITEMS = [
   { key: 'sign-off', label: 'Sign-Off', icon: 'check', Component: AdminSignOff },
   ...(EVENTS_FEATURE_ENABLED ? [{ key: 'events', label: 'Events', icon: 'calendar', Component: AdminEvents }] : []),
   { key: 'properties', label: 'Properties', icon: 'building', Component: AdminProperties },
+  // Room-by-room floor measurements, feeding the Property Profile's own
+  // "Dimensions" tab (see PropertyDimensionsTab.jsx) -- built for the
+  // Landlord Liaison, replacing a Microsoft Forms form nobody else could
+  // see the results of. visibleTo (not divisions/divisionOnly, same
+  // reasoning as Onboard a Property above) deliberately matches exactly who
+  // can already see that Property Profile tab (admin, unscoped managers,
+  // and Landlord Liaison -- Housekeeping/Compliance's own narrower
+  // DIVISION_PROFILE_TABS lists don't include it) -- otherwise the "Redo
+  // Assessment" button's navigation would silently land on the Dashboard
+  // instead for anyone allowed to see the tab but not this nav item
+  // (isNavItemVisible gates actual page rendering, not just the sidebar).
+  { key: 'property-dimensions', label: 'Dimensions Assessment', icon: 'building', Component: PropertyDimensionsAssessment, visibleTo: p => p.role === 'admin' || p.division === 'Landlord Liaison' || (p.role === 'manager' && !p.division) },
   { key: 'voids', label: 'Voids', icon: 'key', Component: AdminVoids, divisions: ['Maintenance'] },
   // Division dashboards, grouped together in this order.
   { key: 'compliance', label: 'Compliance', icon: 'shield', Component: AdminCompliance, divisions: ['Maintenance', 'Compliance'] },
@@ -244,6 +257,7 @@ export default function AdminDashboard({ profile }) {
   const [complianceInitialTierFilter, setComplianceInitialTierFilter] = useState(null)
   const [voidsInitialTierFilter, setVoidsInitialTierFilter] = useState(null)
   const [buildersInitialStaffId, setBuildersInitialStaffId] = useState(null)
+  const [dimensionsInitialPropertyId, setDimensionsInitialPropertyId] = useState(null)
   const [pushEnabled, setPushEnabled] = useState(false)
   const [pushError, setPushError] = useState('')
 
@@ -739,6 +753,9 @@ export default function AdminDashboard({ profile }) {
     }
     if (key === 'builders' && opts.staffId) {
       setBuildersInitialStaffId(opts.staffId)
+    }
+    if (key === 'property-dimensions' && opts.propertyId) {
+      setDimensionsInitialPropertyId(opts.propertyId)
     }
   }
 
@@ -1430,6 +1447,8 @@ export default function AdminDashboard({ profile }) {
               onInitialTierFilterConsumed={() => { setComplianceInitialTierFilter(null); setVoidsInitialTierFilter(null) }}
               initialStaffId={currentPage === 'builders' ? buildersInitialStaffId : null}
               onInitialStaffIdConsumed={() => setBuildersInitialStaffId(null)}
+              initialPropertyId={currentPage === 'property-dimensions' ? dimensionsInitialPropertyId : null}
+              onInitialPropertyIdConsumed={() => setDimensionsInitialPropertyId(null)}
             />
           </Suspense>
         </div>
