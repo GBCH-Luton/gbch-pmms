@@ -181,7 +181,7 @@ export default function PropertyOnboardingWalk({ profile, onNavigate }) {
   if (loading) return <p style={{ color: COLORS.slate500, fontSize: '13px' }}>Loading properties…</p>
 
   return (
-    <div style={{ maxWidth: '760px' }}>
+    <div>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', marginBottom: '18px' }}>
         <div>
           <h1 style={{ margin: '0 0 4px 0', fontSize: '18px', fontWeight: 700, color: COLORS.slate900 }}>Onboard a Property</h1>
