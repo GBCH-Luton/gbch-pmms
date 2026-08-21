@@ -3,7 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { supabase } from './lib/supabase'
 import { COLORS } from './lib/colors'
 import { roleFromJobTitle, normalizeCustomRoles, accessLevelForRole, hideSettingsForRole, divisionForRole, canCreateEventsForRole } from './lib/roles'
-import { logLoginEvent } from './lib/loginEvents'
+import { logLoginEvent, consumeGenuineLoginAttempt } from './lib/loginEvents'
 import { consumeSuppressSignInLog } from './lib/impersonation'
 import Login from './pages/Login'
 import SetPassword from './pages/SetPassword'
@@ -76,8 +76,18 @@ export default function App() {
         // a real credentialed sign-in) from being logged as a genuine
         // pmms.login_events row. See client/src/lib/impersonation.js.
         const suppressLog = event === 'SIGNED_IN' && consumeSuppressSignInLog()
+        // supabase-js also fires SIGNED_IN when a backgrounded tab simply
+        // regains focus (it silently re-validates the stored session on
+        // visibilitychange -- intentional upstream behaviour, see
+        // supabase/gotrue-js#284), not just on a real credentialed login.
+        // Without this flag every tab switch looked identical to a fresh
+        // sign-in, so the reload below (and, separately, the login-events
+        // insert) fired on every tab switch, not just real logins -- found
+        // live 2026-08-21 right after this reload was added. Login.jsx sets
+        // this synchronously right before calling signInWithPassword().
+        const genuineLogin = event === 'SIGNED_IN' && consumeGenuineLoginAttempt()
         fetchProfile(session.user.email).then(resolvedProfile => {
-          if (event === 'SIGNED_IN' && resolvedProfile && !suppressLog) {
+          if (event === 'SIGNED_IN' && resolvedProfile && !suppressLog && genuineLogin) {
             // Deliberately kept even though the JWT-expiry and tab-switch
             // auto-reloads were removed for interrupting active work --
             // this one can't do that. It only ever fires on a fresh login

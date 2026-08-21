@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { markGenuineLoginAttempt } from '../lib/loginEvents'
 import logo from '../assets/gbch-logo.svg'
 import { COLORS } from '../lib/colors'
 
@@ -13,6 +14,10 @@ export default function Login() {
     if (!email.trim() || !password.trim()) { setError('Please enter your email and password'); return }
     setLoading(true)
     setError('')
+    // Must be set synchronously, before this call -- see loginEvents.js's
+    // consumeGenuineLoginAttempt for why App.jsx needs this to tell a real
+    // login apart from supabase-js's own SIGNED_IN-on-tab-refocus.
+    markGenuineLoginAttempt()
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) {
       setError(error.message)
