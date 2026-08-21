@@ -147,6 +147,13 @@ export default function App() {
     let hideSettings = false
     let division = null
     let canCreateEvents = false
+    // The raw assigned PMMS Role name itself (e.g. "Maintenance Assistant"),
+    // not just what it derives (role/division/etc above) -- needed by any
+    // feature gated on a specific named role rather than the coarser
+    // access-level/division vocabulary (see Property Onboarding's nav gate
+    // in AdminDashboard.jsx, added 2026-08-21 after job_title-based gating
+    // turned out to target a role that doesn't actually exist).
+    let pmmsRole = null
 
     // job_title lives on a company-wide table PMMS doesn't control -- a
     // rename there (even a legitimate one) can otherwise silently lock
@@ -164,6 +171,7 @@ export default function App() {
       .maybeSingle()
 
     if (roleRow?.role) {
+      pmmsRole = roleRow.role
       const { data: settingsRow } = await supabase
         .schema('pmms')
         .from('settings')
@@ -192,9 +200,9 @@ export default function App() {
     // this is a remove-only check, applied last, and it overrides every
     // access grant above (job_title, PMMS Admin/Builder/custom role) with
     // no exception.
-    if (data.active === false) role = null
+    if (data.active === false) { role = null; pmmsRole = null }
 
-    const resolvedProfile = { ...data, role, hideSettings, division, canCreateEvents }
+    const resolvedProfile = { ...data, role, hideSettings, division, canCreateEvents, pmmsRole }
     setProfile(resolvedProfile)
     setLoading(false)
     return resolvedProfile

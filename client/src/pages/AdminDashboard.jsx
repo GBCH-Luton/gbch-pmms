@@ -64,9 +64,14 @@ const NAV_ITEMS = [
   { key: 'raise-ticket', label: 'Log a Ticket', icon: 'ticket', Component: AdminRaiseTicket },
   // Room-by-room new-property walk -> real tickets on any Fail -> Landlord
   // Liaison review -> property flips Live. Restricted to exactly the two
-  // roles it's for -- job_title isn't part of the divisions/divisionOnly
-  // vocabulary below, so this is the one nav item using visibleTo instead.
-  { key: 'onboard-property', label: 'Onboard a Property', icon: 'sunrise', Component: AdminOnboardProperty, visibleTo: p => p.job_title === 'Assistant Manager' || p.division === 'Landlord Liaison' },
+  // roles it's for -- neither divisions nor divisionOnly fit "one specific
+  // named PMMS Role, regardless of division", so this is the one nav item
+  // using visibleTo instead. Gated on the assigned Role's own name
+  // (profile.pmmsRole, e.g. "Maintenance Assistant" -- an existing manager-
+  // access custom role, not a job_title), not job_title -- an earlier
+  // version of this gate checked job_title === 'Assistant Manager', which
+  // turned out not to be a real job_title in this company's data at all.
+  { key: 'onboard-property', label: 'Onboard a Property', icon: 'sunrise', Component: AdminOnboardProperty, visibleTo: p => p.pmmsRole === 'Maintenance Assistant' || p.division === 'Landlord Liaison' },
   { key: 'sign-off', label: 'Sign-Off', icon: 'check', Component: AdminSignOff },
   ...(EVENTS_FEATURE_ENABLED ? [{ key: 'events', label: 'Events', icon: 'calendar', Component: AdminEvents }] : []),
   { key: 'properties', label: 'Properties', icon: 'building', Component: AdminProperties },
