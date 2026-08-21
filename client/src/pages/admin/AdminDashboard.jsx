@@ -639,7 +639,17 @@ function TeamWhereabouts({ profile, onNavigate, height = DASHBOARD_TOP_CARD_HEIG
             )}
             {visibleEntries.map(e => (
               <div key={e.id} style={{ display: 'flex', gap: '10px', padding: '9px 0', borderTop: `1px solid ${COLORS.slate100}`, alignItems: 'flex-start' }}>
-                <span style={{ fontFamily: 'monospace', fontSize: '11px', color: COLORS.slate400, flexShrink: 0, width: '38px', paddingTop: '1px' }}>
+                {/* The feed intentionally includes any still-open activity leg
+                    regardless of when it started (see fetch above), so a
+                    lunch/travel leg from a previous day that never got closed
+                    resurfaces here every day after. Bare "16:05" with no date
+                    then reads as impossible when it's actually from
+                    yesterday -- found live: Stuart Blease's never-closed lunch
+                    break. Show the date too whenever an entry isn't from today. */}
+                <span style={{ fontFamily: 'monospace', fontSize: '11px', color: COLORS.slate400, flexShrink: 0, width: '38px', paddingTop: '1px', lineHeight: 1.3 }}>
+                  {ukDateKey(new Date(e.time).getTime()) !== ukDateKey() && (
+                    <>{formatUKDate(e.time).slice(0, 5)}<br /></>
+                  )}
                   {formatUKDateTime(e.time).split(' ').slice(-1)[0]}
                 </span>
                 <span style={{ width: '7px', height: '7px', borderRadius: '50%', marginTop: '5px', flexShrink: 0, background: toneDot[e.tone] }} />

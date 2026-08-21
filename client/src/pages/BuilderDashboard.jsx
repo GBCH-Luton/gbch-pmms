@@ -857,12 +857,13 @@ export default function BuilderDashboard({ profile }) {
     // clocking out -- same asymmetry as the existing per-job clock-out,
     // which only ever requires a fix on the way in.
     const position = await getCurrentPositionSafe()
+    const now = new Date().toISOString()
 
     const { error } = await supabase
       .schema('pmms')
       .from('daily_attendance')
       .update({
-        clock_out_at: new Date().toISOString(),
+        clock_out_at: now,
         clock_out_lat: position?.latitude ?? null,
         clock_out_lng: position?.longitude ?? null,
         ...(earlyReason ? { early_leave_reason: earlyReason } : {}),
@@ -871,6 +872,22 @@ export default function BuilderDashboard({ profile }) {
 
     setClockingOutForDay(false)
     if (error) { setClockOutForDayError(error.message); return }
+
+    // attemptClockOutForDay already blocks on a same-render openActivity,
+    // but that's local state -- it can go stale if an activity leg started
+    // in another tab/session, or between that check and this submit. A
+    // leg left open here never gets closed by anything else and resurfaces
+    // in "Where's the Team" every day after, looking like it just
+    // happened (found live: Stuart Blease's lunch break, still open a day
+    // later). Belt-and-braces: close out anything still open for this
+    // staff member at the same moment the day itself ends.
+    await supabase
+      .schema('pmms')
+      .from('activity_log')
+      .update({ ended_at: now, end_note: 'Auto-closed — clocked out for the day' })
+      .eq('staff_id', profile.id)
+      .is('ended_at', null)
+
     setEarlyLeavePromptOpen(false)
     setTodayShift(null)
   }
