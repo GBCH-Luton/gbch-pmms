@@ -78,22 +78,16 @@ export default function App() {
         const suppressLog = event === 'SIGNED_IN' && consumeSuppressSignInLog()
         fetchProfile(session.user.email).then(resolvedProfile => {
           if (event === 'SIGNED_IN' && resolvedProfile && !suppressLog) {
-            // A genuine credentialed sign-in (not INITIAL_SESSION, which is
-            // what fires on an ordinary page load/refresh restoring an
-            // already-valid session) is the one moment literally every user
-            // passes through sooner or later -- including someone whose tab
-            // has been sitting open since before the last deploy, whose
-            // session just expired. Typing a password back in doesn't
-            // normally reload the page at all, so without this a tab that
-            // old could stay on old code indefinitely; the update-available
-            // toast can't rescue it either, since a tab that stale never
-            // loaded the code that runs that check in the first place.
-            // Found live: ticket #360's fix (and later #365/#366, #379)
-            // auto-assigning anyway, from a tab that had simply re-logged in
-            // rather than actually reloaded. window.location.reload() here
-            // forces a real fetch of the current bundle; the session itself
-            // is already persisted by Supabase, so the reload logs back in
-            // automatically without asking for the password again.
+            // Deliberately kept even though the JWT-expiry and tab-switch
+            // auto-reloads were removed for interrupting active work --
+            // this one can't do that. It only ever fires on a fresh login
+            // (nothing in progress to lose) or after a session already
+            // expired and redirected here (which already unmounted
+            // whatever screen was open and lost any unsaved input before
+            // this point -- the reload isn't what costs it). Still the one
+            // reliable, frequent-enough moment to pull a tab stuck on old
+            // code onto the current build. See git history around
+            // 2026-08-21 for the auto-assign bug this exists to prevent.
             logLoginEvent(resolvedProfile, session.user.email, 'Signed In').then(() => {
               window.location.reload()
             })
