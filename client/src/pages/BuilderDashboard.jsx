@@ -2752,13 +2752,16 @@ export default function BuilderDashboard({ profile }) {
                       )
                     })}
                   </div>
-                  <textarea
-                    value={delayReasonNote}
-                    onChange={(e) => setDelayReasonNote(e.target.value)}
-                    placeholder="Add a note (optional)"
-                    rows={3}
-                    style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '14px', fontFamily: 'inherit', boxSizing: 'border-box', resize: 'vertical' }}
-                  />
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <textarea
+                      value={delayReasonNote}
+                      onChange={(e) => setDelayReasonNote(e.target.value)}
+                      placeholder="Add a note (optional)"
+                      rows={3}
+                      style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '14px', fontFamily: 'inherit', boxSizing: 'border-box', resize: 'vertical', flex: 1 }}
+                    />
+                    <VoiceInputButton onResult={(text) => setDelayReasonNote(prev => prev ? `${prev} ${text}` : text)} />
+                  </div>
                   <button
                     onClick={() => handleReportDelay(delayReason, delayReasonNote)}
                     disabled={!delayReason || delayReasonSubmitting}
@@ -2819,13 +2822,16 @@ export default function BuilderDashboard({ profile }) {
               </div>
             )}
 
-            <textarea
-              value={completeNote}
-              onChange={(e) => setCompleteNote(e.target.value)}
-              placeholder="Describe the work completed..."
-              rows={3}
-              style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '14px', fontFamily: 'inherit', boxSizing: 'border-box', resize: 'vertical' }}
-            />
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <textarea
+                value={completeNote}
+                onChange={(e) => setCompleteNote(e.target.value)}
+                placeholder="Describe the work completed..."
+                rows={3}
+                style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '14px', fontFamily: 'inherit', boxSizing: 'border-box', resize: 'vertical', flex: 1 }}
+              />
+              <VoiceInputButton onResult={(text) => setCompleteNote(prev => prev ? `${prev} ${text}` : text)} />
+            </div>
 
             <TicketMediaPicker files={completeMediaFiles} onChange={setCompleteMediaFiles} inputId="complete-media-input" onBrokenChange={setHasBrokenCompleteMedia} />
             {completeUploadProgress && (
@@ -2886,13 +2892,16 @@ export default function BuilderDashboard({ profile }) {
               </span>
             </label>
             {followUpNeeded && (
-              <textarea
-                value={followUpNote}
-                onChange={(e) => setFollowUpNote(e.target.value)}
-                placeholder="What needs following up..."
-                rows={2}
-                style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '14px', fontFamily: 'inherit', boxSizing: 'border-box', resize: 'vertical' }}
-              />
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <textarea
+                  value={followUpNote}
+                  onChange={(e) => setFollowUpNote(e.target.value)}
+                  placeholder="What needs following up..."
+                  rows={2}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '14px', fontFamily: 'inherit', boxSizing: 'border-box', resize: 'vertical', flex: 1 }}
+                />
+                <VoiceInputButton onResult={(text) => setFollowUpNote(prev => prev ? `${prev} ${text}` : text)} />
+              </div>
             )}
 
             {completeError && (
@@ -3029,13 +3038,16 @@ export default function BuilderDashboard({ profile }) {
           ))}
         </div>
 
-        <textarea
-          value={commentText}
-          onChange={(e) => setCommentText(e.target.value)}
-          placeholder="Add a comment..."
-          rows={3}
-          style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '14px', fontFamily: 'inherit', boxSizing: 'border-box', resize: 'vertical', marginBottom: '10px' }}
-        />
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
+          <textarea
+            value={commentText}
+            onChange={(e) => setCommentText(e.target.value)}
+            placeholder="Add a comment..."
+            rows={3}
+            style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '14px', fontFamily: 'inherit', boxSizing: 'border-box', resize: 'vertical', flex: 1 }}
+          />
+          <VoiceInputButton onResult={(text) => setCommentText(prev => prev ? `${prev} ${text}` : text)} />
+        </div>
         {commentError && (
           <p style={{ margin: '0 0 10px 0', fontSize: '13px', color: COLORS.red500 }}>{commentError}</p>
         )}
@@ -3130,13 +3142,16 @@ export default function BuilderDashboard({ profile }) {
               <p style={{ margin: '0 0 12px 0', fontSize: '13px', fontWeight: 500, color: COLORS.slate500 }}>
                 {(stopReasonPicked === 'Other' || stopReasonPicked === 'Unable to Do the Job') ? 'Please say what happened' : 'Add a note (optional)'}
               </p>
-              <textarea
-                value={stopNote}
-                onChange={(e) => setStopNote(e.target.value)}
-                placeholder={(stopReasonPicked === 'Other' || stopReasonPicked === 'Unable to Do the Job') ? 'e.g. Ran out of a specific part, coming back tomorrow...' : 'Add a note...'}
-                rows={3}
-                style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '14px', fontFamily: 'inherit', boxSizing: 'border-box', resize: 'vertical', marginBottom: '10px' }}
-              />
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
+                <textarea
+                  value={stopNote}
+                  onChange={(e) => setStopNote(e.target.value)}
+                  placeholder={(stopReasonPicked === 'Other' || stopReasonPicked === 'Unable to Do the Job') ? 'e.g. Ran out of a specific part, coming back tomorrow...' : 'Add a note...'}
+                  rows={3}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '14px', fontFamily: 'inherit', boxSizing: 'border-box', resize: 'vertical', flex: 1 }}
+                />
+                <VoiceInputButton onResult={(text) => setStopNote(prev => prev ? `${prev} ${text}` : text)} />
+              </div>
               {stopError && <p style={{ margin: '0 0 10px 0', fontSize: '13px', color: COLORS.red500, fontWeight: 600 }}>{stopError}</p>}
               <button
                 onClick={() => {

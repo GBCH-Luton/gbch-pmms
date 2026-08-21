@@ -1010,13 +1010,16 @@ function SignOffList({ profile, onChanged }) {
                     </div>
                   ))}
                   {anyNo && (
-                    <textarea
-                      value={signoffNote}
-                      onChange={(e) => setSignoffNote(e.target.value)}
-                      placeholder="What's wrong, so the manager knows what to follow up on..."
-                      rows={2}
-                      style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', fontFamily: 'inherit', boxSizing: 'border-box', resize: 'vertical' }}
-                    />
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <textarea
+                        value={signoffNote}
+                        onChange={(e) => setSignoffNote(e.target.value)}
+                        placeholder="What's wrong, so the manager knows what to follow up on..."
+                        rows={2}
+                        style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', fontFamily: 'inherit', boxSizing: 'border-box', resize: 'vertical', flex: 1 }}
+                      />
+                      <VoiceInputButton onResult={(text) => setSignoffNote(prev => prev ? `${prev} ${text}` : text)} />
+                    </div>
                   )}
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <button
