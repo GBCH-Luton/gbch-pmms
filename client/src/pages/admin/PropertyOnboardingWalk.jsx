@@ -98,6 +98,14 @@ export default function PropertyOnboardingWalk({ profile, onNavigate }) {
   const room = ROOMS[roomIndex]
   const allVerdicted = CHECK_ITEMS.every(item => verdicts[item.key])
   const hasAnyFail = CHECK_ITEMS.some(item => verdicts[item.key] === 'fail')
+  // A note is required on every Fail issue -- once this room is submitted
+  // it can't be reopened (no "previous room" nav, no jump-back), so unlike
+  // a normal draft form there's no later chance to fill one in. Better to
+  // block the submit than leave a real ticket permanently stuck with the
+  // placeholder "(no note added)" text.
+  const allNotesFilled = CHECK_ITEMS.every(item =>
+    verdicts[item.key] !== 'fail' || (issuesByItem[item.key] || []).every(issue => issue.note?.trim())
+  )
 
   function setVerdict(itemKey, v) {
     setVerdicts(prev => ({ ...prev, [itemKey]: v }))
@@ -123,6 +131,7 @@ export default function PropertyOnboardingWalk({ profile, onNavigate }) {
 
   async function submitRoom() {
     if (!allVerdicted) return
+    if (!allNotesFilled) { setError('Add a note to every failed item before continuing.'); return }
     setSubmittingRoom(true)
     setError('')
     try {
@@ -135,7 +144,7 @@ export default function PropertyOnboardingWalk({ profile, onNavigate }) {
             await raiseOnboardingTicket({
               profile, walkId: walk.id, propertyId: property.id, room, itemKey: item.key,
               source: 'walk', issueTag: item.label,
-              description: issue.note?.trim() || '(no note added)',
+              description: issue.note.trim(),
               files: issue.files, highVulnerability: property.high_vulnerability,
             })
           }
@@ -269,7 +278,7 @@ export default function PropertyOnboardingWalk({ profile, onNavigate }) {
                         <textarea
                           value={issue.note}
                           onChange={e => updateIssue(item.key, idx, { note: e.target.value })}
-                          placeholder="Describe what's wrong..."
+                          placeholder="Describe what's wrong... (required)"
                           style={{ flex: 1, minHeight: '60px', padding: '8px 10px', borderRadius: '8px', border: `1px solid ${COLORS.amber300}`, fontSize: '13px', boxSizing: 'border-box', fontFamily: 'inherit' }}
                         />
                         <VoiceInputButton onResult={text => updateIssue(item.key, idx, { note: issue.note ? `${issue.note} ${text}` : text })} />
@@ -292,10 +301,10 @@ export default function PropertyOnboardingWalk({ profile, onNavigate }) {
 
           <button
             onClick={submitRoom}
-            disabled={!allVerdicted || submittingRoom}
-            style={{ ...primaryBtn, width: '100%', marginTop: '16px', opacity: (!allVerdicted || submittingRoom) ? 0.6 : 1, cursor: (!allVerdicted || submittingRoom) ? 'not-allowed' : 'pointer' }}
+            disabled={!allVerdicted || !allNotesFilled || submittingRoom}
+            style={{ ...primaryBtn, width: '100%', marginTop: '16px', opacity: (!allVerdicted || !allNotesFilled || submittingRoom) ? 0.6 : 1, cursor: (!allVerdicted || !allNotesFilled || submittingRoom) ? 'not-allowed' : 'pointer' }}
           >
-            {submittingRoom ? 'Submitting…' : hasAnyFail ? 'Submit job(s) and move to next room →' : 'Next room →'}
+            {submittingRoom ? 'Submitting…' : !allNotesFilled ? 'Add a note to every fail first' : hasAnyFail ? 'Submit job(s) and move to next room →' : 'Next room →'}
           </button>
         </div>
       )}
