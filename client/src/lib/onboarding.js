@@ -1,0 +1,117 @@
+import { supabase } from './supabase'
+
+// Six fixed rooms, five fixed checklist items, identical every walk -- no
+// per-property variation for v1 (confirmed explicitly, "for now is ok").
+export const ROOMS = ['Kitchen', 'Living Room', 'Hallway', 'Bedroom 1', 'Bedroom 2', 'Bathroom']
+
+export const CHECK_ITEMS = [
+  { key: 'walls', label: 'Walls, ceiling & decoration' },
+  { key: 'flooring', label: 'Flooring' },
+  { key: 'windows_doors', label: 'Windows, doors & locks' },
+  { key: 'fixtures', label: 'Fixtures & fittings' },
+  { key: 'safety', label: 'Safety (smoke alarm / sockets / trip hazards)' },
+]
+
+// Must match a sub-category label in the "Property Onboarding" category
+// seeded by scripts/add_property_onboarding_category.sql.
+export const ONBOARDING_CATEGORY = 'Property Onboarding'
+
+// "Resolved", for the go-live gate, means fully signed off (Archived), not
+// just builder-Completed -- deliberately stricter than the app's usual
+// open-ticket definition (OPEN_TICKET_STATUS_EXCLUSION in shared.jsx, which
+// also treats Completed as not-open everywhere else) per this feature's
+// explicit confirmed answer: a ticket sitting Completed-but-unsigned-off
+// must still block go-live.
+const RESOLVED_STATUSES = ['Archived', 'Cancelled']
+
+// Every open ticket on the property blocks both submission-to-review and
+// final approval -- including ones with nothing to do with this walk. Runs
+// at both checkpoints since time passes between them and either side (the
+// Assistant Manager or the Landlord Liaison) can add tickets in between.
+export async function fetchPropertyOpenTickets(propertyId) {
+  const { data } = await supabase
+    .schema('pmms')
+    .from('tickets')
+    .select('id, ticket_number, category, issue_tag, room, status, raised_by_name')
+    .eq('property_id', propertyId)
+    .not('status', 'in', `(${RESOLVED_STATUSES.map(s => `"${s}"`).join(',')})`)
+    .order('created_at', { ascending: false })
+  return data || []
+}
+
+// Procured properties (the only ones eligible to be walked), each carrying
+// its own active walk if one exists -- 'in_progress' | 'pending_liaison_review'
+// | 'sent_back'. An 'approved' walk isn't "active" any more (the property
+// left Procured for Live, so it drops out of this list on its own).
+export async function fetchOnboardingProperties() {
+  const { data: properties } = await supabase
+    .schema('pmms')
+    .from('properties')
+    .select('id, address, high_vulnerability, layout_type, status')
+    .eq('status', 'Procured')
+    .order('address')
+
+  const { data: walks } = await supabase
+    .schema('pmms')
+    .from('property_onboarding_walks')
+    .select('*')
+    .in('status', ['in_progress', 'pending_liaison_review', 'sent_back'])
+
+  return (properties || []).map(p => ({
+    ...p,
+    walk: (walks || []).find(w => w.property_id === p.id) || null,
+  }))
+}
+
+// Reuses an already-active walk on this property (another Assistant
+// Manager may have started it, or this is a resume) rather than always
+// creating a new one -- the DB's own partial unique index is the real
+// guarantee against two walks existing at once; this just avoids a
+// needless insert-then-conflict round trip in the common case.
+export async function startOrResumeWalk(propertyId, profile) {
+  const { data: existing } = await supabase
+    .schema('pmms')
+    .from('property_onboarding_walks')
+    .select('*')
+    .eq('property_id', propertyId)
+    .in('status', ['in_progress', 'pending_liaison_review', 'sent_back'])
+    .maybeSingle()
+  if (existing) return existing
+
+  const { data, error } = await supabase
+    .schema('pmms')
+    .from('property_onboarding_walks')
+    .insert({ property_id: propertyId, started_by: profile.id, started_by_name: profile.name })
+    .select()
+    .single()
+  if (error) throw new Error(error.message)
+  return data
+}
+
+// No PostgREST embedding anywhere else in this codebase (every other page
+// does a separate fetch + JS-side join) -- matching that instead of being
+// the first to rely on embed syntax against a relationship that's never
+// been exercised.
+export async function fetchWalkChecks(walkId) {
+  const { data: checks } = await supabase
+    .schema('pmms')
+    .from('property_onboarding_checks')
+    .select('*')
+    .eq('walk_id', walkId)
+    .order('created_at')
+
+  const ticketIds = [...new Set((checks || []).map(c => c.ticket_id).filter(Boolean))]
+  const { data: tickets } = ticketIds.length
+    ? await supabase.schema('pmms').from('tickets').select('id, ticket_number, status, issue_tag, description, photo_url').in('id', ticketIds)
+    : { data: [] }
+
+  return (checks || []).map(c => ({ ...c, ticket: (tickets || []).find(t => t.id === c.ticket_id) || null }))
+}
+
+export async function recordPass(walkId, room, itemKey, profile) {
+  const { error } = await supabase
+    .schema('pmms')
+    .from('property_onboarding_checks')
+    .insert({ walk_id: walkId, room, item_key: itemKey, verdict: 'pass', source: 'walk', raised_by_name: profile.name })
+  if (error) throw new Error(error.message)
+}

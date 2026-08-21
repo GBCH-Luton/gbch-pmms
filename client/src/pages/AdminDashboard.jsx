@@ -32,6 +32,7 @@ const AdminSignOff = lazy(() => import('./admin/AdminSignOff'))
 const AdminBuilders = lazy(() => import('./admin/AdminBuilders'))
 const AdminClocking = lazy(() => import('./admin/AdminClocking'))
 const AdminRaiseTicket = lazy(() => import('./admin/AdminRaiseTicket'))
+const AdminOnboardProperty = lazy(() => import('./admin/AdminOnboardProperty'))
 const AdminStock = lazy(() => import('./admin/AdminStock'))
 const AdminReports = lazy(() => import('./admin/AdminReports'))
 const AdminSettings = lazy(() => import('./admin/AdminSettings'))
@@ -61,6 +62,11 @@ const NAV_ITEMS = [
   { key: 'team-chat', label: 'Team Chat', icon: 'chat', Component: AdminTeamChat },
   { key: 'pipeline', label: 'Pipeline', icon: 'pipeline', Component: AdminPipeline },
   { key: 'raise-ticket', label: 'Log a Ticket', icon: 'ticket', Component: AdminRaiseTicket },
+  // Room-by-room new-property walk -> real tickets on any Fail -> Landlord
+  // Liaison review -> property flips Live. Restricted to exactly the two
+  // roles it's for -- job_title isn't part of the divisions/divisionOnly
+  // vocabulary below, so this is the one nav item using visibleTo instead.
+  { key: 'onboard-property', label: 'Onboard a Property', icon: 'sunrise', Component: AdminOnboardProperty, visibleTo: p => p.job_title === 'Assistant Manager' || p.division === 'Landlord Liaison' },
   { key: 'sign-off', label: 'Sign-Off', icon: 'check', Component: AdminSignOff },
   ...(EVENTS_FEATURE_ENABLED ? [{ key: 'events', label: 'Events', icon: 'calendar', Component: AdminEvents }] : []),
   { key: 'properties', label: 'Properties', icon: 'building', Component: AdminProperties },
@@ -157,6 +163,10 @@ function isNavItemVisible(item, profile) {
   if (item.key === 'settings' && profile.hideSettings) return false
   if (item.divisions && profile.division && !item.divisions.includes(profile.division)) return false
   if (item.divisionOnly && profile.role !== 'admin' && profile.division !== item.divisionOnly) return false
+  // A third, narrower shape for the one item (Onboard a Property) gated by
+  // job_title, not division -- neither divisions nor divisionOnly fit a
+  // job_title condition, so this is a plain predicate instead.
+  if (item.visibleTo && !item.visibleTo(profile)) return false
   return true
 }
 
