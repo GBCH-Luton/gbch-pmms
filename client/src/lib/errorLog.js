@@ -21,6 +21,31 @@ export async function logClientError(errorType, message, { stack, context } = {}
   }
 }
 
+// A query failing with PGRST303 means the access token expired and
+// supabase-js's own silent background refresh didn't happen in time (the
+// tab was asleep/backgrounded past the token's lifetime, a network blip
+// during the refresh window, etc.) -- confirmed live via Paulo Da Silva's
+// error log entry, a tab actively in use hitting this mid-session, not
+// just at login. Left alone, the query just silently fails and whatever
+// screen depended on it looks broken or empty. Same recovery as the
+// stale-chunk case in ErrorBoundary.jsx: reload once, guarded by
+// sessionStorage so a genuinely dead account (not just an expired token)
+// doesn't loop forever -- a reload either picks the session back up
+// cleanly via the refresh token, or lands on the login screen, both far
+// better than a query that quietly does nothing. This also happens to be
+// a real, frequent-enough moment (unlike a deliberate sign-in) to catch a
+// tab that's been open across a deploy and pull it onto current code.
+const JWT_EXPIRED_RELOAD_KEY = 'pmms_jwt_reload_at'
+const JWT_RELOOP_GUARD_MS = 15000
+
+function handleJwtExpired() {
+  const lastReload = Number(sessionStorage.getItem(JWT_EXPIRED_RELOAD_KEY) || 0)
+  if (Date.now() - lastReload < JWT_RELOOP_GUARD_MS) return false
+  sessionStorage.setItem(JWT_EXPIRED_RELOAD_KEY, String(Date.now()))
+  window.location.reload()
+  return true
+}
+
 // PostgrestQueryBuilder (what .from() returns) isn't itself thenable --
 // only the builder returned by .select()/.insert()/.update()/.upsert()/
 // .delete() is (confirmed against this project's supabase-js version by
@@ -41,6 +66,9 @@ function wrapQueryBuilder(queryBuilder, table, schemaName) {
 
       filterBuilder.then = (onFulfilled, onRejected) =>
         originalThen(result => {
+          if (result?.error?.code === 'PGRST303' && handleJwtExpired()) {
+            return new Promise(() => {}) // reloading -- never resolve into a broken screen
+          }
           if (result?.error) {
             logClientError('supabase_query', result.error.message, {
               context: {
