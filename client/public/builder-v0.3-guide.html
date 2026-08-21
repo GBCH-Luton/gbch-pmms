@@ -408,7 +408,17 @@
   .followup-check input { margin-top: 3px; flex-shrink: 0; width: 16px; height: 16px; }
   .followup-title { display: block; font-size: 13.5px; font-weight: 700; color: var(--app-amber900); }
   .followup-sub { display: block; font-size: 12px; color: var(--app-amber800); margin-top: 2px; line-height: 1.4; }
-  .complete-note { width: 100%; min-height: 80px; padding: 12px; border-radius: 10px; border: 1px solid var(--app-slate200); font-size: 13.5px; font-family: inherit; box-sizing: border-box; resize: vertical; margin-bottom: 14px; }
+  .complete-note { width: 100%; min-height: 80px; padding: 12px; border-radius: 10px; border: 1px solid var(--app-slate200); font-size: 13.5px; font-family: inherit; box-sizing: border-box; resize: vertical; }
+
+  /* Mic-button-on-a-note row -- matches the real app's VoiceInputButton
+     placement (client/src/components/VoiceInputButton.jsx), added
+     alongside every note field here so this guide stays an accurate
+     picture of BuilderDashboard.jsx, not just the Leaving Site redesign
+     it started as. */
+  .note-row { display: flex; gap: 8px; align-items: flex-start; margin-bottom: 10px; }
+  .note-row textarea { flex: 1; margin-bottom: 0; }
+  .mic-btn { flex-shrink: 0; background: none; border: none; border-radius: 8px; font-size: 18px; cursor: pointer; padding: 4px 8px; color: inherit; font-family: inherit; }
+  .mic-btn.listening { background: var(--app-red100); color: var(--app-red600); }
 </style>
 </head>
 <body>
@@ -514,6 +524,36 @@
   // same idea as Where's the Team's own log, just for this one simulated
   // builder instead of a whole team.
   function logEvent(text) { state.events.unshift({ time: new Date(), text }); }
+
+  // Same one-shot dictation as the real app's VoiceInputButton -- browser
+  // waits for a natural pause then fires one final result. micBtnHtml is
+  // called from the note templates below; hidden entirely (returns '') on
+  // browsers without support, same as the real component returning null.
+  function speechSupported() { return !!(window.SpeechRecognition || window.webkitSpeechRecognition); }
+  function micBtnHtml(targetId) {
+    if (!speechSupported()) return '';
+    return `<button type="button" class="mic-btn" title="Tap to speak" onclick="startDictation('${targetId}', this)">&#127908;</button>`;
+  }
+  function startDictation(targetId, btn) {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const el = document.getElementById(targetId);
+    if (!SR || !el) return;
+    const recognition = new SR();
+    recognition.lang = 'en-GB';
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    btn.classList.add('listening');
+    btn.innerHTML = '&#9209;';
+    recognition.onresult = (e) => {
+      const transcript = e.results[0][0].transcript;
+      const existing = el.value.trim();
+      el.value = existing ? `${existing} ${transcript}` : transcript;
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    };
+    recognition.onend = () => { btn.classList.remove('listening'); btn.innerHTML = '&#127908;'; };
+    recognition.onerror = () => { btn.classList.remove('listening'); btn.innerHTML = '&#127908;'; };
+    recognition.start();
+  }
 
   function fmtElapsed(s) {
     const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
@@ -1180,7 +1220,10 @@
                 <span>${item}</span>
               </label>`).join('')}
           ` : ''}
-          <textarea class="complete-note" placeholder="Describe the work completed..." oninput="state.completeNote=this.value">${state.completeNote}</textarea>
+          <div class="note-row">
+            <textarea id="completeNoteField" class="complete-note" placeholder="Describe the work completed..." oninput="state.completeNote=this.value">${state.completeNote}</textarea>
+            ${micBtnHtml('completeNoteField')}
+          </div>
           <button class="photo-btn ${state.completePhotoAttached ? 'attached' : ''}" onclick="togglePhoto()">${state.completePhotoAttached ? '✓ Photo attached' : '📷 Attach Photo'}</button>
           <p style="margin:0 0 8px;font-size:12px;font-weight:700;color:var(--app-slate500);text-transform:uppercase;letter-spacing:0.06em">Materials Used (optional)</p>
           ${state.materialsUsedRows.map((row, i) => `
@@ -1197,7 +1240,7 @@
               <span class="followup-sub">Job's done, but something here needs picking up later — e.g. "fixed the fridge, but it should really be replaced."</span>
             </span>
           </label>
-          ${state.followUpNeeded ? `<textarea class="complete-note" placeholder="What needs following up..." oninput="state.followUpNote=this.value">${state.followUpNote}</textarea>` : ''}
+          ${state.followUpNeeded ? `<div class="note-row"><textarea id="followUpNoteField" class="complete-note" placeholder="What needs following up..." oninput="state.followUpNote=this.value">${state.followUpNote}</textarea>${micBtnHtml('followUpNoteField')}</div>` : ''}
           <button class="btn-primary" ${canSubmit ? '' : 'disabled'} onclick="confirmComplete()">✓ Confirm complete</button>
           <button class="btn-ghost" onclick="cancelComplete()">Cancel</button>
         </div>`;
@@ -1231,7 +1274,10 @@
       return `
         <p class="stop-title">${r}</p>
         <p class="stop-sub">${needsNote ? 'Please say what happened' : 'Add a note (optional)'}</p>
-        <textarea class="sheet-note" rows="3" placeholder="${needsNote ? 'e.g. Ran out of a specific part, coming back tomorrow...' : 'Add a note...'}" oninput="state.stopNote=this.value">${state.stopNote}</textarea>
+        <div class="note-row">
+          <textarea id="stopNoteField" class="sheet-note" rows="3" placeholder="${needsNote ? 'e.g. Ran out of a specific part, coming back tomorrow...' : 'Add a note...'}" oninput="state.stopNote=this.value">${state.stopNote}</textarea>
+          ${micBtnHtml('stopNoteField')}
+        </div>
         <button class="sheet-confirm" onclick="confirmStop()">Confirm</button>
         <button class="btn-ghost" onclick="stopReasonBack()">Back</button>
       `;
