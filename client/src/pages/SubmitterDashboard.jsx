@@ -515,7 +515,12 @@ function NewReportForm({ profile, onSubmitted }) {
 // a mistaken/duplicate cancel shouldn't clutter the view, but it's still
 // one tap away.
 const PIPELINE_FILTERS = {
-  All: (t) => t.status !== 'Cancelled',
+  // Archived (signed off) is excluded from the default view, same as
+  // Cancelled -- once she's confirmed a job herself there's nothing left to
+  // track it for day to day, and it was otherwise piling up permanently at
+  // the top of an otherwise-short list. Still reachable via the "Closed"
+  // tile/status filter below, same as AdminPipeline.jsx's own "All".
+  All: (t) => t.status !== 'Cancelled' && t.status !== 'Archived',
   Pending: (t) => t.status === 'Pending',
   Assigned: (t) => t.status === 'Assigned',
   InProgress: (t) => t.status === 'In Progress',
@@ -523,6 +528,21 @@ const PIPELINE_FILTERS = {
   Completed: (t) => t.status === 'Completed',
   Archived: (t) => t.status === 'Archived',
   Cancelled: (t) => t.status === 'Cancelled',
+}
+
+// Shared between the status filter dropdown and the "Showing: X" summary
+// below -- same reworded, submitter-friendly wording the KPI tiles already
+// use (see their own comment above), so a status reads the same way
+// wherever it shows up on this page.
+const PIPELINE_FILTER_LABELS = {
+  All: 'All Statuses',
+  Pending: 'Not Picked Up Yet',
+  Assigned: 'Assigned, Not Started',
+  InProgress: 'In Progress',
+  OnHold: 'On Hold',
+  Completed: 'Needs Your Confirmation',
+  Archived: 'Closed',
+  Cancelled: 'Cancelled',
 }
 
 function PipelineList({ profile, onGoToSignOff }) {
@@ -724,6 +744,16 @@ function PipelineList({ profile, onGoToSignOff }) {
       />
 
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+        {/* Same statuses the KPI tiles above already jump to (this just
+            gives a direct way in without having to hunt for the matching
+            tile) -- no category/builder/priority/assign-type/division
+            filters here, those are AdminPipeline's own triage tools for
+            managing everyone's tickets, not relevant to browsing her own. */}
+        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={{ ...inputStyle, width: 'auto', height: '40px' }}>
+          {Object.entries(PIPELINE_FILTER_LABELS).map(([key, label]) => (
+            <option key={key} value={key}>{label}</option>
+          ))}
+        </select>
         <div style={{ minWidth: '220px', flex: '1 1 220px' }}>
           <PropertySearchSelect properties={propertyOptions} value={propertyFilter} onChange={setPropertyFilter} placeholder="All Properties" />
         </div>
@@ -739,7 +769,7 @@ function PipelineList({ profile, onGoToSignOff }) {
 
       {filtersActive && (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', background: COLORS.teal50, border: `1px solid ${COLORS.teal300}`, borderRadius: '10px', padding: '10px 16px', marginBottom: '16px' }}>
-          <span style={{ fontSize: '13px', fontWeight: 700, color: COLORS.teal700 }}>Showing: {statusFilter} ({filteredTickets.length})</span>
+          <span style={{ fontSize: '13px', fontWeight: 700, color: COLORS.teal700 }}>Showing: {PIPELINE_FILTER_LABELS[statusFilter]} ({filteredTickets.length})</span>
           <button onClick={clearAllFilters} style={{ background: 'none', border: 'none', color: COLORS.teal700, fontSize: '13px', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}>
             Clear filters
           </button>
