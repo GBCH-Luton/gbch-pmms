@@ -12,6 +12,26 @@ const StaffLocationsMapModal = lazy(() => import('../../components/StaffLocation
 
 const DEFAULT_NEW_PROPERTY_WINDOW_HOURS = 48
 
+// What to show on the Where's the Team chip/log instead of a bare "Idle"
+// once the most recent thing that happened was one of these activity_log
+// categories closing, rather than an actual job finishing. `job` (going to
+// another job) isn't listed -- by the time that leg closes ("arrived on
+// site") a new work_session has normally already opened, which the "On
+// Job" branch above already catches before this is ever reached; if it
+// somehow isn't (arrived but never started work), plain "Idle" is the
+// right fallback, same as not being in this map at all.
+const IDLE_CONTEXT_LABEL = {
+  lunch: 'Back from lunch',
+  materials: 'Back from materials run',
+  office: 'Back from the office',
+  visit: 'Back from a visit',
+  // Kathryn's own two categories -- unlike builders' `office` above
+  // (which means "away, now back"), her office IS home base, so arriving
+  // there is an ongoing "still here", not a return to normal duty.
+  visit_office: 'At the office',
+  visit_other: 'Arrived',
+}
+
 // Collapsed/expanded state is deliberately session-only, not persisted --
 // every page load/refresh always comes back to the same layout (Ticket
 // Pipeline open, everything else collapsed), regardless of what an admin
@@ -286,6 +306,23 @@ function TeamWhereabouts({ profile, onNavigate, height = DASHBOARD_TOP_CARD_HEIG
     // any job ends (complete or pause), just not previously surfaced here.
     const lastEndedByBuilder = await fetchLastEndedSessionsToday(allStaff.map(b => b.id), todayKey)
 
+    // fetchLastEndedSessionsToday only ever looks at work_sessions (actual
+    // jobs) -- someone whose day is built entirely from activity_log legs
+    // instead (Landlord Liaison's Log a Visit/office trips, no jobs at all)
+    // has no row there, so idleSince below fell all the way back to their
+    // morning clock-in even seconds after finishing a trip. Found live:
+    // Kathryn showing "idle 5h 40m" one minute after "arrived at the
+    // office" -- that arrival IS what closed the activity_log leg, so it
+    // should have reset idleSince to just now, not this morning. Keeps the
+    // whole row (not just the timestamp) so the status label below can
+    // say what that last thing actually was.
+    const lastActivityEndedByBuilder = {}
+    ;(activityData || []).forEach(a => {
+      if (!a.ended_at) return
+      const existing = lastActivityEndedByBuilder[a.staff_id]
+      if (!existing || new Date(a.ended_at) > new Date(existing.ended_at)) lastActivityEndedByBuilder[a.staff_id] = a
+    })
+
     const statuses = {}
     allStaff.forEach(b => {
       const shift = (attendanceData || [])
@@ -322,13 +359,20 @@ function TeamWhereabouts({ profile, onNavigate, height = DASHBOARD_TOP_CARD_HEIG
           status = 'On Job'
           tone = 'job'
         } else {
-          // "Idle" not "Available" -- this chip only ever appears for
-          // someone already known to be on shift with nothing open (see
-          // chipBuilders' off/leave filter below), so "Available" was
-          // redundant with the section itself. How long and where they
-          // were last seen now surface as an annotation on their most
-          // recent log entry below instead of a second line on the chip.
-          status = 'Idle'
+          // "Idle" is reserved for genuinely between jobs -- a job just
+          // completed (or nothing's happened yet today) with nothing new
+          // started since. Coming back from lunch/materials/the office
+          // isn't the same thing (found live: Kathryn reading "Idle" one
+          // minute after arriving at the office, and the same would apply
+          // to a builder back from lunch) -- those keep showing what they
+          // actually just did instead, and only fall through to plain
+          // "Idle" once whichever happened most recently was a real job
+          // finishing. "Away"/"On Job" above already cover anyone still
+          // mid-activity or mid-job.
+          const lastActivity = lastActivityEndedByBuilder[b.id]
+          const lastJobEndedAt = lastEndedByBuilder[b.id]?.ended_at || null
+          const activityIsMostRecent = lastActivity && (!lastJobEndedAt || new Date(lastActivity.ended_at) > new Date(lastJobEndedAt))
+          status = (activityIsMostRecent && IDLE_CONTEXT_LABEL[lastActivity.activity_category]) || 'Idle'
           tone = 'available'
         }
       }
@@ -336,7 +380,14 @@ function TeamWhereabouts({ profile, onNavigate, height = DASHBOARD_TOP_CARD_HEIG
       let idleSince = null, idleLat = null, idleLng = null
       const lastEnded = lastEndedByBuilder[b.id]
       if (tone === 'available') {
-        idleSince = lastEnded?.ended_at || shift?.clock_in_at || null
+        // Whichever actually happened most recently -- a finished job, a
+        // closed activity_log leg (arrived at the office, back from a
+        // visit, etc.), or (nothing else today yet) this morning's
+        // clock-in.
+        const idleCandidates = [lastEnded?.ended_at, lastActivityEndedByBuilder[b.id]?.ended_at, shift?.clock_in_at].filter(Boolean)
+        idleSince = idleCandidates.length
+          ? idleCandidates.reduce((latest, t) => new Date(t) > new Date(latest) ? t : latest)
+          : null
         idleLat = lastEnded?.clock_out_lat ?? null
         idleLng = lastEnded?.clock_out_lng ?? null
       }
@@ -626,7 +677,10 @@ function TeamWhereabouts({ profile, onNavigate, height = DASHBOARD_TOP_CARD_HEIG
                         anywhere in the feed) -- the feed is now uncapped, but
                         this chip-level copy stays since it's still the
                         fastest way to see it. */}
-                    {s.tone === 'available' && s.idleSince && ` · idle ${formatDuration(Date.now() - new Date(s.idleSince).getTime())}`}
+                    {/* No literal "idle" word here -- s.status already says what's
+                        going on ("Idle", "At the office", "Back from lunch"...),
+                        so this is just how long that's been true for. */}
+                    {s.tone === 'available' && s.idleSince && ` · ${formatDuration(Date.now() - new Date(s.idleSince).getTime())}`}
                   </span>
                 </div>
               )
@@ -675,7 +729,7 @@ function TeamWhereabouts({ profile, onNavigate, height = DASHBOARD_TOP_CARD_HEIG
                   )}
                   {idleAnnotationByEntryId[e.id] && (
                     <span style={{ fontSize: '12px', color: COLORS.slate400, fontWeight: 600 }}>
-                      {' '}&middot; idle {formatDuration(Date.now() - new Date(idleAnnotationByEntryId[e.id].idleSince).getTime())}
+                      {' '}&middot; {idleAnnotationByEntryId[e.id].status.toLowerCase()} {formatDuration(Date.now() - new Date(idleAnnotationByEntryId[e.id].idleSince).getTime())}
                       {idleAnnotationByEntryId[e.id].idleLat != null && idleAnnotationByEntryId[e.id].idleLng != null && (
                         <>
                           {' '}&middot;{' '}
