@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react'
-import { supabase } from '../../lib/supabase'
 import { COLORS } from '../../lib/colors'
 import { statusColour, statusLabel } from './shared'
 import { ROOMS, CHECK_ITEMS, fetchOnboardingProperties, startOrResumeWalk, fetchWalkChecks, fetchPropertyOpenTickets, recordPass } from '../../lib/onboarding'
@@ -47,8 +46,6 @@ export default function PropertyOnboardingWalk({ profile, onNavigate }) {
   const [customPaid, setCustomPaid] = useState(true)
   const [customFiles, setCustomFiles] = useState([])
   const [customSubmitting, setCustomSubmitting] = useState(false)
-
-  const [submittingReview, setSubmittingReview] = useState(false)
 
   useEffect(() => { loadProperties() }, [])
 
@@ -175,19 +172,6 @@ export default function PropertyOnboardingWalk({ profile, onNavigate }) {
       setError(err.message)
     }
     setCustomSubmitting(false)
-  }
-
-  async function submitForReview() {
-    setSubmittingReview(true)
-    setError('')
-    const { error: err } = await supabase
-      .schema('pmms')
-      .from('property_onboarding_walks')
-      .update({ status: 'pending_liaison_review', submitted_at: new Date().toISOString() })
-      .eq('id', walk.id)
-    setSubmittingReview(false)
-    if (err) { setError(err.message); return }
-    backToPicker()
   }
 
   if (loading) return <p style={{ color: COLORS.slate500, fontSize: '13px' }}>Loading properties…</p>
@@ -323,7 +307,7 @@ export default function PropertyOnboardingWalk({ profile, onNavigate }) {
             </div>
           ) : (
             <div style={{ ...cardStyle, background: COLORS.green50, border: `1px solid ${COLORS.green200}`, marginBottom: '14px' }}>
-              <p style={{ margin: 0, fontSize: '13.5px', fontWeight: 700, color: COLORS.green700 }}>✓ Clear — 0 open jobs.</p>
+              <p style={{ margin: 0, fontSize: '13.5px', fontWeight: 700, color: COLORS.green700 }}>✓ Clear — 0 open jobs. This moves to Landlord Liaison automatically — nothing more for you to do here.</p>
             </div>
           )}
 
@@ -370,13 +354,11 @@ export default function PropertyOnboardingWalk({ profile, onNavigate }) {
                 </div>
               )}
 
-              <button
-                onClick={submitForReview}
-                disabled={openTickets.length > 0 || submittingReview}
-                style={{ ...primaryBtn, width: '100%', opacity: (openTickets.length > 0 || submittingReview) ? 0.6 : 1, cursor: (openTickets.length > 0 || submittingReview) ? 'not-allowed' : 'pointer' }}
-              >
-                {submittingReview ? 'Submitting…' : walk.status === 'sent_back' ? 'Resubmit for Landlord Liaison review →' : 'Submit for Landlord Liaison review →'}
-              </button>
+              {openTickets.length > 0 && (
+                <p style={{ fontSize: '12.5px', color: COLORS.slate500, fontStyle: 'italic' }}>
+                  Nothing to do here — once every job above is signed off, this moves to Landlord Liaison on its own.
+                </p>
+              )}
             </>
           ) : (
             <p style={{ fontSize: '13px', color: COLORS.slate500, fontStyle: 'italic' }}>Waiting on Landlord Liaison to review this walk.</p>

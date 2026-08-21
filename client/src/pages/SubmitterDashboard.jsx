@@ -24,6 +24,7 @@ import { logLoginEvent } from '../lib/loginEvents'
 import { uploadTicketAttachments, formatUploadProgress } from '../lib/ticketAttachments'
 import { fetchMaintenanceCategories, sortedCategoryEntries, isUnlistedTag, unlistedTagFor, unlistedLabelFor, calculatePriorityScore } from '../lib/maintenanceCategories'
 import { attachBuilderSafeProperties } from '../lib/properties'
+import { maybeAutoSubmitOnboardingWalk } from '../lib/onboarding'
 import { statusColour, statusLabel, postSystemComment, postAuditEvent, KpiTiles, resolveStaffPhotoUrl, suggestAutoAssignBuilder, AUTO_ASSIGN_ON_RAISE_ENABLED, GARDEN_SURVEY_CAMPAIGN_ENABLED, createNotification, fetchManagersForDivision, sendPushNotification, floorContextOptions, floorContextLabel, SIGNOFF_QUESTIONS } from './admin/shared'
 import { NavIcon } from '../lib/icons'
 import PropertySearchSelect from '../components/PropertySearchSelect'
@@ -879,6 +880,7 @@ function SignOffList({ profile, onChanged }) {
 
     await postSystemComment(ticket.id, profile, `Verified and archived by ${profile.name}.`)
     await postAuditEvent(ticket.id, profile, 'Status Changed', `Completed → Archived (verified by ${profile.name})`)
+    await maybeAutoSubmitOnboardingWalk(ticket.property_id)
     setArchivingId(null)
     setConfirmId(null)
     await fetchPending()

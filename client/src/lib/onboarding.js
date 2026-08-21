@@ -108,6 +108,28 @@ export async function fetchWalkChecks(walkId) {
   return (checks || []).map(c => ({ ...c, ticket: (tickets || []).find(t => t.id === c.ticket_id) || null }))
 }
 
+// Called after any ticket gets signed off (Archived) -- checks whether that
+// was the last open ticket on a property whose onboarding walk has already
+// finished all its rooms, and if so silently advances the walk to
+// 'pending_liaison_review' with no further action from anyone. This is
+// deliberately silent: the Maintenance Assistant's job is to walk the
+// property and raise tickets, not babysit their resolution -- the whole
+// point is she never needs to come back and check.
+// A security-definer RPC (see scripts/add_property_onboarding_auto_submit.sql)
+// because whoever just signed off a ticket may be neither the Maintenance
+// Assistant nor Landlord Liaison (a pre-existing legacy ticket can belong to
+// any manager or submitter), so this can't rely on their own RLS access to
+// pmms.property_onboarding_walks. Best-effort: a failure here must never
+// block or surface an error on the sign-off action that triggered it.
+export async function maybeAutoSubmitOnboardingWalk(propertyId) {
+  if (!propertyId) return
+  try {
+    await supabase.schema('pmms').rpc('maybe_auto_submit_onboarding_walk', { p_property_id: propertyId })
+  } catch {
+    // swallow -- see comment above
+  }
+}
+
 export async function recordPass(walkId, room, itemKey, profile) {
   const { error } = await supabase
     .schema('pmms')

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import { COLORS } from '../../lib/colors'
 import { attachProperties } from '../../lib/properties'
+import { maybeAutoSubmitOnboardingWalk } from '../../lib/onboarding'
 import PropertySearchSelect from '../../components/PropertySearchSelect'
 import TicketAttachmentGallery from '../../components/TicketAttachmentGallery'
 import {
@@ -163,6 +164,7 @@ function MySignOffs({ profile, onTicketsChanged }) {
     const stamp = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
     await postSystemComment(ticket.id, profile, `Verified and archived by ${profile.name} on ${stamp}.`)
     await postAuditEvent(ticket.id, profile, 'Status Changed', `Completed → Archived (verified by ${profile.name})`)
+    await maybeAutoSubmitOnboardingWalk(ticket.property_id)
     await fetchPending()
   }
 
