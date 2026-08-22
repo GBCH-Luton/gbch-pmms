@@ -223,6 +223,18 @@ function TeamWhereabouts({ profile, onNavigate, height = DASHBOARD_TOP_CARD_HEIG
 
   async function fetchData(isBackground = false) {
     if (!isBackground) setLoading(true)
+    // The visibilitychange refetch above is most likely to fire right when
+    // a long-backgrounded tab's access token has just expired but
+    // supabase-js's own refresh timer hasn't caught up yet -- every query
+    // below fails at once (PGRST303 "JWT expired") and, since none of them
+    // returned any rows, every builder falls through to the final status
+    // branch and reads as falsely "Idle" until the next 45s tick. Forcing
+    // a refresh first when the token has actually already expired closes
+    // that race instead of silently showing the wrong status.
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session && session.expires_at * 1000 <= Date.now()) {
+      await supabase.auth.refreshSession()
+    }
     const assignableBuilders = await (profile.division ? fetchAssignableStaffForDivision(profile.division) : fetchAssignableBuilders())
 
     // Landlord Liaison Manager has her own daily clock-in/out (see
@@ -843,7 +855,16 @@ export default function AdminDashboard({ profile, onNavigate }) {
     }
   }, [])
 
-  function refreshDashboardData() {
+  async function refreshDashboardData() {
+    // Same expired-token race as TeamWhereabouts' fetchData above -- the
+    // visibilitychange refetch below is most likely to fire right when a
+    // long-backgrounded tab's token has just expired but supabase-js's own
+    // refresh timer hasn't caught up yet, which would otherwise show every
+    // KPI tile here as a false zero until the next 45s tick.
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session && session.expires_at * 1000 <= Date.now()) {
+      await supabase.auth.refreshSession()
+    }
     fetchTickets()
     fetchPropertiesMetrics()
     fetchTotalPropertiesCount()
