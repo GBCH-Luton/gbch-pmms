@@ -20,7 +20,7 @@ function labelFor(property) {
 // be an absolutely-positioned child here: the ticket form's outer card uses
 // `overflow: hidden` (to get rounded corners on the whole card), which would
 // otherwise clip the dropdown whenever this is the only/last visible step.
-export default function PropertySearchSelect({ properties, value, onChange, placeholder = 'Select a property...' }) {
+export default function PropertySearchSelect({ properties, value, onChange, placeholder = 'Select a property...', badgeFor }) {
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
   const [rect, setRect] = useState(null)
@@ -108,17 +108,25 @@ export default function PropertySearchSelect({ properties, value, onChange, plac
           {filtered.length === 0 && (
             <div style={{ padding: '10px 12px', fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>No matching properties</div>
           )}
-          {filtered.map(property => (
-            <button
-              type="button"
-              key={property.id}
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => selectProperty(property)}
-              style={optionStyle}
-            >
-              {labelFor(property)}
-            </button>
-          ))}
+          {filtered.map(property => {
+            const badge = badgeFor?.(property)
+            return (
+              <button
+                type="button"
+                key={property.id}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => selectProperty(property)}
+                style={{ ...optionStyle, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}
+              >
+                <span>{labelFor(property)}</span>
+                {badge && (
+                  <span style={{ flexShrink: 0, fontSize: '10px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em', padding: '3px 8px', borderRadius: '999px', background: badge.bg, color: badge.color }}>
+                    {badge.label}
+                  </span>
+                )}
+              </button>
+            )
+          })}
         </div>,
         document.body
       )}

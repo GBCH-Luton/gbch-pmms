@@ -6,7 +6,7 @@ export const ROOM_TYPES = ['bedroom', 'bathroom', 'kitchen', 'garden', 'communal
 // scope, a dimensions assessment applies to a property at any point in its
 // lifecycle, not just while it's being brought into the portfolio.
 export async function fetchAllProperties() {
-  const { data } = await supabase.schema('pmms').from('properties').select('id, address, high_vulnerability').order('address')
+  const { data } = await supabase.schema('pmms').from('properties').select('id, address, high_vulnerability, dimensions_assessed_at').order('address')
   return data || []
 }
 

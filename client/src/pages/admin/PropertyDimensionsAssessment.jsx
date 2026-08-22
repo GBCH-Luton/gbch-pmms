@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { COLORS } from '../../lib/colors'
 import PropertySearchSelect from '../../components/PropertySearchSelect'
+import { KpiTiles } from './shared'
 import { ROOM_TYPES, fetchAllProperties, fetchPropertyDimensions, saveDimensions } from '../../lib/dimensions'
 
 // Real build of the "Dimensions Assessment" wizard -- reviewed and iterated
@@ -44,6 +45,7 @@ export default function PropertyDimensionsAssessment({ profile, onNavigate, init
   const [properties, setProperties] = useState([])
   const [loadingProperties, setLoadingProperties] = useState(true)
   const [propertyId, setPropertyId] = useState('')
+  const [tileFilter, setTileFilter] = useState(null)
   const [loadingExisting, setLoadingExisting] = useState(false)
   const [step, setStep] = useState(0)
   const [rooms, setRooms] = useState(emptyRooms())
@@ -143,6 +145,11 @@ export default function PropertyDimensionsAssessment({ profile, onNavigate, init
     try {
       await saveDimensions(propertyId, { rooms, desc, updateNote, profile })
       setSubmitted(true)
+      // Keeps the picker's tiles/badges accurate for the rest of this visit
+      // without a full refetch -- otherwise "Assess another property"
+      // right after saving would still show this one as Not Assessed.
+      const now = new Date().toISOString()
+      setProperties(prev => prev.map(p => String(p.id) === String(propertyId) ? { ...p, dimensions_assessed_at: now } : p))
     } catch (err) {
       setError(err.message)
     }
@@ -293,9 +300,33 @@ export default function PropertyDimensionsAssessment({ profile, onNavigate, init
       </div>
 
       {!propertyId ? (
-        <div style={cardStyle}>
-          <label style={fieldLabelStyle}>Property Address</label>
-          <PropertySearchSelect properties={properties} value={propertyId} onChange={selectProperty} placeholder="Search by address..." />
+        <div>
+          <KpiTiles
+            kpis={[
+              { label: 'Total Properties', value: properties.length, colour: COLORS.slate500, key: 'total' },
+              { label: 'Assessed', value: properties.filter(p => p.dimensions_assessed_at).length, colour: COLORS.green600, key: 'assessed' },
+              { label: 'Not Assessed', value: properties.filter(p => !p.dimensions_assessed_at).length, colour: COLORS.amber600, key: 'notAssessed' },
+            ]}
+            onTileClick={kpi => kpi.key !== 'total' && setTileFilter(prev => prev === kpi.key ? null : kpi.key)}
+          />
+          {tileFilter && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '-8px 0 12px 0' }}>
+              <span style={{ fontSize: '12px', color: COLORS.slate500 }}>Filtered — click the tile again to clear.</span>
+              <button onClick={() => setTileFilter(null)} style={{ ...ghostBtn, height: '26px', padding: '0 10px', fontSize: '11.5px' }}>Clear</button>
+            </div>
+          )}
+          <div style={cardStyle}>
+            <label style={fieldLabelStyle}>Property Address</label>
+            <PropertySearchSelect
+              properties={tileFilter ? properties.filter(p => tileFilter === 'assessed' ? p.dimensions_assessed_at : !p.dimensions_assessed_at) : properties}
+              value={propertyId}
+              onChange={selectProperty}
+              placeholder="Search by address..."
+              badgeFor={p => p.dimensions_assessed_at
+                ? { label: 'Assessed', bg: COLORS.green100, color: COLORS.green600 }
+                : { label: 'Not assessed', bg: COLORS.amber100, color: COLORS.amber600 }}
+            />
+          </div>
         </div>
       ) : loadingExisting ? (
         <p style={{ color: COLORS.slate500, fontSize: '13px' }}>Loading this property's dimensions…</p>
