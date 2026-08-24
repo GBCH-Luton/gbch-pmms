@@ -654,7 +654,16 @@ export default function AdminProperties({ profile, onNavigate, initialProperties
 
         {/* Property Profile tabs */}
         {(() => {
-          const profileTabs = DIVISION_PROFILE_TABS[profile.division] || ALL_PROFILE_TABS
+          // Dimensions is Landlord Liaison's own assessment -- unlike the
+          // rest of ALL_PROFILE_TABS' unscoped-manager fallback, this one
+          // tab is deliberately restricted rather than open-by-default, so
+          // it's filtered back out for everyone except admin/her own
+          // division (found live 2026-08-24: Maintenance Manager, an
+          // unscoped manager, could see and edit it same as her).
+          let profileTabs = DIVISION_PROFILE_TABS[profile.division] || ALL_PROFILE_TABS
+          if (profile.role !== 'admin' && profile.division !== 'Landlord Liaison') {
+            profileTabs = profileTabs.filter(t => t !== 'Dimensions')
+          }
           // Falls back to the first tab this role is actually scoped to if
           // the current selection isn't in that list -- covers both a stale
           // tab left over from before a role change, and

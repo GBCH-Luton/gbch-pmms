@@ -88,7 +88,7 @@ const NAV_ITEMS = [
   // Assessment" button's navigation would silently land on the Dashboard
   // instead for anyone allowed to see the tab but not this nav item
   // (isNavItemVisible gates actual page rendering, not just the sidebar).
-  { key: 'property-dimensions', label: 'Dimensions Assessment', icon: 'building', Component: PropertyDimensionsAssessment, visibleTo: p => p.role === 'admin' || p.division === 'Landlord Liaison' || (p.role === 'manager' && !p.division) },
+  { key: 'property-dimensions', label: 'Dimensions Assessment', icon: 'building', Component: PropertyDimensionsAssessment, visibleTo: p => p.role === 'admin' || p.division === 'Landlord Liaison' },
   { key: 'voids', label: 'Voids', icon: 'key', Component: AdminVoids, divisions: ['Maintenance'] },
   // Division dashboards, grouped together in this order.
   { key: 'compliance', label: 'Compliance', icon: 'shield', Component: AdminCompliance, divisions: ['Maintenance', 'Compliance'] },
