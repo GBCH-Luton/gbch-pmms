@@ -14,7 +14,7 @@ select cron.schedule(
       url := 'https://wvhelwxyzdkfjpyyxvbc.functions.supabase.co/check-clock-out-reminders',
       headers := jsonb_build_object(
         'Content-Type', 'application/json',
-        'x-cron-secret', 'b13134e5c233895dd95c645c7f5ed6f55e0f8a16ad6276b63dba00d32fc93e81'
+        'x-cron-secret', 'YOUR_CRON_SECRET_HERE'
       ),
       body := '{}'::jsonb
     )
