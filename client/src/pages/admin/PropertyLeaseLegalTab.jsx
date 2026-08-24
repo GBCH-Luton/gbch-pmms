@@ -297,11 +297,15 @@ export default function PropertyLeaseLegalTab({ property, onFieldsSaved, profile
         }
       />
 
+      {/* Unlike the rest of this tab, Landlord Details is editable for
+          Landlord Liaison -- she's the one who actually maintains landlord
+          contact info day to day. Lease Details/Financials/Insurance below
+          stay read-only for her, still owned by whoever maintains those. */}
       <EditableSection
         title="Landlord Details"
         property={property}
         onSave={saveFields}
-        readOnly={readOnly}
+        readOnly={false}
         fields={[
           { key: 'landlord_company', label: 'Landlord Company Name', type: 'text' },
           { key: 'landlord_name', label: 'Landlord Contact Name', type: 'text' },
