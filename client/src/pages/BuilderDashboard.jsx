@@ -227,6 +227,18 @@ export default function BuilderDashboard({ profile }) {
   const [attendanceSummary, setAttendanceSummary] = useState(null)
   const [attendanceLoading, setAttendanceLoading] = useState(true)
 
+  // My Mileage's own ticket set, separate from the `tickets` state above --
+  // that one is scoped to active jobs (excludes Archived/Cancelled, correct
+  // for a job list) and would otherwise silently hide real driven mileage
+  // on completed-and-signed-off jobs from this history page. Cancelled
+  // stays excluded (that travel likely never happened as planned); Archived
+  // doesn't, matching the admin-side Staff profile's own mileage total
+  // (fetchMileageSummary), which never filters by status at all. Found live
+  // 2026-08-24 -- this page's "This month" figure disagreed with the admin
+  // side by exactly the miles sitting on Archived tickets.
+  const [mileageAllTickets, setMileageAllTickets] = useState([])
+  const [mileageDataLoading, setMileageDataLoading] = useState(true)
+
   // Mid-day presence, independent of both the shift above and any job's
   // own work_session -- a materials run or a break doesn't pause or
   // affect job time, it's purely a supplementary "where are they right
@@ -445,6 +457,25 @@ export default function BuilderDashboard({ profile }) {
     return () => { cancelled = true }
   }, [page, attendancePeriodDays])
 
+  useEffect(() => {
+    if (page !== 'mileage') return
+    let cancelled = false
+    setMileageDataLoading(true)
+    supabase
+      .schema('pmms')
+      .from('tickets')
+      .select('id, ticket_number, mileage_logged, mileage_logged_at, property_id')
+      .eq('assigned_builder_id', profile.id)
+      .neq('status', 'Cancelled')
+      .gt('mileage_logged', 0)
+      .then(async ({ data }) => {
+        if (cancelled) return
+        setMileageAllTickets(await attachBuilderSafeProperties(data || []))
+        setMileageDataLoading(false)
+      })
+    return () => { cancelled = true }
+  }, [page])
+
   // Direct Messages: loaded whenever the team-chat page is open regardless
   // of which tab is active, so switching from Channel to Direct Messages
   // is instant. One subscription for every DM this builder sends/receives
@@ -633,7 +664,7 @@ export default function BuilderDashboard({ profile }) {
       .schema('pmms')
       .from('tickets')
       .select(`
-        id, ticket_number, status, status_changed_at, category, issue_tag, description, room, priority_score, estimated_minutes, mileage_logged, transit_start, created_at, completed_at, completion_note, completion_photo_url, hold_reason, hold_note, photo_url, property_id, checklist_responses, delay_reason, delay_reason_note, delay_reason_status
+        id, ticket_number, status, status_changed_at, category, issue_tag, description, room, priority_score, estimated_minutes, mileage_logged, mileage_logged_at, transit_start, created_at, completed_at, completion_note, completion_photo_url, hold_reason, hold_note, photo_url, property_id, checklist_responses, delay_reason, delay_reason_note, delay_reason_status
       `)
       .eq('assigned_builder_id', profile.id)
       .not('status', 'in', '("Archived","Cancelled")')
@@ -1924,16 +1955,22 @@ export default function BuilderDashboard({ profile }) {
     )) * ROAD_DISTANCE_MULTIPLIER
   }
 
-  const mileageTickets = tickets
-    .filter(t => t.mileage_logged > 0)
-    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+  const mileageTickets = mileageAllTickets
+    .slice()
+    .sort((a, b) => new Date(b.mileage_logged_at) - new Date(a.mileage_logged_at))
 
   const totalMiles = mileageTickets.reduce((sum, t) => sum + t.mileage_logged, 0)
 
   const thisMonth = new Date()
+  // Filtered by mileage_logged_at (when the trip was actually made), not
+  // created_at (when the ticket was raised) -- those can land in different
+  // months for the same ticket (e.g. raised in July, travelled to in
+  // August), which is exactly why this "This month" tile could disagree
+  // with the admin-side Staff profile's own mileage total, which has
+  // always used mileage_logged_at. Found live 2026-08-24.
   const monthMiles = mileageTickets
     .filter(t => {
-      const d = new Date(t.created_at)
+      const d = new Date(t.mileage_logged_at)
       return d.getMonth() === thisMonth.getMonth() && d.getFullYear() === thisMonth.getFullYear()
     })
     .reduce((sum, t) => sum + t.mileage_logged, 0)
@@ -3575,12 +3612,16 @@ export default function BuilderDashboard({ profile }) {
 
             {/* Trip list */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {mileageTickets.length === 0 && (
+              {mileageDataLoading ? (
+                <div style={{ background: COLORS.white, borderRadius: '16px', padding: '40px', textAlign: 'center' }}>
+                  <p style={{ color: COLORS.slate400, fontWeight: 600 }}>Loading...</p>
+                </div>
+              ) : mileageTickets.length === 0 && (
                 <div style={{ background: COLORS.white, borderRadius: '16px', padding: '40px', textAlign: 'center' }}>
                   <p style={{ color: COLORS.slate400, fontWeight: 600 }}>No trips logged yet.</p>
                 </div>
               )}
-              {mileageTickets.map(t => (
+              {!mileageDataLoading && mileageTickets.map(t => (
                 <div key={t.id} style={{ background: COLORS.white, borderRadius: '16px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
                   <div>
                     <p style={{ margin: '0 0 4px 0', fontSize: '14px', fontWeight: 700, color: COLORS.slate900 }}>{t.property?.address}</p>
