@@ -3028,7 +3028,7 @@ export default function BuilderDashboard({ profile }) {
         {selectedTicket.status === 'On Hold' && SHORT_TRIP_REASONS.includes(selectedTicket.hold_reason) && !shortTripNeedsMileage && (
           <div>
             <button
-              onClick={handleResumeWork}
+              onClick={() => handleResumeWork()}
               disabled={clockingIn}
               style={{ width: '100%', padding: '18px', background: COLORS.teal600, color: COLORS.white, border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: 800, cursor: clockingIn ? 'not-allowed' : 'pointer', opacity: clockingIn ? 0.7 : 1 }}
             >
