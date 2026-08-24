@@ -656,10 +656,18 @@ export default function BuilderProfilePage({ staffId, onBack }) {
                           {dayTrips.map(t => (
                             <div key={t.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', padding: '9px 0', borderBottom: `1px solid ${COLORS.slate100}` }}>
                               <div style={{ minWidth: 0 }}>
-                                <span style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: COLORS.slate900, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.property?.address || '—'}</span>
+                                <span style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: COLORS.slate900, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.property?.address || t.note || '—'}</span>
                                 <span style={{ fontSize: '11.5px', color: COLORS.slate500 }}>
-                                  <span style={{ display: 'inline-block', fontSize: '10.5px', fontWeight: 700, padding: '1px 8px', borderRadius: '999px', background: COLORS.blue50, color: COLORS.blue700, marginRight: '6px' }}>{t.transit_start || '—'}</span>
-                                  Job #{t.ticket_number}
+                                  {t.kind === 'ticket' ? (
+                                    <>
+                                      <span style={{ display: 'inline-block', fontSize: '10.5px', fontWeight: 700, padding: '1px 8px', borderRadius: '999px', background: COLORS.blue50, color: COLORS.blue700, marginRight: '6px' }}>{t.transit_start || '—'}</span>
+                                      Job #{t.ticket_number}
+                                    </>
+                                  ) : (
+                                    <span style={{ display: 'inline-block', fontSize: '10.5px', fontWeight: 700, padding: '1px 8px', borderRadius: '999px', background: COLORS.teal50, color: COLORS.teal700 }}>
+                                      {ACTIVITY_CATEGORY_META[t.activity_category]?.label || 'Visit'}
+                                    </span>
+                                  )}
                                 </span>
                               </div>
                               <span style={{ fontSize: '14px', fontWeight: 800, color: COLORS.blue600, flexShrink: 0 }}>{Number(t.mileage_logged).toFixed(1)} mi</span>

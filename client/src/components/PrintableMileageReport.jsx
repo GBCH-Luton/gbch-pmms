@@ -49,7 +49,7 @@ export default function PrintableMileageReport({ staffName, periodLabel, summary
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
           <thead>
             <tr style={{ borderBottom: `2px solid ${COLORS.slate900}` }}>
-              {['Date', 'Job', 'Property', 'Coming From', 'Miles'].map(h => (
+              {['Date', 'Type', 'Property', 'Coming From', 'Miles'].map(h => (
                 <th key={h} style={{ textAlign: 'left', padding: '6px 8px', fontWeight: 800, color: COLORS.slate900 }}>{h}</th>
               ))}
             </tr>
@@ -57,9 +57,9 @@ export default function PrintableMileageReport({ staffName, periodLabel, summary
           <tbody>
             {summary.trips.map(t => (
               <tr key={t.id} style={{ borderBottom: `1px solid ${COLORS.slate200}` }}>
-                <td style={{ padding: '6px 8px' }}>{formatUKDate(t.mileage_logged_at)}</td>
-                <td style={{ padding: '6px 8px' }}>#{t.ticket_number}</td>
-                <td style={{ padding: '6px 8px' }}>{t.property?.address || '—'}</td>
+                <td style={{ padding: '6px 8px' }}>{formatUKDate(t.loggedAt)}</td>
+                <td style={{ padding: '6px 8px' }}>{t.kind === 'ticket' ? `Job #${t.ticket_number}` : (t.activity_category === 'visit' ? 'Property Visit' : t.activity_category === 'visit_office' ? 'Office Visit' : 'Visit')}</td>
+                <td style={{ padding: '6px 8px' }}>{t.property?.address || t.note || '—'}</td>
                 <td style={{ padding: '6px 8px' }}>{t.transit_start || '—'}</td>
                 <td style={{ padding: '6px 8px' }}>{Number(t.mileage_logged).toFixed(1)}</td>
               </tr>

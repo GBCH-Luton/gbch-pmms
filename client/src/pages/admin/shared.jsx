@@ -816,35 +816,67 @@ export async function fetchAttendanceSummary(staffId, fromDateKey, toDateKey) {
 }
 
 // Trip-level mileage for one staff member over an inclusive UK-calendar-date
-// range -- mirrors fetchAttendanceSummary's shape/purpose, but keyed off
-// tickets.mileage_logged_at (set at clock-in, see
-// scripts/add_ticket_mileage_logged_at.sql) rather than daily_attendance.
-// Bounds are converted through ukDateTimeInputValueToMs so "the whole of
-// August" means UK midnight-to-midnight, not the viewer's own timezone.
+// range -- mirrors fetchAttendanceSummary's shape/purpose. Two sources, same
+// as AdminClocking.jsx's Travel & Visits rollup already combines: job travel
+// via tickets.mileage_logged_at (set at clock-in, see
+// scripts/add_ticket_mileage_logged_at.sql), and property/office visit
+// travel via activity_log.mileage_logged (set on arrival -- see the
+// 'visit'/'visit_office'/'visit_other' categories, Kathryn's Log a Visit).
+// Found live 2026-08-24: this only ever queried tickets, so anyone whose
+// mileage comes entirely from visits (Landlord Liaison has no tickets
+// assigned to her at all) always read 0 here despite Travel & Visits
+// showing their real total. Bounds are converted through
+// ukDateTimeInputValueToMs so "the whole of August" means UK
+// midnight-to-midnight, not the viewer's own timezone.
 export async function fetchMileageSummary(staffId, fromDateKey, toDateKey) {
   const fromMs = ukDateTimeInputValueToMs(`${fromDateKey}T00:00`)
   const toExclusiveMs = ukDateTimeInputValueToMs(`${shiftDateKey(toDateKey, 1)}T00:00`)
+  const fromIso = new Date(fromMs).toISOString()
+  const toExclusiveIso = new Date(toExclusiveMs).toISOString()
 
-  const { data: rows } = await supabase
+  const { data: ticketRows } = await supabase
     .schema('pmms')
     .from('tickets')
     .select('id, ticket_number, property_id, mileage_logged, mileage_logged_at, transit_start')
     .eq('assigned_builder_id', staffId)
     .gt('mileage_logged', 0)
-    .gte('mileage_logged_at', new Date(fromMs).toISOString())
-    .lt('mileage_logged_at', new Date(toExclusiveMs).toISOString())
-    .order('mileage_logged_at', { ascending: false })
+    .gte('mileage_logged_at', fromIso)
+    .lt('mileage_logged_at', toExclusiveIso)
 
-  const withProperties = await attachProperties(rows || [], 'address')
+  const { data: activityRows } = await supabase
+    .schema('pmms')
+    .from('activity_log')
+    .select('id, activity_category, note, arrived_at, destination_property_id, mileage_logged')
+    .eq('staff_id', staffId)
+    .in('activity_category', ['visit', 'visit_office', 'visit_other'])
+    .gt('mileage_logged', 0)
+    .gte('arrived_at', fromIso)
+    .lt('arrived_at', toExclusiveIso)
+
+  const withTicketProperties = await attachProperties(ticketRows || [], 'address')
+  const withActivityProperties = await attachProperties(
+    (activityRows || []).map(a => ({ ...a, property_id: a.destination_property_id })),
+    'address'
+  )
 
   let totalMiles = 0
   const dateSet = new Set()
-  const trips = withProperties.map(t => {
+
+  const ticketTrips = withTicketProperties.map(t => {
     const dateKey = ukDateKey(new Date(t.mileage_logged_at).getTime())
     totalMiles += Number(t.mileage_logged) || 0
     dateSet.add(dateKey)
-    return { ...t, dateKey }
+    return { ...t, dateKey, kind: 'ticket', loggedAt: t.mileage_logged_at }
   })
+
+  const activityTrips = withActivityProperties.map(a => {
+    const dateKey = ukDateKey(new Date(a.arrived_at).getTime())
+    totalMiles += Number(a.mileage_logged) || 0
+    dateSet.add(dateKey)
+    return { ...a, dateKey, kind: 'activity', loggedAt: a.arrived_at }
+  })
+
+  const trips = [...ticketTrips, ...activityTrips].sort((a, b) => new Date(b.loggedAt) - new Date(a.loggedAt))
 
   return { trips, totalMiles, tripCount: trips.length, daysWithTravel: dateSet.size, avgMilesPerTrip: trips.length ? totalMiles / trips.length : 0 }
 }
