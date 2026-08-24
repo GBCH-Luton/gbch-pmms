@@ -25,7 +25,7 @@ import { uploadTicketAttachments, formatUploadProgress } from '../lib/ticketAtta
 import { fetchMaintenanceCategories, sortedCategoryEntries, isUnlistedTag, unlistedTagFor, unlistedLabelFor, calculatePriorityScore } from '../lib/maintenanceCategories'
 import { attachBuilderSafeProperties } from '../lib/properties'
 import { maybeAutoSubmitOnboardingWalk } from '../lib/onboarding'
-import { statusColour, statusLabel, postSystemComment, postAuditEvent, KpiTiles, resolveStaffPhotoUrl, suggestAutoAssignBuilder, AUTO_ASSIGN_ON_RAISE_ENABLED, GARDEN_SURVEY_CAMPAIGN_ENABLED, createNotification, fetchManagersForDivision, sendPushNotification, floorContextOptions, floorContextLabel, SIGNOFF_QUESTIONS } from './admin/shared'
+import { statusColour, statusLabel, postSystemComment, postAuditEvent, KpiTiles, resolveStaffPhotoUrl, suggestAutoAssignBuilder, fetchAutoAssignOnRaiseEnabled, GARDEN_SURVEY_CAMPAIGN_ENABLED, createNotification, fetchManagersForDivision, sendPushNotification, floorContextOptions, floorContextLabel, SIGNOFF_QUESTIONS } from './admin/shared'
 import { NavIcon } from '../lib/icons'
 import PropertySearchSelect from '../components/PropertySearchSelect'
 import VoiceInputButton from '../components/VoiceInputButton'
@@ -321,9 +321,12 @@ function NewReportForm({ profile, onSubmitted }) {
     // happens silently instead, same least-loaded-eligible-builder logic
     // as the admin raise-ticket form, just without the option to see or
     // override it before submitting. Disabled 2026-08-20 on a management
-    // request (AUTO_ASSIGN_ON_RAISE_ENABLED, admin/shared.jsx) -- tickets
-    // land Pending/unassigned for a real manager to assign by hand instead.
-    const suggested = AUTO_ASSIGN_ON_RAISE_ENABLED ? await suggestAutoAssignBuilder(category) : null
+    // request (fetchAutoAssignOnRaiseEnabled, admin/shared.jsx, a live
+    // pmms.settings read -- not a JS constant, so a long-open tab can't
+    // enforce a stale value) -- tickets land Pending/unassigned for a real
+    // manager to assign by hand instead.
+    const autoAssignEnabled = await fetchAutoAssignOnRaiseEnabled()
+    const suggested = autoAssignEnabled ? await suggestAutoAssignBuilder(category) : null
 
     const { data, error: insertError } = await supabase
       .schema('pmms')

@@ -57,9 +57,29 @@ export const LANDLORD_LIAISON_PAGE_ENABLED = true
 // suggestAutoAssignBuilder's own history. Does NOT affect the pre-filled
 // suggestion shown to managers in AdminRaiseTicket's own picker (canAssignBuilder
 // === true) -- that one's always reviewed/overridable before submit, so it
-// wasn't in scope. Flip back to true to restore silent auto-assign with no
-// rebuilding.
-export const AUTO_ASSIGN_ON_RAISE_ENABLED = false
+// wasn't in scope.
+//
+// Lives in pmms.settings, NOT a hardcoded JS constant -- deliberately never
+// cached, fetched fresh every time a ticket is about to be raised. Found
+// live 2026-08-24 (ticket #414): a hardcoded constant only reflects
+// whatever was true when a tab's JS was last loaded, so a tab left open
+// since before this flag existed (or before any future flip) keeps
+// enforcing the old value indefinitely -- a genuine sign-in forces a
+// reload, but a tab that's simply stayed authenticated for days without
+// one never gets the memo. Reading this from the database at the moment
+// of submission closes that gap regardless of how stale the rest of the
+// tab's code is. Defaults to false (the current desired state) if the
+// settings row is ever missing, not true -- a missing setting should never
+// silently re-enable something that was deliberately turned off.
+export async function fetchAutoAssignOnRaiseEnabled() {
+  const { data } = await supabase
+    .schema('pmms')
+    .from('settings')
+    .select('setting_value')
+    .eq('setting_key', 'auto_assign_on_raise_enabled')
+    .maybeSingle()
+  return data?.setting_value === true
+}
 
 // Temporary garden survey campaign (2026-08-20) -- support workers (Ticket
 // Submitter role) visit properties daily and can record garden state/photos

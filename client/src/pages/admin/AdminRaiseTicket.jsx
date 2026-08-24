@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { COLORS } from '../../lib/colors'
-import { fetchAssignableStaffForCategory, suggestAutoAssignBuilder, builderOptionLabel, createNotification, sendPushNotification, pushEmergencyAlert, priorityTierLabel, fetchPriorityThresholds, EVENTS_FEATURE_ENABLED, AUTO_ASSIGN_ON_RAISE_ENABLED, postSystemComment, floorContextOptions, floorContextLabel } from './shared'
+import { fetchAssignableStaffForCategory, suggestAutoAssignBuilder, builderOptionLabel, createNotification, sendPushNotification, pushEmergencyAlert, priorityTierLabel, fetchPriorityThresholds, EVENTS_FEATURE_ENABLED, fetchAutoAssignOnRaiseEnabled, postSystemComment, floorContextOptions, floorContextLabel } from './shared'
 import { fetchComplianceCheckTypes } from '../../lib/compliance'
 import { fetchMaintenanceCategories, sortedCategoryEntries, UNLISTED_MARKER_PREFIX, isUnlistedTag, unlistedTagFor, unlistedLabelFor, calculatePriorityScore } from '../../lib/maintenanceCategories'
 import { fetchDivisions } from '../../lib/divisions'
@@ -62,7 +62,7 @@ export default function AdminRaiseTicket({ profile, onNavigate }) {
     if (canAssignBuilder) {
       return { builderId: assignedBuilderId || null, assignType: assignedBuilderId && assignedBuilderId === autoSuggestedBuilderId ? 'Auto' : 'Manual' }
     }
-    if (!AUTO_ASSIGN_ON_RAISE_ENABLED) return { builderId: null, assignType: 'Manual' }
+    if (!(await fetchAutoAssignOnRaiseEnabled())) return { builderId: null, assignType: 'Manual' }
     const suggested = await suggestAutoAssignBuilder(category)
     return { builderId: suggested?.id || null, assignType: suggested ? 'Auto' : 'Manual' }
   }

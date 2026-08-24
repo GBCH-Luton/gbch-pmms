@@ -2,7 +2,7 @@ import { supabase } from '../../lib/supabase'
 import { uploadTicketAttachments } from '../../lib/ticketAttachments'
 import { calculatePriorityScore, fetchMaintenanceCategories } from '../../lib/maintenanceCategories'
 import { ONBOARDING_CATEGORY } from '../../lib/onboarding'
-import { postSystemComment, postAuditEvent, fetchAssignableStaffForCategory, suggestAutoAssignBuilder, AUTO_ASSIGN_ON_RAISE_ENABLED } from './shared'
+import { postSystemComment, postAuditEvent, fetchAssignableStaffForCategory, suggestAutoAssignBuilder, fetchAutoAssignOnRaiseEnabled } from './shared'
 
 // Lives here (not lib/onboarding.js) because it depends on this file's own
 // shared.jsx helpers -- lib/ files don't reach back into pages/admin/
@@ -19,7 +19,8 @@ export async function raiseOnboardingTicket({ profile, walkId, propertyId, room,
   const categories = await fetchMaintenanceCategories()
   const score = calculatePriorityScore(categories, ONBOARDING_CATEGORY, issueTag) + (highVulnerability ? 30 : 0)
   const staff = await fetchAssignableStaffForCategory(ONBOARDING_CATEGORY, {})
-  const suggested = AUTO_ASSIGN_ON_RAISE_ENABLED ? await suggestAutoAssignBuilder(ONBOARDING_CATEGORY, { candidates: staff }) : null
+  const autoAssignEnabled = await fetchAutoAssignOnRaiseEnabled()
+  const suggested = autoAssignEnabled ? await suggestAutoAssignBuilder(ONBOARDING_CATEGORY, { candidates: staff }) : null
   const resolvedBuilderId = suggested?.id || null
 
   const { data, error } = await supabase
