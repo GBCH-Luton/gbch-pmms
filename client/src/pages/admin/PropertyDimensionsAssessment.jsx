@@ -322,11 +322,43 @@ export default function PropertyDimensionsAssessment({ profile, onNavigate, init
               value={propertyId}
               onChange={selectProperty}
               placeholder="Search by address..."
-              badgeFor={p => p.dimensions_assessed_at
-                ? { label: 'Assessed', bg: COLORS.green100, color: COLORS.green600 }
-                : { label: 'Not assessed', bg: COLORS.amber100, color: COLORS.amber600 }}
             />
           </div>
+
+          {/* Clicking a tile narrows the search box above, but that's
+              hidden inside a closed dropdown until clicked into -- nothing
+              on the page actually changes, which reads as the tile doing
+              nothing. This list makes the filtered result visible
+              immediately, matching what a tile click implies. */}
+          {tileFilter && (() => {
+            const matching = properties.filter(p => tileFilter === 'assessed' ? p.dimensions_assessed_at : !p.dimensions_assessed_at)
+            return (
+              <div style={cardStyle}>
+                {matching.length === 0 ? (
+                  <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>No properties match.</p>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {matching.map(p => (
+                      <button
+                        key={p.id}
+                        onClick={() => selectProperty(String(p.id))}
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', width: '100%', textAlign: 'left', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, background: COLORS.white, cursor: 'pointer', fontSize: '13px', fontWeight: 600, color: COLORS.slate900 }}
+                      >
+                        <span>{p.address}</span>
+                        <span style={{
+                          flexShrink: 0, fontSize: '10.5px', fontWeight: 700, padding: '3px 10px', borderRadius: '999px',
+                          background: tileFilter === 'assessed' ? COLORS.green100 : COLORS.amber100,
+                          color: tileFilter === 'assessed' ? COLORS.green600 : COLORS.amber600,
+                        }}>
+                          {tileFilter === 'assessed' ? 'Assessed' : 'Not assessed'}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          })()}
         </div>
       ) : loadingExisting ? (
         <p style={{ color: COLORS.slate500, fontSize: '13px' }}>Loading this property's dimensions…</p>
