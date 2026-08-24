@@ -377,15 +377,23 @@ export default function AdminRaiseTicket({ profile, onNavigate }) {
       return
     }
 
-    setComplianceSubmitting(true)
-    setTicketError('')
-
     const selectedType = complianceCheckTypes.find(t => t.name === complianceCheckType)
     const items = selectedType?.items || []
     const vulnBonus = selectedTicketProperty?.high_vulnerability ? 30 : 0
     const failedItems = items
       .map((item, idx) => ({ ...item, result: complianceResults[idx], note: complianceNotes[idx], mediaFile: complianceMediaFiles[idx] }))
       .filter(i => i.result === 'Fail')
+
+    // Checked up front, before any ticket is created, so a manager never
+    // ends up with some failed items submitted and others blocked partway
+    // through the loop below.
+    if (failedItems.some(i => !i.mediaFile)) {
+      setTicketError('Please add a photo for every failed item before submitting.')
+      return
+    }
+
+    setComplianceSubmitting(true)
+    setTicketError('')
 
     const createdIds = []
 

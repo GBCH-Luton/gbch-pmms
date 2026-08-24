@@ -683,6 +683,7 @@ export default function AdminPipeline({
 
   async function submitComplete() {
     if (!completeNote.trim()) { setCompleteError('Please describe the completed work.'); return }
+    if (!completePhotoFile) { setCompleteError('Please add a photo of the completed work.'); return }
 
     const t = completeModalTicket
     setCompleteSubmitting(true)

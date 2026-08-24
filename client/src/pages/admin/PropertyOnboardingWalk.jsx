@@ -107,6 +107,11 @@ export default function PropertyOnboardingWalk({ profile, onNavigate }) {
   const allNotesFilled = CHECK_ITEMS.every(item =>
     verdicts[item.key] !== 'fail' || (issuesByItem[item.key] || []).every(issue => issue.note?.trim())
   )
+  // Same "no going back" reasoning as allNotesFilled above -- a fail with
+  // no photo would leave a real ticket permanently without a before-photo.
+  const allPhotosFilled = CHECK_ITEMS.every(item =>
+    verdicts[item.key] !== 'fail' || (issuesByItem[item.key] || []).every(issue => issue.files?.length > 0)
+  )
 
   function setVerdict(itemKey, v) {
     setVerdicts(prev => ({ ...prev, [itemKey]: v }))
@@ -133,6 +138,7 @@ export default function PropertyOnboardingWalk({ profile, onNavigate }) {
   async function submitRoom() {
     if (!allVerdicted) return
     if (!allNotesFilled) { setError('Add a note to every failed item before continuing.'); return }
+    if (!allPhotosFilled) { setError('Add a photo to every failed item before continuing.'); return }
     setSubmittingRoom(true)
     setError('')
     try {
@@ -160,6 +166,7 @@ export default function PropertyOnboardingWalk({ profile, onNavigate }) {
 
   async function submitCustomJob() {
     if (!customDesc.trim()) { setError('Add a description of the agreed work first.'); return }
+    if (customFiles.length === 0) { setError('Add a photo of the agreed work first.'); return }
     setCustomSubmitting(true)
     setError('')
     try {
@@ -319,10 +326,10 @@ export default function PropertyOnboardingWalk({ profile, onNavigate }) {
 
           <button
             onClick={submitRoom}
-            disabled={!allVerdicted || !allNotesFilled || submittingRoom}
-            style={{ ...primaryBtn, width: '100%', marginTop: '16px', opacity: (!allVerdicted || !allNotesFilled || submittingRoom) ? 0.6 : 1, cursor: (!allVerdicted || !allNotesFilled || submittingRoom) ? 'not-allowed' : 'pointer' }}
+            disabled={!allVerdicted || !allNotesFilled || !allPhotosFilled || submittingRoom}
+            style={{ ...primaryBtn, width: '100%', marginTop: '16px', opacity: (!allVerdicted || !allNotesFilled || !allPhotosFilled || submittingRoom) ? 0.6 : 1, cursor: (!allVerdicted || !allNotesFilled || !allPhotosFilled || submittingRoom) ? 'not-allowed' : 'pointer' }}
           >
-            {submittingRoom ? 'Submitting…' : !allNotesFilled ? 'Add a note to every fail first' : hasAnyFail ? 'Submit job(s) and move to next room →' : 'Next room →'}
+            {submittingRoom ? 'Submitting…' : !allNotesFilled ? 'Add a note to every fail first' : !allPhotosFilled ? 'Add a photo to every fail first' : hasAnyFail ? 'Submit job(s) and move to next room →' : 'Next room →'}
           </button>
         </div>
       )}

@@ -1615,6 +1615,11 @@ export default function BuilderDashboard({ profile }) {
   async function handleSubmitTicket(skipDuplicateCheck) {
     setTicketError('')
 
+    if (ticketMediaFiles.length === 0) {
+      setTicketError('Please add at least one photo or video of the issue before submitting.')
+      return
+    }
+
     const finalIssueTag = isUnlistedTag(ticketIssueTag) ? `[Unlisted: ${ticketCategory}] ${ticketIssueOther}` : ticketIssueTag
     const priorityScore = calculatePriorityScore(ticketCategory, ticketIssueTag) + (selectedTicketProperty?.high_vulnerability ? 30 : 0)
     const roomString = ticketRoomString()
@@ -1722,15 +1727,23 @@ export default function BuilderDashboard({ profile }) {
   async function handleSubmitCompliance() {
     if (!complianceCheckType || complianceResults.length === 0 || complianceResults.some(r => r === null)) return
 
-    setComplianceSubmitting(true)
-    setTicketError('')
-
     const selectedType = complianceCheckTypes.find(t => t.name === complianceCheckType)
     const items = selectedType?.items || []
     const vulnBonus = selectedTicketProperty?.high_vulnerability ? 30 : 0
     const failedItems = items
       .map((item, idx) => ({ ...item, result: complianceResults[idx], note: complianceNotes[idx], mediaFile: complianceMediaFiles[idx] }))
       .filter(i => i.result === 'Fail')
+
+    // Checked up front, before any ticket is created, so this never ends
+    // up with some failed items submitted and others blocked partway
+    // through the loop below.
+    if (failedItems.some(i => !i.mediaFile)) {
+      setTicketError('Please add a photo for every failed item before submitting.')
+      return
+    }
+
+    setComplianceSubmitting(true)
+    setTicketError('')
 
     for (const failedItem of failedItems) {
       const category = selectedType?.category || 'Other / Unlisted Trade'
@@ -4601,7 +4614,7 @@ export default function BuilderDashboard({ profile }) {
                                     onClick={() => document.getElementById(`compliance-media-${idx}`).click()}
                                     style={{ width: '100%', marginTop: '8px', height: '40px', borderRadius: '8px', border: `2px dashed ${COLORS.slate300}`, background: COLORS.white, color: COLORS.slate500, fontSize: '12px', fontWeight: 600, cursor: 'pointer', boxSizing: 'border-box' }}
                                   >
-                                    📷 Add a photo or video (optional)
+                                    📷 Add a photo or video
                                   </button>
                                 )}
                               </>

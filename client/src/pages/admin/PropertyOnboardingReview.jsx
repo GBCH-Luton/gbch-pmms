@@ -28,11 +28,11 @@ function RaiseForm({ onCancel, onSubmit, submitting }) {
       <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
         <button onClick={onCancel} style={ghostBtn}>Cancel</button>
         <button
-          onClick={() => { if (!note.trim()) return; onSubmit({ note: note.trim(), files }) }}
-          disabled={submitting || !note.trim()}
-          style={{ ...ghostBtn, background: COLORS.amber600, color: COLORS.white, border: 'none', opacity: (submitting || !note.trim()) ? 0.6 : 1 }}
+          onClick={() => { if (!note.trim() || files.length === 0) return; onSubmit({ note: note.trim(), files }) }}
+          disabled={submitting || !note.trim() || files.length === 0}
+          style={{ ...ghostBtn, background: COLORS.amber600, color: COLORS.white, border: 'none', opacity: (submitting || !note.trim() || files.length === 0) ? 0.6 : 1 }}
         >
-          {submitting ? 'Raising…' : 'Raise ticket'}
+          {submitting ? 'Raising…' : files.length === 0 ? 'Add a photo first' : 'Raise ticket'}
         </button>
       </div>
     </div>

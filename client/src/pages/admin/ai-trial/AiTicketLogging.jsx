@@ -11,6 +11,8 @@ import { priorityTierLabel, fetchPriorityThresholds } from '../shared'
 import { suggestTicketFields } from './keywordEngine'
 import PropertySearchSelect from '../../../components/PropertySearchSelect'
 import VoiceInputButton from '../../../components/VoiceInputButton'
+import TicketMediaPicker from '../../../components/TicketMediaPicker'
+import { uploadTicketAttachments } from '../../../lib/ticketAttachments'
 
 const ROOM_OPTIONS = ['Kitchen', 'Bathroom', 'Communal Area', 'Bedroom', 'Hallways / Stairs', 'Garden', 'Other Area...']
 
@@ -61,6 +63,7 @@ export default function AiTicketLogging({ profile }) {
   const [category, setCategory] = useState(null)
   const [issueTag, setIssueTag] = useState(null)
   const [matchedFromText, setMatchedFromText] = useState({ property: false, room: false, category: false })
+  const [mediaFiles, setMediaFiles] = useState([])
 
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -96,6 +99,12 @@ export default function AiTicketLogging({ profile }) {
 
   async function handleSubmit() {
     setError('')
+
+    if (mediaFiles.length === 0) {
+      setError('Please add at least one photo or video of the issue before submitting.')
+      return
+    }
+
     setSubmitting(true)
 
     const priorityScore = category ? calculatePriorityScore(maintenanceCategories, category, issueTag) : 15
@@ -118,20 +127,29 @@ export default function AiTicketLogging({ profile }) {
       })
       .select('id, ticket_number')
 
-    setSubmitting(false)
-
     if (insertError) {
+      setSubmitting(false)
       setError(insertError.message)
       return
     }
 
+    try {
+      const [firstUrl] = await uploadTicketAttachments(mediaFiles, data[0].id, profile.id)
+      await supabase.schema('pmms').from('tickets').update({ photo_url: firstUrl }).eq('id', data[0].id)
+    } catch (uploadErr) {
+      setSubmitting(false)
+      setError(`Ticket #${data[0].ticket_number} was logged, but the photo failed to upload: ${uploadErr.message}`)
+      return
+    }
+
+    setSubmitting(false)
     setSuccess(`Logged as Job #${data[0].ticket_number}.`)
-    setDescription(''); setDrafted(false); setPropertyId(''); setRoom(null); setCategory(null); setIssueTag(null)
+    setDescription(''); setDrafted(false); setPropertyId(''); setRoom(null); setCategory(null); setIssueTag(null); setMediaFiles([])
   }
 
   const priorityScore = category ? calculatePriorityScore(maintenanceCategories, category, issueTag) : null
   const priorityTier = priorityScore != null ? priorityTierLabel(priorityScore, p1Threshold, p2Threshold) : null
-  const canSubmit = propertyId && room && category && issueTag && !submitting
+  const canSubmit = propertyId && room && category && issueTag && mediaFiles.length > 0 && !submitting
 
   return (
     <div>
@@ -197,6 +215,11 @@ export default function AiTicketLogging({ profile }) {
                 </div>
               </>
             )}
+
+            <p style={fieldLabelStyle}>Photo or video</p>
+            <div style={{ marginBottom: '14px' }}>
+              <TicketMediaPicker files={mediaFiles} onChange={setMediaFiles} inputId="ai-ticket-media-input" />
+            </div>
 
             {priorityTier && (
               <div style={{ padding: '12px 14px', borderRadius: '10px', background: COLORS.slate50, marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
