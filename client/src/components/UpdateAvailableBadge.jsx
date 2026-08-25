@@ -8,12 +8,23 @@ import { COLORS } from '../lib/colors'
 // -- and surfaces this toast the moment the two differ, so a push actually
 // reaches whoever's already got PMMS open instead of relying on them knowing
 // to hard-refresh (found live: a fix went out but a tab left open overnight
-// kept behaving the old way). Clicking "Update" reloads; it never reloads on
+// kept behaving the old way). Clicking Update reloads; it never reloads on
 // its own, since that would risk wiping out whatever someone's mid-typing
 // the moment a deploy happens to land -- but there's no dismiss either, on
 // purpose, so it can't get waved away and forgotten before the tab ever
 // picks up the fix it's there for.
 const MOBILE_BREAKPOINT_PX = 640
+
+// A click can still land mid form-fill, so ask before actually discarding
+// whatever wasn't saved yet -- confirmed as a real gap (raised 2026-08-25):
+// reload has no undo. No equivalent guard on the auto-reload paths
+// elsewhere (chunk-load recovery) since those only ever fire while loading
+// a NEW page's code, before anything is on screen to lose.
+function confirmAndReload() {
+  if (window.confirm('Reload now to get the latest update? Anything unsaved on this page will be lost.')) {
+    window.location.reload()
+  }
+}
 
 export default function UpdateAvailableBadge() {
   const [available, setAvailable] = useState(false)
@@ -23,11 +34,10 @@ export default function UpdateAvailableBadge() {
 
   // A plain resize listener, not a CSS media query -- this codebase has no
   // existing pattern for injecting media-query CSS from a component, and a
-  // single formula trying to serve both a small desktop corner box and a
-  // full-width mobile bar is exactly what went wrong twice already (see
-  // [[project_update_toast_mobile_fix]]) -- two genuinely separate layouts
-  // driven by a JS breakpoint sidesteps that whole class of bug instead of
-  // trying to find a cleverer CSS formula for it.
+  // single formula trying to serve both a desktop toast and a mobile layout
+  // is exactly what went wrong repeatedly already (see
+  // [[project_update_toast_mobile_fix]]) -- two genuinely separate
+  // renderings driven by a JS breakpoint sidesteps that whole class of bug.
   useEffect(() => {
     const onResize = () => setIsMobile(window.innerWidth <= MOBILE_BREAKPOINT_PX)
     window.addEventListener('resize', onResize)
@@ -63,38 +73,49 @@ export default function UpdateAvailableBadge() {
 
   if (!available) return null
 
-  // Mobile: a full-width bar pinned to the bottom edge -- unmissable and
-  // impossible to overflow off-screen since it has no computed width at
-  // all. Desktop: back to the original small corner box (the user
-  // confirmed that one was already fine) -- a plain auto-width box needs
-  // no width formula either, since it just sizes to its own content.
-  const containerStyle = isMobile
-    ? {
-        position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 999999,
-        display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', gap: '10px 16px',
-        background: COLORS.slate900, color: COLORS.white,
-        padding: '16px', paddingBottom: 'calc(16px + env(safe-area-inset-bottom))',
-        boxShadow: '0 -8px 24px rgba(0,0,0,0.35)',
-        fontFamily: 'system-ui, sans-serif', fontSize: '15px',
-      }
-    : {
+  // Mobile: a small fixed-size icon button, not free-flowing text -- a
+  // full-width bar and a wider text toast both broke differently on real
+  // devices (see [[project_update_toast_mobile_fix]]); a small box with a
+  // one-word label at a fixed size can't overflow or get clipped the way
+  // wrapping text did.
+  if (isMobile) {
+    return (
+      <button
+        onClick={confirmAndReload}
+        aria-label="A new update is available -- tap to refresh"
+        style={{
+          position: 'fixed', bottom: 'max(16px, env(safe-area-inset-bottom))', right: '16px', zIndex: 999999,
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '2px',
+          width: '60px', height: '60px', borderRadius: '16px', border: 'none',
+          background: COLORS.blue600, color: COLORS.white,
+          boxShadow: '0 8px 20px rgba(0,0,0,0.35)', cursor: 'pointer',
+          fontFamily: 'system-ui, sans-serif',
+        }}
+      >
+        <span style={{ fontSize: '22px', lineHeight: 1 }}>↻</span>
+        <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.02em' }}>Update</span>
+      </button>
+    )
+  }
+
+  return (
+    <div
+      role="status"
+      style={{
         position: 'fixed', bottom: '20px', right: '20px', zIndex: 999999,
         display: 'flex', alignItems: 'center', gap: '12px',
         background: COLORS.slate900, color: COLORS.white,
         borderRadius: '10px', padding: '10px 12px 10px 14px',
         boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
         fontFamily: 'system-ui, sans-serif', fontSize: '13px',
-      }
-
-  return (
-    <div role="status" style={containerStyle}>
-      <span style={{ fontWeight: 700, whiteSpace: isMobile ? 'normal' : 'nowrap' }}>A new update is available</span>
+      }}
+    >
+      <span style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>A new update is available</span>
       <button
-        onClick={() => window.location.reload()}
+        onClick={confirmAndReload}
         style={{
           background: COLORS.blue600, color: COLORS.white, border: 'none',
-          borderRadius: isMobile ? '8px' : '6px', padding: isMobile ? '10px 24px' : '6px 14px',
-          fontSize: isMobile ? '15px' : '13px', fontWeight: 700,
+          borderRadius: '6px', padding: '6px 14px', fontSize: '13px', fontWeight: 700,
           cursor: 'pointer', whiteSpace: 'nowrap',
         }}
       >
