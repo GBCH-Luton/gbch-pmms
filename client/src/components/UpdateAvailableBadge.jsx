@@ -51,8 +51,8 @@ export default function UpdateAvailableBadge() {
     <div
       role="status"
       style={{
-        position: 'fixed', bottom: 'max(20px, env(safe-area-inset-bottom))', right: '12px', left: '12px',
-        marginLeft: 'auto', maxWidth: '420px', zIndex: 999999,
+        position: 'fixed', bottom: 'max(20px, env(safe-area-inset-bottom))', right: '12px',
+        width: 'min(420px, calc(100vw - 24px))', zIndex: 999999,
         display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '10px 12px',
         background: COLORS.slate900, color: COLORS.white,
         borderRadius: '12px', padding: '14px 16px',
