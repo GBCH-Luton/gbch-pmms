@@ -17,7 +17,7 @@ import {
   fetchComplianceAgingCounts, fetchVoidAgingCounts, fetchHousekeepingCounts, statusColour, statusLabel,
   modalOverlayStyle, modalCardStyle, modalTitleStyle, modalSubtitleStyle,
   shiftDateKey, mondayOfWeek, firstOfMonth, ACTIVITY_CATEGORY_META, fetchAttendanceSummary,
-  priorityTierLabel, fetchPriorityThresholds,
+  priorityTierLabel, fetchPriorityThresholds, fetchMileageSummary,
 } from './shared'
 import SimpleBarChart from '../../components/SimpleBarChart'
 import PrintableOperationsSnapshot from '../../components/PrintableOperationsSnapshot'
@@ -85,6 +85,8 @@ const AI_EXAMPLE_QUESTIONS = [
   "What's our average response time this month?",
   "What's our average ticket turnaround time this month?",
   'How many tickets were completed this week vs last week?',
+  'How much mileage has each staff member logged today, this week, and this month?',
+  'Compare all staff mileage this month vs last month',
 ]
 
 // Matched first, before ever calling Claude -- these questions stay
@@ -124,6 +126,11 @@ const AI_PATTERNS = [
   { test: /landlord.*(most|open)|which landlord/i, key: 'landlordOpenTickets' },
   { test: /average response time|response time.*month/i, key: 'avgResponseTime' },
   { test: /average.*turnaround|turnaround.*month/i, key: 'avgTurnaroundTime' },
+  // Checked before the general mileage pattern below -- "compare... mileage
+  // ...this month...last month" would otherwise also satisfy the plain
+  // /mileage/i test, and Array.find takes whichever pattern comes first.
+  { test: /mileage.*(compare|last month)|compare.*mileage|mileage.*vs.*last month/i, key: 'compareMileageMonths' },
+  { test: /mileage/i, key: 'staffMileageBreakdown' },
   // Same key/pattern as ticketVolumeTrend above on purpose -- "raised...
   // this week vs last week" and "completed...this week vs last week" are
   // the same shape of question, just a different metric word. The runner
@@ -763,6 +770,82 @@ async function aiRunAvgTurnaroundTimeThisMonth() {
   }
 }
 
+// Reuses fetchMileageSummary (shared.jsx) -- same trip-level source
+// AdminClocking's Travel & Visits rollup and BuilderProfilePage's My
+// Mileage tab already read from (tickets.mileage_logged_at for job travel,
+// activity_log.mileage_logged for visits). One month-wide fetch per staff
+// member, not three -- today's and this week's totals are just narrower
+// slices of the same trip list, bucketed client-side by each trip's own
+// dateKey, rather than querying the same range three times.
+async function aiRunStaffMileageBreakdown(questionText, builders) {
+  const today = todayIso()
+  const weekStart = mondayOfWeek(today)
+  const monthStart = firstOfMonth(today)
+
+  const summaries = await Promise.all(builders.map(async b => ({ b, s: await fetchMileageSummary(b.id, monthStart, today) })))
+  const rows = summaries
+    .map(({ b, s }) => {
+      const todayMiles = s.trips.filter(t => t.dateKey === today).reduce((sum, t) => sum + (Number(t.mileage_logged) || 0), 0)
+      const weekMiles = s.trips.filter(t => t.dateKey >= weekStart).reduce((sum, t) => sum + (Number(t.mileage_logged) || 0), 0)
+      return { label: b.name.split(' ')[0], today: Math.round(todayMiles * 10) / 10, week: Math.round(weekMiles * 10) / 10, month: Math.round(s.totalMiles * 10) / 10 }
+    })
+    .filter(r => r.today > 0 || r.week > 0 || r.month > 0)
+    .sort((a, b) => b.month - a.month)
+
+  if (!rows.length) return { summary: 'No mileage logged by any staff member this month yet.', multiColumns: ['Staff', 'Today (mi)', 'This week (mi)', 'This month (mi)'], multiRows: [] }
+
+  const totalMonth = Math.round(rows.reduce((sum, r) => sum + r.month, 0) * 10) / 10
+  return {
+    summary: `${rows[0].label} has logged the most mileage this month, ${rows[0].month} mi. ${totalMonth} mi logged across the team this month.`,
+    multiColumns: ['Staff', 'Today (mi)', 'This week (mi)', 'This month (mi)'],
+    multiRows: rows.map(r => [r.label, r.today, r.week, r.month]),
+  }
+}
+
+// Same fetchMileageSummary source as the breakdown above, called twice per
+// staff member (this month, last month) since the two ranges don't
+// overlap. Rendered as a grouped SimpleBarChart via the answer's own
+// `chart` field -- this needs two bars per staff, not the single-series
+// chart the answer modal already auto-builds from plain numeric rows.
+async function aiRunCompareMileageMonths(questionText, builders) {
+  const today = todayIso()
+  const monthStart = firstOfMonth(today)
+  const lastMonthEnd = shiftDateKey(monthStart, -1)
+  const lastMonthStart = firstOfMonth(lastMonthEnd)
+
+  const summaries = await Promise.all(builders.map(async b => ({
+    b,
+    thisMonth: await fetchMileageSummary(b.id, monthStart, today),
+    lastMonth: await fetchMileageSummary(b.id, lastMonthStart, lastMonthEnd),
+  })))
+
+  const rows = summaries
+    .map(({ b, thisMonth, lastMonth }) => ({
+      label: b.name.split(' ')[0],
+      thisMonthMiles: Math.round(thisMonth.totalMiles * 10) / 10,
+      lastMonthMiles: Math.round(lastMonth.totalMiles * 10) / 10,
+    }))
+    .filter(r => r.thisMonthMiles > 0 || r.lastMonthMiles > 0)
+    .sort((a, b) => b.thisMonthMiles - a.thisMonthMiles)
+
+  if (!rows.length) return { summary: 'No mileage logged by any staff member this month or last month.', multiColumns: ['Staff', 'This month (mi)', 'Last month (mi)'], multiRows: [] }
+
+  const totalThisMonth = Math.round(rows.reduce((sum, r) => sum + r.thisMonthMiles, 0) * 10) / 10
+  const totalLastMonth = Math.round(rows.reduce((sum, r) => sum + r.lastMonthMiles, 0) * 10) / 10
+  const diff = Math.round((totalThisMonth - totalLastMonth) * 10) / 10
+  const trendWord = diff > 0 ? `up ${diff} mi` : diff < 0 ? `down ${Math.abs(diff)} mi` : 'unchanged'
+
+  return {
+    summary: `${totalThisMonth} mi logged across the team this month vs ${totalLastMonth} mi last month (${trendWord}).`,
+    chart: {
+      data: rows.map(r => ({ label: r.label, values: [r.thisMonthMiles, r.lastMonthMiles] })),
+      series: [{ name: 'This month', color: COLORS.teal600 }, { name: 'Last month', color: COLORS.slate400 }],
+    },
+    multiColumns: ['Staff', 'This month (mi)', 'Last month (mi)'],
+    multiRows: rows.map(r => [r.label, r.thisMonthMiles, r.lastMonthMiles]),
+  }
+}
+
 const AI_RUNNERS = {
   topProperties: aiRunTopProperties, complianceOverdue: aiRunComplianceOverdue, topCategory: aiRunTopCategory,
   topCategoryThisMonth: aiRunTopCategoryThisMonth, topBuilders: aiRunTopBuilders,
@@ -776,6 +859,7 @@ const AI_RUNNERS = {
   hoursWorkedByStaff: aiRunHoursWorkedByStaff,
   voidRentExposure: aiRunVoidRentExposure, portfolioGrowth: aiRunPortfolioGrowth, landlordOpenTickets: aiRunLandlordOpenTickets,
   avgResponseTime: aiRunAvgResponseTimeThisMonth, avgTurnaroundTime: aiRunAvgTurnaroundTimeThisMonth,
+  staffMileageBreakdown: aiRunStaffMileageBreakdown, compareMileageMonths: aiRunCompareMileageMonths,
 }
 
 export default function AdminReports({ profile, onNavigate }) {
@@ -1654,6 +1738,32 @@ export default function AdminReports({ profile, onNavigate }) {
 
             {aiAnswer.free && aiAnswer.rows && aiAnswer.rows.length === 0 && (
               <p style={{ margin: '16px 0 0 0', fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>Nothing to show.</p>
+            )}
+
+            {aiAnswer.free && aiAnswer.multiRows && aiAnswer.multiRows.length === 0 && (
+              <p style={{ margin: '16px 0 0 0', fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>Nothing to show.</p>
+            )}
+
+            {aiAnswer.free && aiAnswer.chart && (
+              <div style={{ marginTop: '18px', overflowX: 'auto' }}>
+                <SimpleBarChart data={aiAnswer.chart.data} series={aiAnswer.chart.series} hideAxisLabels />
+              </div>
+            )}
+
+            {/* Arbitrary-width table (3+ columns) -- e.g. one row per staff
+                member with a Today/This week/This month mileage split, more
+                columns than the 2-column numeric-rows chart+table below can
+                represent. Rendered as a plain table only; a `chart` field
+                (see above) carries any graph this answer also wants. */}
+            {aiAnswer.free && aiAnswer.multiColumns && aiAnswer.multiRows && aiAnswer.multiRows.length > 0 && (
+              <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '16px' }}>
+                <thead><tr>{aiAnswer.multiColumns.map(c => <th key={c} style={thStyle}>{c}</th>)}</tr></thead>
+                <tbody>
+                  {aiAnswer.multiRows.map((r, i) => (
+                    <tr key={i}>{r.map((cell, j) => <td key={j} style={tdStyle}>{cell}</td>)}</tr>
+                  ))}
+                </tbody>
+              </table>
             )}
 
             {aiAnswer.free && aiAnswer.rows && aiAnswer.rows.length > 0 && (() => {
