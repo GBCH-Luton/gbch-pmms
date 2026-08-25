@@ -298,7 +298,13 @@ export default function SubmitterDashboard({ profile }) {
   )
 }
 
-function NewReportForm({ profile, onSubmitted }) {
+// Exported so it can be reused as-is by AdminRaiseMaintenanceTicket.jsx
+// (temporary cross-division access for the Housekeeping Manager, see that
+// file) -- module-scope constants it references below (cardStyle,
+// fieldLabelStyle, choiceBtn, ROOM_OPTIONS, etc.) resolve from THIS file
+// regardless of where the component gets rendered, so no further exports
+// are needed for it to work correctly from another page.
+export function NewReportForm({ profile, onSubmitted }) {
   const [properties, setProperties] = useState([])
   const [propertyId, setPropertyId] = useState('')
   const [room, setRoom] = useState(null)

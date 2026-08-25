@@ -33,6 +33,7 @@ const AdminSignOff = lazy(() => import('./admin/AdminSignOff'))
 const AdminBuilders = lazy(() => import('./admin/AdminBuilders'))
 const AdminClocking = lazy(() => import('./admin/AdminClocking'))
 const AdminRaiseTicket = lazy(() => import('./admin/AdminRaiseTicket'))
+const AdminRaiseMaintenanceTicket = lazy(() => import('./admin/AdminRaiseMaintenanceTicket'))
 const AdminOnboardProperty = lazy(() => import('./admin/AdminOnboardProperty'))
 const PropertyDimensionsAssessment = lazy(() => import('./admin/PropertyDimensionsAssessment'))
 const AdminStock = lazy(() => import('./admin/AdminStock'))
@@ -64,6 +65,13 @@ const NAV_ITEMS = [
   { key: 'team-chat', label: 'Team Chat', icon: 'chat', Component: AdminTeamChat },
   { key: 'pipeline', label: 'Pipeline', icon: 'pipeline', Component: AdminPipeline },
   { key: 'raise-ticket', label: 'Log a Ticket', icon: 'ticket', Component: AdminRaiseTicket },
+  // Temporary (2026-08-25): Housekeeping Manager needs to raise tickets
+  // outside her own division's categories for a while. Gated on the exact
+  // named Role (not job_title/division alone), same reasoning as Onboard a
+  // Property below -- remove this whole item (and AdminRaiseMaintenanceTicket.jsx,
+  // and the matching RLS policies) once that need ends, see
+  // [[project_housekeeping_manager_temp_raise_access]].
+  { key: 'raise-maintenance-ticket', label: 'Raise a Ticket (Any Category)', icon: 'ticket', Component: AdminRaiseMaintenanceTicket, visibleTo: p => p.pmmsRole === 'Housekeeping Manager' },
   // Room-by-room new-property walk -> real tickets on any Fail -> Landlord
   // Liaison review -> property flips Live. Restricted to exactly the two
   // roles it's for -- neither divisions nor divisionOnly fit "one specific
