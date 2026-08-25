@@ -1323,6 +1323,21 @@ export async function fetchAssignableStaffForCategory(category, { ignoreSkills =
   const staffLists = await Promise.all(roleNames.map(fetchAssignableStaffForRole))
   const byId = {}
   staffLists.flat().forEach(s => { byId[s.id] = s })
+
+  // Compliance has no builder-level role of its own (only Compliance
+  // Manager) -- physical compliance work (fire alarm/CO alarm/fire door
+  // faults etc.) is actually done by tagged Maintenance builders. Reuses
+  // the same opt-in staff.skills tag Maintenance categories use below,
+  // just to ADD eligibility here instead of narrowing it. ignoreSkills
+  // widens this to every Maintenance builder, the same override intent
+  // the Maintenance skill-narrowing branch below already has.
+  if (categoryDivision === 'Compliance') {
+    const maintenanceBuilders = await fetchAssignableStaffForRole('Builder')
+    maintenanceBuilders
+      .filter(s => ignoreSkills || s.skills?.includes('Compliance Technician'))
+      .forEach(s => { byId[s.id] = s })
+  }
+
   const eligible = Object.values(byId)
 
   // Skill-narrowing only applies within Maintenance (the case this was
