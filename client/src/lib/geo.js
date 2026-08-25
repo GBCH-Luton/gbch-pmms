@@ -45,13 +45,35 @@ export function distanceMetres(lat1, lon1, lat2, lon2) {
 // carry on -- clocking IN specifically requires a real position before
 // starting the job (BuilderDashboard.jsx's handleClockIn/handleResumeWork),
 // since "no signal" is something a builder can walk outside and fix.
-export function getCurrentPositionSafe(timeoutMs = 8000) {
+//
+// Two-tier lookup: a GPS-grade fix (enableHighAccuracy) can fail or time
+// out indoors or under cover even with a full mobile signal bar and
+// location services on -- cell/data signal and a GPS hardware lock are
+// unrelated. Every caller here only needs tens-of-metres accuracy
+// (AdminClocking's "same spot" check is a 50m radius; the rest is
+// mileage-scale), so a much faster WiFi/cell-tower fix is a perfectly
+// good fallback rather than surfacing "couldn't get your location" when a
+// real, usable position was available all along.
+export function getCurrentPositionSafe(timeoutMs = 10000) {
   return new Promise((resolve) => {
     if (!('geolocation' in navigator)) { resolve(null); return }
-    const timer = setTimeout(() => resolve(null), timeoutMs)
+    let settled = false
+    const finish = (result) => { if (!settled) { settled = true; resolve(result) } }
+
+    const fallbackTimeoutMs = 6000
+    const tryLowAccuracy = () => {
+      const backstop = setTimeout(() => finish(null), fallbackTimeoutMs + 2000)
+      navigator.geolocation.getCurrentPosition(
+        (pos) => { clearTimeout(backstop); finish({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }) },
+        () => { clearTimeout(backstop); finish(null) },
+        { enableHighAccuracy: false, timeout: fallbackTimeoutMs, maximumAge: 60000 },
+      )
+    }
+
+    const backstop = setTimeout(tryLowAccuracy, timeoutMs + 2000)
     navigator.geolocation.getCurrentPosition(
-      (pos) => { clearTimeout(timer); resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }) },
-      () => { clearTimeout(timer); resolve(null) },
+      (pos) => { clearTimeout(backstop); finish({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }) },
+      () => { clearTimeout(backstop); tryLowAccuracy() },
       { enableHighAccuracy: true, timeout: timeoutMs, maximumAge: 0 },
     )
   })
