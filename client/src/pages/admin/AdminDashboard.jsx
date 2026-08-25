@@ -1174,8 +1174,14 @@ export default function AdminDashboard({ profile, onNavigate }) {
     if (voidAgingCounts.overdue > 0) flaggedLines.push({ target: 'void-aging', tone: 'warning', text: <><b>{voidAgingCounts.overdue} void room{voidAgingCounts.overdue === 1 ? '' : 's'}</b> {voidAgingCounts.overdue === 1 ? 'is' : 'are'} overdue for turnaround.</> })
     else quietLines.push({ target: 'void-aging', tone: 'quiet', text: <>Void Aging — no updates. {voidAgingCounts.aging} aging, nothing overdue.</> })
 
-    if (gardenAgingCounts.overdue > 0) flaggedLines.push({ target: 'gardens', tone: 'warning', text: <><b>{gardenAgingCounts.overdue} garden{gardenAgingCounts.overdue === 1 ? '' : 's'}</b> {gardenAgingCounts.overdue === 1 ? 'is' : 'are'} overdue for attention.</> })
-    else quietLines.push({ target: 'gardens', tone: 'quiet', text: <>Gardens — no updates. {gardenAgingCounts.aging} due soon, nothing overdue.</> })
+    if (gardenAgingCounts.overdue > 0 || gardenAgingCounts.overgrown > 0) {
+      const gardenBits = []
+      if (gardenAgingCounts.overdue > 0) gardenBits.push(`${gardenAgingCounts.overdue} overdue for attention`)
+      if (gardenAgingCounts.overgrown > 0) gardenBits.push(`${gardenAgingCounts.overgrown} overgrown`)
+      flaggedLines.push({ target: 'gardens', tone: 'warning', text: <>Gardens — <b>{gardenBits.join(', ')}</b>.</> })
+    } else {
+      quietLines.push({ target: 'gardens', tone: 'quiet', text: <>Gardens — no updates. {gardenAgingCounts.aging} due soon, nothing overdue.</> })
+    }
   }
 
   if (housekeepingVisible) {
@@ -1333,7 +1339,7 @@ export default function AdminDashboard({ profile, onNavigate }) {
       )}
 
       {!profile.division && (
-        <DashboardSection id="gardens" title="Gardens" background={COLORS.white} alertCount={gardenAgingCounts.overdue} defaultCollapsed>
+        <DashboardSection id="gardens" title="Gardens" background={COLORS.white} alertCount={gardenAgingCounts.overdue + gardenAgingCounts.overgrown} defaultCollapsed>
           <div style={{ width: '100%' }}>
             <KpiTiles
               kpis={gardenAgingKpis}
