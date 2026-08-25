@@ -47,17 +47,23 @@ function renderIssueTag(tag) {
 }
 
 // No human raised these -- check-office-cleaning-due (the 08:30 weekday
-// cron) inserts them directly with no raised_by/raised_by_name at all
-// (see scripts/add_office_cleaning_cron.sql), so they'd otherwise show
-// the same "Unknown" a genuinely missing raiser would -- misleading,
-// since there's nothing actually wrong with these, they just don't have
-// a person behind them. Matched on the exact category/issue_tag/
-// assign_type combination that function writes, not just "no raiser",
+// cron) and check-routine-visits-due (the daily 2-week-routine-visit
+// cron) both insert tickets directly with no raised_by/raised_by_name at
+// all (see scripts/add_office_cleaning_cron.sql and
+// scripts/add_routine_visits_cron.sql), so they'd otherwise show the
+// same "Unknown" a genuinely missing raiser would -- misleading, since
+// there's nothing actually wrong with these, they just don't have a
+// person behind them. Matched on the exact category/issue_tag/
+// assign_type combination each function writes, not just "no raiser",
 // so a real ticket with a missing raiser for some other reason still
-// correctly reads "Unknown".
+// correctly reads "Unknown". check-garden-service-due writes raised_by
+// itself (confirmed 2026-08-25: no auto-raised garden tickets exist yet
+// without one) so it doesn't need an entry here -- if that ever changes,
+// add it the same way.
 function raisedByLabel(t) {
   if (t.raised_by_name) return t.raised_by_name
   if (t.category === 'Cleaning Rota' && t.issue_tag === 'Office Daily Clean' && t.assign_type === 'Auto') return 'Daily Cleaning Rota'
+  if (t.category === 'Cleaning Rota' && t.issue_tag === 'Routine 2-Week Visit' && t.assign_type === 'Auto') return 'Routine Visit Schedule'
   return 'Unknown'
 }
 
