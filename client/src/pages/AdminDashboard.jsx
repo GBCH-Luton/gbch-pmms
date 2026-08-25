@@ -71,7 +71,7 @@ const NAV_ITEMS = [
   // Property below -- remove this whole item (and AdminRaiseMaintenanceTicket.jsx,
   // and the matching RLS policies) once that need ends, see
   // [[project_housekeeping_manager_temp_raise_access]].
-  { key: 'raise-maintenance-ticket', label: 'Raise a Ticket (Any Category)', icon: 'ticket', Component: AdminRaiseMaintenanceTicket, visibleTo: p => p.pmmsRole === 'Housekeeping Manager' },
+  { key: 'raise-maintenance-ticket', label: 'Temp Log Tickets', icon: 'ticket', Component: AdminRaiseMaintenanceTicket, visibleTo: p => p.pmmsRole === 'Housekeeping Manager' },
   // Room-by-room new-property walk -> real tickets on any Fail -> Landlord
   // Liaison review -> property flips Live. Restricted to exactly the two
   // roles it's for -- neither divisions nor divisionOnly fit "one specific
