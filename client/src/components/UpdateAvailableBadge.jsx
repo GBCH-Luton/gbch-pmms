@@ -51,21 +51,22 @@ export default function UpdateAvailableBadge() {
     <div
       role="status"
       style={{
-        position: 'fixed', bottom: '20px', right: '20px', zIndex: 999999,
-        display: 'flex', alignItems: 'center', gap: '12px',
+        position: 'fixed', bottom: 'max(20px, env(safe-area-inset-bottom))', right: '12px', left: '12px',
+        marginLeft: 'auto', maxWidth: '420px', zIndex: 999999,
+        display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '10px 12px',
         background: COLORS.slate900, color: COLORS.white,
-        borderRadius: '10px', padding: '10px 12px 10px 14px',
+        borderRadius: '12px', padding: '14px 16px',
         boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
-        fontFamily: 'system-ui, sans-serif', fontSize: '13px',
+        fontFamily: 'system-ui, sans-serif', fontSize: 'clamp(14px, 3.8vw, 15px)',
       }}
     >
-      <span style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>A new update is available</span>
+      <span style={{ fontWeight: 700, flex: '1 1 auto' }}>A new update is available</span>
       <button
         onClick={() => window.location.reload()}
         style={{
           background: COLORS.blue600, color: COLORS.white, border: 'none',
-          borderRadius: '6px', padding: '6px 14px', fontSize: '13px', fontWeight: 700,
-          cursor: 'pointer', whiteSpace: 'nowrap',
+          borderRadius: '8px', padding: '10px 18px', fontSize: 'clamp(14px, 3.8vw, 15px)', fontWeight: 700,
+          cursor: 'pointer', whiteSpace: 'nowrap', flex: '0 0 auto',
         }}
       >
         Update
