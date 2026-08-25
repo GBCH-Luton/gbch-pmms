@@ -17,6 +17,7 @@ import { COLORS } from '../../lib/colors'
 import { modalLabelStyle, modalErrorStyle, GARDEN_STATE_OPTIONS, GARDEN_STATE_STYLES, formatUKDate } from './shared'
 import { compressImage } from '../../lib/imageCompression'
 import { getSignedUrl } from '../../lib/storage'
+import PhotoLightbox from '../../components/PhotoLightbox'
 
 const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', fontFamily: 'inherit', boxSizing: 'border-box', marginBottom: '14px' }
 const readRowStyle = { display: 'flex', justifyContent: 'space-between', gap: '12px', padding: '8px 0' }
@@ -29,11 +30,15 @@ export default function PropertyGardensTab({ property, onFieldsSaved, profile })
   const [state, setState] = useState(property.garden_state || '')
   const [lastAttendedDate, setLastAttendedDate] = useState(property.garden_last_attended_date || '')
   const [lastAttendedBy, setLastAttendedBy] = useState(property.garden_last_attended_by || '')
+  const [keepsGarden, setKeepsGarden] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [frontUploading, setFrontUploading] = useState(false)
   const [backUploading, setBackUploading] = useState(false)
   const [photoError, setPhotoError] = useState('')
+  const [lightboxIndex, setLightboxIndex] = useState(null)
+
+  const galleryUrls = [property.garden_front_photo_url, property.garden_back_photo_url].filter(Boolean)
 
   async function saveFields(fields) {
     const { error: updateError } = await supabase
@@ -58,6 +63,7 @@ export default function PropertyGardensTab({ property, onFieldsSaved, profile })
     setState(property.garden_state || '')
     setLastAttendedDate(property.garden_last_attended_date || '')
     setLastAttendedBy(property.garden_last_attended_by || '')
+    setKeepsGarden(true)
     setError('')
     setEditing(true)
   }
@@ -66,7 +72,15 @@ export default function PropertyGardensTab({ property, onFieldsSaved, profile })
     setSaving(true)
     setError('')
 
+    // Turning has_garden off only hides this tab back behind the "does
+    // this property have a garden" prompt -- garden_state/dates/photos
+    // are left untouched in the row, so switching it back on later
+    // restores exactly where things were. Bundled into the same Save as
+    // everything else (moved here from a standalone one-click link in the
+    // read view, which was too easy to hit by accident -- see
+    // [[project_gardens_tracking]]).
     const err = await saveFields({
+      has_garden: keepsGarden,
       garden_state: state || null,
       garden_last_attended_date: lastAttendedDate || null,
       garden_last_attended_by: lastAttendedBy.trim() || null,
@@ -164,16 +178,6 @@ export default function PropertyGardensTab({ property, onFieldsSaved, profile })
                 : 'Never recorded'}
             </span>
           </div>
-          {!readOnly && (
-            <div style={{ ...readRowStyle, justifyContent: 'flex-start' }}>
-              <button
-                onClick={() => toggleHasGarden(false)}
-                style={{ background: 'none', border: 'none', padding: 0, fontSize: '12px', color: COLORS.slate400, cursor: 'pointer', textDecoration: 'underline' }}
-              >
-                This property no longer has a garden
-              </button>
-            </div>
-          )}
         </div>
       ) : (
         <div style={{ marginBottom: '20px' }}>
@@ -194,6 +198,21 @@ export default function PropertyGardensTab({ property, onFieldsSaved, profile })
             onChange={(e) => setLastAttendedBy(e.target.value)}
             style={inputStyle}
           />
+
+          <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '12px', background: COLORS.slate50, borderRadius: '10px', marginBottom: '14px', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={keepsGarden}
+              onChange={(e) => setKeepsGarden(e.target.checked)}
+              style={{ marginTop: '2px' }}
+            />
+            <span>
+              <span style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: COLORS.slate900 }}>This property has a garden</span>
+              <span style={{ display: 'block', fontSize: '12px', color: COLORS.slate500, marginTop: '2px' }}>
+                Uncheck if this is wrong -- the state, dates and photos below are kept either way, so re-checking this later brings everything straight back.
+              </span>
+            </span>
+          </label>
 
           {error && <p style={modalErrorStyle}>{error}</p>}
 
@@ -216,7 +235,11 @@ export default function PropertyGardensTab({ property, onFieldsSaved, profile })
         <div style={{ flex: '1 1 220px' }}>
           <p style={{ margin: '0 0 8px 0', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Front Garden</p>
           {property.garden_front_photo_url && (
-            <img src={property.garden_front_photo_url} alt="Front garden" style={{ width: '100%', maxHeight: '180px', objectFit: 'cover', borderRadius: '10px', display: 'block', marginBottom: '8px' }} />
+            <img
+              src={property.garden_front_photo_url} alt="Front garden"
+              onClick={() => setLightboxIndex(galleryUrls.indexOf(property.garden_front_photo_url))}
+              style={{ width: '100%', maxHeight: '180px', objectFit: 'cover', borderRadius: '10px', display: 'block', marginBottom: '8px', cursor: 'pointer' }}
+            />
           )}
           {!readOnly && (
             <>
@@ -231,7 +254,11 @@ export default function PropertyGardensTab({ property, onFieldsSaved, profile })
         <div style={{ flex: '1 1 220px' }}>
           <p style={{ margin: '0 0 8px 0', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Back Garden</p>
           {property.garden_back_photo_url && (
-            <img src={property.garden_back_photo_url} alt="Back garden" style={{ width: '100%', maxHeight: '180px', objectFit: 'cover', borderRadius: '10px', display: 'block', marginBottom: '8px' }} />
+            <img
+              src={property.garden_back_photo_url} alt="Back garden"
+              onClick={() => setLightboxIndex(galleryUrls.indexOf(property.garden_back_photo_url))}
+              style={{ width: '100%', maxHeight: '180px', objectFit: 'cover', borderRadius: '10px', display: 'block', marginBottom: '8px', cursor: 'pointer' }}
+            />
           )}
           {!readOnly && (
             <>
@@ -244,6 +271,9 @@ export default function PropertyGardensTab({ property, onFieldsSaved, profile })
         </div>
       </div>
       {photoError && <p style={modalErrorStyle}>{photoError}</p>}
+      {lightboxIndex !== null && (
+        <PhotoLightbox urls={galleryUrls} index={lightboxIndex} onNavigate={setLightboxIndex} onClose={() => setLightboxIndex(null)} />
+      )}
     </div>
   )
 }
