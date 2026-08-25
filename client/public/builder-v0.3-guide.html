@@ -487,9 +487,16 @@
   // ================= State =================
   const state = {
     todayShift: null,          // { clockInAt: Date, lateFlag }
-    page: 'dashboard',         // dashboard | leaving-choices | leaving-job | leaving-materials | leaving-office | leaving-lunch | leaving-resume
+    page: 'dashboard',         // dashboard | leaving-choices | leaving-job | leaving-job-confirm | leaving-materials | leaving-office | leaving-lunch | leaving-resume
     openActivity: null,        // { kind: 'Travel'|'Break', label, note, destinationTicketId, category }
     awaySince: null,
+    // Distinguishes "opened this search to actually travel" (the Going to
+    // Another Job pill) from "opened the same search to just browse the
+    // to-do list" (the To Do tile) -- both land on the identical
+    // leaving-job screen, so without this there'd be no way to tell a
+    // genuine travel pick from a casual peek at an assigned job.
+    travelPickerIntent: false,
+    pendingTravelJobId: null,  // set on leaving-job selection, consumed by confirmTravelToJob()
     receiptRows: [],           // [{ photoAttached, amount }] -- optional, only shown for category 'materials'
     selectedTicketId: null,
     miles: null,
@@ -601,6 +608,7 @@
   function openToDoFromTile() {
     if (state.openActivity) return;
     state.jobSearchQuery = '';
+    state.travelPickerIntent = false;
     state.page = 'leaving-job';
     render();
   }
@@ -615,16 +623,34 @@
     state.page = 'leaving-choices';
     render();
   }
-  function goToLeavingPage(p) { state.page = p; state.jobSearchQuery = ''; state.materialsQuery = ''; render(); }
+  function goToLeavingPage(p) { state.page = p; state.jobSearchQuery = ''; state.materialsQuery = ''; state.travelPickerIntent = (p === 'leaving-job'); render(); }
   function backToChoices() { state.page = 'leaving-choices'; render(); }
   function backToDashboard() { state.page = 'dashboard'; render(); }
 
   function pickTravelJob(id) {
-    // Picking a job here is navigation, not a commitment -- same as
-    // tapping into Urgent/To Do just to look. Nothing is logged and no
-    // "Away" state opens until he actually taps "Arrived -- Start Work"
-    // on the ticket screen (see startWork()).
+    if (state.travelPickerIntent) {
+      // Real commitment starts on the confirm screen's explicit "Start
+      // Travelling" tap (see confirmTravelToJob()), not this selection --
+      // mirrors Buying Materials' own pick-then-Start shape.
+      state.pendingTravelJobId = id;
+      state.page = 'leaving-job-confirm';
+      render();
+      return;
+    }
+    // To Do tile: just a peek at an assigned job, same as tapping into it
+    // directly -- no travel intent implied, nothing logged.
     state.selectedTicketId = id;
+    state.miles = null;
+    state.page = 'dashboard';
+    render();
+  }
+  function confirmTravelToJob() {
+    const j = job(state.pendingTravelJobId);
+    if (!j) return;
+    state.openActivity = { kind: 'Travel', label: 'Travelling', note: `Job #${j.number} — ${j.address}`, destinationTicketId: j.id, category: 'job' };
+    state.awaySince = nowHHMM();
+    logEvent('left site — heading to another job');
+    state.selectedTicketId = j.id;
     state.miles = null;
     state.page = 'dashboard';
     render();
@@ -684,16 +710,29 @@
   // ================= Ticket overlay actions =================
   function closeTicket() {
     if (lockedTicket()) return; // Back hidden while locked, matches real closeTicket()
-    // Nothing to clean up here any more -- picking a job under "Going to
-    // Another Job" no longer opens an activity on selection (see
-    // pickTravelJob), so backing out before tapping "Arrived -- Start
-    // Work" simply never created anything to begin with.
+    // A "Start Travelling" tap on leaving-job-confirm opens a real
+    // openActivity for this destination -- backing out here without ever
+    // tapping "Arrived -- Start Work" needs to close it, or it'd stay
+    // "Away" forever. Guarded to this exact destination + still-Assigned
+    // so it never double-handles a job startWork() already closed.
+    const j = state.selectedTicketId ? job(state.selectedTicketId) : null;
+    if (j && j.status === 'Assigned' && state.openActivity?.category === 'job' && state.openActivity.destinationTicketId === j.id) {
+      state.openActivity = null; state.awaySince = null;
+      logEvent(`came back — didn't start Job #${j.number}`);
+    }
     state.selectedTicketId = null;
     render();
   }
 
   function startWork() {
     const j = job(state.selectedTicketId);
+    // Defensive close, mirrors the real app's handleClockIn -- normally a
+    // no-op (arriving via confirmTravelToJob always targets this same
+    // ticket), but covers a stale simulator state cleanly rather than
+    // leaving a dangling "Away" behind.
+    if (state.openActivity?.category === 'job' && state.openActivity.destinationTicketId === j.id) {
+      state.openActivity = null; state.awaySince = null;
+    }
     j.status = 'In Progress';
     j.mileageLogged = state.miles;
     state.inProgressSeconds = 0;
@@ -1031,6 +1070,29 @@
       }`;
   }
 
+  // Explicit "Start Travelling" tap here is what actually opens the
+  // activity/logs anything -- picking the destination on leavingJobPageHtml
+  // never does (see pickTravelJob). Mirrors Buying Materials' own
+  // pick-then-Start shape below.
+  function leavingJobConfirmPageHtml() {
+    const j = job(state.pendingTravelJobId);
+    if (!j) return `<p class="search-empty">Could not find that job.</p>`;
+    return `
+      <p class="sheet-title">Going to Another Job</p>
+      <div class="job-pick-list">
+        <div class="search-result" style="cursor:default">
+          <div class="result-top-row">
+            <span class="num">#${j.number} · ${j.category}</span>
+            <span class="mi-pill">${j.miles.toFixed(1)} mi</span>
+          </div>
+          <p class="result-addr">${j.address}</p>
+          <p class="result-desc">${j.desc}${j.room ? ' — ' + j.room : ''}</p>
+        </div>
+      </div>
+      <button class="btn-primary" onclick="confirmTravelToJob()">🚗 Start Travelling</button>
+    `;
+  }
+
   function leavingMaterialsPageHtml() {
     const q = state.materialsQuery.trim().toLowerCase();
     const matches = q ? STORE_SUGGESTIONS.filter(s => s.toLowerCase().includes(q)) : [];
@@ -1340,6 +1402,7 @@
     switch (state.page) {
       case 'leaving-choices': bodyHtml = leavingChoicesPageHtml(); showBack = true; onBack = 'backToDashboard()'; break;
       case 'leaving-job': bodyHtml = leavingJobPageHtml(); showBack = true; onBack = 'backToChoices()'; break;
+      case 'leaving-job-confirm': bodyHtml = leavingJobConfirmPageHtml(); showBack = true; onBack = "goToLeavingPage('leaving-job')"; break;
       case 'leaving-materials': bodyHtml = leavingMaterialsPageHtml(); showBack = true; onBack = 'backToChoices()'; break;
       case 'leaving-office': bodyHtml = leavingOfficePageHtml(); showBack = true; onBack = 'backToChoices()'; break;
       case 'leaving-lunch': bodyHtml = leavingLunchPageHtml(); showBack = true; onBack = 'backToChoices()'; break;

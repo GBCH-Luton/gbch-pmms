@@ -254,6 +254,12 @@ export default function BuilderDashboard({ profile }) {
   // unchanged.
   const [travelMode, setTravelMode] = useState('shop')
   const [destinationTicketId, setDestinationTicketId] = useState('')
+  // Distinguishes "opened the job search to actually travel there" (Going
+  // to Another Job) from "opened the same search to just browse the to-do
+  // list" (the home tile below) -- both land on the identical leaving-job
+  // screen with travelMode 'job', so without this flag there'd be no way
+  // to tell a genuine travel pick from a casual peek at an assigned job.
+  const [pickingForTravel, setPickingForTravel] = useState(false)
   const [activityNote, setActivityNote] = useState('')
   const [jobSearchQuery, setJobSearchQuery] = useState('')
   // Optional receipt capture, shown only when ending a 'materials' trip --
@@ -943,6 +949,7 @@ export default function BuilderDashboard({ profile }) {
     setActivityNote('')
     setJobSearchQuery('')
     setActivityError('')
+    setPickingForTravel(false)
     setPage('leaving-choices')
   }
 
@@ -958,21 +965,17 @@ export default function BuilderDashboard({ profile }) {
     }
     setActivityError('')
 
-    // Going to Another Job is navigation, not a commitment -- picking a
-    // job here (like tapping into Urgent/To Do) just opens it to look at.
-    // Nothing gets logged until he actually taps "Arrived -- Start Work"
-    // on that screen (handleClockIn), the same moment a directly-opened
-    // job would log. No activity_log row, no "Away" status, and nothing
-    // to clean up if he backs out -- closeTicket()'s old auto-clear
-    // existed only to paper over the previous start-on-pick behaviour and
-    // no longer applies to this path.
-    if (travelMode === 'job') {
-      const destinationTicket = tickets.find(t => t.id === destinationId)
-      if (!destinationTicket) { setActivityError('Could not find that job.'); return }
-      setSelectedTicket(destinationTicket)
-      setPage('jobs')
-      return
-    }
+    // Going to Another Job only ever reaches here from the new
+    // leaving-job-confirm screen's explicit "Start Travelling" tap --
+    // picking a destination from the search list itself is still pure
+    // navigation with no write (see the leaving-job result row's onClick,
+    // gated on pickingForTravel). That two-step shape (pick, then a
+    // separate explicit Start) mirrors materials/office/lunch below
+    // exactly, so this is the same "only log on a real button action"
+    // this file has always used elsewhere -- job-to-job travel just
+    // didn't have a distinct Start step until now.
+    const destinationTicket = travelMode === 'job' ? tickets.find(t => t.id === destinationId) : null
+    if (travelMode === 'job' && !destinationTicket) { setActivityError('Could not find that job.'); return }
 
     setStartingActivity(true)
     // Non-blocking, unlike the daily clock-in GPS fix -- a bad signal
@@ -987,7 +990,9 @@ export default function BuilderDashboard({ profile }) {
       ? (activityNote.trim() || 'Lunch')
       : travelMode === 'office'
         ? 'Going to the office'
-        : activityNote.trim()
+        : travelMode === 'job'
+          ? `Job #${destinationTicket.ticket_number} — ${destinationTicket.property?.address || 'address unknown'}`
+          : activityNote.trim()
 
     // Distinct from activity_type ('Travel'/'Break') -- lets admin-side
     // displays and duration reporting tell "Buying Materials" apart from
@@ -995,6 +1000,7 @@ export default function BuilderDashboard({ profile }) {
     // "Travelling" label.
     const category = activityType === 'Break' ? 'lunch'
       : travelMode === 'office' ? 'office'
+      : travelMode === 'job' ? 'job'
       : 'materials'
 
     const { data, error } = await supabase
@@ -1009,7 +1015,7 @@ export default function BuilderDashboard({ profile }) {
         started_lat: position?.latitude ?? null,
         started_lng: position?.longitude ?? null,
         ticket_id: inProgressTicket?.id ?? null,
-        destination_ticket_id: null,
+        destination_ticket_id: travelMode === 'job' ? destinationId : null,
       })
       .select('id, activity_type, activity_category, note, started_at, destination_ticket_id, ticket_id')
       .single()
@@ -1017,6 +1023,11 @@ export default function BuilderDashboard({ profile }) {
     setStartingActivity(false)
     if (error) { setActivityError(error.message); return }
     setOpenActivity(data)
+    // Lands him straight on the picked job's own Arrived screen, same as
+    // tapping directly into any other job -- generic Away flows (materials/
+    // office/lunch) have no specific ticket to jump to, so selectedTicket
+    // stays whatever it already was.
+    if (destinationTicket) setSelectedTicket(destinationTicket)
     setPage('jobs')
   }
 
@@ -1903,10 +1914,18 @@ export default function BuilderDashboard({ profile }) {
     setSelectedTicket(lockedTicket || t)
   }
   function closeTicket() {
-    // Nothing to clean up here any more -- picking a job under "Going to
-    // Another Job" no longer writes an activity_log row on selection (see
-    // handleStartActivity), so backing out of this screen before tapping
-    // "Arrived -- Start Work" simply never created a record to begin with.
+    // A "Start Travelling" tap on leaving-job-confirm opens a real
+    // activity_log row for this destination (see handleStartActivity) --
+    // backing out here without ever tapping "Arrived -- Start Work" would
+    // leave it open forever if not closed. Fire-and-forget, same as the
+    // rest of this function -- handleEndActivity() only touches
+    // openActivity/receiptRows (empty for a 'job' leg) and never
+    // navigates, so it can't race with setSelectedTicket below. Guarded to
+    // this exact destination + still-Assigned so it never double-handles
+    // a job handleClockIn already closed and moved to In Progress.
+    if (!lockedTicket && selectedTicket?.status === 'Assigned' && openActivity?.activity_category === 'job' && openActivity.destination_ticket_id === selectedTicket.id) {
+      handleEndActivity()
+    }
     setSelectedTicket(lockedTicket || null)
   }
 
@@ -2474,6 +2493,7 @@ export default function BuilderDashboard({ profile }) {
           onClick={() => {
             if (openActivity) return
             setActivityType('Travel'); setTravelMode('job'); setDestinationTicketId(''); setJobSearchQuery(''); setActivityError('')
+            setPickingForTravel(false)
             setPage('leaving-job')
           }}
           disabled={!!openActivity}
@@ -3243,7 +3263,7 @@ export default function BuilderDashboard({ profile }) {
             <p style={{ margin: '0 0 12px 0', fontSize: '12px', fontWeight: 700, color: COLORS.slate500, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Where are you going?</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <button
-                onClick={() => { setActivityType('Travel'); setTravelMode('job'); setDestinationTicketId(''); setJobSearchQuery(''); setActivityError(''); setPage('leaving-job') }}
+                onClick={() => { setActivityType('Travel'); setTravelMode('job'); setDestinationTicketId(''); setJobSearchQuery(''); setActivityError(''); setPickingForTravel(true); setPage('leaving-job') }}
                 style={{ width: '100%', padding: '16px', borderRadius: '12px', fontSize: '15px', fontWeight: 700, cursor: 'pointer', border: 'none', background: COLORS.green600, color: COLORS.white, textAlign: 'center' }}
               >
                 🚗 Going to Another Job
@@ -3315,9 +3335,16 @@ export default function BuilderDashboard({ profile }) {
                   return (
                     <button
                       key={t.id}
-                      onClick={() => handleStartActivity(t.id)}
-                      disabled={startingActivity}
-                      style={{ display: 'block', width: '100%', textAlign: 'left', padding: '12px 14px', border: 'none', borderBottom: i < results.length - 1 ? `1px solid ${COLORS.slate300}` : 'none', background: COLORS.white, cursor: startingActivity ? 'not-allowed' : 'pointer' }}
+                      // pickingForTravel: he's actually heading there --
+                      // select only, the new confirm screen's explicit
+                      // Start is what logs it. Otherwise (the "To do" tile)
+                      // this is just a peek at an assigned job, same plain
+                      // open used everywhere else in this file.
+                      onClick={() => {
+                        if (pickingForTravel) { setDestinationTicketId(t.id); setPage('leaving-job-confirm') }
+                        else { setSelectedTicket(t); setPage('jobs') }
+                      }}
+                      style={{ display: 'block', width: '100%', textAlign: 'left', padding: '12px 14px', border: 'none', borderBottom: i < results.length - 1 ? `1px solid ${COLORS.slate300}` : 'none', background: COLORS.white, cursor: 'pointer' }}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '2px' }}>
                         <span style={{ fontSize: '10.5px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.05em' }}>#{t.ticket_number} · {t.category}</span>
@@ -3331,6 +3358,48 @@ export default function BuilderDashboard({ profile }) {
                   )
                 })}
               </div>
+            )}
+          </div>
+        </div>
+        )
+      })()}
+
+      {/* Leaving Site -- Going to Another Job (confirm) -- the explicit
+          "Start Travelling" tap here is what actually logs anything;
+          picking the destination on the previous screen never does (see
+          handleStartActivity's comment). Mirrors Buying Materials' own
+          pick-then-Start shape below. */}
+      {page === 'leaving-job-confirm' && (() => {
+        const destinationTicket = tickets.find(t => t.id === destinationTicketId)
+        const miles = destinationTicket ? estimateMilesTo(destinationTicket) : null
+        return (
+        <div style={{ position: 'fixed', top: 'var(--pmms-banner-offset, 0px)', left: 0, right: 0, bottom: 0, background: COLORS.slate100, zIndex: 50, overflowY: 'auto', fontFamily: 'system-ui, sans-serif' }}>
+          <BuilderNavHeader onBack={() => setPage('leaving-job')} goHome={goHome} menuOpen={menuOpen} setMenuOpen={setMenuOpen} profile={profile} unreadMentions={unreadMentions} setPage={setPage} handleSignOut={handleSignOut} />
+          <div style={{ padding: '16px', maxWidth: '600px', margin: '0 auto' }}>
+            <p style={{ margin: '0 0 12px 0', fontSize: '12px', fontWeight: 700, color: COLORS.slate500, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Going to Another Job</p>
+            {!destinationTicket ? (
+              <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic', textAlign: 'center' }}>Could not find that job.</p>
+            ) : (
+              <>
+                <div style={{ border: `1px solid ${COLORS.slate200}`, borderRadius: '12px', padding: '14px', background: COLORS.white, marginBottom: '14px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '2px' }}>
+                    <span style={{ fontSize: '10.5px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.05em' }}>#{destinationTicket.ticket_number} · {destinationTicket.category}</span>
+                    {miles != null && (
+                      <span style={{ flexShrink: 0, fontSize: '10.5px', fontWeight: 800, color: COLORS.white, background: COLORS.teal600, padding: '2px 8px', borderRadius: '20px', whiteSpace: 'nowrap' }}>{miles.toFixed(1)} mi</span>
+                    )}
+                  </div>
+                  <p style={{ margin: '0 0 2px 0', fontSize: '13.5px', fontWeight: 800, color: COLORS.slate900 }}>{destinationTicket.property?.address}</p>
+                  <p style={{ margin: 0, fontSize: '12px', color: COLORS.slate500 }}>{destinationTicket.description}{destinationTicket.room ? ` — ${destinationTicket.room}` : ''}</p>
+                </div>
+                {activityError && <p style={{ margin: '0 0 10px 0', fontSize: '12px', color: COLORS.red500, fontWeight: 600 }}>{activityError}</p>}
+                <button
+                  onClick={() => handleStartActivity()}
+                  disabled={startingActivity}
+                  style={{ width: '100%', padding: '14px', background: COLORS.teal600, color: COLORS.white, border: 'none', borderRadius: '12px', fontSize: '14.5px', fontWeight: 700, cursor: startingActivity ? 'not-allowed' : 'pointer', opacity: startingActivity ? 0.5 : 1 }}
+                >
+                  {startingActivity ? 'Starting…' : '🚗 Start Travelling'}
+                </button>
+              </>
             )}
           </div>
         </div>
