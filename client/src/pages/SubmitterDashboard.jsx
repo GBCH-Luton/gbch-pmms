@@ -21,6 +21,7 @@ import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { COLORS } from '../lib/colors'
 import { logLoginEvent } from '../lib/loginEvents'
+import { pushNotificationsSupported, hasActivePushSubscription, enablePushNotifications } from '../lib/pushNotifications'
 import { uploadTicketAttachments, formatUploadProgress } from '../lib/ticketAttachments'
 import { fetchMaintenanceCategories, sortedCategoryEntries, isUnlistedTag, unlistedTagFor, unlistedLabelFor, calculatePriorityScore } from '../lib/maintenanceCategories'
 import { attachBuilderSafeProperties } from '../lib/properties'
@@ -77,10 +78,23 @@ export default function SubmitterDashboard({ profile }) {
   })
   const [signingOut, setSigningOut] = useState(false)
   const [signOffCount, setSignOffCount] = useState(0)
+  const [pushEnabled, setPushEnabled] = useState(false)
+  const [pushError, setPushError] = useState('')
 
   useEffect(() => {
     fetchSignOffCount()
+    // Permission alone doesn't mean a subscription actually exists (a
+    // browser can report "granted" with nothing ever subscribed) -- this
+    // is the real check for whether the button should offer to enable.
+    hasActivePushSubscription().then(setPushEnabled)
   }, [])
+
+  async function handleEnableNotifications() {
+    setPushError('')
+    const result = await enablePushNotifications(profile.id)
+    if (!result.success) { setPushError(result.message); return }
+    setPushEnabled(true)
+  }
 
   async function fetchSignOffCount() {
     const { count } = await supabase
@@ -199,6 +213,16 @@ export default function SubmitterDashboard({ profile }) {
               </div>
             )}
           </div>
+          {!isCollapsed && pushNotificationsSupported() && (
+            <button
+              onClick={handleEnableNotifications}
+              disabled={pushEnabled}
+              style={{ width: '100%', padding: '8px', marginBottom: '8px', borderRadius: '8px', border: 'none', background: 'rgba(255,255,255,0.1)', color: pushEnabled ? 'rgba(255,255,255,0.5)' : COLORS.white, fontWeight: 700, fontSize: '13px', cursor: pushEnabled ? 'default' : 'pointer' }}
+            >
+              🔔 {pushEnabled ? 'Notifications: On' : 'Enable Notifications'}
+            </button>
+          )}
+          {!isCollapsed && pushError && <p style={{ margin: '0 0 8px 0', fontSize: '11px', color: COLORS.red300 }}>{pushError}</p>}
           <button
             onClick={handleSignOut}
             disabled={signingOut}
