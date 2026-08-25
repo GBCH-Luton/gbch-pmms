@@ -625,7 +625,7 @@ export async function fetchGardenReviewAging() {
   const { data: properties } = await supabase
     .schema('pmms')
     .from('properties')
-    .select('id, garden_last_attended_date')
+    .select('id, garden_last_attended_date, garden_state')
     .eq('has_garden', true)
 
   const { data: settingsRows } = await supabase
@@ -639,13 +639,24 @@ export async function fetchGardenReviewAging() {
   const thresholdDays = isUkSummerMonth(new Date()) ? summerDays : winterDays
 
   const nowMs = Date.now()
-  const counts = { overdue: 0, aging: 0, recent: 0 }
+  // overdue/aging/recent are review-cadence tiers (when it was last
+  // attended, regardless of condition); needsAttention/overgrown are the
+  // separate garden_state a manager sets by hand on the Gardens tab
+  // (current condition, regardless of when it was last visited) -- a
+  // garden can be recently-attended but still assessed Overgrown, or
+  // overdue but still Good, so these two axes are deliberately counted
+  // independently rather than folded into one tier.
+  const counts = { overdue: 0, aging: 0, recent: 0, needsAttention: 0, overgrown: 0 }
   ;(properties || []).forEach(p => {
-    if (!p.garden_last_attended_date) { counts.overdue += 1; return }
-    const daysSince = Math.floor((nowMs - new Date(p.garden_last_attended_date).getTime()) / 86400000)
-    if (daysSince >= thresholdDays) counts.overdue += 1
-    else if (daysSince >= thresholdDays * 0.5) counts.aging += 1
-    else counts.recent += 1
+    if (!p.garden_last_attended_date) counts.overdue += 1
+    else {
+      const daysSince = Math.floor((nowMs - new Date(p.garden_last_attended_date).getTime()) / 86400000)
+      if (daysSince >= thresholdDays) counts.overdue += 1
+      else if (daysSince >= thresholdDays * 0.5) counts.aging += 1
+      else counts.recent += 1
+    }
+    if (p.garden_state === 'Needs Attention') counts.needsAttention += 1
+    else if (p.garden_state === 'Overgrown') counts.overgrown += 1
   })
   return counts
 }

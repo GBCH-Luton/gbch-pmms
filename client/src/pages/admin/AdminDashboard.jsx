@@ -783,7 +783,7 @@ export default function AdminDashboard({ profile, onNavigate }) {
   const [stuckThresholds, setStuckThresholds] = useState(null)
   const [complianceCounts, setComplianceCounts] = useState({ expired: 0, dueSoon: 0, noRecord: 0, valid: 0 })
   const [voidAgingCounts, setVoidAgingCounts] = useState({ overdue: 0, aging: 0, recent: 0 })
-  const [gardenAgingCounts, setGardenAgingCounts] = useState({ overdue: 0, aging: 0, recent: 0 })
+  const [gardenAgingCounts, setGardenAgingCounts] = useState({ overdue: 0, aging: 0, recent: 0, needsAttention: 0, overgrown: 0 })
   const [housekeepingCounts, setHousekeepingCounts] = useState({ overdue: 0, dueSoon: 0, ok: 0, pendingDelays: 0 })
   const [p1Threshold, setP1Threshold] = useState(70)
   const [p2Threshold, setP2Threshold] = useState(40)
@@ -1093,9 +1093,11 @@ export default function AdminDashboard({ profile, onNavigate }) {
   ]
 
   const gardenAgingKpis = [
-    { label: 'Overdue Gardens', value: gardenAgingCounts.overdue, colour: COLORS.red600 },
-    { label: 'Due Soon', value: gardenAgingCounts.aging, colour: COLORS.amber600 },
-    { label: 'Recently Attended', value: gardenAgingCounts.recent, colour: COLORS.green600 },
+    { label: 'Overdue Gardens', value: gardenAgingCounts.overdue, colour: COLORS.red600, filterMode: 'gardensOverdue' },
+    { label: 'Due Soon', value: gardenAgingCounts.aging, colour: COLORS.amber600, filterMode: 'gardensOverdue' },
+    { label: 'Recently Attended', value: gardenAgingCounts.recent, colour: COLORS.green600, filterMode: 'gardensOverdue' },
+    { label: 'Needs Attention', value: gardenAgingCounts.needsAttention, colour: COLORS.amber600, filterMode: 'gardensNeedsAttention' },
+    { label: 'Overgrown', value: gardenAgingCounts.overgrown, colour: COLORS.red600, filterMode: 'gardensOvergrown' },
   ]
 
   const housekeepingKpis = [
@@ -1335,7 +1337,7 @@ export default function AdminDashboard({ profile, onNavigate }) {
           <div style={{ width: '100%' }}>
             <KpiTiles
               kpis={gardenAgingKpis}
-              onTileClick={() => onNavigate?.('properties', { filterMode: 'gardensOverdue' })}
+              onTileClick={(kpi) => onNavigate?.('properties', { filterMode: kpi.filterMode })}
             />
           </div>
         </DashboardSection>

@@ -152,7 +152,7 @@ export default function AdminProperties({ profile, onNavigate, initialProperties
   const [openTicketCounts, setOpenTicketCounts] = useState({})
   const [voidRoomCounts, setVoidRoomCounts] = useState({})
   const [newPropertyWindowHours, setNewPropertyWindowHours] = useState(DEFAULT_NEW_PROPERTY_WINDOW_HOURS)
-  const [filterMode, setFilterMode] = useState('all') // 'all' | 'newProperties' | 'procured' | 'live' | 'inactive' | 'gardensOverdue'
+  const [filterMode, setFilterMode] = useState('all') // 'all' | 'newProperties' | 'procured' | 'live' | 'inactive' | 'gardensOverdue' | 'gardensNeedsAttention' | 'gardensOvergrown'
   const [p1Threshold, setP1Threshold] = useState(70)
   const [p2Threshold, setP2Threshold] = useState(40)
   const [loading, setLoading] = useState(true)
@@ -447,6 +447,8 @@ export default function AdminProperties({ profile, onNavigate, initialProperties
     if (filterMode === 'inactive' && p.status !== 'Inactive') return false
     if (filterMode === 'internal' && p.status !== 'Internal') return false
     if (filterMode === 'gardensOverdue' && !p.has_garden) return false
+    if (filterMode === 'gardensNeedsAttention' && (!p.has_garden || p.garden_state !== 'Needs Attention')) return false
+    if (filterMode === 'gardensOvergrown' && (!p.has_garden || p.garden_state !== 'Overgrown')) return false
     if (filterMode === 'openTickets' && !((openTicketCounts[p.id] || 0) > 0)) return false
     return true
   })
@@ -458,6 +460,8 @@ export default function AdminProperties({ profile, onNavigate, initialProperties
     filterMode === 'inactive' ? 'Inactive' :
     filterMode === 'internal' ? 'Internal' :
     filterMode === 'gardensOverdue' ? 'Gardens' :
+    filterMode === 'gardensNeedsAttention' ? 'Gardens — Needs Attention' :
+    filterMode === 'gardensOvergrown' ? 'Gardens — Overgrown' :
     filterMode === 'openTickets' ? 'With Open Tickets' :
     null
 
