@@ -10,12 +10,11 @@ import { supabase } from './supabase'
 // room list.
 export const ROOMS = ['Kitchen', 'Living Room', 'Hallway', 'Bedroom 1', 'Bedroom 2', 'Bathroom']
 
-// The room types a Maintenance Assistant can add another instance of
-// mid-walk, for a property with more of these than the default -- matches
-// the "2 or 3 kitchens, 4 or 6 bedrooms" cases this was built for. Living
-// Room/Hallway stay singular; nothing stops a future need from adding to
-// this list.
-export const ADDABLE_ROOM_TYPES = ['Bedroom', 'Kitchen', 'Bathroom']
+// The five room types the walk groups rooms into (see groupRoomsByType) --
+// every type is addable now, not just Bedroom/Kitchen/Bathroom (a split-
+// level property can genuinely have 2 living rooms or 2 hallways too),
+// matching the "2 or 3 kitchens, 4 or 6 bedrooms" cases this was built for.
+export const ROOM_TYPES = ['Kitchen', 'Living Room', 'Hallway', 'Bedroom', 'Bathroom']
 
 export const CHECK_ITEMS = [
   { key: 'walls', label: 'Walls, ceiling & decoration' },
@@ -42,6 +41,28 @@ export function nextRoomName(existingRooms, baseType) {
   return count === 0 ? baseType : `${baseType} ${count + 1}`
 }
 
+// Inverse of nextRoomName's naming -- "Bedroom 3" -> "Bedroom", "Kitchen" ->
+// "Kitchen". Groups a walk's room list into the wizard's per-type steps
+// (Kitchens / Living Room / Hallway / Bedrooms / Bathrooms), preserving
+// each type's first-appearance order -- ROOMS already lists the 5 types in
+// the fixed order the wizard should show them, so a fresh walk's steps
+// come out in that order for free; extra_rooms only ever adds to an
+// existing group, never introduces a new one (every type already has at
+// least its default room from ROOMS).
+export function roomBaseType(roomName) {
+  return roomName.replace(/ \d+$/, '')
+}
+export function groupRoomsByType(rooms) {
+  const order = []
+  const byType = {}
+  rooms.forEach(r => {
+    const type = roomBaseType(r)
+    if (!byType[type]) { byType[type] = []; order.push(type) }
+    byType[type].push(r)
+  })
+  return order.map(type => ({ type, rooms: byType[type] }))
+}
+
 // Appends one room to a walk's extra_rooms and persists it -- RLS already
 // covers this (onboarding_am_and_liaison is an ALL-command policy), no RPC
 // needed. Returns the updated walk row so callers can setWalk(...) it
@@ -56,6 +77,30 @@ export async function addExtraRoom(walk, roomName) {
     .single()
   if (error) throw new Error(error.message)
   return data
+}
+
+// One free-text description per individual room (not per type -- "Bedroom
+// 3" gets its own, separate from "Bedroom 1"), see
+// scripts/add_onboarding_room_notes.sql. Same "keyed by room text" idiom
+// as property_onboarding_checks.room -- no need to know which rooms exist
+// in advance, any room name this walk has can get a note.
+export async function fetchRoomNotes(walkId) {
+  const { data } = await supabase
+    .schema('pmms')
+    .from('property_onboarding_room_notes')
+    .select('room, description')
+    .eq('walk_id', walkId)
+  const byRoom = {}
+  ;(data || []).forEach(r => { byRoom[r.room] = r.description })
+  return byRoom
+}
+
+export async function saveRoomDescription(walkId, room, description) {
+  const { error } = await supabase
+    .schema('pmms')
+    .from('property_onboarding_room_notes')
+    .upsert({ walk_id: walkId, room, description, updated_at: new Date().toISOString() }, { onConflict: 'walk_id,room' })
+  if (error) throw new Error(error.message)
 }
 
 // Must match a sub-category label in the "Property Onboarding" category

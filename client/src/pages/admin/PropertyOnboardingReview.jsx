@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { COLORS } from '../../lib/colors'
 import { statusColour, statusLabel } from './shared'
-import { CHECK_ITEMS, effectiveRoomsFor, fetchWalkChecks, fetchPropertyOpenTickets } from '../../lib/onboarding'
+import { CHECK_ITEMS, effectiveRoomsFor, fetchWalkChecks, fetchPropertyOpenTickets, fetchRoomNotes } from '../../lib/onboarding'
 import { raiseOnboardingTicket } from './onboardingTicket'
 import TicketMediaPicker from '../../components/TicketMediaPicker'
 import VoiceInputButton from '../../components/VoiceInputButton'
@@ -45,6 +45,7 @@ export default function PropertyOnboardingReview({ profile, onNavigate }) {
   const [walk, setWalk] = useState(null)
   const [property, setProperty] = useState(null)
   const [checks, setChecks] = useState([])
+  const [roomNotes, setRoomNotes] = useState({}) // { [room]: description }
   const [openTickets, setOpenTickets] = useState([])
   const [error, setError] = useState('')
 
@@ -79,11 +80,12 @@ export default function PropertyOnboardingReview({ profile, onNavigate }) {
     setWalk(w)
     setProperty(w.property)
     setChecks(await fetchWalkChecks(w.id))
+    setRoomNotes(await fetchRoomNotes(w.id))
     setOpenTickets(await fetchPropertyOpenTickets(w.property.id))
   }
 
   function backToQueue() {
-    setWalk(null); setProperty(null); setChecks([]); setOpenTickets([]); setOpenForm(null)
+    setWalk(null); setProperty(null); setChecks([]); setRoomNotes({}); setOpenTickets([]); setOpenForm(null)
     loadQueue()
   }
 
@@ -180,7 +182,8 @@ export default function PropertyOnboardingReview({ profile, onNavigate }) {
 
           {effectiveRoomsFor(walk).map(room => (
             <div key={room} style={{ ...cardStyle, marginBottom: '10px' }}>
-              <p style={{ margin: '0 0 10px 0', fontSize: '14px', fontWeight: 700, color: COLORS.slate900 }}>{room}</p>
+              <p style={{ margin: '0 0 4px 0', fontSize: '14px', fontWeight: 700, color: COLORS.slate900 }}>{room}</p>
+              {roomNotes[room] && <p style={{ margin: '0 0 10px 0', fontSize: '12.5px', color: COLORS.slate500 }}>{roomNotes[room]}</p>}
               {CHECK_ITEMS.map(item => {
                 const rows = checks.filter(c => c.room === room && c.item_key === item.key)
                 return (

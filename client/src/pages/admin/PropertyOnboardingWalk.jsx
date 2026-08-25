@@ -1,7 +1,11 @@
 import { useState, useEffect } from 'react'
 import { COLORS } from '../../lib/colors'
 import { statusColour, statusLabel, KpiTiles } from './shared'
-import { CHECK_ITEMS, ADDABLE_ROOM_TYPES, effectiveRoomsFor, nextRoomName, addExtraRoom, fetchOnboardingProperties, fetchOnboardingMetrics, startOrResumeWalk, fetchWalkChecks, fetchPropertyOpenTickets, recordPass } from '../../lib/onboarding'
+import {
+  CHECK_ITEMS, ROOM_TYPES, effectiveRoomsFor, nextRoomName, groupRoomsByType, addExtraRoom,
+  fetchRoomNotes, saveRoomDescription, fetchOnboardingProperties, fetchOnboardingMetrics,
+  startOrResumeWalk, fetchWalkChecks, fetchPropertyOpenTickets, recordPass,
+} from '../../lib/onboarding'
 import { raiseOnboardingTicket } from './onboardingTicket'
 import TicketMediaPicker from '../../components/TicketMediaPicker'
 import VoiceInputButton from '../../components/VoiceInputButton'
@@ -10,9 +14,13 @@ const fieldLabelStyle = { margin: '0 0 8px 0', fontSize: '11px', fontWeight: 600
 const cardStyle = { background: COLORS.white, borderRadius: '14px', padding: '18px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }
 const primaryBtn = { height: '46px', padding: '0 22px', background: COLORS.blue900, color: COLORS.white, border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: 700, cursor: 'pointer' }
 const ghostBtn = { height: '40px', padding: '0 16px', background: COLORS.white, color: COLORS.slate500, border: `1px solid ${COLORS.slate200}`, borderRadius: '10px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }
+const addBtn = { width: '100%', background: COLORS.teal50, color: COLORS.teal700, border: `1.5px dashed ${COLORS.teal700}`, borderRadius: '10px', padding: '12px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', marginBottom: '16px' }
 
 function roomComplete(checks, room) {
   return CHECK_ITEMS.every(item => checks.some(c => c.room === room && c.item_key === item.key))
+}
+function emptyRoomForm(desc = '') {
+  return { desc, verdicts: {}, issuesByItem: {} }
 }
 
 function walkStatusPill(walk) {
@@ -29,18 +37,22 @@ export default function PropertyOnboardingWalk({ profile, onNavigate }) {
   const [property, setProperty] = useState(null)
   const [walk, setWalk] = useState(null)
   const [checks, setChecks] = useState([])
+  const [roomNotes, setRoomNotes] = useState({}) // { [room]: description }, persisted
   const [screen, setScreen] = useState('picker') // 'picker' | 'room' | 'status'
-  const [roomIndex, setRoomIndex] = useState(0)
+  const [stepIndex, setStepIndex] = useState(0)
   const [openTickets, setOpenTickets] = useState([])
   const [error, setError] = useState('')
   const [propertySearch, setPropertySearch] = useState('')
   const [metrics, setMetrics] = useState(null)
   const [tileFilter, setTileFilter] = useState(null) // null | 'toWalk' | 'walking' | 'waiting' | 'liaison'
 
-  // Per-room in-progress form state -- reset every time roomIndex changes.
-  const [verdicts, setVerdicts] = useState({}) // { [itemKey]: 'pass'|'fail' }
-  const [issuesByItem, setIssuesByItem] = useState({}) // { [itemKey]: [{note, files}] }
-  const [submittingRoom, setSubmittingRoom] = useState(false)
+  // One entry per room that hasn't been submitted yet (any room), not just
+  // the currently-viewed step -- so switching steps (or the stepper's free
+  // "jump to any step" nav) never loses an in-progress draft. A room's
+  // entry is removed once refreshChecksAndRoute sees it's actually
+  // complete in the DB.
+  const [roomForms, setRoomForms] = useState({}) // { [room]: { desc, verdicts, issuesByItem } }
+  const [submittingStep, setSubmittingStep] = useState(false)
 
   const [showCustomForm, setShowCustomForm] = useState(false)
   const [customDesc, setCustomDesc] = useState('')
@@ -74,35 +86,41 @@ export default function PropertyOnboardingWalk({ profile, onNavigate }) {
   async function refreshChecksAndRoute(w) {
     const rows = await fetchWalkChecks(w.id)
     setChecks(rows)
-    const nextIdx = effectiveRoomsFor(w).findIndex(r => !roomComplete(rows, r))
+    const notes = await fetchRoomNotes(w.id)
+    setRoomNotes(notes)
+
+    const allRooms = effectiveRoomsFor(w)
+    setRoomForms(prev => {
+      const next = {}
+      allRooms.forEach(r => {
+        if (roomComplete(rows, r)) return
+        next[r] = prev[r] || emptyRoomForm(notes[r] || '')
+      })
+      return next
+    })
+
+    const stepList = groupRoomsByType(allRooms)
+    const nextIdx = stepList.findIndex(s => s.rooms.some(r => !roomComplete(rows, r)))
     if (nextIdx === -1) {
       setScreen('status')
       setOpenTickets(await fetchPropertyOpenTickets(w.property_id))
     } else {
-      setRoomIndex(nextIdx)
-      resetRoomForm()
+      setStepIndex(nextIdx)
       setScreen('room')
     }
   }
 
-  function resetRoomForm() {
-    setVerdicts({})
-    setIssuesByItem({})
-  }
-
-  // For a property with more bedrooms/kitchens/bathrooms than the fixed
-  // default -- appends one to this walk's extra_rooms. Mid-room (screen
-  // 'room'), this only needs to update `walk` so the pills bar grows a new
-  // entry at the end; it must NOT call refreshChecksAndRoute, which would
-  // reset the in-progress verdicts/issues form for whichever room she's
-  // currently on. On the 'status' screen there's no in-progress form to
-  // lose, and she needs routing straight into the new room since nothing
-  // else would get her there.
+  // For a property with more bedrooms/kitchens/bathrooms (or living rooms/
+  // hallways) than the fixed default -- appends one to this walk's
+  // extra_rooms and seeds a blank draft for it immediately. Doesn't touch
+  // roomForms for any other room, so nothing in-progress is lost.
   async function addRoomOfType(baseType) {
     setError('')
     try {
-      const updatedWalk = await addExtraRoom(walk, nextRoomName(effectiveRoomsFor(walk), baseType))
+      const roomName = nextRoomName(effectiveRoomsFor(walk), baseType)
+      const updatedWalk = await addExtraRoom(walk, roomName)
       setWalk(updatedWalk)
+      setRoomForms(prev => ({ ...prev, [roomName]: emptyRoomForm('') }))
       if (screen === 'status') await refreshChecksAndRoute(updatedWalk)
     } catch (err) {
       setError(err.message)
@@ -110,78 +128,101 @@ export default function PropertyOnboardingWalk({ profile, onNavigate }) {
   }
 
   function backToPicker() {
-    setProperty(null); setWalk(null); setChecks([]); setScreen('picker')
+    setProperty(null); setWalk(null); setChecks([]); setRoomNotes({}); setScreen('picker')
+    setRoomForms({}); setStepIndex(0)
     setShowCustomForm(false); setCustomDesc(''); setCustomAmount(''); setCustomPaid(true); setCustomFiles([])
     loadProperties()
   }
 
-  const rooms = walk ? effectiveRoomsFor(walk) : []
-  const room = rooms[roomIndex]
-  const allVerdicted = CHECK_ITEMS.every(item => verdicts[item.key])
-  const hasAnyFail = CHECK_ITEMS.some(item => verdicts[item.key] === 'fail')
-  // A note is required on every Fail issue -- once this room is submitted
-  // it can't be reopened (no "previous room" nav, no jump-back), so unlike
-  // a normal draft form there's no later chance to fill one in. Better to
-  // block the submit than leave a real ticket permanently stuck with the
-  // placeholder "(no note added)" text.
-  const allNotesFilled = CHECK_ITEMS.every(item =>
-    verdicts[item.key] !== 'fail' || (issuesByItem[item.key] || []).every(issue => issue.note?.trim())
-  )
-  // Same "no going back" reasoning as allNotesFilled above -- a fail with
-  // no photo would leave a real ticket permanently without a before-photo.
-  const allPhotosFilled = CHECK_ITEMS.every(item =>
-    verdicts[item.key] !== 'fail' || (issuesByItem[item.key] || []).every(issue => issue.files?.length > 0)
-  )
+  const steps = walk ? groupRoomsByType(effectiveRoomsFor(walk)) : []
+  const step = steps[stepIndex]
 
-  function setVerdict(itemKey, v) {
-    setVerdicts(prev => ({ ...prev, [itemKey]: v }))
-    if (v === 'fail' && !issuesByItem[itemKey]) {
-      setIssuesByItem(prev => ({ ...prev, [itemKey]: [{ note: '', files: [] }] }))
-    }
+  function setVerdict(room, itemKey, v) {
+    setRoomForms(prev => {
+      const f = prev[room]
+      const issuesByItem = { ...f.issuesByItem }
+      if (v === 'fail' && !issuesByItem[itemKey]) issuesByItem[itemKey] = [{ note: '', files: [] }]
+      return { ...prev, [room]: { ...f, verdicts: { ...f.verdicts, [itemKey]: v }, issuesByItem } }
+    })
+  }
+  function updateIssue(room, itemKey, idx, patch) {
+    setRoomForms(prev => {
+      const f = prev[room]
+      return { ...prev, [room]: { ...f, issuesByItem: { ...f.issuesByItem, [itemKey]: f.issuesByItem[itemKey].map((iss, i) => i === idx ? { ...iss, ...patch } : iss) } } }
+    })
+  }
+  function addIssue(room, itemKey) {
+    setRoomForms(prev => {
+      const f = prev[room]
+      return { ...prev, [room]: { ...f, issuesByItem: { ...f.issuesByItem, [itemKey]: [...(f.issuesByItem[itemKey] || []), { note: '', files: [] }] } } }
+    })
+  }
+  function removeIssue(room, itemKey, idx) {
+    setRoomForms(prev => {
+      const f = prev[room]
+      return { ...prev, [room]: { ...f, issuesByItem: { ...f.issuesByItem, [itemKey]: f.issuesByItem[itemKey].filter((_, i) => i !== idx) } } }
+    })
+  }
+  function setRoomDesc(room, val) {
+    setRoomForms(prev => ({ ...prev, [room]: { ...prev[room], desc: val } }))
+  }
+  function blurRoomDesc(room) {
+    saveRoomDescription(walk.id, room, roomForms[room]?.desc?.trim() || '').catch(err => setError(err.message))
   }
 
-  function updateIssue(itemKey, idx, patch) {
-    setIssuesByItem(prev => ({
-      ...prev,
-      [itemKey]: prev[itemKey].map((iss, i) => i === idx ? { ...iss, ...patch } : iss),
-    }))
+  function roomValid(room) {
+    const f = roomForms[room]
+    if (!f) return true
+    return CHECK_ITEMS.every(item => {
+      const v = f.verdicts[item.key]
+      if (!v) return false
+      if (v !== 'fail') return true
+      const issues = f.issuesByItem[item.key] || []
+      return issues.length > 0 && issues.every(iss => iss.note?.trim() && iss.files?.length > 0)
+    })
   }
 
-  function addIssue(itemKey) {
-    setIssuesByItem(prev => ({ ...prev, [itemKey]: [...(prev[itemKey] || []), { note: '', files: [] }] }))
+  function stepDraftJobCount(rooms) {
+    let n = 0
+    rooms.forEach(r => {
+      const f = roomForms[r]
+      if (!f) return
+      CHECK_ITEMS.forEach(item => { if (f.verdicts[item.key] === 'fail') n += (f.issuesByItem[item.key] || []).length })
+    })
+    return n
   }
 
-  function removeIssue(itemKey, idx) {
-    setIssuesByItem(prev => ({ ...prev, [itemKey]: prev[itemKey].filter((_, i) => i !== idx) }))
-  }
-
-  async function submitRoom() {
-    if (!allVerdicted) return
-    if (!allNotesFilled) { setError('Add a note to every failed item before continuing.'); return }
-    if (!allPhotosFilled) { setError('Add a photo to every failed item before continuing.'); return }
-    setSubmittingRoom(true)
+  async function submitStep() {
+    if (!step) return
+    const openRooms = step.rooms.filter(r => roomForms[r])
+    if (!openRooms.length || !openRooms.every(roomValid)) return
+    setSubmittingStep(true)
     setError('')
     try {
-      for (const item of CHECK_ITEMS) {
-        const verdict = verdicts[item.key]
-        if (verdict === 'pass') {
-          await recordPass(walk.id, room, item.key, profile)
-        } else {
-          for (const issue of issuesByItem[item.key] || []) {
-            await raiseOnboardingTicket({
-              profile, walkId: walk.id, propertyId: property.id, room, itemKey: item.key,
-              source: 'walk', issueTag: item.label,
-              description: issue.note.trim(),
-              files: issue.files, highVulnerability: property.high_vulnerability,
-            })
+      for (const r of openRooms) {
+        const form = roomForms[r]
+        for (const item of CHECK_ITEMS) {
+          const verdict = form.verdicts[item.key]
+          if (verdict === 'pass') {
+            await recordPass(walk.id, r, item.key, profile)
+          } else {
+            for (const issue of form.issuesByItem[item.key] || []) {
+              await raiseOnboardingTicket({
+                profile, walkId: walk.id, propertyId: property.id, room: r, itemKey: item.key,
+                source: 'walk', issueTag: item.label,
+                description: issue.note.trim(),
+                files: issue.files, highVulnerability: property.high_vulnerability,
+              })
+            }
           }
         }
+        await saveRoomDescription(walk.id, r, form.desc.trim())
       }
       await refreshChecksAndRoute(walk)
     } catch (err) {
       setError(err.message)
     }
-    setSubmittingRoom(false)
+    setSubmittingStep(false)
   }
 
   async function submitCustomJob() {
@@ -283,83 +324,157 @@ export default function PropertyOnboardingWalk({ profile, onNavigate }) {
         </div>
       )}
 
-      {screen === 'room' && (
-        <div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '10px' }}>
-            {rooms.map((r, i) => {
-              const done = roomComplete(checks, r)
-              const current = i === roomIndex
-              return (
-                <span key={r} style={{
-                  padding: '5px 12px', borderRadius: '999px', fontSize: '11.5px', fontWeight: 700,
-                  background: current ? COLORS.blue700 : done ? COLORS.green100 : COLORS.slate100,
-                  color: current ? COLORS.white : done ? COLORS.green700 : COLORS.slate500,
-                }}>
-                  {done && !current ? '✓ ' : ''}{r}
-                </span>
-              )
-            })}
-          </div>
+      {screen === 'room' && step && (() => {
+        const openRooms = step.rooms.filter(r => roomForms[r])
+        const doneRooms = step.rooms.filter(r => !roomForms[r])
+        const draftJobs = stepDraftJobCount(step.rooms)
+        const stepValid = openRooms.length > 0 && openRooms.every(roomValid)
 
-          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px', marginBottom: '16px' }}>
-            <span style={{ fontSize: '11.5px', color: COLORS.slate400 }}>More of these here?</span>
-            {ADDABLE_ROOM_TYPES.map(type => (
-              <button key={type} onClick={() => addRoomOfType(type)} style={{ ...ghostBtn, height: '28px', padding: '0 10px', fontSize: '11.5px' }}>+ {type}</button>
-            ))}
-          </div>
-
-          <div style={{ ...cardStyle, marginBottom: '14px' }}>
-            <p style={{ margin: '0 0 2px 0', fontSize: '11px', fontWeight: 700, color: COLORS.slate500, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{property.address}</p>
-            <h2 style={{ margin: 0, fontSize: '17px', fontWeight: 700, color: COLORS.slate900 }}>{room}</h2>
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {CHECK_ITEMS.map(item => {
-              const verdict = verdicts[item.key]
-              return (
-                <div key={item.key} style={cardStyle}>
-                  <p style={{ margin: '0 0 10px 0', fontSize: '13.5px', fontWeight: 700, color: COLORS.slate900 }}>{item.label}</p>
-                  <div style={{ display: 'flex', gap: '8px', marginBottom: verdict === 'fail' ? '12px' : 0 }}>
-                    <button onClick={() => setVerdict(item.key, 'pass')} style={{ flex: 1, height: '40px', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', border: verdict === 'pass' ? `1px solid ${COLORS.green600}` : `1px solid ${COLORS.slate200}`, background: verdict === 'pass' ? COLORS.green600 : COLORS.white, color: verdict === 'pass' ? COLORS.white : COLORS.slate500 }}>Pass</button>
-                    <button onClick={() => setVerdict(item.key, 'fail')} style={{ flex: 1, height: '40px', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', border: verdict === 'fail' ? `1px solid ${COLORS.red600}` : `1px solid ${COLORS.slate200}`, background: verdict === 'fail' ? COLORS.red600 : COLORS.white, color: verdict === 'fail' ? COLORS.white : COLORS.slate500 }}>Fail</button>
+        return (
+          <div>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', marginBottom: '18px', gap: '2px', flexWrap: 'wrap' }}>
+              {steps.map((s, i) => {
+                const isCurrent = i === stepIndex
+                const isDone = s.rooms.every(r => roomComplete(checks, r))
+                return (
+                  <div key={s.type} style={{ display: 'flex', alignItems: 'flex-start' }}>
+                    <button
+                      onClick={() => { setStepIndex(i); setError('') }}
+                      style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '7px', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                    >
+                      <span style={{ fontSize: '10.5px', fontWeight: 700, whiteSpace: 'nowrap', color: isCurrent ? COLORS.blue700 : isDone ? COLORS.slate500 : COLORS.slate400 }}>{s.type}</span>
+                      <span style={{
+                        width: '30px', height: '30px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontWeight: 800, fontSize: '13px', flexShrink: 0,
+                        background: isCurrent ? COLORS.blue700 : isDone ? COLORS.green100 : COLORS.white,
+                        border: `2px solid ${isCurrent || isDone ? COLORS.blue700 : COLORS.slate200}`,
+                        color: isCurrent ? COLORS.white : isDone ? COLORS.green700 : COLORS.slate400,
+                      }}>
+                        {isDone ? '✓' : i + 1}
+                      </span>
+                    </button>
+                    {i < steps.length - 1 && <div style={{ width: '18px', height: '2px', background: isDone ? COLORS.blue700 : COLORS.slate200, marginTop: '14px' }} />}
                   </div>
+                )
+              })}
+            </div>
 
-                  {verdict === 'fail' && (issuesByItem[item.key] || []).map((issue, idx) => (
-                    <div key={idx} style={{ marginTop: idx > 0 ? '10px' : 0, paddingTop: idx > 0 ? '10px' : 0, borderTop: idx > 0 ? `1px dashed ${COLORS.slate200}` : 'none' }}>
-                      <div style={{ display: 'flex', gap: '6px', alignItems: 'flex-start' }}>
-                        <textarea
-                          value={issue.note}
-                          onChange={e => updateIssue(item.key, idx, { note: e.target.value })}
-                          placeholder="Describe what's wrong... (required)"
-                          style={{ flex: 1, minHeight: '60px', padding: '8px 10px', borderRadius: '8px', border: `1px solid ${COLORS.amber300}`, fontSize: '13px', boxSizing: 'border-box', fontFamily: 'inherit' }}
-                        />
-                        <VoiceInputButton onResult={text => updateIssue(item.key, idx, { note: issue.note ? `${issue.note} ${text}` : text })} />
-                      </div>
-                      <div style={{ marginTop: '8px' }}>
-                        <TicketMediaPicker files={issue.files} onChange={files => updateIssue(item.key, idx, { files })} inputId={`onboard-issue-${item.key}-${idx}`} />
-                      </div>
-                      {(issuesByItem[item.key] || []).length > 1 && (
-                        <button onClick={() => removeIssue(item.key, idx)} style={{ ...ghostBtn, height: '32px', marginTop: '6px', fontSize: '12px' }}>Remove this issue</button>
-                      )}
+            <div style={{ ...cardStyle, marginBottom: '14px' }}>
+              <p style={{ margin: '0 0 2px 0', fontSize: '11px', fontWeight: 700, color: COLORS.slate500, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{property.address}</p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '10px' }}>
+                <h2 style={{ margin: 0, fontSize: '17px', fontWeight: 700, color: COLORS.slate900 }}>{step.type}</h2>
+                <span style={{ fontSize: '11.5px', fontWeight: 700, color: COLORS.slate500, whiteSpace: 'nowrap' }}>
+                  {step.rooms.length} room{step.rooms.length === 1 ? '' : 's'}{draftJobs ? ` · ${draftJobs} job${draftJobs === 1 ? '' : 's'}` : ''}
+                </span>
+              </div>
+            </div>
+
+            {doneRooms.map(r => {
+              const roomChecks = checks.filter(c => c.room === r)
+              const fails = roomChecks.filter(c => c.verdict === 'fail')
+              return (
+                <div key={r} style={{ ...cardStyle, marginBottom: '10px', opacity: 0.85 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '13.5px', fontWeight: 700, color: COLORS.slate900 }}>{r}</span>
+                    <span style={{ fontSize: '11px', fontWeight: 700, color: COLORS.green700, background: COLORS.green100, padding: '3px 10px', borderRadius: '999px' }}>✓ Done</span>
+                  </div>
+                  {roomNotes[r] && <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: COLORS.slate500 }}>{roomNotes[r]}</p>}
+                  {fails.length > 0 && (
+                    <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      {fails.map(c => (
+                        <p key={c.id} style={{ margin: 0, fontSize: '11.5px', color: COLORS.slate500 }}>
+                          {c.ticket ? `Job #${c.ticket.ticket_number}` : 'Job'} — {CHECK_ITEMS.find(i => i.key === c.item_key)?.label}
+                        </p>
+                      ))}
                     </div>
-                  ))}
-                  {verdict === 'fail' && (
-                    <button onClick={() => addIssue(item.key)} style={{ ...ghostBtn, height: '34px', marginTop: '10px', fontSize: '12px' }}>+ Add another issue (separate job)</button>
                   )}
                 </div>
               )
             })}
-          </div>
 
-          <button
-            onClick={submitRoom}
-            disabled={!allVerdicted || !allNotesFilled || !allPhotosFilled || submittingRoom}
-            style={{ ...primaryBtn, width: '100%', marginTop: '16px', opacity: (!allVerdicted || !allNotesFilled || !allPhotosFilled || submittingRoom) ? 0.6 : 1, cursor: (!allVerdicted || !allNotesFilled || !allPhotosFilled || submittingRoom) ? 'not-allowed' : 'pointer' }}
-          >
-            {submittingRoom ? 'Submitting…' : !allNotesFilled ? 'Add a note to every fail first' : !allPhotosFilled ? 'Add a photo to every fail first' : hasAnyFail ? 'Submit job(s) and move to next room →' : 'Next room →'}
-          </button>
-        </div>
-      )}
+            {openRooms.map(r => {
+              const form = roomForms[r]
+              return (
+                <div key={r} style={{ ...cardStyle, marginBottom: '14px' }}>
+                  <p style={{ margin: '0 0 12px 0', fontSize: '15px', fontWeight: 700, color: COLORS.slate900 }}>{r}</p>
+
+                  <div style={{ marginBottom: '14px' }}>
+                    <p style={fieldLabelStyle}>Description</p>
+                    <div style={{ display: 'flex', gap: '6px', alignItems: 'flex-start' }}>
+                      <textarea
+                        value={form.desc}
+                        onChange={e => setRoomDesc(r, e.target.value)}
+                        onBlur={() => blurRoomDesc(r)}
+                        placeholder="e.g. double aspect, fitted wardrobe..."
+                        style={{ flex: 1, minHeight: '44px', padding: '8px 10px', borderRadius: '8px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', boxSizing: 'border-box', fontFamily: 'inherit' }}
+                      />
+                      <VoiceInputButton onResult={text => setRoomDesc(r, form.desc ? `${form.desc} ${text}` : text)} />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {CHECK_ITEMS.map(item => {
+                      const verdict = form.verdicts[item.key]
+                      const inputBase = `onboard-issue-${r.replace(/\s+/g, '-')}-${item.key}`
+                      return (
+                        <div key={item.key} style={{ border: `1px solid ${COLORS.slate200}`, borderRadius: '10px', padding: '12px', background: COLORS.slate50 }}>
+                          <p style={{ margin: '0 0 10px 0', fontSize: '13px', fontWeight: 700, color: COLORS.slate900 }}>{item.label}</p>
+                          <div style={{ display: 'flex', gap: '8px', marginBottom: verdict === 'fail' ? '12px' : 0 }}>
+                            <button onClick={() => setVerdict(r, item.key, 'pass')} style={{ flex: 1, height: '40px', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', border: verdict === 'pass' ? `1px solid ${COLORS.green600}` : `1px solid ${COLORS.slate200}`, background: verdict === 'pass' ? COLORS.green600 : COLORS.white, color: verdict === 'pass' ? COLORS.white : COLORS.slate500 }}>Pass</button>
+                            <button onClick={() => setVerdict(r, item.key, 'fail')} style={{ flex: 1, height: '40px', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', border: verdict === 'fail' ? `1px solid ${COLORS.red600}` : `1px solid ${COLORS.slate200}`, background: verdict === 'fail' ? COLORS.red600 : COLORS.white, color: verdict === 'fail' ? COLORS.white : COLORS.slate500 }}>Fail</button>
+                          </div>
+
+                          {verdict === 'fail' && (form.issuesByItem[item.key] || []).map((issue, idx) => (
+                            <div key={idx} style={{ marginTop: idx > 0 ? '10px' : 0, paddingTop: idx > 0 ? '10px' : 0, borderTop: idx > 0 ? `1px dashed ${COLORS.slate200}` : 'none' }}>
+                              <div style={{ display: 'flex', gap: '6px', alignItems: 'flex-start' }}>
+                                <textarea
+                                  value={issue.note}
+                                  onChange={e => updateIssue(r, item.key, idx, { note: e.target.value })}
+                                  placeholder="Describe what's wrong... (required)"
+                                  style={{ flex: 1, minHeight: '60px', padding: '8px 10px', borderRadius: '8px', border: `1px solid ${COLORS.amber300}`, fontSize: '13px', boxSizing: 'border-box', fontFamily: 'inherit' }}
+                                />
+                                <VoiceInputButton onResult={text => updateIssue(r, item.key, idx, { note: issue.note ? `${issue.note} ${text}` : text })} />
+                              </div>
+                              <div style={{ marginTop: '8px' }}>
+                                <TicketMediaPicker files={issue.files} onChange={files => updateIssue(r, item.key, idx, { files })} inputId={`${inputBase}-${idx}`} />
+                              </div>
+                              {(form.issuesByItem[item.key] || []).length > 1 && (
+                                <button onClick={() => removeIssue(r, item.key, idx)} style={{ ...ghostBtn, height: '32px', marginTop: '6px', fontSize: '12px' }}>Remove this issue</button>
+                              )}
+                            </div>
+                          ))}
+                          {verdict === 'fail' && (
+                            <button onClick={() => addIssue(r, item.key)} style={{ ...ghostBtn, height: '34px', marginTop: '10px', fontSize: '12px' }}>+ Add another issue (separate job)</button>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })}
+
+            <button onClick={() => addRoomOfType(step.type)} style={addBtn}>+ Add another {step.type.toLowerCase()}</button>
+
+            {openRooms.length > 0 ? (
+              <button
+                onClick={submitStep}
+                disabled={!stepValid || submittingStep}
+                style={{ ...primaryBtn, width: '100%', opacity: (!stepValid || submittingStep) ? 0.6 : 1, cursor: (!stepValid || submittingStep) ? 'not-allowed' : 'pointer' }}
+              >
+                {submittingStep ? 'Submitting…' : !stepValid ? 'Finish every room above first' : draftJobs ? `Submit job${draftJobs === 1 ? '' : 's'} and continue →` : 'Continue →'}
+              </button>
+            ) : (
+              <button
+                onClick={() => stepIndex < steps.length - 1 ? setStepIndex(stepIndex + 1) : refreshChecksAndRoute(walk)}
+                style={{ ...primaryBtn, width: '100%' }}
+              >
+                {stepIndex < steps.length - 1 ? 'Next step →' : 'Finish walk →'}
+              </button>
+            )}
+          </div>
+        )
+      })()}
 
       {screen === 'status' && (
         <div>
@@ -370,7 +485,7 @@ export default function PropertyOnboardingWalk({ profile, onNavigate }) {
 
           <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px', marginBottom: '14px' }}>
             <span style={{ fontSize: '11.5px', color: COLORS.slate400 }}>Missed a room? This property has more of these?</span>
-            {ADDABLE_ROOM_TYPES.map(type => (
+            {ROOM_TYPES.map(type => (
               <button key={type} onClick={() => addRoomOfType(type)} style={{ ...ghostBtn, height: '28px', padding: '0 10px', fontSize: '11.5px' }}>+ {type}</button>
             ))}
           </div>
