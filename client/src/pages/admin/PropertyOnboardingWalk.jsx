@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { COLORS } from '../../lib/colors'
 import { statusColour, statusLabel, KpiTiles } from './shared'
-import { ROOMS, CHECK_ITEMS, fetchOnboardingProperties, fetchOnboardingMetrics, startOrResumeWalk, fetchWalkChecks, fetchPropertyOpenTickets, recordPass } from '../../lib/onboarding'
+import { CHECK_ITEMS, ADDABLE_ROOM_TYPES, effectiveRoomsFor, nextRoomName, addExtraRoom, fetchOnboardingProperties, fetchOnboardingMetrics, startOrResumeWalk, fetchWalkChecks, fetchPropertyOpenTickets, recordPass } from '../../lib/onboarding'
 import { raiseOnboardingTicket } from './onboardingTicket'
 import TicketMediaPicker from '../../components/TicketMediaPicker'
 import VoiceInputButton from '../../components/VoiceInputButton'
@@ -74,7 +74,7 @@ export default function PropertyOnboardingWalk({ profile, onNavigate }) {
   async function refreshChecksAndRoute(w) {
     const rows = await fetchWalkChecks(w.id)
     setChecks(rows)
-    const nextIdx = ROOMS.findIndex(r => !roomComplete(rows, r))
+    const nextIdx = effectiveRoomsFor(w).findIndex(r => !roomComplete(rows, r))
     if (nextIdx === -1) {
       setScreen('status')
       setOpenTickets(await fetchPropertyOpenTickets(w.property_id))
@@ -90,13 +90,33 @@ export default function PropertyOnboardingWalk({ profile, onNavigate }) {
     setIssuesByItem({})
   }
 
+  // For a property with more bedrooms/kitchens/bathrooms than the fixed
+  // default -- appends one to this walk's extra_rooms. Mid-room (screen
+  // 'room'), this only needs to update `walk` so the pills bar grows a new
+  // entry at the end; it must NOT call refreshChecksAndRoute, which would
+  // reset the in-progress verdicts/issues form for whichever room she's
+  // currently on. On the 'status' screen there's no in-progress form to
+  // lose, and she needs routing straight into the new room since nothing
+  // else would get her there.
+  async function addRoomOfType(baseType) {
+    setError('')
+    try {
+      const updatedWalk = await addExtraRoom(walk, nextRoomName(effectiveRoomsFor(walk), baseType))
+      setWalk(updatedWalk)
+      if (screen === 'status') await refreshChecksAndRoute(updatedWalk)
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
   function backToPicker() {
     setProperty(null); setWalk(null); setChecks([]); setScreen('picker')
     setShowCustomForm(false); setCustomDesc(''); setCustomAmount(''); setCustomPaid(true); setCustomFiles([])
     loadProperties()
   }
 
-  const room = ROOMS[roomIndex]
+  const rooms = walk ? effectiveRoomsFor(walk) : []
+  const room = rooms[roomIndex]
   const allVerdicted = CHECK_ITEMS.every(item => verdicts[item.key])
   const hasAnyFail = CHECK_ITEMS.some(item => verdicts[item.key] === 'fail')
   // A note is required on every Fail issue -- once this room is submitted
@@ -265,8 +285,8 @@ export default function PropertyOnboardingWalk({ profile, onNavigate }) {
 
       {screen === 'room' && (
         <div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '16px' }}>
-            {ROOMS.map((r, i) => {
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '10px' }}>
+            {rooms.map((r, i) => {
               const done = roomComplete(checks, r)
               const current = i === roomIndex
               return (
@@ -279,6 +299,13 @@ export default function PropertyOnboardingWalk({ profile, onNavigate }) {
                 </span>
               )
             })}
+          </div>
+
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px', marginBottom: '16px' }}>
+            <span style={{ fontSize: '11.5px', color: COLORS.slate400 }}>More of these here?</span>
+            {ADDABLE_ROOM_TYPES.map(type => (
+              <button key={type} onClick={() => addRoomOfType(type)} style={{ ...ghostBtn, height: '28px', padding: '0 10px', fontSize: '11.5px' }}>+ {type}</button>
+            ))}
           </div>
 
           <div style={{ ...cardStyle, marginBottom: '14px' }}>
@@ -339,6 +366,13 @@ export default function PropertyOnboardingWalk({ profile, onNavigate }) {
           <div style={{ ...cardStyle, marginBottom: '14px' }}>
             <p style={{ margin: '0 0 2px 0', fontSize: '11px', fontWeight: 700, color: COLORS.slate500, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{property.address}</p>
             <h2 style={{ margin: 0, fontSize: '17px', fontWeight: 700, color: COLORS.slate900 }}>Property Status</h2>
+          </div>
+
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '6px', marginBottom: '14px' }}>
+            <span style={{ fontSize: '11.5px', color: COLORS.slate400 }}>Missed a room? This property has more of these?</span>
+            {ADDABLE_ROOM_TYPES.map(type => (
+              <button key={type} onClick={() => addRoomOfType(type)} style={{ ...ghostBtn, height: '28px', padding: '0 10px', fontSize: '11.5px' }}>+ {type}</button>
+            ))}
           </div>
 
           {openTickets.length > 0 ? (

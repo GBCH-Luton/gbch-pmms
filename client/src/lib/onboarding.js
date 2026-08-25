@@ -1,8 +1,21 @@
 import { supabase } from './supabase'
 
-// Six fixed rooms, five fixed checklist items, identical every walk -- no
-// per-property variation for v1 (confirmed explicitly, "for now is ok").
+// Six fixed rooms, five fixed checklist items, identical every walk by
+// default (confirmed explicitly at launch, "for now is ok"). A property
+// with more bedrooms/kitchens/bathrooms than this default gets the extra
+// ones appended to its own walk's `extra_rooms` column (see
+// scripts/add_onboarding_walk_extra_rooms.sql) rather than changing this
+// constant -- ROOMS stays the fixed baseline every walk starts with;
+// effectiveRoomsFor() below is what actually reflects one walk's real
+// room list.
 export const ROOMS = ['Kitchen', 'Living Room', 'Hallway', 'Bedroom 1', 'Bedroom 2', 'Bathroom']
+
+// The room types a Maintenance Assistant can add another instance of
+// mid-walk, for a property with more of these than the default -- matches
+// the "2 or 3 kitchens, 4 or 6 bedrooms" cases this was built for. Living
+// Room/Hallway stay singular; nothing stops a future need from adding to
+// this list.
+export const ADDABLE_ROOM_TYPES = ['Bedroom', 'Kitchen', 'Bathroom']
 
 export const CHECK_ITEMS = [
   { key: 'walls', label: 'Walls, ceiling & decoration' },
@@ -11,6 +24,39 @@ export const CHECK_ITEMS = [
   { key: 'fixtures', label: 'Fixtures & fittings' },
   { key: 'safety', label: 'Safety (smoke alarm / sockets / trip hazards)' },
 ]
+
+// This walk's full room list -- the fixed baseline plus whatever extra
+// rooms have been added to it so far. Every place that used to read ROOMS
+// directly for a specific walk (pills bar, room routing, the Landlord
+// Liaison review screen) reads this instead.
+export function effectiveRoomsFor(walk) {
+  return [...ROOMS, ...(walk?.extra_rooms || [])]
+}
+
+// "Bedroom" -> "Bedroom 3" (if 1 & 2 already exist), or the bare type name
+// if this is the first of its kind beyond the singular default (e.g.
+// "Kitchen" -> "Kitchen 2", since the existing "Kitchen" entry has no
+// trailing number of its own).
+export function nextRoomName(existingRooms, baseType) {
+  const count = existingRooms.filter(r => r === baseType || r.startsWith(`${baseType} `)).length
+  return count === 0 ? baseType : `${baseType} ${count + 1}`
+}
+
+// Appends one room to a walk's extra_rooms and persists it -- RLS already
+// covers this (onboarding_am_and_liaison is an ALL-command policy), no RPC
+// needed. Returns the updated walk row so callers can setWalk(...) it
+// straight back into state.
+export async function addExtraRoom(walk, roomName) {
+  const { data, error } = await supabase
+    .schema('pmms')
+    .from('property_onboarding_walks')
+    .update({ extra_rooms: [...(walk.extra_rooms || []), roomName] })
+    .eq('id', walk.id)
+    .select()
+    .single()
+  if (error) throw new Error(error.message)
+  return data
+}
 
 // Must match a sub-category label in the "Property Onboarding" category
 // seeded by scripts/add_property_onboarding_category.sql.
@@ -130,9 +176,9 @@ export async function maybeAutoSubmitOnboardingWalk(propertyId) {
   }
 }
 
-function isRoomsComplete(checks, walkId) {
-  return ROOMS.every(room => CHECK_ITEMS.every(item =>
-    checks.some(c => c.walk_id === walkId && c.room === room && c.item_key === item.key)
+function isRoomsComplete(checks, walk) {
+  return effectiveRoomsFor(walk).every(room => CHECK_ITEMS.every(item =>
+    checks.some(c => c.walk_id === walk.id && c.room === room && c.item_key === item.key)
   ))
 }
 
@@ -143,7 +189,7 @@ function isRoomsComplete(checks, walkId) {
 // drift apart from each other.
 export async function fetchOnboardingMetrics() {
   const { data: properties } = await supabase.schema('pmms').from('properties').select('id').eq('status', 'Procured')
-  const { data: walks } = await supabase.schema('pmms').from('property_onboarding_walks').select('id, property_id, status')
+  const { data: walks } = await supabase.schema('pmms').from('property_onboarding_walks').select('id, property_id, status, extra_rooms')
 
   const activeWalks = (walks || []).filter(w => w.status === 'in_progress' || w.status === 'sent_back')
   const walkIds = activeWalks.map(w => w.id)
@@ -155,8 +201,8 @@ export async function fetchOnboardingMetrics() {
 
   return {
     toWalkIds: new Set((properties || []).filter(p => !nonApprovedWalkPropertyIds.has(p.id)).map(p => p.id)),
-    walkingIds: new Set(activeWalks.filter(w => !isRoomsComplete(checks || [], w.id)).map(w => w.property_id)),
-    waitingIds: new Set(activeWalks.filter(w => isRoomsComplete(checks || [], w.id)).map(w => w.property_id)),
+    walkingIds: new Set(activeWalks.filter(w => !isRoomsComplete(checks || [], w)).map(w => w.property_id)),
+    waitingIds: new Set(activeWalks.filter(w => isRoomsComplete(checks || [], w)).map(w => w.property_id)),
     liaisonIds: new Set((walks || []).filter(w => w.status === 'pending_liaison_review').map(w => w.property_id)),
     liveCount: (walks || []).filter(w => w.status === 'approved').length,
   }

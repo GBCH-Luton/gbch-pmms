@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { COLORS } from '../../lib/colors'
 import { statusColour, statusLabel } from './shared'
-import { ROOMS, CHECK_ITEMS, fetchWalkChecks, fetchPropertyOpenTickets } from '../../lib/onboarding'
+import { CHECK_ITEMS, effectiveRoomsFor, fetchWalkChecks, fetchPropertyOpenTickets } from '../../lib/onboarding'
 import { raiseOnboardingTicket } from './onboardingTicket'
 import TicketMediaPicker from '../../components/TicketMediaPicker'
 import VoiceInputButton from '../../components/VoiceInputButton'
@@ -178,7 +178,7 @@ export default function PropertyOnboardingReview({ profile, onNavigate }) {
             <h2 style={{ margin: 0, fontSize: '17px', fontWeight: 700, color: COLORS.slate900 }}>Walked by {walk.started_by_name}</h2>
           </div>
 
-          {ROOMS.map(room => (
+          {effectiveRoomsFor(walk).map(room => (
             <div key={room} style={{ ...cardStyle, marginBottom: '10px' }}>
               <p style={{ margin: '0 0 10px 0', fontSize: '14px', fontWeight: 700, color: COLORS.slate900 }}>{room}</p>
               {CHECK_ITEMS.map(item => {
