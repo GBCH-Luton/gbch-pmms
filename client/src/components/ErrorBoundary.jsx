@@ -8,7 +8,7 @@ import { COLORS } from '../lib/colors'
 // old filename because a newer deploy replaced it, and this tab has been
 // open since before that. Confirmed live 2026-08-21 via pmms.error_logs.
 const CHUNK_LOAD_ERROR_PATTERN = /dynamically imported module|importing a module script failed|loading chunk/i
-const CHUNK_RELOAD_GUARD_KEY = 'pmms_chunk_error_reloaded'
+const CHUNK_RELOAD_GUARD_KEY = 'pmms_chunk_error_reload_state'
 // How long a guard trip blocks a repeat auto-reload for. Short enough that
 // a genuinely broken deploy (same error immediately after reloading) still
 // falls through to the manual card instead of looping forever; long enough
@@ -18,6 +18,17 @@ const CHUNK_RELOAD_GUARD_KEY = 'pmms_chunk_error_reloaded'
 // several pushes ever got auto-recovered; every deploy after that hit the
 // same already-tripped guard and fell straight to the manual card instead.
 const CHUNK_RELOAD_GUARD_MS = 60000
+// A short extra allowance for a second reload landing very soon after the
+// first -- found live 2026-08-25 (Kathryn Williamson): a deploy can still
+// be propagating across Vercel's edge network in the seconds right after
+// it lands, so a reload triggered by one stale chunk can itself land on an
+// edge node still serving the previous manifest and hit ANOTHER stale
+// chunk moments later. That second failure is the same staleness episode,
+// not a new one, so it gets one more automatic try. Capped at
+// CHUNK_RELOAD_MAX_STREAK total reloads so a genuinely broken deploy still
+// falls through to the manual card rather than bouncing forever.
+const CHUNK_RELOAD_BURST_MS = 10000
+const CHUNK_RELOAD_MAX_STREAK = 2
 
 export default class ErrorBoundary extends Component {
   state = { hasError: false }
@@ -43,9 +54,13 @@ export default class ErrorBoundary extends Component {
     // failure within CHUNK_RELOAD_GUARD_MS of the last one falls through to
     // the manual card, on the theory that reloading clearly didn't help.
     try {
-      const lastReload = Number(sessionStorage.getItem(CHUNK_RELOAD_GUARD_KEY) || 0)
-      if (CHUNK_LOAD_ERROR_PATTERN.test(error?.message || '') && Date.now() - lastReload > CHUNK_RELOAD_GUARD_MS) {
-        sessionStorage.setItem(CHUNK_RELOAD_GUARD_KEY, String(Date.now()))
+      const stored = JSON.parse(sessionStorage.getItem(CHUNK_RELOAD_GUARD_KEY) || 'null')
+      const elapsed = Date.now() - (stored?.at || 0)
+      const withinBurst = elapsed <= CHUNK_RELOAD_BURST_MS && (stored?.streak || 0) < CHUNK_RELOAD_MAX_STREAK
+      const isFreshEpisode = elapsed > CHUNK_RELOAD_GUARD_MS
+      if (CHUNK_LOAD_ERROR_PATTERN.test(error?.message || '') && (withinBurst || isFreshEpisode)) {
+        const streak = withinBurst ? (stored?.streak || 0) + 1 : 1
+        sessionStorage.setItem(CHUNK_RELOAD_GUARD_KEY, JSON.stringify({ at: Date.now(), streak }))
         window.location.reload()
       }
     } catch {
