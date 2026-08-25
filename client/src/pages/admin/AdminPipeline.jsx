@@ -738,6 +738,13 @@ export default function AdminPipeline({
     // off to a contractor.
     await supabase.schema('pmms').from('work_sessions').update({ ended_at: now }).eq('ticket_id', t.id).is('ended_at', null)
 
+    // Close the loop with whoever raised it -- not just the assigned-to
+    // notifications this app already sends. Skip self-notifying whoever's
+    // completing their own raised ticket here (rare, but possible).
+    if (t.raised_by && t.raised_by !== profile.id) {
+      await sendPushNotification([t.raised_by], 'Ticket completed', `Job #${t.ticket_number} — ${t.property?.address || 'your reported issue'} has been marked completed.`)
+    }
+
     await postSystemComment(t.id, profile, `Marked Completed by ${profile.name} on behalf of the assignee (no PMMS access -- e.g. an external contractor). Note: ${completeNote.trim()}`)
     await postAuditEvent(t.id, profile, 'Status Changed', `${statusLabel(previousStatus)} → Completed (marked by ${profile.name} on behalf of the assignee)`)
 

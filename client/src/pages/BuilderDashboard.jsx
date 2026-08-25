@@ -664,7 +664,7 @@ export default function BuilderDashboard({ profile }) {
       .schema('pmms')
       .from('tickets')
       .select(`
-        id, ticket_number, status, status_changed_at, category, issue_tag, description, room, priority_score, estimated_minutes, mileage_logged, mileage_logged_at, transit_start, created_at, completed_at, completion_note, completion_photo_url, hold_reason, hold_note, photo_url, property_id, checklist_responses, delay_reason, delay_reason_note, delay_reason_status
+        id, ticket_number, status, status_changed_at, category, issue_tag, description, room, priority_score, estimated_minutes, mileage_logged, mileage_logged_at, transit_start, created_at, completed_at, completion_note, completion_photo_url, hold_reason, hold_note, photo_url, property_id, checklist_responses, delay_reason, delay_reason_note, delay_reason_status, raised_by
       `)
       .eq('assigned_builder_id', profile.id)
       .not('status', 'in', '("Archived","Cancelled")')
@@ -1241,6 +1241,13 @@ export default function BuilderDashboard({ profile }) {
       setCompleteSubmitting(false)
       setCompleteError("Couldn't save -- check your connection and try again.")
       return
+    }
+
+    // Close the loop with whoever raised it -- not just the assigned-to
+    // notifications this app already sends. Skip self-notifying a builder
+    // who raised and completed their own ticket.
+    if (selectedTicket.raised_by && selectedTicket.raised_by !== profile.id) {
+      await sendPushNotification([selectedTicket.raised_by], 'Ticket completed', `Job #${selectedTicket.ticket_number} — ${selectedTicket.property?.address || 'your reported issue'} has been marked completed.`)
     }
 
     await supabase
