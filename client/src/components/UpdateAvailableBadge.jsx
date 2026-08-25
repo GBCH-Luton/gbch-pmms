@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { COLORS } from '../lib/colors'
 
+// no-op comment, bumps the build id so this deploy can be used to test
+// the toast/icon above actually appearing on an already-open tab
+
 // Every build gets a unique ID (see vite.config.js's write-build-id plugin)
 // baked into the bundle as __BUILD_ID__ and also dropped as a plain
 // build-id.txt file alongside it. This polls that file -- once on load, again
