@@ -73,15 +73,19 @@ const NAV_ITEMS = [
   // [[project_housekeeping_manager_temp_raise_access]].
   { key: 'raise-maintenance-ticket', label: 'Temp Log Tickets', icon: 'ticket', Component: AdminRaiseMaintenanceTicket, visibleTo: p => p.pmmsRole === 'Housekeeping Manager' },
   // Room-by-room new-property walk -> real tickets on any Fail -> Landlord
-  // Liaison review -> property flips Live. Restricted to exactly the two
-  // roles it's for -- neither divisions nor divisionOnly fit "one specific
-  // named PMMS Role, regardless of division", so this is the one nav item
+  // Liaison review -> property flips Live. Restricted to exactly the roles
+  // it's for -- neither divisions nor divisionOnly fit "one specific named
+  // PMMS Role, regardless of division", so this is one of the nav items
   // using visibleTo instead. Gated on the assigned Role's own name
   // (profile.pmmsRole, e.g. "Maintenance Assistant" -- an existing manager-
   // access custom role, not a job_title), not job_title -- an earlier
   // version of this gate checked job_title === 'Assistant Manager', which
   // turned out not to be a real job_title in this company's data at all.
-  { key: 'onboard-property', label: 'Onboard a Property', icon: 'sunrise', Component: AdminOnboardProperty, visibleTo: p => p.pmmsRole === 'Maintenance Assistant' || p.division === 'Landlord Liaison' },
+  // Admin added 2026-08-26 (same p.role === 'admin' check as Dimensions
+  // Assessment below) -- explicitly NOT Maintenance Manager, who is
+  // otherwise unscoped/sees-everything but has no reason to be walking
+  // properties himself.
+  { key: 'onboard-property', label: 'Onboard a Property', icon: 'sunrise', Component: AdminOnboardProperty, visibleTo: p => p.role === 'admin' || p.pmmsRole === 'Maintenance Assistant' || p.division === 'Landlord Liaison' },
   { key: 'sign-off', label: 'Sign-Off', icon: 'check', Component: AdminSignOff },
   ...(EVENTS_FEATURE_ENABLED ? [{ key: 'events', label: 'Events', icon: 'calendar', Component: AdminEvents }] : []),
   { key: 'properties', label: 'Properties', icon: 'building', Component: AdminProperties },
