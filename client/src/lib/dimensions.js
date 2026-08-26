@@ -2,11 +2,14 @@ import { supabase } from './supabase'
 
 export const ROOM_TYPES = ['bedroom', 'bathroom', 'kitchen', 'garden', 'communal']
 
-// Every property, no status filter -- unlike Onboarding's Procured-only
-// scope, a dimensions assessment applies to a property at any point in its
-// lifecycle, not just while it's being brought into the portfolio.
+// Every property, no lifecycle-status filter -- unlike Onboarding's
+// Procured-only scope, a dimensions assessment applies to a property at any
+// point in its lifecycle, not just while it's being brought into the
+// portfolio. 'Internal' is excluded separately -- it's not a lifecycle
+// stage, it marks non-tenant records like the GBCH office itself, which
+// have no bedrooms/bathrooms to assess.
 export async function fetchAllProperties() {
-  const { data } = await supabase.schema('pmms').from('properties').select('id, address, high_vulnerability, dimensions_assessed_at').order('address')
+  const { data } = await supabase.schema('pmms').from('properties').select('id, address, high_vulnerability, dimensions_assessed_at').neq('status', 'Internal').order('address')
   return data || []
 }
 
