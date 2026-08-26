@@ -168,7 +168,10 @@ async function aiRunTopProperties() {
   const counts = {}
   data.forEach(t => { if (t.property_id) counts[t.property_id] = (counts[t.property_id] || 0) + 1 })
   const withProps = await attachProperties(Object.keys(counts).map(id => ({ property_id: id })), 'address')
-  const rows = withProps.map(r => ({ label: r.property?.address || 'Unknown', value: counts[r.property_id] }))
+  // propertyTab: these rows are about open tickets specifically, so the
+  // click-through (see the answer modal) should land straight on the
+  // property's Maintenance tab, not the modal's own default (Compliance).
+  const rows = withProps.map(r => ({ label: r.property?.address || 'Unknown', value: counts[r.property_id], propertyId: r.property_id, propertyTab: 'Maintenance' }))
     .sort((a, b) => b.value - a.value).slice(0, 5)
 
   return {
@@ -1785,7 +1788,7 @@ export default function AdminReports({ profile, onNavigate }) {
                           <tr key={i}>
                             <td
                               style={{ ...tdStyle, ...(r.propertyId && onNavigate ? { cursor: 'pointer', color: COLORS.blue700, fontWeight: 700 } : {}) }}
-                              onClick={r.propertyId && onNavigate ? () => { setAiAnswer(null); onNavigate('properties', { propertyId: r.propertyId }) } : undefined}
+                              onClick={r.propertyId && onNavigate ? () => { setAiAnswer(null); onNavigate('properties', { propertyId: r.propertyId, tab: r.propertyTab }) } : undefined}
                             >
                               {r.label}
                             </td>
