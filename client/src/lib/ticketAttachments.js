@@ -27,6 +27,21 @@ import { getSignedUrl, uploadFileWithProgress } from './storage'
 // ticket lifecycle; both happened to already be named "stage" in their own
 // contexts.)
 export async function uploadTicketAttachments(files, ticketId, uploaderId, { onProgress, attachmentStage = 'reported' } = {}) {
+  const urls = await uploadAttachmentFiles(files, uploaderId, onProgress)
+  await recordTicketAttachments(urls, ticketId, attachmentStage)
+  return urls
+}
+
+// Storage-only half of uploadTicketAttachments, with no ticket_id
+// dependency -- lets a caller finish the upload (the part that can
+// actually fail: compression, network, storage) *before* the ticket row
+// exists, so a failed upload never leaves a "photo required" ticket
+// sitting in the queue with no photo. See AdminRaiseTicket.jsx's
+// handleSubmitTicket for the reordered caller this was split out for
+// (found live: tickets #547/#548, 2026-08-26 -- insert-then-upload order
+// meant an upload failure after a successful insert left an orphaned,
+// photo-less ticket while showing the raiser an error).
+export async function uploadAttachmentFiles(files, uploaderId, onProgress) {
   const urls = []
   let index = 0
   for (const file of files) {
@@ -42,15 +57,18 @@ export async function uploadTicketAttachments(files, ticketId, uploaderId, { onP
     const url = await getSignedUrl('ticket-photos', path)
     urls.push(url)
   }
-
-  if (urls.length > 0) {
-    const { error } = await supabase.schema('pmms').from('ticket_attachments').insert(
-      urls.map(url => ({ ticket_id: ticketId, url, stage: attachmentStage }))
-    )
-    if (error) throw new Error(`Saving attachments failed: ${error.message}`)
-  }
-
   return urls
+}
+
+// DB-only half of uploadTicketAttachments -- records already-uploaded URLs
+// against a ticket. Split out so a caller can upload first, create the
+// ticket second, and record attachment rows third (see uploadAttachmentFiles).
+export async function recordTicketAttachments(urls, ticketId, attachmentStage = 'reported') {
+  if (urls.length === 0) return
+  const { error } = await supabase.schema('pmms').from('ticket_attachments').insert(
+    urls.map(url => ({ ticket_id: ticketId, url, stage: attachmentStage }))
+  )
+  if (error) throw new Error(`Saving attachments failed: ${error.message}`)
 }
 
 // Turns the { index, total, stage, pct } shape uploadTicketAttachments

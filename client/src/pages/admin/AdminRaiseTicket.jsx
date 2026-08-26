@@ -7,7 +7,7 @@ import { fetchMaintenanceCategories, sortedCategoryEntries, UNLISTED_MARKER_PREF
 import { fetchDivisions } from '../../lib/divisions'
 import { compressImage } from '../../lib/imageCompression'
 import { getSignedUrl } from '../../lib/storage'
-import { uploadTicketAttachments, formatUploadProgress } from '../../lib/ticketAttachments'
+import { uploadAttachmentFiles, recordTicketAttachments, formatUploadProgress } from '../../lib/ticketAttachments'
 import PropertySearchSelect from '../../components/PropertySearchSelect'
 import VoiceInputButton from '../../components/VoiceInputButton'
 import TicketMediaPicker from '../../components/TicketMediaPicker'
@@ -272,6 +272,23 @@ export default function AdminRaiseTicket({ profile, onNavigate }) {
     setTicketDuplicateWarning(null)
     setTicketSubmitting(true)
 
+    // Upload before the ticket exists (not after, the way this used to
+    // work) -- see #547/#548, 2026-08-24: an insert-then-upload order let
+    // an upload failure land a "photo required" ticket in the queue with
+    // no photo at all, while showing the raiser an error that made it
+    // look like nothing had been submitted (prompting a retry -> #548,
+    // the near-duplicate of #547). Failing here now means no ticket gets
+    // created at all, matching what the guard above already promises.
+    let attachmentUrls
+    try {
+      attachmentUrls = await uploadAttachmentFiles(ticketMediaFiles, profile.id, setTicketUploadProgress)
+    } catch (uploadErr) {
+      setTicketSubmitting(false)
+      setTicketUploadProgress(null)
+      setTicketError(uploadErr.message)
+      return
+    }
+
     const { builderId: resolvedBuilderId, assignType: resolvedAssignType } = await resolveAssignment(ticketCategory)
 
     const { data, error } = await supabase
@@ -283,6 +300,7 @@ export default function AdminRaiseTicket({ profile, onNavigate }) {
         category: ticketCategory,
         issue_tag: finalIssueTag,
         description: finalIssueTag,
+        photo_url: attachmentUrls[0],
         priority_score: priorityScore,
         priority_override: priorityOverride || null,
         assigned_builder_id: resolvedBuilderId,
@@ -301,20 +319,19 @@ export default function AdminRaiseTicket({ profile, onNavigate }) {
 
     if (error) {
       setTicketSubmitting(false)
+      setTicketUploadProgress(null)
       setTicketError(error.message)
       return
     }
 
-    if (ticketMediaFiles.length > 0) {
-      try {
-        const [firstUrl] = await uploadTicketAttachments(ticketMediaFiles, data[0].id, profile.id, { onProgress: setTicketUploadProgress })
-        await supabase.schema('pmms').from('tickets').update({ photo_url: firstUrl }).eq('id', data[0].id)
-      } catch (uploadErr) {
-        setTicketSubmitting(false)
-        setTicketUploadProgress(null)
-        setTicketError(uploadErr.message)
-        return
-      }
+    try {
+      await recordTicketAttachments(attachmentUrls, data[0].id, 'reported')
+    } catch (attachErr) {
+      // The ticket already exists with photo_url set -- the single
+      // required photo is safe either way. This only affects the
+      // multi-photo gallery's extra entries, not worth failing the whole
+      // submission over at this point.
+      console.error('Failed to record ticket attachment rows', attachErr)
     }
 
     setTicketSubmitting(false)
