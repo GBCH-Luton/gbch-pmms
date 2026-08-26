@@ -700,7 +700,7 @@ export default function AdminProperties({ profile, onNavigate, initialProperties
               ) : effectiveActiveTab === 'Assets' ? (
                 <PropertyAssetsTab property={selectedProperty} profile={profile} />
               ) : effectiveActiveTab === 'Maintenance' ? (
-                <PropertyMaintenanceTab property={selectedProperty} />
+                <PropertyMaintenanceTab property={selectedProperty} onNavigate={onNavigate} />
               ) : effectiveActiveTab === 'Lease & Legal' ? (
                 <PropertyLeaseLegalTab property={selectedProperty} onFieldsSaved={handleCoreFieldsSaved} profile={profile} />
               ) : effectiveActiveTab === 'Documents' ? (

@@ -37,7 +37,25 @@ const tileStyle = (colour) => ({ flex: '1 1 160px', background: colour, borderRa
 const tileLabelStyle = { margin: '0 0 6px 0', fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.8)', textTransform: 'uppercase', letterSpacing: '0.06em' }
 const tileValueStyle = { margin: 0, fontSize: '26px', fontWeight: 800, color: COLORS.white }
 
-export default function PropertyMaintenanceTab({ property }) {
+// One key per sortable column -- ticket_number/priority_score/created_at/
+// completed_at sort numerically (dates as epoch ms), the rest as
+// lowercased strings. completed_at falls back to -Infinity for an
+// incomplete ticket so "no completion date yet" always sorts to one end
+// rather than throwing off a real date comparison.
+function sortValue(t, key) {
+  switch (key) {
+    case 'ticket_number': return t.ticket_number
+    case 'summary': return (t.issue_tag || t.description || '').toLowerCase()
+    case 'category': return (t.category || '').toLowerCase()
+    case 'priority_score': return t.priority_score || 0
+    case 'status': return statusLabel(t.status).toLowerCase()
+    case 'created_at': return new Date(t.created_at).getTime()
+    case 'completed_at': return t.completed_at ? new Date(t.completed_at).getTime() : -Infinity
+    default: return ''
+  }
+}
+
+export default function PropertyMaintenanceTab({ property, onNavigate }) {
   const [tickets, setTickets] = useState(null)
   const [loadError, setLoadError] = useState('')
   const [statusFilter, setStatusFilter] = useState('All')
@@ -45,6 +63,14 @@ export default function PropertyMaintenanceTab({ property }) {
   const [categoryOptions, setCategoryOptions] = useState([])
   const [p1Threshold, setP1Threshold] = useState(70)
   const [p2Threshold, setP2Threshold] = useState(40)
+  const [sortKey, setSortKey] = useState('created_at')
+  const [sortDir, setSortDir] = useState('desc')
+
+  function toggleSort(key) {
+    if (sortKey === key) { setSortDir(d => d === 'asc' ? 'desc' : 'asc'); return }
+    setSortKey(key)
+    setSortDir('asc')
+  }
 
   useEffect(() => {
     fetchTickets()
@@ -106,13 +132,19 @@ export default function PropertyMaintenanceTab({ property }) {
   })
   const topIssues = Object.entries(issueTagCounts).sort((a, b) => b[1] - a[1]).slice(0, 5)
 
-  // Filtered table rows
+  // Filtered + sorted table rows
   const filteredTickets = tickets.filter(t => {
     if (statusFilter === 'Open' && !isOpen(t)) return false
     if (statusFilter === 'Completed' && t.status !== 'Completed') return false
     if (statusFilter === 'Cancelled' && t.status !== 'Cancelled') return false
     if (categoryFilter !== 'All' && t.category !== categoryFilter) return false
     return true
+  })
+  const sortedTickets = [...filteredTickets].sort((a, b) => {
+    const va = sortValue(a, sortKey), vb = sortValue(b, sortKey)
+    if (va < vb) return sortDir === 'asc' ? -1 : 1
+    if (va > vb) return sortDir === 'asc' ? 1 : -1
+    return 0
   })
 
   // Performance metrics -- see file header for why two of these can't be
@@ -217,22 +249,36 @@ export default function PropertyMaintenanceTab({ property }) {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ borderBottom: `1px solid ${COLORS.slate200}` }}>
-                  <th style={thStyle}>Ticket</th>
-                  <th style={thStyle}>Summary</th>
-                  <th style={thStyle}>Category</th>
-                  <th style={thStyle}>Priority</th>
-                  <th style={thStyle}>Status</th>
-                  <th style={thStyle}>Raised</th>
-                  <th style={thStyle}>Completed</th>
+                  {[
+                    ['ticket_number', 'Ticket'], ['summary', 'Summary'], ['category', 'Category'],
+                    ['priority_score', 'Priority'], ['status', 'Status'], ['created_at', 'Raised'], ['completed_at', 'Completed'],
+                  ].map(([key, label]) => (
+                    <th
+                      key={key}
+                      onClick={() => toggleSort(key)}
+                      style={{ ...thStyle, cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}
+                      title={`Sort by ${label}`}
+                    >
+                      {label}{sortKey === key ? (sortDir === 'asc' ? ' ▲' : ' ▼') : ''}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
-                {filteredTickets.map(t => {
+                {sortedTickets.map(t => {
                   const tier = priorityTierLabel(t.priority_score, p1Threshold, p2Threshold)
                   const tierStyle = priorityBadgeStyle(tier)
                   return (
                     <tr key={t.id} style={{ borderBottom: `1px solid ${COLORS.slate100}` }}>
-                      <td style={tdStyle}>#{t.ticket_number}</td>
+                      <td
+                        style={{ ...tdStyle, ...(onNavigate ? { cursor: 'pointer', color: COLORS.blue700, fontWeight: 700 } : {}) }}
+                        onClick={onNavigate ? () => onNavigate('pipeline', {
+                          ticketNumber: t.ticket_number,
+                          returnTo: { label: property.address, page: 'properties', opts: { propertyId: property.id, tab: 'Maintenance' } },
+                        }) : undefined}
+                      >
+                        #{t.ticket_number}
+                      </td>
                       <td style={tdStyle}>{t.issue_tag || t.description || '—'}</td>
                       <td style={tdStyle}>{t.category || '—'}</td>
                       <td style={tdStyle}>
