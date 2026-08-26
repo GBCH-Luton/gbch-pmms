@@ -1,12 +1,15 @@
 import { useState, useEffect } from 'react'
+import { supabase } from '../../lib/supabase'
 import { COLORS } from '../../lib/colors'
-import { statusColour, statusLabel, KpiTiles } from './shared'
+import { statusColour, statusLabel, KpiTiles, GARDEN_STATE_OPTIONS } from './shared'
 import {
   CHECK_ITEMS, ROOM_TYPES, effectiveRoomsFor, nextRoomName, groupRoomsByType, addExtraRoom, removeExtraRoom,
   fetchRoomNotes, saveRoomDescription, fetchOnboardingProperties, fetchOnboardingMetrics,
-  startOrResumeWalk, fetchWalkChecks, fetchPropertyOpenTickets, recordPass,
+  startOrResumeWalk, fetchWalkChecks, fetchPropertyOpenTickets, recordPass, saveGardenStep,
 } from '../../lib/onboarding'
 import { raiseOnboardingTicket } from './onboardingTicket'
+import { compressImage } from '../../lib/imageCompression'
+import { getSignedUrl } from '../../lib/storage'
 import TicketMediaPicker from '../../components/TicketMediaPicker'
 import VoiceInputButton from '../../components/VoiceInputButton'
 
@@ -38,7 +41,7 @@ export default function PropertyOnboardingWalk({ profile, onNavigate }) {
   const [walk, setWalk] = useState(null)
   const [checks, setChecks] = useState([])
   const [roomNotes, setRoomNotes] = useState({}) // { [room]: description }, persisted
-  const [screen, setScreen] = useState('picker') // 'picker' | 'room' | 'status'
+  const [screen, setScreen] = useState('picker') // 'picker' | 'room' | 'garden' | 'status'
   const [stepIndex, setStepIndex] = useState(0)
   const [openTickets, setOpenTickets] = useState([])
   const [error, setError] = useState('')
@@ -53,6 +56,30 @@ export default function PropertyOnboardingWalk({ profile, onNavigate }) {
   // complete in the DB.
   const [roomForms, setRoomForms] = useState({}) // { [room]: { desc, verdicts, issuesByItem } }
   const [submittingStep, setSubmittingStep] = useState(false)
+
+  // Garden step -- final stage of the walk, mirroring the Ticket
+  // Submitter's Garden Check campaign fields exactly (GardenSurvey.jsx).
+  // Seeded from the property's existing garden columns once the screen is
+  // actually reached (see the effect below), not inside
+  // refreshChecksAndRoute -- that function's `property` closure is stale
+  // on the very first call from openProperty(), before setProperty(p) has
+  // committed.
+  const [gardenHasGarden, setGardenHasGarden] = useState(null)
+  const [gardenState, setGardenState] = useState('')
+  const [gardenFrontUrl, setGardenFrontUrl] = useState('')
+  const [gardenBackUrl, setGardenBackUrl] = useState('')
+  const [gardenFrontUploading, setGardenFrontUploading] = useState(false)
+  const [gardenBackUploading, setGardenBackUploading] = useState(false)
+  const [gardenSubmitting, setGardenSubmitting] = useState(false)
+
+  useEffect(() => {
+    if (screen === 'garden' && property) {
+      setGardenHasGarden(property.has_garden ?? null)
+      setGardenState(property.garden_state || '')
+      setGardenFrontUrl(property.garden_front_photo_url || '')
+      setGardenBackUrl(property.garden_back_photo_url || '')
+    }
+  }, [screen, property])
 
   const [showCustomForm, setShowCustomForm] = useState(false)
   const [customDesc, setCustomDesc] = useState('')
@@ -101,12 +128,14 @@ export default function PropertyOnboardingWalk({ profile, onNavigate }) {
 
     const stepList = groupRoomsByType(allRooms)
     const nextIdx = stepList.findIndex(s => s.rooms.some(r => !roomComplete(rows, r)))
-    if (nextIdx === -1) {
-      setScreen('status')
-      setOpenTickets(await fetchPropertyOpenTickets(w.property_id))
-    } else {
+    if (nextIdx !== -1) {
       setStepIndex(nextIdx)
       setScreen('room')
+    } else if (!w.garden_step_completed_at) {
+      setScreen('garden')
+    } else {
+      setScreen('status')
+      setOpenTickets(await fetchPropertyOpenTickets(w.property_id))
     }
   }
 
@@ -146,11 +175,99 @@ export default function PropertyOnboardingWalk({ profile, onNavigate }) {
     setProperty(null); setWalk(null); setChecks([]); setRoomNotes({}); setScreen('picker')
     setRoomForms({}); setStepIndex(0)
     setShowCustomForm(false); setCustomDesc(''); setCustomAmount(''); setCustomPaid(true); setCustomFiles([])
+    setGardenHasGarden(null); setGardenState(''); setGardenFrontUrl(''); setGardenBackUrl('')
     loadProperties()
+  }
+
+  async function handleGardenPhoto(e, side) {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    const setUploading = side === 'front' ? setGardenFrontUploading : setGardenBackUploading
+    const setUrl = side === 'front' ? setGardenFrontUrl : setGardenBackUrl
+    setUploading(true)
+    setError('')
+
+    let compressed
+    try {
+      compressed = await compressImage(file)
+    } catch (compressErr) {
+      setUploading(false)
+      setError(compressErr.message)
+      return
+    }
+    const path = `${property.id}/garden-${side}-${Date.now()}-${compressed.name}`
+    const { error: uploadError } = await supabase.storage.from('property-photos').upload(path, compressed)
+
+    if (uploadError) {
+      setUploading(false)
+      setError(`Upload failed: ${uploadError.message}`)
+      return
+    }
+
+    setUrl(await getSignedUrl('property-photos', path))
+    setUploading(false)
+  }
+
+  async function submitGardenStep() {
+    setGardenSubmitting(true)
+    setError('')
+    try {
+      const updatedWalk = await saveGardenStep(walk, property, profile, {
+        hasGarden: gardenHasGarden, state: gardenState, frontUrl: gardenFrontUrl, backUrl: gardenBackUrl,
+      })
+      setWalk(updatedWalk)
+      await refreshChecksAndRoute(updatedWalk)
+    } catch (err) {
+      setError(err.message)
+    }
+    setGardenSubmitting(false)
   }
 
   const steps = walk ? groupRoomsByType(effectiveRoomsFor(walk)) : []
   const step = steps[stepIndex]
+  const gardenValid = gardenHasGarden !== null && (!gardenHasGarden || gardenFrontUrl) && !gardenFrontUploading && !gardenBackUploading
+
+  // One combined stepper list -- room-type steps plus a final Garden entry
+  // -- shared between the 'room' and 'garden' screens so both render the
+  // exact same row and free "jump to any step" navigation works across
+  // the boundary between them, not just within the room steps.
+  const stepperItems = steps.map((s, i) => ({
+    key: `room-${i}`, label: s.type,
+    isCurrent: screen === 'room' && i === stepIndex,
+    isDone: s.rooms.every(r => roomComplete(checks, r)),
+    onClick: () => { setStepIndex(i); setScreen('room'); setError('') },
+  })).concat(walk ? [{
+    key: 'garden', label: 'Garden',
+    isCurrent: screen === 'garden',
+    isDone: !!walk.garden_step_completed_at,
+    onClick: () => { setScreen('garden'); setError('') },
+  }] : [])
+
+  const stepperRow = (
+    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', marginBottom: '18px', gap: '2px', flexWrap: 'wrap' }}>
+      {stepperItems.map((item, i) => (
+        <div key={item.key} style={{ display: 'flex', alignItems: 'flex-start' }}>
+          <button
+            onClick={item.onClick}
+            style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '7px', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+          >
+            <span style={{ fontSize: '10.5px', fontWeight: 700, whiteSpace: 'nowrap', color: item.isCurrent ? COLORS.blue700 : item.isDone ? COLORS.slate500 : COLORS.slate400 }}>{item.label}</span>
+            <span style={{
+              width: '30px', height: '30px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontWeight: 800, fontSize: '13px', flexShrink: 0,
+              background: item.isCurrent ? COLORS.blue700 : item.isDone ? COLORS.green100 : COLORS.white,
+              border: `2px solid ${item.isCurrent || item.isDone ? COLORS.blue700 : COLORS.slate200}`,
+              color: item.isCurrent ? COLORS.white : item.isDone ? COLORS.green700 : COLORS.slate400,
+            }}>
+              {item.isDone ? '✓' : i + 1}
+            </span>
+          </button>
+          {i < stepperItems.length - 1 && <div style={{ width: '18px', height: '2px', background: item.isDone ? COLORS.blue700 : COLORS.slate200, marginTop: '14px' }} />}
+        </div>
+      ))}
+    </div>
+  )
 
   function setVerdict(room, itemKey, v) {
     setRoomForms(prev => {
@@ -347,32 +464,7 @@ export default function PropertyOnboardingWalk({ profile, onNavigate }) {
 
         return (
           <div>
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', marginBottom: '18px', gap: '2px', flexWrap: 'wrap' }}>
-              {steps.map((s, i) => {
-                const isCurrent = i === stepIndex
-                const isDone = s.rooms.every(r => roomComplete(checks, r))
-                return (
-                  <div key={s.type} style={{ display: 'flex', alignItems: 'flex-start' }}>
-                    <button
-                      onClick={() => { setStepIndex(i); setError('') }}
-                      style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '7px', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
-                    >
-                      <span style={{ fontSize: '10.5px', fontWeight: 700, whiteSpace: 'nowrap', color: isCurrent ? COLORS.blue700 : isDone ? COLORS.slate500 : COLORS.slate400 }}>{s.type}</span>
-                      <span style={{
-                        width: '30px', height: '30px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontWeight: 800, fontSize: '13px', flexShrink: 0,
-                        background: isCurrent ? COLORS.blue700 : isDone ? COLORS.green100 : COLORS.white,
-                        border: `2px solid ${isCurrent || isDone ? COLORS.blue700 : COLORS.slate200}`,
-                        color: isCurrent ? COLORS.white : isDone ? COLORS.green700 : COLORS.slate400,
-                      }}>
-                        {isDone ? '✓' : i + 1}
-                      </span>
-                    </button>
-                    {i < steps.length - 1 && <div style={{ width: '18px', height: '2px', background: isDone ? COLORS.blue700 : COLORS.slate200, marginTop: '14px' }} />}
-                  </div>
-                )
-              })}
-            </div>
+            {stepperRow}
 
             <div style={{ ...cardStyle, marginBottom: '14px' }}>
               <p style={{ margin: '0 0 2px 0', fontSize: '11px', fontWeight: 700, color: COLORS.slate500, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{property.address}</p>
@@ -490,12 +582,91 @@ export default function PropertyOnboardingWalk({ profile, onNavigate }) {
                 onClick={() => stepIndex < steps.length - 1 ? setStepIndex(stepIndex + 1) : refreshChecksAndRoute(walk)}
                 style={{ ...primaryBtn, width: '100%' }}
               >
-                {stepIndex < steps.length - 1 ? 'Next step →' : 'Finish walk →'}
+                {stepIndex < steps.length - 1 ? 'Next step →' : walk.garden_step_completed_at ? 'Finish walk →' : 'Continue to Garden →'}
               </button>
             )}
           </div>
         )
       })()}
+
+      {screen === 'garden' && (
+        <div>
+          {stepperRow}
+
+          <div style={{ ...cardStyle, marginBottom: '14px' }}>
+            <p style={{ margin: '0 0 2px 0', fontSize: '11px', fontWeight: 700, color: COLORS.slate500, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{property.address}</p>
+            <h2 style={{ margin: 0, fontSize: '17px', fontWeight: 700, color: COLORS.slate900 }}>Garden</h2>
+          </div>
+
+          <div style={cardStyle}>
+            <p style={fieldLabelStyle}>Does {property.address} have a garden?</p>
+            <div style={{ display: 'flex', gap: '10px', marginBottom: gardenHasGarden === true ? '20px' : 0 }}>
+              <button
+                onClick={() => setGardenHasGarden(true)}
+                style={{ flex: 1, padding: '10px', borderRadius: '10px', border: gardenHasGarden === true ? `2px solid ${COLORS.green600}` : `1px solid ${COLORS.slate200}`, background: gardenHasGarden === true ? COLORS.green50 : COLORS.white, color: COLORS.slate900, fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}
+              >
+                Yes
+              </button>
+              <button
+                onClick={() => setGardenHasGarden(false)}
+                style={{ flex: 1, padding: '10px', borderRadius: '10px', border: gardenHasGarden === false ? `2px solid ${COLORS.slate500}` : `1px solid ${COLORS.slate200}`, background: gardenHasGarden === false ? COLORS.slate100 : COLORS.white, color: COLORS.slate900, fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}
+              >
+                No
+              </button>
+            </div>
+
+            {gardenHasGarden === true && (
+              <>
+                <p style={fieldLabelStyle}>State</p>
+                <select
+                  value={gardenState}
+                  onChange={e => setGardenState(e.target.value)}
+                  style={{ width: '100%', height: '44px', padding: '0 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', boxSizing: 'border-box', marginBottom: '16px' }}
+                >
+                  <option value="">Not set</option>
+                  {GARDEN_STATE_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+                </select>
+
+                <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+                  <div style={{ flex: '1 1 220px' }}>
+                    <p style={fieldLabelStyle}>Front Garden (required)</p>
+                    {gardenFrontUrl && <img src={gardenFrontUrl} alt="Front garden" style={{ width: '100%', maxHeight: '160px', objectFit: 'cover', borderRadius: '10px', display: 'block', marginBottom: '8px' }} />}
+                    <input type="file" accept="image/*" id="onboard-garden-front-photo" onChange={e => handleGardenPhoto(e, 'front')} style={{ display: 'none' }} />
+                    <button
+                      onClick={() => document.getElementById('onboard-garden-front-photo').click()}
+                      disabled={gardenFrontUploading}
+                      style={{ width: '100%', height: '44px', borderRadius: '10px', border: `2px dashed ${COLORS.slate300}`, background: COLORS.white, color: COLORS.slate500, fontSize: '13px', fontWeight: 600, cursor: gardenFrontUploading ? 'not-allowed' : 'pointer', boxSizing: 'border-box' }}
+                    >
+                      {gardenFrontUploading ? 'Uploading...' : gardenFrontUrl ? 'Retake front photo' : 'Take/upload front photo'}
+                    </button>
+                  </div>
+
+                  <div style={{ flex: '1 1 220px' }}>
+                    <p style={fieldLabelStyle}>Back Garden (optional)</p>
+                    {gardenBackUrl && <img src={gardenBackUrl} alt="Back garden" style={{ width: '100%', maxHeight: '160px', objectFit: 'cover', borderRadius: '10px', display: 'block', marginBottom: '8px' }} />}
+                    <input type="file" accept="image/*" id="onboard-garden-back-photo" onChange={e => handleGardenPhoto(e, 'back')} style={{ display: 'none' }} />
+                    <button
+                      onClick={() => document.getElementById('onboard-garden-back-photo').click()}
+                      disabled={gardenBackUploading}
+                      style={{ width: '100%', height: '44px', borderRadius: '10px', border: `2px dashed ${COLORS.slate300}`, background: COLORS.white, color: COLORS.slate500, fontSize: '13px', fontWeight: 600, cursor: gardenBackUploading ? 'not-allowed' : 'pointer', boxSizing: 'border-box' }}
+                    >
+                      {gardenBackUploading ? 'Uploading...' : gardenBackUrl ? 'Retake back photo' : 'Take/upload back photo'}
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
+          <button
+            onClick={submitGardenStep}
+            disabled={!gardenValid || gardenSubmitting}
+            style={{ ...primaryBtn, width: '100%', marginTop: '14px', opacity: (!gardenValid || gardenSubmitting) ? 0.6 : 1, cursor: (!gardenValid || gardenSubmitting) ? 'not-allowed' : 'pointer' }}
+          >
+            {gardenSubmitting ? 'Saving…' : 'Finish walk →'}
+          </button>
+        </div>
+      )}
 
       {screen === 'status' && (
         <div>

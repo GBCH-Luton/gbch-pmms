@@ -157,7 +157,7 @@ export async function fetchOnboardingProperties() {
   const { data: properties } = await supabase
     .schema('pmms')
     .from('properties')
-    .select('id, address, high_vulnerability, layout_type, status')
+    .select('id, address, high_vulnerability, layout_type, status, has_garden, garden_state, garden_front_photo_url, garden_back_photo_url')
     .eq('status', 'Procured')
     .order('address')
 
@@ -240,10 +240,15 @@ export async function maybeAutoSubmitOnboardingWalk(propertyId) {
   }
 }
 
-function isRoomsComplete(checks, walk) {
-  return effectiveRoomsFor(walk).every(room => CHECK_ITEMS.every(item =>
+// "Rooms done" alone used to be the whole story here; the Garden step is
+// now also a required, active task (not a passive wait), so a walk that's
+// rooms-complete but garden-pending still counts as "walking", not
+// "waiting on tickets" -- see fetchOnboardingMetrics below.
+function isWalkStepsComplete(checks, walk) {
+  const roomsDone = effectiveRoomsFor(walk).every(room => CHECK_ITEMS.every(item =>
     checks.some(c => c.walk_id === walk.id && c.room === room && c.item_key === item.key)
   ))
+  return roomsDone && !!walk.garden_step_completed_at
 }
 
 // Powers the Maintenance Assistant's KPI tiles (PropertyOnboardingWalk.jsx)
@@ -253,7 +258,7 @@ function isRoomsComplete(checks, walk) {
 // drift apart from each other.
 export async function fetchOnboardingMetrics() {
   const { data: properties } = await supabase.schema('pmms').from('properties').select('id').eq('status', 'Procured')
-  const { data: walks } = await supabase.schema('pmms').from('property_onboarding_walks').select('id, property_id, status, extra_rooms')
+  const { data: walks } = await supabase.schema('pmms').from('property_onboarding_walks').select('id, property_id, status, extra_rooms, garden_step_completed_at')
 
   const activeWalks = (walks || []).filter(w => w.status === 'in_progress' || w.status === 'sent_back')
   const walkIds = activeWalks.map(w => w.id)
@@ -265,11 +270,50 @@ export async function fetchOnboardingMetrics() {
 
   return {
     toWalkIds: new Set((properties || []).filter(p => !nonApprovedWalkPropertyIds.has(p.id)).map(p => p.id)),
-    walkingIds: new Set(activeWalks.filter(w => !isRoomsComplete(checks || [], w)).map(w => w.property_id)),
-    waitingIds: new Set(activeWalks.filter(w => isRoomsComplete(checks || [], w)).map(w => w.property_id)),
+    walkingIds: new Set(activeWalks.filter(w => !isWalkStepsComplete(checks || [], w)).map(w => w.property_id)),
+    waitingIds: new Set(activeWalks.filter(w => isWalkStepsComplete(checks || [], w)).map(w => w.property_id)),
     liaisonIds: new Set((walks || []).filter(w => w.status === 'pending_liaison_review').map(w => w.property_id)),
     liveCount: (walks || []).filter(w => w.status === 'approved').length,
   }
+}
+
+// Walk's final stage -- reuses the exact fields/behaviour of the Ticket
+// Submitter's Garden Check campaign (GardenSurvey.jsx) but writes
+// straight to pmms.properties instead of going through
+// pmms.submit_garden_survey, which hard-checks current_access_level() =
+// 'submitter' and would silently reject a Maintenance Assistant. She
+// already has full RLS access via admin_manager_full_access (same as
+// PropertyGardensTab.jsx's own saveFields), so a plain update is enough.
+// Falls back to the property's current values when hasGarden is false,
+// matching the RPC's own "preserve if no garden" semantics.
+export async function saveGardenStep(walk, property, profile, { hasGarden, state, frontUrl, backUrl }) {
+  const { error: propError } = await supabase
+    .schema('pmms')
+    .from('properties')
+    .update({
+      has_garden: hasGarden,
+      garden_state: hasGarden ? (state || null) : property.garden_state,
+      garden_last_attended_date: hasGarden ? new Date().toISOString().slice(0, 10) : property.garden_last_attended_date,
+      garden_last_attended_by: hasGarden ? profile.name : property.garden_last_attended_by,
+      garden_front_photo_url: hasGarden ? (frontUrl || property.garden_front_photo_url) : property.garden_front_photo_url,
+      garden_back_photo_url: hasGarden ? (backUrl || property.garden_back_photo_url) : property.garden_back_photo_url,
+    })
+    .eq('id', property.id)
+  if (propError) throw new Error(propError.message)
+
+  // garden_step_completed_at is walk-scoped -- separate from the
+  // campaign's own garden_survey_completed_at, which drives that
+  // feature's own picker/dedupe logic and shouldn't be conflated with
+  // "this walk covered it".
+  const { data, error: walkError } = await supabase
+    .schema('pmms')
+    .from('property_onboarding_walks')
+    .update({ garden_step_completed_at: new Date().toISOString() })
+    .eq('id', walk.id)
+    .select()
+    .single()
+  if (walkError) throw new Error(walkError.message)
+  return data
 }
 
 export async function recordPass(walkId, room, itemKey, profile) {
