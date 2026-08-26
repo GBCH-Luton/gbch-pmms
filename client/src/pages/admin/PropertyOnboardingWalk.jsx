@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { COLORS } from '../../lib/colors'
 import { statusColour, statusLabel, KpiTiles } from './shared'
 import {
-  CHECK_ITEMS, ROOM_TYPES, effectiveRoomsFor, nextRoomName, groupRoomsByType, addExtraRoom,
+  CHECK_ITEMS, ROOM_TYPES, effectiveRoomsFor, nextRoomName, groupRoomsByType, addExtraRoom, removeExtraRoom,
   fetchRoomNotes, saveRoomDescription, fetchOnboardingProperties, fetchOnboardingMetrics,
   startOrResumeWalk, fetchWalkChecks, fetchPropertyOpenTickets, recordPass,
 } from '../../lib/onboarding'
@@ -122,6 +122,21 @@ export default function PropertyOnboardingWalk({ profile, onNavigate }) {
       setWalk(updatedWalk)
       setRoomForms(prev => ({ ...prev, [roomName]: emptyRoomForm('') }))
       if (screen === 'status') await refreshChecksAndRoute(updatedWalk)
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
+  // Undoes an accidental add -- only ever offered on a room that's still
+  // an open, not-yet-submitted extra_rooms entry (see the isRemovable
+  // check at the call site), so there's never any persisted check/ticket
+  // data to orphan.
+  async function removeRoom(room) {
+    setError('')
+    try {
+      const updatedWalk = await removeExtraRoom(walk, room)
+      setWalk(updatedWalk)
+      setRoomForms(prev => { const next = { ...prev }; delete next[room]; return next })
     } catch (err) {
       setError(err.message)
     }
@@ -394,9 +409,15 @@ export default function PropertyOnboardingWalk({ profile, onNavigate }) {
 
             {openRooms.map(r => {
               const form = roomForms[r]
+              const isRemovable = walk.extra_rooms?.includes(r)
               return (
                 <div key={r} style={{ ...cardStyle, marginBottom: '14px' }}>
-                  <p style={{ margin: '0 0 12px 0', fontSize: '15px', fontWeight: 700, color: COLORS.slate900 }}>{r}</p>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                    <p style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: COLORS.slate900 }}>{r}</p>
+                    {isRemovable && (
+                      <button onClick={() => removeRoom(r)} style={{ background: 'none', border: 'none', color: COLORS.slate400, fontSize: '12px', fontWeight: 600, cursor: 'pointer', padding: 0 }}>✕ Remove</button>
+                    )}
+                  </div>
 
                   <div style={{ marginBottom: '14px' }}>
                     <p style={fieldLabelStyle}>Description</p>

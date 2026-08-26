@@ -79,6 +79,25 @@ export async function addExtraRoom(walk, roomName) {
   return data
 }
 
+// Undoes an accidental "+ Add another {type}" tap. Only ever removes from
+// extra_rooms -- the fixed ROOMS baseline every walk starts with is never
+// touched. Callers are responsible for only offering this while the room
+// has no persisted checks yet (see PropertyOnboardingWalk.jsx's roomForms
+// -- an open, not-yet-submitted room is the only thing safe to undo; once
+// submitted, checks/tickets already exist against that room name and
+// removing it would orphan them).
+export async function removeExtraRoom(walk, roomName) {
+  const { data, error } = await supabase
+    .schema('pmms')
+    .from('property_onboarding_walks')
+    .update({ extra_rooms: (walk.extra_rooms || []).filter(r => r !== roomName) })
+    .eq('id', walk.id)
+    .select()
+    .single()
+  if (error) throw new Error(error.message)
+  return data
+}
+
 // One free-text description per individual room (not per type -- "Bedroom
 // 3" gets its own, separate from "Bedroom 1"), see
 // scripts/add_onboarding_room_notes.sql. Same "keyed by room text" idiom
