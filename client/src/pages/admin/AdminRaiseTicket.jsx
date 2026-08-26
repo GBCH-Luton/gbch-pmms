@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { COLORS } from '../../lib/colors'
-import { fetchAssignableStaffForCategory, suggestAutoAssignBuilder, builderOptionLabel, createNotification, sendPushNotification, pushEmergencyAlert, priorityTierLabel, fetchPriorityThresholds, EVENTS_FEATURE_ENABLED, fetchAutoAssignOnRaiseEnabled, postSystemComment, floorContextOptions, floorContextLabel } from './shared'
+import { fetchAssignableStaffForCategory, suggestAutoAssignBuilder, builderOptionLabel, createNotification, sendPushNotification, pushEmergencyAlert, priorityTierLabel, fetchPriorityThresholds, EVENTS_FEATURE_ENABLED, fetchAutoAssignOnRaiseEnabled, postSystemComment, floorContextOptions, floorContextLabel, modalOverlayStyle, modalCardStyle, modalTitleStyle, modalSubtitleStyle, modalCancelBtnStyle } from './shared'
 import { fetchComplianceCheckTypes } from '../../lib/compliance'
 import { fetchMaintenanceCategories, sortedCategoryEntries, UNLISTED_MARKER_PREFIX, isUnlistedTag, unlistedTagFor, unlistedLabelFor, calculatePriorityScore } from '../../lib/maintenanceCategories'
 import { fetchDivisions } from '../../lib/divisions'
@@ -11,6 +11,7 @@ import { uploadTicketAttachments, formatUploadProgress } from '../../lib/ticketA
 import PropertySearchSelect from '../../components/PropertySearchSelect'
 import VoiceInputButton from '../../components/VoiceInputButton'
 import TicketMediaPicker from '../../components/TicketMediaPicker'
+import TicketAttachmentGallery from '../../components/TicketAttachmentGallery'
 
 const ROOM_OPTIONS = ['Kitchen', 'Bathroom', 'Communal Area', 'Bedroom', 'Hallways / Stairs', 'Garden', 'Other Area...']
 
@@ -81,6 +82,7 @@ export default function AdminRaiseTicket({ profile, onNavigate }) {
   const [ticketMediaFiles, setTicketMediaFiles] = useState([])
   const [hasBrokenTicketMedia, setHasBrokenTicketMedia] = useState(false)
   const [ticketDuplicateWarning, setTicketDuplicateWarning] = useState(null)
+  const [duplicatePreviewOpen, setDuplicatePreviewOpen] = useState(false)
   const [ticketSubmitting, setTicketSubmitting] = useState(false)
   const [ticketUploadProgress, setTicketUploadProgress] = useState(null)
   const [ticketError, setTicketError] = useState('')
@@ -203,6 +205,7 @@ export default function AdminRaiseTicket({ profile, onNavigate }) {
     setTicketIssueOther('')
     setTicketMediaFiles([])
     setTicketDuplicateWarning(null)
+    setDuplicatePreviewOpen(false)
     setTicketSubmitting(false)
     setTicketError('')
     setTicketSuccess('')
@@ -252,7 +255,7 @@ export default function AdminRaiseTicket({ profile, onNavigate }) {
       const { data: openTickets } = await supabase
         .schema('pmms')
         .from('tickets')
-        .select('id, ticket_number, category, issue_tag, room, status')
+        .select('id, ticket_number, category, issue_tag, room, status, description, photo_url, raised_by_name, created_at')
         .eq('property_id', ticketPropertyId)
         .not('status', 'in', '("Completed","Cancelled")')
 
@@ -834,10 +837,23 @@ export default function AdminRaiseTicket({ profile, onNavigate }) {
                     There's already an open ticket at this property for {ticketDuplicateWarning.matchKind}: Job #{ticketDuplicateWarning.ticket.ticket_number} — {ticketDuplicateWarning.ticket.issue_tag} ({ticketDuplicateWarning.ticket.status}). Is this a duplicate, or a genuinely separate fault?
                   </p>
                   <button
-                    onClick={() => setTicketDuplicateWarning(null)}
+                    onClick={() => setDuplicatePreviewOpen(true)}
+                    style={{ width: '100%', height: '40px', marginBottom: '10px', background: 'none', border: `1px solid ${COLORS.amber300}`, borderRadius: '10px', color: COLORS.amber800, fontSize: '13px', fontWeight: 600, cursor: 'pointer', boxSizing: 'border-box' }}
+                  >
+                    View Job #{ticketDuplicateWarning.ticket.ticket_number} first →
+                  </button>
+                  <button
+                    onClick={() => {
+                      const dupTicketNumber = ticketDuplicateWarning.ticket.ticket_number
+                      resetTicketForm()
+                      onNavigate?.('pipeline', {
+                        ticketNumber: dupTicketNumber,
+                        returnTo: { label: 'Log a Ticket', page: 'raise-ticket', opts: {} },
+                      })
+                    }}
                     style={{ width: '100%', height: '44px', marginBottom: '8px', background: COLORS.white, border: `1px solid ${COLORS.slate200}`, borderRadius: '10px', color: COLORS.slate900, fontSize: '13px', fontWeight: 600, cursor: 'pointer', boxSizing: 'border-box' }}
                   >
-                    Cancel — it's a duplicate
+                    Yes, it's a duplicate — take me to #{ticketDuplicateWarning.ticket.ticket_number}
                   </button>
                   <button
                     onClick={() => handleSubmitTicket(true)}
@@ -1135,6 +1151,45 @@ export default function AdminRaiseTicket({ profile, onNavigate }) {
             </div>
           )}
 
+        </div>
+      )}
+
+      {duplicatePreviewOpen && ticketDuplicateWarning && (
+        <div style={modalOverlayStyle}>
+          <div style={modalCardStyle}>
+            <p style={modalTitleStyle}>Job #{ticketDuplicateWarning.ticket.ticket_number}</p>
+            <p style={modalSubtitleStyle}>{ticketDuplicateWarning.ticket.status} · {ticketDuplicateWarning.ticket.category}{ticketDuplicateWarning.ticket.room ? ` · ${ticketDuplicateWarning.ticket.room}` : ''}</p>
+
+            <p style={{ margin: '16px 0 0 0', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Issue</p>
+            <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: COLORS.slate900 }}>{ticketDuplicateWarning.ticket.issue_tag}</p>
+
+            {ticketDuplicateWarning.ticket.description && (
+              <>
+                <p style={{ margin: '14px 0 0 0', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Description</p>
+                <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: COLORS.slate700, lineHeight: 1.5 }}>{ticketDuplicateWarning.ticket.description}</p>
+              </>
+            )}
+
+            <p style={{ margin: '14px 0 0 0', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Photo</p>
+            <div style={{ marginTop: '6px' }}>
+              <TicketAttachmentGallery
+                ticketId={ticketDuplicateWarning.ticket.id}
+                fallbackUrl={ticketDuplicateWarning.ticket.photo_url}
+                emptyLabel="No photo on this ticket"
+                mediaHeight="160px"
+              />
+            </div>
+
+            {(ticketDuplicateWarning.ticket.raised_by_name || ticketDuplicateWarning.ticket.created_at) && (
+              <p style={{ margin: '14px 0 0 0', fontSize: '12px', color: COLORS.slate500 }}>
+                Raised{ticketDuplicateWarning.ticket.raised_by_name ? ` by ${ticketDuplicateWarning.ticket.raised_by_name}` : ''}{ticketDuplicateWarning.ticket.created_at ? ` on ${new Date(ticketDuplicateWarning.ticket.created_at).toLocaleDateString('en-GB')}` : ''}
+              </p>
+            )}
+
+            <button onClick={() => setDuplicatePreviewOpen(false)} style={{ ...modalCancelBtnStyle, width: '100%', marginTop: '20px' }}>
+              Close
+            </button>
+          </div>
         </div>
       )}
 
