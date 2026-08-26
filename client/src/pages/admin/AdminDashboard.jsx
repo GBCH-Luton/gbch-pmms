@@ -265,7 +265,7 @@ function TeamWhereabouts({ profile, onNavigate, height = DASHBOARD_TOP_CARD_HEIG
     const [{ data: attendanceData }, { data: activityData }, { data: openSessions }, { data: auditData }, { data: onHoldShortTrips }] = await Promise.all([
       supabase.schema('pmms').from('daily_attendance').select('id, staff_id, clock_in_at, late_flag, clock_out_at, early_leave_reason, clock_in_lat, clock_in_lng').or(`work_date.eq.${todayKey},clock_out_at.is.null`),
       supabase.schema('pmms').from('activity_log').select('id, staff_id, activity_type, activity_category, note, end_note, started_at, started_lat, started_lng, arrived_at, ended_at, ticket_id, destination_ticket_id, destination_property_id, mileage_logged').or(`started_at.gte.${todayKey}T00:00:00,ended_at.is.null`),
-      supabase.schema('pmms').from('work_sessions').select('id, ticket_id, builder_id').is('ended_at', null),
+      supabase.schema('pmms').from('work_sessions').select('id, ticket_id, builder_id, started_at').is('ended_at', null),
       // Job start/resume/complete/pause/no-access events -- these were
       // previously invisible here entirely (this panel only ever read
       // daily_attendance + activity_log), even though every one of them
@@ -354,7 +354,24 @@ function TeamWhereabouts({ profile, onNavigate, height = DASHBOARD_TOP_CARD_HEIG
         status = b.availability
         tone = 'leave'
       } else if (shift && !shift.clock_out_at) {
-        if (openActivity) {
+        // Normally the app's own client-side guard makes openActivity and
+        // openSession mutually exclusive (BuilderDashboard.jsx disables
+        // every job-starting button while an activity is open), but that
+        // guard only holds if the builder's local state correctly picked
+        // up the still-open activity on load -- found live 2026-08-26
+        // (Paulo Da Silva): an "Office" leg opened at 07:39 never got
+        // closed, and by 09:33 he'd started a brand new job anyway,
+        // leaving both rows open and this screen stuck showing "Away"
+        // indefinitely despite him actively being on a job since. The
+        // discriminator is which one is actually newer: a job session
+        // that started AFTER the still-open activity means the builder
+        // has demonstrably moved on from it (this can only happen once
+        // the guard has already failed), so "On Job" wins. A session
+        // that started BEFORE the activity is the legitimate case --
+        // paused mid-job for a materials run etc. -- where "Away" is
+        // still correct.
+        const openSessionIsNewer = openSession && openActivity && new Date(openSession.started_at) > new Date(openActivity.started_at)
+        if (openActivity && !openSessionIsNewer) {
           // The pill itself only ever needs to say "Away" -- which
           // property/job/note they're away for is already in the
           // timeline log below, so cramming it into the pill too (as
