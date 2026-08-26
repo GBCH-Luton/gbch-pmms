@@ -72,6 +72,12 @@ const NAV_ITEMS = [
   // and the matching RLS policies) once that need ends, see
   // [[project_housekeeping_manager_temp_raise_access]].
   { key: 'raise-maintenance-ticket', label: 'Temp Log Tickets', icon: 'ticket', Component: AdminRaiseMaintenanceTicket, visibleTo: p => p.pmmsRole === 'Housekeeping Manager' },
+  { key: 'sign-off', label: 'Sign-Off', icon: 'check', Component: AdminSignOff },
+  ...(EVENTS_FEATURE_ENABLED ? [{ key: 'events', label: 'Events', icon: 'calendar', Component: AdminEvents }] : []),
+  // Properties / Onboard a Property / Dimensions Assessment grouped
+  // together in this order (2026-08-26) -- all three are property-record
+  // work, kept adjacent rather than scattered through the list.
+  { key: 'properties', label: 'Properties', icon: 'building', Component: AdminProperties },
   // Room-by-room new-property walk -> real tickets on any Fail -> Landlord
   // Liaison review -> property flips Live. Restricted to exactly the roles
   // it's for -- neither divisions nor divisionOnly fit "one specific named
@@ -86,9 +92,6 @@ const NAV_ITEMS = [
   // otherwise unscoped/sees-everything but has no reason to be walking
   // properties himself.
   { key: 'onboard-property', label: 'Onboard a Property', icon: 'sunrise', Component: AdminOnboardProperty, visibleTo: p => p.role === 'admin' || p.pmmsRole === 'Maintenance Assistant' || p.division === 'Landlord Liaison' },
-  { key: 'sign-off', label: 'Sign-Off', icon: 'check', Component: AdminSignOff },
-  ...(EVENTS_FEATURE_ENABLED ? [{ key: 'events', label: 'Events', icon: 'calendar', Component: AdminEvents }] : []),
-  { key: 'properties', label: 'Properties', icon: 'building', Component: AdminProperties },
   // Room-by-room floor measurements, feeding the Property Profile's own
   // "Dimensions" tab (see PropertyDimensionsTab.jsx) -- built for the
   // Landlord Liaison, replacing a Microsoft Forms form nobody else could
