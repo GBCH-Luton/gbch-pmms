@@ -173,6 +173,7 @@ export default function AdminPipeline({
   const [reassignReason, setReassignReason] = useState('')
   const [reassignEstimatedMinutes, setReassignEstimatedMinutes] = useState('')
   const [reassignError, setReassignError] = useState('')
+  const [reassignSubmitting, setReassignSubmitting] = useState(false)
   const [reassignSendPush, setReassignSendPush] = useState(false)
   const [reassignIgnoreSkills, setReassignIgnoreSkills] = useState(false)
 
@@ -195,6 +196,7 @@ export default function AdminPipeline({
   const [cancelReason, setCancelReason] = useState('')
   const [cancelDuplicateRef, setCancelDuplicateRef] = useState('')
   const [cancelError, setCancelError] = useState('')
+  const [cancelSubmitting, setCancelSubmitting] = useState(false)
 
   // For jobs done by an external contractor with no PMMS login -- the
   // normal Complete button only exists inside the assigned builder's own
@@ -213,6 +215,7 @@ export default function AdminPipeline({
   const [priorityTier, setPriorityTier] = useState('')
   const [priorityReason, setPriorityReason] = useState('')
   const [priorityError, setPriorityError] = useState('')
+  const [prioritySubmitting, setPrioritySubmitting] = useState(false)
 
   // Separate from the Reassign modal on purpose -- correcting an estimate
   // on a ticket that's already correctly assigned (most commonly one the
@@ -484,12 +487,16 @@ export default function AdminPipeline({
   }
 
   function openReassignModal(ticket) { setReassignModalTicket(ticket) }
-  function closeReassignModal() { setReassignModalTicket(null); setReassignSendPush(false) }
+  function closeReassignModal() { setReassignModalTicket(null); setReassignSendPush(false); setReassignSubmitting(false) }
 
   async function submitReassign() {
+    if (reassignSubmitting) return
     if (!reassignBuilderId) { setReassignError('Please select a builder.'); return }
     if (!reassignReason.trim()) { setReassignError('Please enter a reason.'); return }
     if (reassignEstimatedMinutes === '') { setReassignError('Please enter an estimated time for this job.'); return }
+
+    setReassignSubmitting(true)
+    setReassignError('')
 
     const t = reassignModalTicket
     const promoteToAssigned = t.status === 'Pending'
@@ -510,7 +517,7 @@ export default function AdminPipeline({
       })
       .eq('id', t.id)
 
-    if (error) { setReassignError(error.message); return }
+    if (error) { setReassignSubmitting(false); setReassignError(error.message); return }
 
     const statusNote = promoteToAssigned ? ` Status: ${statusLabel(t.status)} → Assigned.` : ''
     await postSystemComment(t.id, profile, `Reassigned from ${fromName} to ${toName}. Reason: ${reassignReason.trim()}`)
@@ -520,6 +527,7 @@ export default function AdminPipeline({
       await sendPushNotification([reassignBuilderId], 'New job assigned', `Job #${t.ticket_number} at ${t.property?.address || 'a property'}.`)
     }
     await fetchTickets()
+    setReassignSubmitting(false)
     closeReassignModal()
   }
 
@@ -638,10 +646,14 @@ export default function AdminPipeline({
   }
 
   function openCancelModal(ticket) { setCancelModalTicket(ticket) }
-  function closeCancelModal() { setCancelModalTicket(null) }
+  function closeCancelModal() { setCancelModalTicket(null); setCancelSubmitting(false) }
 
   async function submitCancel() {
+    if (cancelSubmitting) return
     if (!cancelReason.trim()) { setCancelError('Please enter a reason.'); return }
+
+    setCancelSubmitting(true)
+    setCancelError('')
 
     const t = cancelModalTicket
     const dupRef = cancelDuplicateRef.trim()
@@ -659,12 +671,13 @@ export default function AdminPipeline({
       })
       .eq('id', t.id)
 
-    if (error) { setCancelError(error.message); return }
+    if (error) { setCancelSubmitting(false); setCancelError(error.message); return }
 
     const dupNote = (cancelType === 'Duplicate' && dupRef) ? ` (duplicate of #${dupRef})` : ''
     await postSystemComment(t.id, profile, `Ticket cancelled — ${cancelType}${dupNote}. Reason: ${cancelReason.trim()}`)
     await postAuditEvent(t.id, profile, 'Status Changed', `${statusLabel(t.status)} → Cancelled (${cancelType}${dupNote}). Reason: ${cancelReason.trim()}`)
     await fetchTickets()
+    setCancelSubmitting(false)
     closeCancelModal()
   }
 
@@ -827,11 +840,15 @@ export default function AdminPipeline({
   }
 
   function openPriorityModal(ticket) { setPriorityModalTicket(ticket) }
-  function closePriorityOverrideModal() { setPriorityModalTicket(null) }
+  function closePriorityOverrideModal() { setPriorityModalTicket(null); setPrioritySubmitting(false) }
 
   async function submitPriorityOverride() {
+    if (prioritySubmitting) return
     if (!priorityTier) { setPriorityError('Please select a priority tier.'); return }
     if (!priorityReason.trim()) { setPriorityError('Please enter a reason.'); return }
+
+    setPrioritySubmitting(true)
+    setPriorityError('')
 
     const t = priorityModalTicket
 
@@ -841,7 +858,7 @@ export default function AdminPipeline({
       .update({ priority_override: priorityTier })
       .eq('id', t.id)
 
-    if (error) { setPriorityError(error.message); return }
+    if (error) { setPrioritySubmitting(false); setPriorityError(error.message); return }
 
     if (priorityTier === 'P1 Critical') {
       const { data: categoriesRow } = await supabase
@@ -856,6 +873,7 @@ export default function AdminPipeline({
     await postSystemComment(t.id, profile, `Priority manually set to ${priorityTier}. Reason: ${priorityReason.trim()}`)
     await postAuditEvent(t.id, profile, 'Priority Override', `Priority manually set to ${priorityTier}. Reason: ${priorityReason.trim()}`)
     await fetchTickets()
+    setPrioritySubmitting(false)
     closePriorityOverrideModal()
   }
 
@@ -1814,8 +1832,14 @@ export default function AdminPipeline({
             {reassignError && <p style={modalErrorStyle}>{reassignError}</p>}
 
             <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
-              <button onClick={closeReassignModal} style={modalCancelBtnStyle}>Cancel</button>
-              <button onClick={submitReassign} style={modalConfirmBtnStyle}>Reassign</button>
+              <button onClick={closeReassignModal} style={modalCancelBtnStyle} disabled={reassignSubmitting}>Cancel</button>
+              <button
+                onClick={submitReassign}
+                disabled={reassignSubmitting}
+                style={{ ...modalConfirmBtnStyle, opacity: reassignSubmitting ? 0.6 : 1, cursor: reassignSubmitting ? 'not-allowed' : 'pointer' }}
+              >
+                {reassignSubmitting ? 'Reassigning...' : 'Reassign'}
+              </button>
             </div>
           </div>
         </div>
@@ -1981,8 +2005,14 @@ export default function AdminPipeline({
             {cancelError && <p style={modalErrorStyle}>{cancelError}</p>}
 
             <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
-              <button onClick={closeCancelModal} style={modalCancelBtnStyle}>Keep Ticket</button>
-              <button onClick={submitCancel} style={{ ...modalConfirmBtnStyle, background: COLORS.red600 }}>Confirm Cancellation</button>
+              <button onClick={closeCancelModal} style={modalCancelBtnStyle} disabled={cancelSubmitting}>Keep Ticket</button>
+              <button
+                onClick={submitCancel}
+                disabled={cancelSubmitting}
+                style={{ ...modalConfirmBtnStyle, background: COLORS.red600, opacity: cancelSubmitting ? 0.6 : 1, cursor: cancelSubmitting ? 'not-allowed' : 'pointer' }}
+              >
+                {cancelSubmitting ? 'Cancelling...' : 'Confirm Cancellation'}
+              </button>
             </div>
           </div>
         </div>
@@ -2183,8 +2213,14 @@ export default function AdminPipeline({
             {priorityError && <p style={modalErrorStyle}>{priorityError}</p>}
 
             <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
-              <button onClick={closePriorityOverrideModal} style={modalCancelBtnStyle}>Cancel</button>
-              <button onClick={submitPriorityOverride} style={modalConfirmBtnStyle}>Set Priority</button>
+              <button onClick={closePriorityOverrideModal} style={modalCancelBtnStyle} disabled={prioritySubmitting}>Cancel</button>
+              <button
+                onClick={submitPriorityOverride}
+                disabled={prioritySubmitting}
+                style={{ ...modalConfirmBtnStyle, opacity: prioritySubmitting ? 0.6 : 1, cursor: prioritySubmitting ? 'not-allowed' : 'pointer' }}
+              >
+                {prioritySubmitting ? 'Saving...' : 'Set Priority'}
+              </button>
             </div>
           </div>
         </div>
