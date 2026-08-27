@@ -32,6 +32,23 @@ const IDLE_CONTEXT_LABEL = {
   visit_other: 'Arrived',
 }
 
+// One-word pill text for an open activity_log leg -- distinguishes "away
+// doing something in transit" from "away on lunch", per the user's own
+// read: materials runs, heading to another job, and travel to/from the
+// office are all genuinely "Travelling"; only lunch is a stationary break
+// worth its own word. A category not listed here falls back to plain
+// "Away" in the code below. `visit` isn't listed -- it has its own
+// travelling-then-on-site phase split handled inline, since arrived_at
+// (not the category alone) decides which word applies.
+const AWAY_PILL_LABEL = {
+  lunch: 'On Lunch',
+  materials: 'Travelling',
+  office: 'Travelling',
+  job: 'Travelling',
+  visit_office: 'Travelling',
+  visit_other: 'Travelling',
+}
+
 // Collapsed/expanded state is deliberately session-only, not persisted --
 // every page load/refresh always comes back to the same layout (Ticket
 // Pipeline open, everything else collapsed), regardless of what an admin
@@ -372,15 +389,22 @@ function TeamWhereabouts({ profile, onNavigate, height = DASHBOARD_TOP_CARD_HEIG
         // still correct.
         const openSessionIsNewer = openSession && openActivity && new Date(openSession.started_at) > new Date(openActivity.started_at)
         if (openActivity && !openSessionIsNewer) {
-          // The pill itself only ever needs to say "Away" -- which
-          // property/job/note they're away for is already in the
-          // timeline log below, so cramming it into the pill too (as
-          // this used to) just made it wrap/overflow. Tone still varies
-          // by category (see toneDot/chipStyle below), so the colour
-          // still hints at what kind of "away" it is even though the
-          // text doesn't.
-          status = 'Away'
-          tone = openActivity.activity_category ? `away-${openActivity.activity_category}` : 'away'
+          // The pill stays a single word -- full property/job/note detail
+          // is already in the timeline log below, so cramming it into the
+          // pill too (as this used to) just made it wrap/overflow. But
+          // "Away" alone collapsed a genuinely useful distinction: most of
+          // these categories are someone in transit ("Travelling"), while
+          // lunch is a stationary break -- worth its own word rather than
+          // reading the same as everything else. `visit` (Kathryn's Log a
+          // Visit) has its own travelling-then-on-site split, since
+          // arrived_at -- not the category alone -- decides which applies.
+          const category = openActivity.activity_category
+          if (category === 'visit') {
+            status = openActivity.arrived_at ? 'Visiting' : 'Travelling'
+          } else {
+            status = (category && AWAY_PILL_LABEL[category]) || 'Away'
+          }
+          tone = category ? `away-${category}` : 'away'
         } else if (shortTripTicket) {
           status = 'Away'
           tone = 'away'
