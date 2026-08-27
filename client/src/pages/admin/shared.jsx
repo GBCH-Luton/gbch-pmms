@@ -990,7 +990,7 @@ export async function fetchMovementTrail(staffId, dateKey) {
     const { data: ticketRows } = await supabase.schema('pmms').from('tickets')
       .select('id, ticket_number, description, property_id')
       .in('id', [...ticketIds])
-    const withProps = await attachProperties(ticketRows || [], 'address')
+    const withProps = await attachProperties(ticketRows || [], 'address, latitude, longitude')
     withProps.forEach(t => { ticketsById[t.id] = t })
   }
 
@@ -998,7 +998,7 @@ export async function fetchMovementTrail(staffId, dateKey) {
   ;(activity || []).forEach(a => { if (a.destination_property_id) propertyIds.add(a.destination_property_id) })
   let propertiesById = {}
   if (propertyIds.size > 0) {
-    const { data: propRows } = await supabase.schema('pmms').from('properties').select('id, address').in('id', [...propertyIds])
+    const { data: propRows } = await supabase.schema('pmms').from('properties').select('id, address, latitude, longitude').in('id', [...propertyIds])
     ;(propRows || []).forEach(p => { propertiesById[p.id] = p })
   }
 
@@ -1029,17 +1029,30 @@ export async function fetchMovementTrail(staffId, dateKey) {
   })
 
   ;(activity || []).forEach(a => {
-    const lat = a.ended_lat ?? a.started_lat
-    const lng = a.ended_lng ?? a.started_lng
+    let lat = a.ended_lat ?? a.started_lat
+    let lng = a.ended_lng ?? a.started_lng
+    const destTicket = a.destination_ticket_id ? ticketsById[a.destination_ticket_id] : null
+    const destProperty = a.destination_property_id ? propertiesById[a.destination_property_id] : null
+    if (lat == null || lng == null) {
+      // Kathryn's Log a Visit flow doesn't capture a GPS fix on either end
+      // of the trip at all (found live: both started_lat/lng and
+      // ended_lat/lng null on every 'visit' row) -- but the destination is
+      // always a known property with its own coordinates, so fall back to
+      // those rather than dropping the stop entirely. Same fallback order
+      // AdminDashboard.jsx's live "Where's the Team" map already uses for
+      // this exact category (property first, GPS second) -- this just
+      // needed the property's own lat/lng actually fetched to use it.
+      const fallbackProperty = destProperty || destTicket?.property
+      lat = fallbackProperty?.latitude ?? null
+      lng = fallbackProperty?.longitude ?? null
+    }
     if (lat == null || lng == null) return
     const meta = activityCategoryMeta(a.activity_type, a.activity_category)
     let subtitle = a.note || ''
-    if (a.activity_category === 'job' && a.destination_ticket_id) {
-      const t = ticketsById[a.destination_ticket_id]
-      if (t) subtitle = `Job #${t.ticket_number}${t.property?.address ? ` — ${t.property.address}` : ''}`
-    } else if (a.destination_property_id) {
-      const p = propertiesById[a.destination_property_id]
-      if (p) subtitle = p.address
+    if (a.activity_category === 'job' && destTicket) {
+      subtitle = `Job #${destTicket.ticket_number}${destTicket.property?.address ? ` — ${destTicket.property.address}` : ''}`
+    } else if (destProperty) {
+      subtitle = destProperty.address
     }
     stops.push({
       id: `activity-${a.id}`,
