@@ -8,6 +8,7 @@ import { supabase } from '../../lib/supabase'
 import { COLORS } from '../../lib/colors'
 import { attachProperties } from '../../lib/properties'
 import SimpleBarChart from '../../components/SimpleBarChart'
+import StaffMovementTrail from '../../components/StaffMovementTrail'
 import {
   Avatar, KpiTiles, roleBadgeStyle, STAFF_AVAILABILITY_STYLES,
   formatUKDateTime, formatUKDate, formatDurationDays, formatDuration,
@@ -344,6 +345,8 @@ export default function BuilderProfilePage({ staffId, onBack }) {
       <button onClick={onBack} style={{ background: COLORS.slate100, border: 'none', borderRadius: '8px', padding: '8px 14px', fontSize: '13px', fontWeight: 700, color: COLORS.slate500, cursor: 'pointer', marginBottom: '16px' }}>
         ← Back to Staff
       </button>
+
+      <StaffMovementTrail staffId={staffId} />
 
       <div style={cardStyle}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>

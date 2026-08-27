@@ -953,6 +953,113 @@ export async function fetchActivitySummary(staffId, fromDateKey, toDateKey) {
   return { entries, totalsByCategory, totalMs, daysWithActivity: dateSet.size, count: entries.length }
 }
 
+// Chronological, located stops for one staff member on one UK calendar day
+// -- clock-in, every job visited (work_sessions), every activity_log leg
+// (materials/office/lunch/heading to another job), clock-out. Powers
+// BuilderProfilePage.jsx's Movement Trail map. Reuses the exact lat/lng
+// columns [[project_staff_locations_map]]'s last-known-pin map already
+// established (work_sessions/activity_log/daily_attendance), just replayed
+// across a whole day instead of read live -- no new location capture
+// needed. A stop with no coordinates recorded (GPS unavailable at the
+// time, or a pre-GPS-capture historical row) is silently dropped rather
+// than plotted at a wrong/default point.
+export async function fetchMovementTrail(staffId, dateKey) {
+  const fromIso = new Date(ukDateTimeInputValueToMs(`${dateKey}T00:00`)).toISOString()
+  const toExclusiveIso = new Date(ukDateTimeInputValueToMs(`${shiftDateKey(dateKey, 1)}T00:00`)).toISOString()
+
+  const [{ data: attendanceRow }, { data: sessions }, { data: activity }] = await Promise.all([
+    supabase.schema('pmms').from('daily_attendance')
+      .select('clock_in_at, clock_in_lat, clock_in_lng, clock_out_at, clock_out_lat, clock_out_lng')
+      .eq('staff_id', staffId).eq('work_date', dateKey).maybeSingle(),
+    supabase.schema('pmms').from('work_sessions')
+      .select('id, ticket_id, started_at, ended_at, clock_in_lat, clock_in_lng')
+      .eq('builder_id', staffId)
+      .gte('started_at', fromIso).lt('started_at', toExclusiveIso),
+    supabase.schema('pmms').from('activity_log')
+      .select('id, activity_type, activity_category, note, started_at, started_lat, started_lng, ended_at, ended_lat, ended_lng, arrived_at, destination_ticket_id, destination_property_id')
+      .eq('staff_id', staffId)
+      .gte('started_at', fromIso).lt('started_at', toExclusiveIso),
+  ])
+
+  const ticketIds = new Set()
+  ;(sessions || []).forEach(s => { if (s.ticket_id) ticketIds.add(s.ticket_id) })
+  ;(activity || []).forEach(a => { if (a.destination_ticket_id) ticketIds.add(a.destination_ticket_id) })
+
+  let ticketsById = {}
+  if (ticketIds.size > 0) {
+    const { data: ticketRows } = await supabase.schema('pmms').from('tickets')
+      .select('id, ticket_number, description, property_id')
+      .in('id', [...ticketIds])
+    const withProps = await attachProperties(ticketRows || [], 'address')
+    withProps.forEach(t => { ticketsById[t.id] = t })
+  }
+
+  const propertyIds = new Set()
+  ;(activity || []).forEach(a => { if (a.destination_property_id) propertyIds.add(a.destination_property_id) })
+  let propertiesById = {}
+  if (propertyIds.size > 0) {
+    const { data: propRows } = await supabase.schema('pmms').from('properties').select('id, address').in('id', [...propertyIds])
+    ;(propRows || []).forEach(p => { propertiesById[p.id] = p })
+  }
+
+  const stops = []
+
+  // No subtitle claiming "GBCH Office" here -- clock-in/out is GPS-tagged
+  // from wherever the button was actually tapped, not guaranteed to be the
+  // office (found live: Paulo Da Silva clocked out from his second job's
+  // site on 2026-08-26, not back at base). The pin's map position already
+  // shows exactly where they were; asserting a place name risks being
+  // wrong rather than just being less specific.
+  if (attendanceRow?.clock_in_at && attendanceRow.clock_in_lat != null && attendanceRow.clock_in_lng != null) {
+    stops.push({ id: 'clockin', at: attendanceRow.clock_in_at, lat: attendanceRow.clock_in_lat, lng: attendanceRow.clock_in_lng, title: 'Clocked in', subtitle: '', kind: 'clockin' })
+  }
+
+  ;(sessions || []).forEach(s => {
+    if (s.clock_in_lat == null || s.clock_in_lng == null) return
+    const t = s.ticket_id ? ticketsById[s.ticket_id] : null
+    stops.push({
+      id: `job-${s.id}`,
+      at: s.started_at,
+      endAt: s.ended_at,
+      lat: s.clock_in_lat, lng: s.clock_in_lng,
+      title: t ? `Job #${t.ticket_number}${t.description ? ` — ${t.description}` : ''}` : 'Job',
+      subtitle: t?.property?.address || '',
+      kind: 'job',
+    })
+  })
+
+  ;(activity || []).forEach(a => {
+    const lat = a.ended_lat ?? a.started_lat
+    const lng = a.ended_lng ?? a.started_lng
+    if (lat == null || lng == null) return
+    const meta = activityCategoryMeta(a.activity_type, a.activity_category)
+    let subtitle = a.note || ''
+    if (a.activity_category === 'job' && a.destination_ticket_id) {
+      const t = ticketsById[a.destination_ticket_id]
+      if (t) subtitle = `Job #${t.ticket_number}${t.property?.address ? ` — ${t.property.address}` : ''}`
+    } else if (a.destination_property_id) {
+      const p = propertiesById[a.destination_property_id]
+      if (p) subtitle = p.address
+    }
+    stops.push({
+      id: `activity-${a.id}`,
+      at: a.arrived_at || a.started_at,
+      endAt: a.ended_at,
+      lat, lng,
+      title: meta.label,
+      subtitle,
+      kind: 'activity',
+    })
+  })
+
+  if (attendanceRow?.clock_out_at && attendanceRow.clock_out_lat != null && attendanceRow.clock_out_lng != null) {
+    stops.push({ id: 'clockout', at: attendanceRow.clock_out_at, lat: attendanceRow.clock_out_lat, lng: attendanceRow.clock_out_lng, title: 'Clocked out', subtitle: '', kind: 'clockout' })
+  }
+
+  stops.sort((x, y) => new Date(x.at) - new Date(y.at))
+  return stops
+}
+
 export const filterSelectStyle = { padding: '8px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', fontWeight: 600, color: COLORS.slate900, background: COLORS.slate50, cursor: 'pointer' }
 export const thStyle = { padding: '10px 14px', textAlign: 'left', fontSize: '10px', fontWeight: 800, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }
 export const tdStyle = { padding: '12px 14px', verticalAlign: 'top', fontSize: '13px' }
