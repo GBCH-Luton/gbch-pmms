@@ -486,7 +486,14 @@
 
   // ================= State =================
   const state = {
-    todayShift: null,          // { clockInAt: Date, lateFlag }
+    todayShift: null,          // { clockInAt: Date, lateFlag, location }
+    // Mockup only, not wired to any real save yet -- see gatePageHtml().
+    // Must pick one before Clock In is even reachable; Job/Property need a
+    // second pick, Office/Home/Other clock in straight away.
+    gateStep: 'choose',        // choose | pick-job | pick-property | confirm
+    gateLocationType: null,    // 'office' | 'home' | 'job' | 'property' | 'other'
+    gateLocationDetail: null,  // job id (type job) or address string (type property)
+    gateOtherNote: '',
     page: 'dashboard',         // dashboard | leaving-choices | leaving-job | leaving-job-confirm | leaving-materials | leaving-office | leaving-lunch | leaving-resume
     openActivity: null,        // { kind: 'Travel'|'Break', label, note, destinationTicketId, category }
     awaySince: null,
@@ -587,10 +594,32 @@
   }
   function toggleMenu() { state.menuOpen = !state.menuOpen; render(); }
 
+  function gateLocationLabel() {
+    const t = state.gateLocationType;
+    if (t === 'office') return 'the Office';
+    if (t === 'home') return 'Home';
+    if (t === 'job') { const j = job(state.gateLocationDetail); return j ? `Job #${j.number} — ${j.address}` : 'a Job'; }
+    if (t === 'property') return state.gateLocationDetail || 'a Property';
+    if (t === 'other') return state.gateOtherNote.trim() || 'Other';
+    return 'an unknown location';
+  }
+  function pickGateLocationType(type) {
+    state.gateLocationType = type;
+    state.gateLocationDetail = null;
+    state.gateStep = (type === 'job') ? 'pick-job' : (type === 'property') ? 'pick-property' : 'confirm';
+    render();
+  }
+  function pickGateJob(id) { state.gateLocationDetail = id; state.gateStep = 'confirm'; render(); }
+  function pickGateProperty(address) { state.gateLocationDetail = address; state.gateStep = 'confirm'; render(); }
+  function backToGateChoose() { state.gateStep = 'choose'; state.gateLocationType = null; state.gateLocationDetail = null; state.gateOtherNote = ''; render(); }
+
   function handleClockInForDay() {
+    if (!state.gateLocationType) return;
+    if (state.gateLocationType === 'other' && !state.gateOtherNote.trim()) return;
     const now = new Date();
-    state.todayShift = { clockInAt: now, lateFlag: nowHHMM() > DAILY_CLOCK_IN_DEADLINE };
-    logEvent(state.todayShift.lateFlag ? 'clocked in for the day (late)' : 'clocked in for the day');
+    const location = gateLocationLabel();
+    state.todayShift = { clockInAt: now, lateFlag: nowHHMM() > DAILY_CLOCK_IN_DEADLINE, location };
+    logEvent(`${state.todayShift.lateFlag ? 'clocked in for the day (late)' : 'clocked in for the day'} — from ${location}`);
     startIdleClock();
     render();
   }
@@ -854,6 +883,10 @@
     logEvent(state.earlyLeaveReason ? `clocked out for the day — left early: ${state.earlyLeaveReason}` : 'clocked out for the day');
     clearInterval(clockTimer);
     state.todayShift = null;
+    state.gateStep = 'choose';
+    state.gateLocationType = null;
+    state.gateLocationDetail = null;
+    state.gateOtherNote = '';
     state.earlyLeavePromptOpen = false;
     state.clockOutConfirmOpen = false;
     state.clockOutForDayError = '';
@@ -865,7 +898,8 @@
     jobs = freshJobsState();
     clearInterval(clockTimer);
     Object.assign(state, {
-      todayShift: null, page: 'dashboard', openActivity: null, awaySince: null, receiptRows: [], selectedTicketId: null, miles: null,
+      todayShift: null, gateStep: 'choose', gateLocationType: null, gateLocationDetail: null, gateOtherNote: '',
+      page: 'dashboard', openActivity: null, awaySince: null, receiptRows: [], selectedTicketId: null, miles: null,
       jobSearchQuery: '', materialsQuery: '', idleSince: null, idleSeconds: 0, inProgressSeconds: 0, breakSeconds: 0,
       stopSheetOpen: false, materialsAskOpen: false, stopReasonPicked: null, stopNote: '',
       showCompleteConfirm: false, completeNote: '', completePhotoAttached: false, checklistChecked: {}, materialsUsedRows: [],
@@ -930,15 +964,83 @@
   }
 
   // ================= Pages =================
+  const GATE_LOCATION_OPTIONS = [
+    { type: 'office', label: '🏢 The Office' },
+    { type: 'home', label: '🏠 Home' },
+    { type: 'job', label: '🔧 A Job' },
+    { type: 'property', label: '🏘️ A Property' },
+    { type: 'other', label: '📍 Other' },
+  ];
+
   function gatePageHtml() {
     const hour = new Date().getHours();
+    const greeting = `
+      <p class="brand-mark">GBCH PMMS</p>
+      <h1>Good ${hour < 12 ? 'morning' : 'afternoon'}, Dan</h1>`;
+
+    if (state.gateStep === 'pick-job') {
+      const assigned = jobs.filter(j => j.status === 'Assigned');
+      return `
+        <div class="gate-wrap">
+          <div class="gate-card" style="text-align:left">
+            ${greeting}
+            <button class="back-header-btn" style="margin-bottom:10px" onclick="backToGateChoose()">← Back</button>
+            <p class="sheet-title">Which job?</p>
+            ${assigned.length === 0 ? `<p class="search-empty">No assigned jobs to pick from.</p>`
+              : `<div class="job-pick-list">${assigned.map(j => `
+                  <button class="search-result" onclick="pickGateJob(${j.id})">
+                    <div class="result-top-row"><span class="num">#${j.number} · ${j.category}</span></div>
+                    <p class="result-addr">${j.address}</p>
+                  </button>`).join('')}</div>`}
+          </div>
+        </div>`;
+    }
+
+    if (state.gateStep === 'pick-property') {
+      const addresses = [...new Set(jobs.map(j => j.address))];
+      return `
+        <div class="gate-wrap">
+          <div class="gate-card" style="text-align:left">
+            ${greeting}
+            <button class="back-header-btn" style="margin-bottom:10px" onclick="backToGateChoose()">← Back</button>
+            <p class="sheet-title">Which property?</p>
+            <div class="job-pick-list">${addresses.map(a => `
+              <button class="search-result" onclick="pickGateProperty('${a.replace(/'/g, "\\'")}')">
+                <p class="result-addr" style="margin:0">${a}</p>
+              </button>`).join('')}</div>
+          </div>
+        </div>`;
+    }
+
+    if (state.gateStep === 'confirm') {
+      const isOther = state.gateLocationType === 'other';
+      return `
+        <div class="gate-wrap">
+          <div class="gate-card">
+            ${greeting}
+            <button class="back-header-btn" style="margin-bottom:10px" onclick="backToGateChoose()">← Back</button>
+            <div class="inline-box" style="text-align:left;margin-bottom:14px">
+              <p style="margin:0;font-size:12px;font-weight:700;color:var(--app-slate500);text-transform:uppercase;letter-spacing:0.06em">Clocking in from</p>
+              <p style="margin:4px 0 0;font-size:15px;font-weight:800;color:var(--app-slate900)">${gateLocationLabel()}</p>
+            </div>
+            ${isOther ? `
+              <input class="search-input" autofocus placeholder="Describe where you are..." value="${state.gateOtherNote}"
+                oninput="state.gateOtherNote=this.value; render()" style="margin-bottom:14px" />
+            ` : ''}
+            <button class="btn-primary" ${isOther && !state.gateOtherNote.trim() ? 'disabled' : ''} onclick="handleClockInForDay()">✓ Clock In for the Day</button>
+          </div>
+        </div>`;
+    }
+
+    // 'choose' -- the default first screen, must pick one before anything else shows.
     return `
       <div class="gate-wrap">
         <div class="gate-card">
-          <p class="brand-mark">GBCH PMMS</p>
-          <h1>Good ${hour < 12 ? 'morning' : 'afternoon'}, Dan</h1>
-          <p>Clock in to start your working day and see your jobs.</p>
-          <button class="btn-primary" onclick="handleClockInForDay()">✓ Clock In for the Day</button>
+          ${greeting}
+          <p>Where are you clocking in from?</p>
+          <div class="choice-row">
+            ${GATE_LOCATION_OPTIONS.map(o => `<button class="choice-pill" onclick="pickGateLocationType('${o.type}')">${o.label}</button>`).join('')}
+          </div>
         </div>
       </div>`;
   }
@@ -989,7 +1091,7 @@
     } else {
       html += `
         <div class="shift-status-row${state.todayShift.lateFlag ? ' late' : ''}">
-          <span class="line">${state.todayShift.lateFlag ? '⚠ ' : '🟢 '}Clocked in since ${fmtTime(state.todayShift.clockInAt)}</span>
+          <span class="line">${state.todayShift.lateFlag ? '⚠ ' : '🟢 '}Clocked in since ${fmtTime(state.todayShift.clockInAt)}${state.todayShift.location ? ` — ${state.todayShift.location}` : ''}</span>
           <div class="cout-row">
             <button class="clockout-link" onclick="attemptClockOutForDay()">Clock Out for the Day</button>
           </div>
