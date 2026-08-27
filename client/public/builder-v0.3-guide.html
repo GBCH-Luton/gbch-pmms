@@ -597,7 +597,6 @@
   function gateLocationLabel() {
     const t = state.gateLocationType;
     if (t === 'office') return 'the Office';
-    if (t === 'home') return 'Home';
     if (t === 'job') { const j = job(state.gateLocationDetail); return j ? `Job #${j.number} — ${j.address}` : 'a Job'; }
     if (t === 'property') return state.gateLocationDetail || 'a Property';
     if (t === 'other') return state.gateOtherNote.trim() || 'Other';
@@ -966,7 +965,6 @@
   // ================= Pages =================
   const GATE_LOCATION_OPTIONS = [
     { type: 'office', label: '🏢 The Office' },
-    { type: 'home', label: '🏠 Home' },
     { type: 'job', label: '🔧 A Job' },
     { type: 'property', label: '🏘️ A Property' },
     { type: 'other', label: '📍 Other' },
