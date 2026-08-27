@@ -203,6 +203,16 @@ export default function BuilderDashboard({ profile }) {
   const [dailyClockOutDeadline, setDailyClockOutDeadline] = useState('17:00')
   const [clockingInForDay, setClockingInForDay] = useState(false)
   const [clockInForDayError, setClockInForDayError] = useState('')
+  // Where they're clocking in from -- must pick one before Clock In For
+  // The Day is even reachable (see the gate render below). Previewed in
+  // the Builder v0.3 guide simulator and approved before building.
+  // Reset to 'choose' on every fresh clock-out via finishClockOutForDay.
+  const [gateStep, setGateStep] = useState('choose') // choose | pick-job | pick-property | confirm
+  const [gateLocationType, setGateLocationType] = useState(null) // 'office' | 'job' | 'property' | 'other'
+  const [gateLocationTicketId, setGateLocationTicketId] = useState(null)
+  const [gateLocationPropertyId, setGateLocationPropertyId] = useState(null)
+  const [gateLocationPropertyAddress, setGateLocationPropertyAddress] = useState('')
+  const [gateOtherNote, setGateOtherNote] = useState('')
   const [clockingOutForDay, setClockingOutForDay] = useState(false)
   const [clockOutForDayError, setClockOutForDayError] = useState('')
   // Symmetric with the late clock-in flag -- clocking out before
@@ -794,7 +804,7 @@ export default function BuilderDashboard({ profile }) {
     const { data } = await supabase
       .schema('pmms')
       .from('daily_attendance')
-      .select('id, work_date, clock_in_at, late_flag, clock_in_lat, clock_in_lng')
+      .select('id, work_date, clock_in_at, late_flag, clock_in_lat, clock_in_lng, clock_in_location_type, clock_in_location_ticket_id, clock_in_location_property_id, clock_in_location_note')
       .eq('staff_id', profile.id)
       .is('clock_out_at', null)
       .order('clock_in_at', { ascending: false })
@@ -830,7 +840,19 @@ export default function BuilderDashboard({ profile }) {
     setShiftLoading(false)
   }
 
+  function resetGateLocationPicker() {
+    setGateStep('choose')
+    setGateLocationType(null)
+    setGateLocationTicketId(null)
+    setGateLocationPropertyId(null)
+    setGateLocationPropertyAddress('')
+    setGateOtherNote('')
+  }
+
   async function handleClockInForDay() {
+    if (!gateLocationType) return
+    if (gateLocationType === 'other' && !gateOtherNote.trim()) return
+
     setClockInForDayError('')
     setClockingInForDay(true)
     const position = await getCurrentPositionSafe()
@@ -851,13 +873,18 @@ export default function BuilderDashboard({ profile }) {
         clock_in_lat: position.latitude,
         clock_in_lng: position.longitude,
         late_flag: ukTimeHHMM(now.getTime()) > dailyClockInDeadline,
+        clock_in_location_type: gateLocationType,
+        clock_in_location_ticket_id: gateLocationType === 'job' ? gateLocationTicketId : null,
+        clock_in_location_property_id: gateLocationType === 'property' ? gateLocationPropertyId : null,
+        clock_in_location_note: gateLocationType === 'other' ? gateOtherNote.trim() : null,
       })
-      .select('id, work_date, clock_in_at, late_flag')
+      .select('id, work_date, clock_in_at, late_flag, clock_in_location_type, clock_in_location_ticket_id, clock_in_location_property_id, clock_in_location_note')
       .single()
 
     setClockingInForDay(false)
     if (error) { setClockInForDayError(error.message); return }
     setTodayShift(data)
+    resetGateLocationPicker()
   }
 
   function attemptClockOutForDay() {
@@ -927,6 +954,7 @@ export default function BuilderDashboard({ profile }) {
 
     setEarlyLeavePromptOpen(false)
     setTodayShift(null)
+    resetGateLocationPicker()
   }
 
   async function fetchOpenActivity() {
@@ -2103,26 +2131,140 @@ export default function BuilderDashboard({ profile }) {
   // where a builder was or whether they'd started work, so the day itself
   // now has its own clock-in, separate from (and required before) clocking
   // into any individual job.
-  if (!todayShift) return (
-    <div style={{ minHeight: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: COLORS.slate100, fontFamily: 'system-ui, sans-serif', padding: '20px' }}>
-      <div style={{ width: '100%', maxWidth: '360px', background: COLORS.white, borderRadius: '20px', padding: '28px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', textAlign: 'center' }}>
-        <img src={gbchLogo} alt="GBCH" style={{ height: '44px', marginBottom: '16px' }} />
-        <p style={{ margin: '0 0 6px 0', fontSize: '18px', fontWeight: 800, color: COLORS.slate900 }}>Good {new Date().getHours() < 12 ? 'morning' : 'afternoon'}, {profile.name.split(' ')[0]}</p>
-        <p style={{ margin: '0 0 24px 0', fontSize: '13px', color: COLORS.slate500, lineHeight: 1.5 }}>Clock in to start your working day and see your jobs.</p>
-        <button
-          onClick={handleClockInForDay}
-          disabled={clockingInForDay}
-          style={{ width: '100%', padding: '16px', background: COLORS.teal600, color: COLORS.white, border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: 700, cursor: clockingInForDay ? 'not-allowed' : 'pointer', opacity: clockingInForDay ? 0.7 : 1 }}
-        >
-          {clockingInForDay ? 'Getting your location…' : '✓ Clock In for the Day'}
-        </button>
-        {clockInForDayError && <p style={{ margin: '12px 0 0 0', fontSize: '13px', color: COLORS.red500, fontWeight: 600 }}>{clockInForDayError}</p>}
-        <button onClick={handleSignOut} style={{ marginTop: '18px', background: 'none', border: 'none', fontSize: '12px', color: COLORS.slate400, cursor: 'pointer', textDecoration: 'underline' }}>
-          Sign out
-        </button>
+  //
+  // Which of their own assigned jobs' properties to offer under "A
+  // Property" -- builders have no general property directory access (see
+  // attachBuilderSafeProperties), so this is deliberately scoped to
+  // properties they already have a reason to be at, not a full list.
+  const gatePropertyOptions = [...new Map(
+    tickets.filter(t => t.property_id && t.property?.address).map(t => [t.property_id, { id: t.property_id, address: t.property.address }])
+  ).values()]
+
+  if (!todayShift) {
+    const greeting = <>
+      <img src={gbchLogo} alt="GBCH" style={{ height: '44px', marginBottom: '16px' }} />
+      <p style={{ margin: '0 0 6px 0', fontSize: '18px', fontWeight: 800, color: COLORS.slate900 }}>Good {new Date().getHours() < 12 ? 'morning' : 'afternoon'}, {profile.name.split(' ')[0]}</p>
+    </>
+
+    let inner
+    if (gateStep === 'pick-job') {
+      const assigned = tickets.filter(t => t.status === 'Assigned')
+      inner = (
+        <>
+          {greeting}
+          <p style={{ margin: '0 0 12px 0', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em', textAlign: 'left' }}>Which job?</p>
+          {assigned.length === 0 ? (
+            <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>No assigned jobs to pick from.</p>
+          ) : (
+            <div style={{ border: `1px solid ${COLORS.slate200}`, borderRadius: '12px', overflow: 'hidden', background: COLORS.white, textAlign: 'left', maxHeight: '280px', overflowY: 'auto' }}>
+              {assigned.map((t, i) => (
+                <button
+                  key={t.id}
+                  onClick={() => { setGateLocationTicketId(t.id); setGateStep('confirm') }}
+                  style={{ display: 'block', width: '100%', textAlign: 'left', padding: '12px 14px', border: 'none', borderBottom: i < assigned.length - 1 ? `1px solid ${COLORS.slate200}` : 'none', background: COLORS.white, cursor: 'pointer' }}
+                >
+                  <span style={{ display: 'block', fontSize: '10.5px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.05em' }}>#{t.ticket_number} · {t.category}</span>
+                  <span style={{ display: 'block', fontSize: '13.5px', fontWeight: 800, color: COLORS.slate900, marginTop: '2px' }}>{t.property?.address}</span>
+                </button>
+              ))}
+            </div>
+          )}
+          <button onClick={() => setGateStep('choose')} style={{ marginTop: '16px', background: 'none', border: 'none', fontSize: '12px', color: COLORS.slate400, cursor: 'pointer', textDecoration: 'underline' }}>← Back</button>
+        </>
+      )
+    } else if (gateStep === 'pick-property') {
+      inner = (
+        <>
+          {greeting}
+          <p style={{ margin: '0 0 12px 0', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em', textAlign: 'left' }}>Which property?</p>
+          {gatePropertyOptions.length === 0 ? (
+            <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>No properties from your current jobs to pick from.</p>
+          ) : (
+            <div style={{ border: `1px solid ${COLORS.slate200}`, borderRadius: '12px', overflow: 'hidden', background: COLORS.white, textAlign: 'left', maxHeight: '280px', overflowY: 'auto' }}>
+              {gatePropertyOptions.map((p, i) => (
+                <button
+                  key={p.id}
+                  onClick={() => { setGateLocationPropertyId(p.id); setGateLocationPropertyAddress(p.address); setGateStep('confirm') }}
+                  style={{ display: 'block', width: '100%', textAlign: 'left', padding: '12px 14px', border: 'none', borderBottom: i < gatePropertyOptions.length - 1 ? `1px solid ${COLORS.slate200}` : 'none', background: COLORS.white, cursor: 'pointer', fontSize: '13.5px', fontWeight: 700, color: COLORS.slate900 }}
+                >
+                  {p.address}
+                </button>
+              ))}
+            </div>
+          )}
+          <button onClick={() => setGateStep('choose')} style={{ marginTop: '16px', background: 'none', border: 'none', fontSize: '12px', color: COLORS.slate400, cursor: 'pointer', textDecoration: 'underline' }}>← Back</button>
+        </>
+      )
+    } else if (gateStep === 'confirm') {
+      const isOther = gateLocationType === 'other'
+      const label = gateLocationType === 'office' ? 'The Office'
+        : gateLocationType === 'job' ? (() => { const t = tickets.find(x => x.id === gateLocationTicketId); return t ? `Job #${t.ticket_number} — ${t.property?.address}` : 'A Job' })()
+        : gateLocationType === 'property' ? gateLocationPropertyAddress
+        : 'Other'
+      inner = (
+        <>
+          {greeting}
+          <div style={{ background: COLORS.slate50, border: `1px solid ${COLORS.slate200}`, borderRadius: '10px', padding: '12px 14px', margin: '0 0 16px 0', textAlign: 'left' }}>
+            <p style={{ margin: 0, fontSize: '10.5px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Clocking in from</p>
+            <p style={{ margin: '4px 0 0 0', fontSize: '14px', fontWeight: 800, color: COLORS.slate900 }}>{label}</p>
+          </div>
+          {isOther && (
+            <input
+              type="text"
+              autoFocus
+              value={gateOtherNote}
+              onChange={(e) => setGateOtherNote(e.target.value)}
+              placeholder="Describe where you are..."
+              style={{ width: '100%', padding: '13px 14px', borderRadius: '12px', border: `1px solid ${COLORS.slate200}`, fontSize: '14px', boxSizing: 'border-box', marginBottom: '16px' }}
+            />
+          )}
+          <button
+            onClick={handleClockInForDay}
+            disabled={clockingInForDay || (isOther && !gateOtherNote.trim())}
+            style={{ width: '100%', padding: '16px', background: COLORS.teal600, color: COLORS.white, border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: 700, cursor: (clockingInForDay || (isOther && !gateOtherNote.trim())) ? 'not-allowed' : 'pointer', opacity: (clockingInForDay || (isOther && !gateOtherNote.trim())) ? 0.7 : 1 }}
+          >
+            {clockingInForDay ? 'Getting your location…' : '✓ Clock In for the Day'}
+          </button>
+          {clockInForDayError && <p style={{ margin: '12px 0 0 0', fontSize: '13px', color: COLORS.red500, fontWeight: 600 }}>{clockInForDayError}</p>}
+          <button onClick={() => setGateStep('choose')} style={{ marginTop: '16px', background: 'none', border: 'none', fontSize: '12px', color: COLORS.slate400, cursor: 'pointer', textDecoration: 'underline' }}>← Back</button>
+        </>
+      )
+    } else {
+      inner = (
+        <>
+          {greeting}
+          <p style={{ margin: '0 0 24px 0', fontSize: '13px', color: COLORS.slate500, lineHeight: 1.5 }}>Where are you clocking in from?</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {[
+              { type: 'office', label: '🏢 The Office' },
+              { type: 'job', label: '🔧 A Job' },
+              { type: 'property', label: '🏘️ A Property' },
+              { type: 'other', label: '📍 Other' },
+            ].map(o => (
+              <button
+                key={o.type}
+                onClick={() => { setGateLocationType(o.type); setGateStep(o.type === 'job' ? 'pick-job' : o.type === 'property' ? 'pick-property' : 'confirm') }}
+                style={{ width: '100%', padding: '16px', borderRadius: '12px', fontSize: '15px', fontWeight: 700, cursor: 'pointer', border: `1px solid ${COLORS.slate200}`, background: COLORS.slate50, color: COLORS.slate900, boxSizing: 'border-box' }}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+          <button onClick={handleSignOut} style={{ marginTop: '18px', background: 'none', border: 'none', fontSize: '12px', color: COLORS.slate400, cursor: 'pointer', textDecoration: 'underline' }}>
+            Sign out
+          </button>
+        </>
+      )
+    }
+
+    return (
+      <div style={{ minHeight: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: COLORS.slate100, fontFamily: 'system-ui, sans-serif', padding: '20px' }}>
+        <div style={{ width: '100%', maxWidth: '360px', background: COLORS.white, borderRadius: '20px', padding: '28px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', textAlign: 'center' }}>
+          {inner}
+        </div>
       </div>
-    </div>
-  )
+    )
+  }
 
   return (
     <div style={{ minHeight: '100%', background: COLORS.slate100, fontFamily: 'system-ui, sans-serif', paddingTop: 'var(--pmms-banner-offset, 0px)' }}>
@@ -2378,6 +2520,14 @@ export default function BuilderDashboard({ profile }) {
           <div style={{ background: todayShift.late_flag ? COLORS.amber50 : COLORS.slate50, border: `1px solid ${todayShift.late_flag ? COLORS.amber300 : COLORS.slate200}`, borderRadius: '12px', padding: '10px 14px' }}>
             <span style={{ fontSize: '13px', fontWeight: 600, color: todayShift.late_flag ? COLORS.amber900 : COLORS.slate600 }}>
               {todayShift.late_flag ? '⚠ ' : '🟢 '}Clocked in since {formatUKDateTime(todayShift.clock_in_at).split(' ').slice(-1)[0]}
+              {(() => {
+                const t = todayShift.clock_in_location_type
+                if (t === 'office') return ' — the Office'
+                if (t === 'job') { const j = tickets.find(x => x.id === todayShift.clock_in_location_ticket_id); return j ? ` — Job #${j.ticket_number}` : '' }
+                if (t === 'property') { const j = tickets.find(x => x.property_id === todayShift.clock_in_location_property_id); return j?.property?.address ? ` — ${j.property.address}` : '' }
+                if (t === 'other' && todayShift.clock_in_location_note) return ` — ${todayShift.clock_in_location_note}`
+                return ''
+              })()}
               {todayShift.late_flag && ` (${minutesLate(todayShift.clock_in_at, dailyClockInDeadline)}m late)`}
             </span>
             {/* Deliberately its own row, set apart with a divider and
