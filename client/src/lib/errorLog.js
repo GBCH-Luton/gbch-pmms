@@ -21,6 +21,13 @@ export async function logClientError(errorType, message, { stack, context } = {}
   }
 }
 
+// PGRST303 covers both "JWT expired" and "JWT issued at future" -- the
+// latter a Supabase-side Auth/Postgres clock-skew glitch seen spread
+// across several unrelated staff accounts/devices the same week (found
+// live 2026-08-28 via this exact log -- not one person's wrong clock).
+// Retried once below rather than just logged.
+const JWT_AUTH_ERROR_CODE = 'PGRST303'
+
 // PostgrestQueryBuilder (what .from() returns) isn't itself thenable --
 // only the builder returned by .select()/.insert()/.update()/.upsert()/
 // .delete() is (confirmed against this project's supabase-js version by
@@ -40,7 +47,34 @@ function wrapQueryBuilder(queryBuilder, table, schemaName) {
       const originalThen = filterBuilder.then.bind(filterBuilder)
 
       filterBuilder.then = (onFulfilled, onRejected) =>
-        originalThen(result => {
+        originalThen(async result => {
+          // Auth is checked before a query ever reaches the database, so
+          // retrying is safe for every method here including insert/
+          // update/delete -- a PGRST303 rejection means the original
+          // attempt never wrote anything. Confirmed against this exact
+          // postgrest-js version that re-invoking .then() on the same
+          // builder re-runs a real fetch (not a cached promise), and that
+          // supabase-js's own fetchWithAuth wrapper injects the
+          // Authorization header fresh on every call rather than baking
+          // it into the builder -- so refreshSession() + one retry
+          // genuinely picks up a new token instead of resending the
+          // stale one that got rejected.
+          if (result?.error?.code === JWT_AUTH_ERROR_CODE) {
+            try {
+              await supabase.auth.refreshSession()
+              const retryResult = await new Promise((resolve, reject) => { originalThen(resolve, reject) })
+              if (retryResult && !retryResult.error) {
+                return onFulfilled ? onFulfilled(retryResult) : retryResult
+              }
+              // Retry also failed -- log ITS error (more current/useful
+              // than the original) by falling through below.
+              if (retryResult) result = retryResult
+            } catch {
+              // refreshSession() itself failed -- fall through and log
+              // the original result untouched.
+            }
+          }
+
           if (result?.error) {
             logClientError('supabase_query', result.error.message, {
               context: {
