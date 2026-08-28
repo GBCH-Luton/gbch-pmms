@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, lazy, Suspense } from 'react'
 import { supabase } from '../../lib/supabase'
 import { COLORS } from '../../lib/colors'
-import { priorityTierLabel, fetchFlaggedClockingCount, isTicketStuck, KpiTiles, fetchComplianceAgingCounts, fetchVoidAgingCounts, fetchGardenReviewAging, fetchHousekeepingCounts, computeAvgResponseMs, formatDuration, fetchPriorityThresholds, fetchAssignableBuilders, fetchAssignableStaffForDivision, fetchAssignableStaffForRole, fetchLastEndedSessionsToday, ukDateKey, formatUKDate, formatUKDateTime, minutesLate, SHORT_TRIP_REASONS, activityCategoryMeta, ACTIVITY_CATEGORY_META, LANDLORD_LIAISON_PAGE_ENABLED } from './shared'
+import { priorityTierLabel, fetchFlaggedClockingCount, isTicketStuck, KpiTiles, fetchComplianceAgingCounts, fetchVoidAgingCounts, fetchGardenReviewAging, fetchHousekeepingCounts, fetchContractorCounts, computeAvgResponseMs, formatDuration, fetchPriorityThresholds, fetchAssignableBuilders, fetchAssignableStaffForDivision, fetchAssignableStaffForRole, fetchLastEndedSessionsToday, ukDateKey, formatUKDate, formatUKDateTime, minutesLate, SHORT_TRIP_REASONS, activityCategoryMeta, ACTIVITY_CATEGORY_META, LANDLORD_LIAISON_PAGE_ENABLED } from './shared'
 import { NavIcon } from '../../lib/icons'
 import { googleMapsLink } from '../../lib/geo'
 
@@ -826,6 +826,7 @@ export default function AdminDashboard({ profile, onNavigate }) {
   const [voidAgingCounts, setVoidAgingCounts] = useState({ overdue: 0, aging: 0, recent: 0 })
   const [gardenAgingCounts, setGardenAgingCounts] = useState({ overdue: 0, aging: 0, recent: 0, needsAttention: 0, overgrown: 0 })
   const [housekeepingCounts, setHousekeepingCounts] = useState({ overdue: 0, dueSoon: 0, ok: 0, pendingDelays: 0 })
+  const [contractorCounts, setContractorCounts] = useState({ active: 0, spendThisMonth: 0 })
   const [p1Threshold, setP1Threshold] = useState(70)
   const [p2Threshold, setP2Threshold] = useState(40)
   const [totalTicketsPeriod, setTotalTicketsPeriod] = useState('all_time')
@@ -918,6 +919,7 @@ export default function AdminDashboard({ profile, onNavigate }) {
     fetchVoidAgingCounts().then(setVoidAgingCounts)
     fetchGardenReviewAging().then(setGardenAgingCounts)
     fetchHousekeepingCounts().then(setHousekeepingCounts)
+    fetchContractorCounts().then(setContractorCounts)
     fetchPriorityThresholds().then(({ p1, p2 }) => { setP1Threshold(p1); setP2Threshold(p2) })
     fetchTotalTicketsPeriod()
     fetchTopCardHeight()
@@ -927,7 +929,7 @@ export default function AdminDashboard({ profile, onNavigate }) {
     const { data, error } = await supabase
       .schema('pmms')
       .from('tickets')
-      .select('id, status, category, created_at, completed_at, status_changed_at, first_assigned_at, priority_score, priority_override, mileage_logged, hold_reason, needs_followup')
+      .select('id, status, category, created_at, completed_at, status_changed_at, first_assigned_at, priority_score, priority_override, mileage_logged, hold_reason, needs_followup, assigned_contractor_id')
 
     if (!error) setTickets(data)
     setLoading(false)
@@ -1113,6 +1115,18 @@ export default function AdminDashboard({ profile, onNavigate }) {
     },
   ]
 
+  // "Open jobs w/ contractor" and "jobs completed this month" are derived
+  // from `tickets` (already fetched for the main kpis array above) rather
+  // than a separate query, same as every other tile group here. Active
+  // count and spend are fetched (see fetchContractorCounts) since they
+  // aren't derivable from the tickets list.
+  const contractorKpis = [
+    { label: 'Active Contractors', value: contractorCounts.active, colour: COLORS.violet600, gotoSettings: true },
+    { label: 'Open Jobs w/ Contractor', value: tickets.filter(t => t.assigned_contractor_id && t.status !== 'Completed' && t.status !== 'Archived' && t.status !== 'Cancelled').length, colour: COLORS.amber600, statusFilter: 'OpenAll' },
+    { label: 'Spend This Month', value: `£${contractorCounts.spendThisMonth.toFixed(0)}`, colour: COLORS.teal600, gotoReports: true },
+    { label: 'Jobs Completed This Month', value: tickets.filter(t => t.assigned_contractor_id && (t.status === 'Completed' || t.status === 'Archived') && t.completed_at && new Date(t.completed_at) >= monthStart).length, colour: COLORS.green600, gotoReports: true },
+  ]
+
   const completedTickets = tickets.filter(t => (t.status === 'Completed' || t.status === 'Archived') && t.completed_at)
 
   const completionKpis = [
@@ -1293,6 +1307,20 @@ export default function AdminDashboard({ profile, onNavigate }) {
             kpis={kpis}
             columns={5}
             onTileClick={(kpi) => onNavigate?.('pipeline', { statusFilter: kpi.statusFilter, priorityFilter: kpi.priorityFilter, stuckOnly: kpi.stuckOnly, needsFollowupOnly: kpi.needsFollowupOnly })}
+          />
+        </div>
+      </DashboardSection>
+
+      <DashboardSection id="contractors" title="Contractors" background={COLORS.white} defaultCollapsed>
+        <div style={{ width: '100%' }}>
+          <KpiTiles
+            kpis={contractorKpis}
+            columns={4}
+            onTileClick={(kpi) => {
+              if (kpi.gotoSettings) onNavigate?.('settings')
+              else if (kpi.gotoReports) onNavigate?.('reports')
+              else onNavigate?.('pipeline', { statusFilter: kpi.statusFilter })
+            }}
           />
         </div>
       </DashboardSection>

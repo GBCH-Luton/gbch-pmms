@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { COLORS } from '../../lib/colors'
-import { fetchAssignableStaffForCategory, suggestAutoAssignBuilder, builderOptionLabel, createNotification, sendPushNotification, pushEmergencyAlert, priorityTierLabel, fetchPriorityThresholds, EVENTS_FEATURE_ENABLED, fetchAutoAssignOnRaiseEnabled, postSystemComment, floorContextOptions, floorContextLabel, modalOverlayStyle, modalCardStyle, modalTitleStyle, modalSubtitleStyle, modalCancelBtnStyle } from './shared'
+import { fetchAssignableStaffForCategory, suggestAutoAssignBuilder, builderOptionLabel, createNotification, sendPushNotification, pushEmergencyAlert, priorityTierLabel, fetchPriorityThresholds, EVENTS_FEATURE_ENABLED, fetchAutoAssignOnRaiseEnabled, postSystemComment, floorContextOptions, floorContextLabel, modalOverlayStyle, modalCardStyle, modalTitleStyle, modalSubtitleStyle, modalCancelBtnStyle, fetchActiveContractors } from './shared'
 import { fetchComplianceCheckTypes } from '../../lib/compliance'
 import { fetchMaintenanceCategories, sortedCategoryEntries, UNLISTED_MARKER_PREFIX, isUnlistedTag, unlistedTagFor, unlistedLabelFor, calculatePriorityScore, calculateDefaultEstimatedMinutes } from '../../lib/maintenanceCategories'
 import { fetchDivisions } from '../../lib/divisions'
@@ -61,11 +61,18 @@ export default function AdminRaiseTicket({ profile, onNavigate }) {
   // not making an assignment call herself). Found live via ticket #310.
   async function resolveAssignment(category) {
     if (canAssignBuilder) {
-      return { builderId: assignedBuilderId || null, assignType: assignedBuilderId && assignedBuilderId === autoSuggestedBuilderId ? 'Auto' : 'Manual' }
+      // A contractor is only ever picked explicitly (assignmentTarget below)
+      // -- never auto-suggested, never reached via the Landlord Liaison
+      // auto-assign path further down, so contractorId/builderId are always
+      // mutually exclusive here without any extra nulling logic.
+      if (assignmentTarget === 'contractor') {
+        return { builderId: null, contractorId: assignedContractorId || null, assignType: 'Manual' }
+      }
+      return { builderId: assignedBuilderId || null, contractorId: null, assignType: assignedBuilderId && assignedBuilderId === autoSuggestedBuilderId ? 'Auto' : 'Manual' }
     }
-    if (!(await fetchAutoAssignOnRaiseEnabled())) return { builderId: null, assignType: 'Manual' }
+    if (!(await fetchAutoAssignOnRaiseEnabled())) return { builderId: null, contractorId: null, assignType: 'Manual' }
     const suggested = await suggestAutoAssignBuilder(category)
-    return { builderId: suggested?.id || null, assignType: suggested ? 'Auto' : 'Manual' }
+    return { builderId: suggested?.id || null, contractorId: null, assignType: suggested ? 'Auto' : 'Manual' }
   }
   const [loggingMode, setLoggingMode] = useState('maintenance') // 'maintenance' | 'compliance'
 
@@ -100,6 +107,9 @@ export default function AdminRaiseTicket({ profile, onNavigate }) {
   // Admin-only additions
   const [builders, setBuilders] = useState([])
   const [assignedBuilderId, setAssignedBuilderId] = useState('')
+  const [assignmentTarget, setAssignmentTarget] = useState('builder') // 'builder' | 'contractor'
+  const [contractors, setContractors] = useState([])
+  const [assignedContractorId, setAssignedContractorId] = useState('')
   // Tracks whichever builder was auto-suggested (least-loaded eligible
   // candidate), separately from assignedBuilderId -- lets submit tell apart
   // "admin left the suggestion as-is" (assign_type: Auto) from "admin picked
@@ -121,6 +131,7 @@ export default function AdminRaiseTicket({ profile, onNavigate }) {
     fetchTicketProperties()
     fetchComplianceTypes()
     fetchMaintenanceCategories(profile.division).then(setMaintenanceCategories)
+    fetchActiveContractors().then(setContractors)
     fetchPriorityThresholds().then(({ p1, p2 }) => { setP1Threshold(p1); setP2Threshold(p2) })
     fetchOpenEvents()
     fetchDivisions().then(setDepartments)
@@ -158,6 +169,7 @@ export default function AdminRaiseTicket({ profile, onNavigate }) {
       : ticketCategory
 
     setAssignedBuilderId('')
+    setAssignedContractorId('')
     setAutoSuggestedBuilderId(null)
     setEstimatedMinutes('')
 
@@ -229,6 +241,8 @@ export default function AdminRaiseTicket({ profile, onNavigate }) {
     setComplianceSubmitting(false)
     setComplianceSuccess('')
     setAssignedBuilderId('')
+    setAssignmentTarget('builder')
+    setAssignedContractorId('')
     setAutoSuggestedBuilderId(null)
     setPriorityOverride('')
     setDepartment('')
@@ -301,7 +315,7 @@ export default function AdminRaiseTicket({ profile, onNavigate }) {
       return
     }
 
-    const { builderId: resolvedBuilderId, assignType: resolvedAssignType } = await resolveAssignment(ticketCategory)
+    const { builderId: resolvedBuilderId, contractorId: resolvedContractorId, assignType: resolvedAssignType } = await resolveAssignment(ticketCategory)
 
     const { data, error } = await supabase
       .schema('pmms')
@@ -316,12 +330,13 @@ export default function AdminRaiseTicket({ profile, onNavigate }) {
         priority_score: priorityScore,
         priority_override: priorityOverride || null,
         assigned_builder_id: resolvedBuilderId,
+        assigned_contractor_id: resolvedContractorId,
         assign_type: resolvedAssignType,
         estimated_minutes: canAssignBuilder && resolvedBuilderId && estimatedMinutes !== '' ? Number(estimatedMinutes) : null,
         department: department || null,
         event_id: selectedEventId || null,
-        status: resolvedBuilderId ? 'Assigned' : 'Pending',
-        first_assigned_at: resolvedBuilderId ? new Date().toISOString() : null,
+        status: (resolvedBuilderId || resolvedContractorId) ? 'Assigned' : 'Pending',
+        first_assigned_at: (resolvedBuilderId || resolvedContractorId) ? new Date().toISOString() : null,
         raised_by: profile.id,
         raised_by_name: profile.name,
         created_at: new Date().toISOString(),
@@ -354,6 +369,8 @@ export default function AdminRaiseTicket({ profile, onNavigate }) {
       if (sendPushOnAssign) {
         await sendPushNotification([resolvedBuilderId], 'New job assigned', `Job #${data[0].ticket_number} at ${selectedTicketProperty?.address || 'a property'}.`)
       }
+    } else if (resolvedContractorId) {
+      // A contractor has no PMMS login -- no in-app notification or push to send.
     } else if (!canAssignBuilder || !autoSuggestedBuilderId) {
       // Nobody eligible for this category at all (not just "admin chose to
       // leave it blank") -- worth a visible note on the ticket itself,
@@ -456,7 +473,7 @@ export default function AdminRaiseTicket({ profile, onNavigate }) {
         photoUrl = await getSignedUrl('ticket-photos', path)
       }
 
-      const { builderId: resolvedBuilderId, assignType: resolvedAssignType } = await resolveAssignment(category)
+      const { builderId: resolvedBuilderId, contractorId: resolvedContractorId, assignType: resolvedAssignType } = await resolveAssignment(category)
 
       const { data, error } = await supabase
         .schema('pmms')
@@ -471,11 +488,12 @@ export default function AdminRaiseTicket({ profile, onNavigate }) {
           photo_url: photoUrl,
           priority_override: priorityOverride || null,
           assigned_builder_id: resolvedBuilderId,
+          assigned_contractor_id: resolvedContractorId,
           assign_type: resolvedAssignType,
           estimated_minutes: canAssignBuilder && resolvedBuilderId && estimatedMinutes !== '' ? Number(estimatedMinutes) : null,
           department: department || null,
-          status: resolvedBuilderId ? 'Assigned' : 'Pending',
-          first_assigned_at: resolvedBuilderId ? new Date().toISOString() : null,
+          status: (resolvedBuilderId || resolvedContractorId) ? 'Assigned' : 'Pending',
+          first_assigned_at: (resolvedBuilderId || resolvedContractorId) ? new Date().toISOString() : null,
           raised_by: profile.id,
           raised_by_name: profile.name,
           created_at: new Date().toISOString(),
@@ -494,6 +512,8 @@ export default function AdminRaiseTicket({ profile, onNavigate }) {
         if (sendPushOnAssign) {
           await sendPushNotification([resolvedBuilderId], 'New job assigned', `Job #${data[0].ticket_number} at ${selectedTicketProperty?.address || 'a property'}.`)
         }
+      } else if (resolvedContractorId) {
+        // A contractor has no PMMS login -- no in-app notification or push to send.
       } else if (!canAssignBuilder || !autoSuggestedBuilderId) {
         await postSystemComment(data[0].id, profile, 'No eligible builder was found for this category at the time this ticket was raised. Needs manual assignment.')
       }
@@ -756,62 +776,91 @@ export default function AdminRaiseTicket({ profile, onNavigate }) {
             <div style={{ background: SECTION_BG[0], padding: '20px', borderBottom: '1px solid rgba(15,23,42,0.06)' }}>
               <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 700, color: COLORS.slate900 }}>5. Assignment &amp; Details</p>
 
-              <p style={fieldLabelStyle}>Assign to builder</p>
-              <select
-                value={assignedBuilderId}
-                onChange={(e) => setAssignedBuilderId(e.target.value)}
-                style={{ ...fieldSelectStyle, marginBottom: '4px' }}
-              >
-                <option value="">Leave unassigned</option>
-                {builders.map(b => (
-                  <option key={b.id} value={b.id} style={b.availability !== 'Available' ? { color: COLORS.slate400 } : undefined}>{builderOptionLabel(b)}</option>
-                ))}
-              </select>
-              {assignedBuilderId && assignedBuilderId === autoSuggestedBuilderId && (
-                <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 600, color: COLORS.slate500 }}>
-                  Auto-suggested (least-busy eligible builder) — change or clear to assign manually.
-                </p>
-              )}
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 10px 0', fontSize: '12px', fontWeight: 600, color: COLORS.slate500, cursor: 'pointer' }}>
-                <input type="checkbox" checked={ignoreSkills} onChange={(e) => setIgnoreSkills(e.target.checked)} />
-                Show all builders (ignore skills)
-              </label>
-              {assignedBuilderId && (
-                <>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 14px 0', fontSize: '13px', fontWeight: 600, color: COLORS.slate900, cursor: 'pointer' }}>
-                    <input type="checkbox" checked={sendPushOnAssign} onChange={(e) => setSendPushOnAssign(e.target.checked)} />
-                    Also send a push notification
-                  </label>
+              <p style={fieldLabelStyle}>Assign to</p>
+              <div style={{ display: 'flex', gap: '6px', margin: '0 0 10px 0', padding: '3px', background: COLORS.slate100, borderRadius: '10px' }}>
+                <button type="button" onClick={() => setAssignmentTarget('builder')} style={{ flex: 1, padding: '8px 10px', borderRadius: '7px', border: 'none', fontSize: '12.5px', fontWeight: 700, cursor: 'pointer', background: assignmentTarget === 'builder' ? COLORS.white : 'none', color: assignmentTarget === 'builder' ? COLORS.slate900 : COLORS.slate500, boxShadow: assignmentTarget === 'builder' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}>
+                  Internal Builder
+                </button>
+                <button type="button" onClick={() => setAssignmentTarget('contractor')} style={{ flex: 1, padding: '8px 10px', borderRadius: '7px', border: 'none', fontSize: '12.5px', fontWeight: 700, cursor: 'pointer', background: assignmentTarget === 'contractor' ? COLORS.white : 'none', color: assignmentTarget === 'contractor' ? COLORS.slate900 : COLORS.slate500, boxShadow: assignmentTarget === 'contractor' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}>
+                  External Contractor
+                </button>
+              </div>
 
-                  {/* Manager-only -- never shown to or fetched by the
-                      builder. Used to compare against actual time worked
-                      (Clocking page) later, e.g. a 15-minute job that
-                      quietly took an hour. */}
-                  <p style={fieldLabelStyle}>Estimated time (minutes, required)</p>
-                  <input
-                    type="number"
-                    min="0"
-                    step="5"
-                    value={estimatedMinutes}
-                    onChange={(e) => setEstimatedMinutes(e.target.value)}
-                    placeholder="e.g. 30"
-                    style={fieldSelectStyle}
-                  />
-                  {(() => {
-                    const def = calculateDefaultEstimatedMinutes(maintenanceCategories, ticketCategory, ticketIssueTag)
-                    if (def === null) return null
-                    const overridden = estimatedMinutes !== '' && Number(estimatedMinutes) !== def
-                    return overridden ? (
-                      <p style={{ margin: '6px 0 14px 0', fontSize: '11px', fontWeight: 600, color: COLORS.amber600 }}>
-                        Overridden — default for this issue is {def}m.{' '}
-                        <span onClick={() => setEstimatedMinutes(String(def))} style={{ textDecoration: 'underline', cursor: 'pointer' }}>Reset to default</span>
-                      </p>
-                    ) : (
-                      <p style={{ margin: '6px 0 14px 0', fontSize: '11px', fontWeight: 600, color: COLORS.slate500 }}>
-                        Auto-filled from Maintenance Categories settings — edit to override.
-                      </p>
-                    )
-                  })()}
+              {assignmentTarget === 'contractor' ? (
+                <>
+                  <select
+                    value={assignedContractorId}
+                    onChange={(e) => setAssignedContractorId(e.target.value)}
+                    style={{ ...fieldSelectStyle, marginBottom: '14px' }}
+                  >
+                    <option value="">Leave unassigned</option>
+                    {contractors.map(c => (
+                      <option key={c.id} value={c.id}>{c.name}{c.company_name ? ` — ${c.company_name}` : ''}</option>
+                    ))}
+                  </select>
+                  {contractors.length === 0 && (
+                    <p style={{ margin: '-8px 0 14px 0', fontSize: '11px', fontWeight: 600, color: COLORS.slate500 }}>No active contractors yet — add one in Settings.</p>
+                  )}
+                </>
+              ) : (
+                <>
+                  <select
+                    value={assignedBuilderId}
+                    onChange={(e) => setAssignedBuilderId(e.target.value)}
+                    style={{ ...fieldSelectStyle, marginBottom: '4px' }}
+                  >
+                    <option value="">Leave unassigned</option>
+                    {builders.map(b => (
+                      <option key={b.id} value={b.id} style={b.availability !== 'Available' ? { color: COLORS.slate400 } : undefined}>{builderOptionLabel(b)}</option>
+                    ))}
+                  </select>
+                  {assignedBuilderId && assignedBuilderId === autoSuggestedBuilderId && (
+                    <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 600, color: COLORS.slate500 }}>
+                      Auto-suggested (least-busy eligible builder) — change or clear to assign manually.
+                    </p>
+                  )}
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 10px 0', fontSize: '12px', fontWeight: 600, color: COLORS.slate500, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={ignoreSkills} onChange={(e) => setIgnoreSkills(e.target.checked)} />
+                    Show all builders (ignore skills)
+                  </label>
+                  {assignedBuilderId && (
+                    <>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 14px 0', fontSize: '13px', fontWeight: 600, color: COLORS.slate900, cursor: 'pointer' }}>
+                        <input type="checkbox" checked={sendPushOnAssign} onChange={(e) => setSendPushOnAssign(e.target.checked)} />
+                        Also send a push notification
+                      </label>
+
+                      {/* Manager-only -- never shown to or fetched by the
+                          builder. Used to compare against actual time worked
+                          (Clocking page) later, e.g. a 15-minute job that
+                          quietly took an hour. */}
+                      <p style={fieldLabelStyle}>Estimated time (minutes, required)</p>
+                      <input
+                        type="number"
+                        min="0"
+                        step="5"
+                        value={estimatedMinutes}
+                        onChange={(e) => setEstimatedMinutes(e.target.value)}
+                        placeholder="e.g. 30"
+                        style={fieldSelectStyle}
+                      />
+                      {(() => {
+                        const def = calculateDefaultEstimatedMinutes(maintenanceCategories, ticketCategory, ticketIssueTag)
+                        if (def === null) return null
+                        const overridden = estimatedMinutes !== '' && Number(estimatedMinutes) !== def
+                        return overridden ? (
+                          <p style={{ margin: '6px 0 14px 0', fontSize: '11px', fontWeight: 600, color: COLORS.amber600 }}>
+                            Overridden — default for this issue is {def}m.{' '}
+                            <span onClick={() => setEstimatedMinutes(String(def))} style={{ textDecoration: 'underline', cursor: 'pointer' }}>Reset to default</span>
+                          </p>
+                        ) : (
+                          <p style={{ margin: '6px 0 14px 0', fontSize: '11px', fontWeight: 600, color: COLORS.slate500 }}>
+                            Auto-filled from Maintenance Categories settings — edit to override.
+                          </p>
+                        )
+                      })()}
+                    </>
+                  )}
                 </>
               )}
 
@@ -1098,45 +1147,74 @@ export default function AdminRaiseTicket({ profile, onNavigate }) {
 
               {canAssignBuilder && (
                 <>
-                  <p style={fieldLabelStyle}>Assign to builder</p>
-                  <select
-                    value={assignedBuilderId}
-                    onChange={(e) => setAssignedBuilderId(e.target.value)}
-                    style={{ ...fieldSelectStyle, marginBottom: '4px' }}
-                  >
-                    <option value="">Leave unassigned</option>
-                    {builders.map(b => (
-                      <option key={b.id} value={b.id} style={b.availability !== 'Available' ? { color: COLORS.slate400 } : undefined}>{builderOptionLabel(b)}</option>
-                    ))}
-                  </select>
-                  {assignedBuilderId && assignedBuilderId === autoSuggestedBuilderId && (
-                    <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 600, color: COLORS.slate500 }}>
-                      Auto-suggested (least-busy eligible builder) — change or clear to assign manually.
-                    </p>
-                  )}
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 10px 0', fontSize: '12px', fontWeight: 600, color: COLORS.slate500, cursor: 'pointer' }}>
-                    <input type="checkbox" checked={ignoreSkills} onChange={(e) => setIgnoreSkills(e.target.checked)} />
-                    Show all builders (ignore skills)
-                  </label>
-                  {assignedBuilderId && (
-                    <>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 14px 0', fontSize: '13px', fontWeight: 600, color: COLORS.slate900, cursor: 'pointer' }}>
-                        <input type="checkbox" checked={sendPushOnAssign} onChange={(e) => setSendPushOnAssign(e.target.checked)} />
-                        Also send a push notification
-                      </label>
+                  <p style={fieldLabelStyle}>Assign to</p>
+                  <div style={{ display: 'flex', gap: '6px', margin: '0 0 10px 0', padding: '3px', background: COLORS.slate100, borderRadius: '10px' }}>
+                    <button type="button" onClick={() => setAssignmentTarget('builder')} style={{ flex: 1, padding: '8px 10px', borderRadius: '7px', border: 'none', fontSize: '12.5px', fontWeight: 700, cursor: 'pointer', background: assignmentTarget === 'builder' ? COLORS.white : 'none', color: assignmentTarget === 'builder' ? COLORS.slate900 : COLORS.slate500, boxShadow: assignmentTarget === 'builder' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}>
+                      Internal Builder
+                    </button>
+                    <button type="button" onClick={() => setAssignmentTarget('contractor')} style={{ flex: 1, padding: '8px 10px', borderRadius: '7px', border: 'none', fontSize: '12.5px', fontWeight: 700, cursor: 'pointer', background: assignmentTarget === 'contractor' ? COLORS.white : 'none', color: assignmentTarget === 'contractor' ? COLORS.slate900 : COLORS.slate500, boxShadow: assignmentTarget === 'contractor' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}>
+                      External Contractor
+                    </button>
+                  </div>
 
-                      {/* Manager-only, applied to every ticket this compliance
-                          batch creates -- never shown to or fetched by the builder. */}
-                      <p style={fieldLabelStyle}>Estimated time per ticket (minutes, required)</p>
-                      <input
-                        type="number"
-                        min="0"
-                        step="5"
-                        value={estimatedMinutes}
-                        onChange={(e) => setEstimatedMinutes(e.target.value)}
-                        placeholder="e.g. 30"
+                  {assignmentTarget === 'contractor' ? (
+                    <>
+                      <select
+                        value={assignedContractorId}
+                        onChange={(e) => setAssignedContractorId(e.target.value)}
                         style={{ ...fieldSelectStyle, marginBottom: '14px' }}
-                      />
+                      >
+                        <option value="">Leave unassigned</option>
+                        {contractors.map(c => (
+                          <option key={c.id} value={c.id}>{c.name}{c.company_name ? ` — ${c.company_name}` : ''}</option>
+                        ))}
+                      </select>
+                      {contractors.length === 0 && (
+                        <p style={{ margin: '-8px 0 14px 0', fontSize: '11px', fontWeight: 600, color: COLORS.slate500 }}>No active contractors yet — add one in Settings.</p>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <select
+                        value={assignedBuilderId}
+                        onChange={(e) => setAssignedBuilderId(e.target.value)}
+                        style={{ ...fieldSelectStyle, marginBottom: '4px' }}
+                      >
+                        <option value="">Leave unassigned</option>
+                        {builders.map(b => (
+                          <option key={b.id} value={b.id} style={b.availability !== 'Available' ? { color: COLORS.slate400 } : undefined}>{builderOptionLabel(b)}</option>
+                        ))}
+                      </select>
+                      {assignedBuilderId && assignedBuilderId === autoSuggestedBuilderId && (
+                        <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 600, color: COLORS.slate500 }}>
+                          Auto-suggested (least-busy eligible builder) — change or clear to assign manually.
+                        </p>
+                      )}
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 10px 0', fontSize: '12px', fontWeight: 600, color: COLORS.slate500, cursor: 'pointer' }}>
+                        <input type="checkbox" checked={ignoreSkills} onChange={(e) => setIgnoreSkills(e.target.checked)} />
+                        Show all builders (ignore skills)
+                      </label>
+                      {assignedBuilderId && (
+                        <>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 14px 0', fontSize: '13px', fontWeight: 600, color: COLORS.slate900, cursor: 'pointer' }}>
+                            <input type="checkbox" checked={sendPushOnAssign} onChange={(e) => setSendPushOnAssign(e.target.checked)} />
+                            Also send a push notification
+                          </label>
+
+                          {/* Manager-only, applied to every ticket this compliance
+                              batch creates -- never shown to or fetched by the builder. */}
+                          <p style={fieldLabelStyle}>Estimated time per ticket (minutes, required)</p>
+                          <input
+                            type="number"
+                            min="0"
+                            step="5"
+                            value={estimatedMinutes}
+                            onChange={(e) => setEstimatedMinutes(e.target.value)}
+                            placeholder="e.g. 30"
+                            style={{ ...fieldSelectStyle, marginBottom: '14px' }}
+                          />
+                        </>
+                      )}
                     </>
                   )}
 

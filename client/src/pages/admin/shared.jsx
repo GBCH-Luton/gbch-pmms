@@ -517,6 +517,33 @@ export async function fetchVoidAgingCounts() {
   return counts
 }
 
+// Dashboard KPI tiles for the new Contractors section -- active directory
+// size and this month's spend (from contractor_job_costs), same
+// fetch-a-summary shape as fetchVoidAgingCounts above. "Open jobs w/
+// contractor" and "jobs completed this month" are derived client-side from
+// the tickets already fetched for the main Pipeline KPIs (now that
+// assigned_contractor_id is in that select), same as those tiles are --
+// no need to fetch tickets twice just for this section.
+export async function fetchContractorCounts() {
+  const { count: active } = await supabase
+    .schema('pmms')
+    .from('contractors')
+    .select('id', { count: 'exact', head: true })
+    .eq('active', true)
+
+  const monthStart = new Date()
+  monthStart.setDate(1)
+  monthStart.setHours(0, 0, 0, 0)
+  const { data: costs } = await supabase
+    .schema('pmms')
+    .from('contractor_job_costs')
+    .select('amount, created_at')
+    .gte('created_at', monthStart.toISOString())
+
+  const spendThisMonth = (costs || []).reduce((sum, c) => sum + Number(c.amount || 0), 0)
+  return { active: active || 0, spendThisMonth }
+}
+
 // Portfolio-wide "how is Housekeeping doing" counts, for the dashboard's
 // Housekeeping KPI tiles -- same shape as fetchVoidAgingCounts/
 // fetchGardenReviewAging. Reuses fetchRoutineVisitAging below (already
@@ -1297,6 +1324,21 @@ export async function fetchAssignableStaffForRole(roleName) {
 // both Admin and Maintenance Manager). Now pulls every accessLevel:
 // 'builder' role, built-in and custom alike, same as
 // fetchAssignableStaffForDivision minus its division filter.
+// Flat list of active contractors -- no fetchAssignableStaffForCategory-
+// style division/skill scoping (deliberate v1 decision: any active
+// contractor can be picked for any job, the list is expected to stay
+// small). Shared between the Reassign modal, the raise-ticket flow, and
+// the Pipeline filter dropdown so all three read the exact same list.
+export async function fetchActiveContractors() {
+  const { data } = await supabase
+    .schema('pmms')
+    .from('contractors')
+    .select('id, name, company_name')
+    .eq('active', true)
+    .order('name')
+  return data || []
+}
+
 export async function fetchAssignableBuilders() {
   const { data: rolesRow } = await supabase
     .schema('pmms')

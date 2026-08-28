@@ -49,6 +49,7 @@ function sortValue(t, key) {
     case 'category': return (t.category || '').toLowerCase()
     case 'priority_score': return t.priority_score || 0
     case 'status': return statusLabel(t.status).toLowerCase()
+    case 'assignee': return (t.assigned_contractor_id ? t.contractorName : t.builderName || '').toLowerCase()
     case 'created_at': return new Date(t.created_at).getTime()
     case 'completed_at': return t.completed_at ? new Date(t.completed_at).getTime() : -Infinity
     default: return ''
@@ -82,12 +83,29 @@ export default function PropertyMaintenanceTab({ property, onNavigate }) {
     const { data, error } = await supabase
       .schema('pmms')
       .from('tickets')
-      .select('id, ticket_number, status, category, issue_tag, description, priority_score, created_at, completed_at, first_assigned_at')
+      .select('id, ticket_number, status, category, issue_tag, description, priority_score, created_at, completed_at, first_assigned_at, assigned_builder_id, assigned_contractor_id')
       .eq('property_id', property.id)
       .order('created_at', { ascending: false })
 
     if (error) { setLoadError(error.message); setTickets([]); return }
-    setTickets(data || [])
+
+    // Resolved here rather than joined server-side (this codebase doesn't
+    // use PostgREST embedded-relation selects anywhere) -- same
+    // fetch-then-client-merge pattern AdminPipeline.jsx uses for its own
+    // builderName/contractorName.
+    const builderIds = [...new Set((data || []).map(t => t.assigned_builder_id).filter(Boolean))]
+    const contractorIds = [...new Set((data || []).map(t => t.assigned_contractor_id).filter(Boolean))]
+    const [{ data: staffData }, { data: contractorsData }] = await Promise.all([
+      builderIds.length > 0 ? supabase.from('staff').select('id, name').in('id', builderIds) : Promise.resolve({ data: [] }),
+      contractorIds.length > 0 ? supabase.schema('pmms').from('contractors').select('id, name').in('id', contractorIds) : Promise.resolve({ data: [] }),
+    ])
+
+    const merged = (data || []).map(t => ({
+      ...t,
+      builderName: (staffData || []).find(s => s.id === t.assigned_builder_id)?.name,
+      contractorName: (contractorsData || []).find(c => c.id === t.assigned_contractor_id)?.name,
+    }))
+    setTickets(merged)
   }
 
   if (tickets === null) {
@@ -251,7 +269,7 @@ export default function PropertyMaintenanceTab({ property, onNavigate }) {
                 <tr style={{ borderBottom: `1px solid ${COLORS.slate200}` }}>
                   {[
                     ['ticket_number', 'Ticket'], ['summary', 'Summary'], ['category', 'Category'],
-                    ['priority_score', 'Priority'], ['status', 'Status'], ['created_at', 'Raised'], ['completed_at', 'Completed'],
+                    ['priority_score', 'Priority'], ['status', 'Status'], ['assignee', 'Assigned To'], ['created_at', 'Raised'], ['completed_at', 'Completed'],
                   ].map(([key, label]) => (
                     <th
                       key={key}
@@ -286,6 +304,17 @@ export default function PropertyMaintenanceTab({ property, onNavigate }) {
                       </td>
                       <td style={tdStyle}>
                         <span style={{ fontSize: '11px', fontWeight: 700, color: statusColour(t.status), background: statusColour(t.status) + '18', padding: '3px 10px', borderRadius: '20px' }}>{statusLabel(t.status)}</span>
+                      </td>
+                      <td style={tdStyle}>
+                        {t.assigned_contractor_id ? (
+                          <span style={{ fontSize: '11px', fontWeight: 700, color: COLORS.violet600, background: COLORS.violet100, padding: '3px 10px', borderRadius: '20px', whiteSpace: 'nowrap' }}>
+                            🔧 External — {t.contractorName || 'Unknown'}
+                          </span>
+                        ) : t.assigned_builder_id ? (
+                          <span style={{ fontSize: '13px', color: COLORS.slate900 }}>{t.builderName || 'Unknown'}</span>
+                        ) : (
+                          <span style={{ fontSize: '11px', color: COLORS.slate300 }}>—</span>
+                        )}
                       </td>
                       <td style={tdStyle}>{formatUKDate(t.created_at)}</td>
                       <td style={tdStyle}>{t.completed_at ? formatUKDate(t.completed_at) : '—'}</td>

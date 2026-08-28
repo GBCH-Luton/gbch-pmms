@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase'
 import { COLORS } from '../../lib/colors'
 import { attachProperties } from '../../lib/properties'
 import BuilderProfileModal from './BuilderProfileModal'
+import ContractorProfileModal from './ContractorProfileModal'
 import PropertySearchSelect from '../../components/PropertySearchSelect'
 import { fetchAllMaintenanceCategoryNames } from '../../lib/maintenanceCategories'
 import { fetchDivisions } from '../../lib/divisions'
@@ -16,7 +17,7 @@ import {
   filterSelectStyle, thStyle, tdStyle, actionBtnStyle,
   modalOverlayStyle, modalCardStyle, modalTitleStyle, modalSubtitleStyle, modalLabelStyle,
   modalTextareaStyle, modalErrorStyle, modalCancelBtnStyle, modalConfirmBtnStyle, radioRowStyle,
-  roleBadgeStyle, postSystemComment, postAuditEvent, fetchAssignableBuilders, fetchAssignableStaffForDivision, fetchAssignableStaffForCategory, STAFF_AVAILABILITY_STYLES,
+  roleBadgeStyle, postSystemComment, postAuditEvent, fetchAssignableBuilders, fetchAssignableStaffForDivision, fetchAssignableStaffForCategory, fetchActiveContractors, STAFF_AVAILABILITY_STYLES,
   createNotification, sendPushNotification, pushEmergencyAlert, resolveCategoryDivision, isTicketStuck, KpiTiles, fetchPriorityThresholds,
   EVENTS_FEATURE_ENABLED, SIGNOFF_QUESTIONS,
 } from './shared'
@@ -99,7 +100,7 @@ function TicketWorkedTime({ ticketId }) {
 
 export default function AdminPipeline({
   profile, onTicketsChanged, onNavigate, returnTo, initialStatusFilter, initialPriorityFilter, initialStuckFilter, initialNeedsFollowupFilter, initialTicketNumberSearch,
-  initialCategoryFilter, initialDivisionFilter, initialBuilderFilter, initialPropertyFilter, initialFromDate, initialToDate,
+  initialCategoryFilter, initialDivisionFilter, initialBuilderFilter, initialContractorFilter, initialPropertyFilter, initialFromDate, initialToDate,
   onInitialFilterConsumed,
 }) {
   const [tickets, setTickets] = useState([])
@@ -144,6 +145,9 @@ export default function AdminPipeline({
   const [propertyFilter, setPropertyFilter] = useState('') // '' = All Properties -- PropertySearchSelect's own "cleared" state
   const [categoryFilter, setCategoryFilter] = useState('All')
   const [builderFilter, setBuilderFilter] = useState('All')
+  const [contractorFilter, setContractorFilter] = useState('All')
+  const [contractors, setContractors] = useState([])
+  const [contractorProfileId, setContractorProfileId] = useState(null)
   // Options derived straight from the loaded tickets (unique raised_by
   // ids, sorted by name) rather than a separate staff fetch -- "who's
   // ever raised a ticket" isn't one role/division, it's Admin, Manager,
@@ -169,7 +173,9 @@ export default function AdminPipeline({
   const [p2Threshold, setP2Threshold] = useState(40)
 
   const [reassignModalTicket, setReassignModalTicket] = useState(null)
+  const [reassignTarget, setReassignTarget] = useState('builder') // 'builder' | 'contractor'
   const [reassignBuilderId, setReassignBuilderId] = useState('')
+  const [reassignContractorId, setReassignContractorId] = useState('')
   const [reassignReason, setReassignReason] = useState('')
   const [reassignEstimatedMinutes, setReassignEstimatedMinutes] = useState('')
   const [reassignError, setReassignError] = useState('')
@@ -210,6 +216,13 @@ export default function AdminPipeline({
   const [completePhotoPreview, setCompletePhotoPreview] = useState(null)
   const [completeError, setCompleteError] = useState('')
   const [completeSubmitting, setCompleteSubmitting] = useState(false)
+  // Contractor cost -- only used/required when the ticket being completed
+  // is assigned to a contractor (assigned_contractor_id set), see
+  // submitComplete(). Reuses the exact compressImage() -> ticket-photos ->
+  // getSignedUrl pattern the completion photo above already uses.
+  const [completeCostAmount, setCompleteCostAmount] = useState('')
+  const [completeReceiptFile, setCompleteReceiptFile] = useState(null)
+  const [completeReceiptPreview, setCompleteReceiptPreview] = useState(null)
 
   const [priorityModalTicket, setPriorityModalTicket] = useState(null)
   const [priorityTier, setPriorityTier] = useState('')
@@ -262,6 +275,7 @@ export default function AdminPipeline({
   useEffect(() => {
     fetchTickets()
     fetchBuilders()
+    fetchActiveContractors().then(setContractors)
     fetchProperties()
     fetchStuckThresholds()
     fetchPriorityThresholds().then(({ p1, p2 }) => { setP1Threshold(p1); setP2Threshold(p2) })
@@ -280,12 +294,13 @@ export default function AdminPipeline({
     if (initialCategoryFilter) setCategoryFilter(initialCategoryFilter)
     if (initialDivisionFilter) setDivisionFilter(initialDivisionFilter)
     if (initialBuilderFilter) setBuilderFilter(initialBuilderFilter)
+    if (initialContractorFilter) setContractorFilter(initialContractorFilter)
     if (initialPropertyFilter) setPropertyFilter(initialPropertyFilter)
     if (initialFromDate) setFromDate(initialFromDate)
     if (initialToDate) setToDate(initialToDate)
     if (
       initialStatusFilter || initialPriorityFilter || initialStuckFilter || initialNeedsFollowupFilter || initialTicketNumberSearch
-      || initialCategoryFilter || initialDivisionFilter || initialBuilderFilter || initialPropertyFilter || initialFromDate || initialToDate
+      || initialCategoryFilter || initialDivisionFilter || initialBuilderFilter || initialContractorFilter || initialPropertyFilter || initialFromDate || initialToDate
     ) onInitialFilterConsumed?.()
   }, [])
 
@@ -319,7 +334,9 @@ export default function AdminPipeline({
 
   useEffect(() => {
     if (reassignModalTicket) {
+      setReassignTarget(reassignModalTicket.assigned_contractor_id ? 'contractor' : 'builder')
       setReassignBuilderId(reassignModalTicket.assigned_builder_id || '')
+      setReassignContractorId(reassignModalTicket.assigned_contractor_id || '')
       setReassignReason('')
       setReassignEstimatedMinutes(reassignModalTicket.estimated_minutes != null ? String(reassignModalTicket.estimated_minutes) : '')
       setReassignError('')
@@ -423,13 +440,21 @@ export default function AdminPipeline({
         no_access_flag, no_access_note, hold_reason, hold_note, completion_note, photo_url, completion_photo_url,
         needs_followup, followup_note,
         signoff_flagged, signoff_note, signoff_resolved, signoff_good_standard, signoff_clean,
-        completed_at, created_at, status_changed_at, first_assigned_at, assigned_builder_id, estimated_minutes, assign_type, property_id, event_id,
+        completed_at, created_at, status_changed_at, first_assigned_at, assigned_builder_id, assigned_contractor_id, estimated_minutes, assign_type, property_id, event_id,
         raised_by, raised_by_name, cancel_type, cancel_reason, cancel_duplicate_ref
       `)
       .order('created_at', { ascending: false })
 
     const { data: staffData, error: staffError } = await supabase
       .from('staff')
+      .select('id, name')
+
+    // Not scoped to active-only -- a ticket can be assigned to a contractor
+    // who's since been deactivated in Settings, and its badge/name should
+    // still resolve correctly rather than showing "Unknown".
+    const { data: contractorsData } = await supabase
+      .schema('pmms')
+      .from('contractors')
       .select('id, name')
 
     // Grouped client-side into a ticket_id -> rows map, same "fetch once,
@@ -465,6 +490,7 @@ export default function AdminPipeline({
       const merged = withProperties.map(t => ({
         ...t,
         builderName: staffData.find(s => s.id === t.assigned_builder_id)?.name,
+        contractorName: (contractorsData || []).find(c => c.id === t.assigned_contractor_id)?.name,
       }))
       setTickets(merged)
     }
@@ -491,7 +517,8 @@ export default function AdminPipeline({
 
   async function submitReassign() {
     if (reassignSubmitting) return
-    if (!reassignBuilderId) { setReassignError('Please select a builder.'); return }
+    if (reassignTarget === 'builder' && !reassignBuilderId) { setReassignError('Please select a builder.'); return }
+    if (reassignTarget === 'contractor' && !reassignContractorId) { setReassignError('Please select a contractor.'); return }
     if (!reassignReason.trim()) { setReassignError('Please enter a reason.'); return }
     if (reassignEstimatedMinutes === '') { setReassignError('Please enter an estimated time for this job.'); return }
 
@@ -500,14 +527,21 @@ export default function AdminPipeline({
 
     const t = reassignModalTicket
     const promoteToAssigned = t.status === 'Pending'
-    const fromName = t.builderName || 'Unassigned'
-    const toName = reassignOptions.find(b => b.id === reassignBuilderId)?.name || reassignBuilderId
+    const fromName = t.assigned_contractor_id ? (t.contractorName || 'Unassigned') : (t.builderName || 'Unassigned')
+    const toName = reassignTarget === 'contractor'
+      ? (contractors.find(c => c.id === reassignContractorId)?.name || reassignContractorId)
+      : (reassignOptions.find(b => b.id === reassignBuilderId)?.name || reassignBuilderId)
 
     const { error } = await supabase
       .schema('pmms')
       .from('tickets')
       .update({
-        assigned_builder_id: reassignBuilderId,
+        // Explicitly nulls whichever of the two FK columns isn't the target
+        // -- assigned_builder_id/assigned_contractor_id are mutually
+        // exclusive (tickets_one_assignee_check), so switching between them
+        // must always clear the other one, not just set the new one.
+        assigned_builder_id: reassignTarget === 'builder' ? reassignBuilderId : null,
+        assigned_contractor_id: reassignTarget === 'contractor' ? reassignContractorId : null,
         estimated_minutes: reassignEstimatedMinutes !== '' ? Number(reassignEstimatedMinutes) : null,
         // A manager choosing the builder here -- explicit, not just left at
         // its previous value, so taking over an auto-routed job (e.g. a
@@ -520,11 +554,15 @@ export default function AdminPipeline({
     if (error) { setReassignSubmitting(false); setReassignError(error.message); return }
 
     const statusNote = promoteToAssigned ? ` Status: ${statusLabel(t.status)} → Assigned.` : ''
-    await postSystemComment(t.id, profile, `Reassigned from ${fromName} to ${toName}. Reason: ${reassignReason.trim()}`)
-    await postAuditEvent(t.id, profile, 'Reassigned', `Reassigned from ${fromName} to ${toName}.${statusNote} Reason: ${reassignReason.trim()}`)
-    await createNotification(reassignBuilderId, t.id, `You've been assigned Job #${t.ticket_number} at ${t.property?.address || 'a property'}.`)
-    if (reassignSendPush) {
-      await sendPushNotification([reassignBuilderId], 'New job assigned', `Job #${t.ticket_number} at ${t.property?.address || 'a property'}.`)
+    const toLabel = reassignTarget === 'contractor' ? `${toName} (external contractor)` : toName
+    await postSystemComment(t.id, profile, `Reassigned from ${fromName} to ${toLabel}. Reason: ${reassignReason.trim()}`)
+    await postAuditEvent(t.id, profile, 'Reassigned', `Reassigned from ${fromName} to ${toLabel}.${statusNote} Reason: ${reassignReason.trim()}`)
+    // A contractor has no PMMS login -- no in-app notification or push to send.
+    if (reassignTarget === 'builder') {
+      await createNotification(reassignBuilderId, t.id, `You've been assigned Job #${t.ticket_number} at ${t.property?.address || 'a property'}.`)
+      if (reassignSendPush) {
+        await sendPushNotification([reassignBuilderId], 'New job assigned', `Job #${t.ticket_number} at ${t.property?.address || 'a property'}.`)
+      }
     }
     await fetchTickets()
     setReassignSubmitting(false)
@@ -687,10 +725,14 @@ export default function AdminPipeline({
     setCompletePhotoFile(null)
     setCompletePhotoPreview(null)
     setCompleteError('')
+    setCompleteCostAmount('')
+    setCompleteReceiptFile(null)
+    setCompleteReceiptPreview(null)
   }
   function closeCompleteModal() {
     setCompleteModalTicket(null)
     if (completePhotoPreview) URL.revokeObjectURL(completePhotoPreview)
+    if (completeReceiptPreview) URL.revokeObjectURL(completeReceiptPreview)
   }
 
   function handleCompletePhoto(e) {
@@ -700,11 +742,23 @@ export default function AdminPipeline({
     setCompletePhotoPreview(URL.createObjectURL(file))
   }
 
+  function handleCompleteReceipt(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setCompleteReceiptFile(file)
+    setCompleteReceiptPreview(URL.createObjectURL(file))
+  }
+
   async function submitComplete() {
     if (!completeNote.trim()) { setCompleteError('Please describe the completed work.'); return }
     if (!completePhotoFile) { setCompleteError('Please add a photo of the completed work.'); return }
-
     const t = completeModalTicket
+    const isContractorJob = !!t.assigned_contractor_id
+    if (isContractorJob) {
+      if (completeCostAmount === '' || Number(completeCostAmount) < 0) { setCompleteError('Please enter the amount paid to the contractor.'); return }
+      if (!completeReceiptFile) { setCompleteError('Please attach a receipt/invoice photo.'); return }
+    }
+
     setCompleteSubmitting(true)
     setCompleteError('')
 
@@ -728,6 +782,29 @@ export default function AdminPipeline({
       photoUrl = await getSignedUrl('ticket-photos', path)
     }
 
+    // Same compressImage() -> ticket-photos -> getSignedUrl pattern as the
+    // completion photo above, reused exactly per the plan (also matches
+    // activity_receipts' upload path in BuilderDashboard.jsx).
+    let receiptUrl = null
+    if (isContractorJob && completeReceiptFile) {
+      let compressedReceipt
+      try {
+        compressedReceipt = await compressImage(completeReceiptFile)
+      } catch (compressErr) {
+        setCompleteSubmitting(false)
+        setCompleteError(compressErr.message)
+        return
+      }
+      const receiptPath = `${profile.id}/${Date.now()}-receipt-${compressedReceipt.name}`
+      const { error: receiptUploadError } = await supabase.storage.from('ticket-photos').upload(receiptPath, compressedReceipt)
+      if (receiptUploadError) {
+        setCompleteSubmitting(false)
+        setCompleteError(`Receipt upload failed: ${receiptUploadError.message}`)
+        return
+      }
+      receiptUrl = await getSignedUrl('ticket-photos', receiptPath)
+    }
+
     const now = new Date().toISOString()
     const previousStatus = t.status
     const { error } = await supabase
@@ -745,6 +822,16 @@ export default function AdminPipeline({
       return
     }
 
+    if (isContractorJob) {
+      await supabase.schema('pmms').from('contractor_job_costs').insert({
+        ticket_id: t.id,
+        contractor_id: t.assigned_contractor_id,
+        amount: Number(completeCostAmount),
+        receipt_photo_url: receiptUrl,
+        logged_by: profile.id,
+      })
+    }
+
     // Closes out any work_session left open under this ticket -- shouldn't
     // normally exist for an external job nobody ever clocked into, but
     // covers the case where an internal builder started it before handing
@@ -758,7 +845,11 @@ export default function AdminPipeline({
       await sendPushNotification([t.raised_by], 'Ticket completed', `Job #${t.ticket_number} — ${t.property?.address || 'your reported issue'} has been marked completed.`)
     }
 
-    await postSystemComment(t.id, profile, `Marked Completed by ${profile.name} on behalf of the assignee (no PMMS access -- e.g. an external contractor). Note: ${completeNote.trim()}`)
+    // Names the actual contractor once one's on record, instead of the
+    // generic "no PMMS access -- e.g. an external contractor" phrasing this
+    // comment used before contractors were a real, trackable thing.
+    const onBehalfOf = isContractorJob ? (t.contractorName || 'the contractor') : 'the assignee (no PMMS access -- e.g. an external contractor)'
+    await postSystemComment(t.id, profile, `Marked Completed by ${profile.name} on behalf of ${onBehalfOf}. Note: ${completeNote.trim()}`)
     await postAuditEvent(t.id, profile, 'Status Changed', `${statusLabel(previousStatus)} → Completed (marked by ${profile.name} on behalf of the assignee)`)
 
     setCompleteSubmitting(false)
@@ -976,6 +1067,7 @@ export default function AdminPipeline({
     if (categoryFilter !== 'All' && t.category !== categoryFilter) return false
     if (divisionFilter !== 'All' && resolveCategoryDivision(t.category, categoriesSettingsRow) !== divisionFilter) return false
     if (builderFilter !== 'All' && t.assigned_builder_id !== builderFilter) return false
+    if (contractorFilter !== 'All' && t.assigned_contractor_id !== contractorFilter) return false
     if (submitterFilter !== 'All' && t.raised_by !== submitterFilter) return false
     if (assignTypeFilter !== 'All' && (t.assign_type || 'Manual') !== assignTypeFilter) return false
     if (priorityFilter !== 'All' && effectiveTier(t) !== priorityFilter) return false
@@ -1177,6 +1269,16 @@ export default function AdminPipeline({
             ))}
           </select>
         )}
+        {/* Own dropdown rather than merged into the builder one above --
+            keeps both simple single-purpose selects, same reasoning as
+            Reassign getting its own second tab instead of one combined
+            builder+contractor list. */}
+        <select value={contractorFilter} onChange={(e) => setContractorFilter(e.target.value)} style={filterSelectStyle}>
+          <option value="All">All Contractors</option>
+          {contractors.map(c => (
+            <option key={c.id} value={c.id}>{c.name}</option>
+          ))}
+        </select>
         <select value={submitterFilter} onChange={(e) => setSubmitterFilter(e.target.value)} style={filterSelectStyle}>
           <option value="All">All Submitters</option>
           {submitterOptions.map(([id, name]) => (
@@ -1401,7 +1503,14 @@ export default function AdminPipeline({
                         )}
                       </td>
                       <td style={tdStyle}>
-                        {t.assigned_builder_id ? (
+                        {t.assigned_contractor_id ? (
+                          <span
+                            onClick={(e) => { e.stopPropagation(); setContractorProfileId(t.assigned_contractor_id) }}
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 700, color: COLORS.violet600, background: COLORS.violet100, padding: '3px 10px', borderRadius: '20px', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                          >
+                            🔧 External — {t.contractorName || 'Unknown'}
+                          </span>
+                        ) : t.assigned_builder_id ? (
                           <span
                             onClick={(e) => { e.stopPropagation(); setBuilderProfileId(t.assigned_builder_id) }}
                             style={{ color: COLORS.blue700, fontWeight: 600, cursor: 'pointer' }}
@@ -1482,8 +1591,12 @@ export default function AdminPipeline({
 
                             <div style={expandSectionStyle}>
                               <p style={expandSectionTitleStyle}>Assignment &amp; Priority</p>
-                              <p style={expandLabelStyle}>Assigned Builder</p>
-                              {t.assigned_builder_id ? (
+                              <p style={expandLabelStyle}>Assigned {t.assigned_contractor_id ? 'Contractor' : 'Builder'}</p>
+                              {t.assigned_contractor_id ? (
+                                <p style={{ ...expandValueStyle, color: COLORS.violet600, cursor: 'pointer' }} onClick={() => setContractorProfileId(t.assigned_contractor_id)}>
+                                  🔧 External — {t.contractorName || 'Unknown'}
+                                </p>
+                              ) : t.assigned_builder_id ? (
                                 <p style={{ ...expandValueStyle, color: COLORS.blue700, cursor: 'pointer' }} onClick={() => setBuilderProfileId(t.assigned_builder_id)}>
                                   {t.builderName || 'Unknown'}
                                 </p>
@@ -1768,37 +1881,78 @@ export default function AdminPipeline({
             <p style={modalTitleStyle}>Reassign Ticket #{reassignModalTicket.ticket_number}</p>
             <p style={modalSubtitleStyle}>{reassignModalTicket.property?.address}</p>
 
-            <label style={modalLabelStyle}>Builder</label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 10px 0', fontSize: '12px', fontWeight: 600, color: COLORS.slate500, cursor: 'pointer' }}>
-              <input type="checkbox" checked={reassignIgnoreSkills} onChange={(e) => setReassignIgnoreSkills(e.target.checked)} />
-              Show all builders (ignore skills)
-            </label>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {reassignOptions.length === 0 && (
-                <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>No one is assignable to this category yet.</p>
-              )}
-              {reassignOptions.map(b => {
-                const isUnavailable = b.availability !== 'Available'
-                return (
-                <label key={b.id} style={{ ...radioRowStyle(reassignBuilderId === b.id), opacity: isUnavailable ? 0.55 : 1 }}>
-                  <input
-                    type="radio"
-                    name="reassign-builder"
-                    checked={reassignBuilderId === b.id}
-                    onChange={() => setReassignBuilderId(b.id)}
-                  />
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: 600, color: isUnavailable ? COLORS.slate500 : COLORS.slate900 }}>
-                    {b.name}
-                    {isUnavailable && (
-                      <span style={{ fontSize: '10px', fontWeight: 800, color: STAFF_AVAILABILITY_STYLES[b.availability]?.color, background: STAFF_AVAILABILITY_STYLES[b.availability]?.bg, padding: '2px 8px', borderRadius: '20px', whiteSpace: 'nowrap' }}>
-                        {b.availability}{b.availabilityNote ? ` — ${b.availabilityNote}` : ''}
-                      </span>
-                    )}
-                  </span>
-                </label>
-                )
-              })}
+            <div style={{ display: 'flex', gap: '6px', margin: '4px 0 14px 0', padding: '3px', background: COLORS.slate100, borderRadius: '11px' }}>
+              <button
+                onClick={() => setReassignTarget('builder')}
+                style={{ flex: 1, padding: '8px 10px', borderRadius: '8px', border: 'none', fontSize: '12.5px', fontWeight: 700, cursor: 'pointer', background: reassignTarget === 'builder' ? COLORS.white : 'none', color: reassignTarget === 'builder' ? COLORS.slate900 : COLORS.slate500, boxShadow: reassignTarget === 'builder' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}
+              >
+                Internal Builder
+              </button>
+              <button
+                onClick={() => setReassignTarget('contractor')}
+                style={{ flex: 1, padding: '8px 10px', borderRadius: '8px', border: 'none', fontSize: '12.5px', fontWeight: 700, cursor: 'pointer', background: reassignTarget === 'contractor' ? COLORS.white : 'none', color: reassignTarget === 'contractor' ? COLORS.slate900 : COLORS.slate500, boxShadow: reassignTarget === 'contractor' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}
+              >
+                External Contractor
+              </button>
             </div>
+
+            {reassignTarget === 'builder' ? (
+              <>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '0 0 10px 0', fontSize: '12px', fontWeight: 600, color: COLORS.slate500, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={reassignIgnoreSkills} onChange={(e) => setReassignIgnoreSkills(e.target.checked)} />
+                  Show all builders (ignore skills)
+                </label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {reassignOptions.length === 0 && (
+                    <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>No one is assignable to this category yet.</p>
+                  )}
+                  {reassignOptions.map(b => {
+                    const isUnavailable = b.availability !== 'Available'
+                    return (
+                    <label key={b.id} style={{ ...radioRowStyle(reassignBuilderId === b.id), opacity: isUnavailable ? 0.55 : 1 }}>
+                      <input
+                        type="radio"
+                        name="reassign-builder"
+                        checked={reassignBuilderId === b.id}
+                        onChange={() => setReassignBuilderId(b.id)}
+                      />
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: 600, color: isUnavailable ? COLORS.slate500 : COLORS.slate900 }}>
+                        {b.name}
+                        {isUnavailable && (
+                          <span style={{ fontSize: '10px', fontWeight: 800, color: STAFF_AVAILABILITY_STYLES[b.availability]?.color, background: STAFF_AVAILABILITY_STYLES[b.availability]?.bg, padding: '2px 8px', borderRadius: '20px', whiteSpace: 'nowrap' }}>
+                            {b.availability}{b.availabilityNote ? ` — ${b.availabilityNote}` : ''}
+                          </span>
+                        )}
+                      </span>
+                    </label>
+                    )
+                  })}
+                </div>
+              </>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {contractors.length === 0 && (
+                  <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>No active contractors yet — add one in Settings.</p>
+                )}
+                {/* Flat list -- every active contractor shows here regardless
+                    of category, deliberate v1 decision (no specialty
+                    tagging), unlike the builder list above which is scoped
+                    via fetchAssignableStaffForCategory. */}
+                {contractors.map(c => (
+                  <label key={c.id} style={radioRowStyle(reassignContractorId === c.id)}>
+                    <input
+                      type="radio"
+                      name="reassign-contractor"
+                      checked={reassignContractorId === c.id}
+                      onChange={() => setReassignContractorId(c.id)}
+                    />
+                    <span style={{ fontSize: '13px', fontWeight: 600, color: COLORS.slate900 }}>
+                      {c.name}{c.company_name ? <span style={{ color: COLORS.slate500, fontWeight: 500 }}> — {c.company_name}</span> : null}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            )}
 
             <label style={modalLabelStyle}>Reason (required)</label>
             <textarea
@@ -2052,6 +2206,41 @@ export default function AdminPipeline({
               : (
                 <input type="file" accept="image/*" onChange={handleCompletePhoto} style={{ marginBottom: '10px', fontSize: '13px' }} />
               )}
+
+            {completeModalTicket.assigned_contractor_id && (
+              <div style={{ marginTop: '4px', padding: '14px', borderRadius: '12px', background: COLORS.violet100, border: `1px solid ${COLORS.violet500}` }}>
+                <p style={{ margin: '0 0 10px 0', fontSize: '12px', fontWeight: 800, color: COLORS.violet600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  💰 Contractor cost — {completeModalTicket.contractorName || 'contractor'}
+                </p>
+                <label style={{ ...modalLabelStyle, marginTop: 0 }}>Amount paid (required)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={completeCostAmount}
+                  onChange={(e) => setCompleteCostAmount(e.target.value)}
+                  placeholder="0.00"
+                  style={{ width: '100%', height: '40px', padding: '0 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', boxSizing: 'border-box' }}
+                />
+                <label style={modalLabelStyle}>Receipt / invoice photo (required)</label>
+                {completeReceiptPreview
+                  ? (
+                    <div>
+                      <img src={completeReceiptPreview} alt="" style={{ width: '100%', maxHeight: '160px', objectFit: 'cover', borderRadius: '10px', marginBottom: '6px' }} />
+                      <button
+                        type="button"
+                        onClick={() => { setCompleteReceiptFile(null); if (completeReceiptPreview) URL.revokeObjectURL(completeReceiptPreview); setCompleteReceiptPreview(null) }}
+                        style={{ background: 'none', border: 'none', padding: 0, fontSize: '12px', fontWeight: 700, color: COLORS.red600, cursor: 'pointer' }}
+                      >
+                        Remove receipt
+                      </button>
+                    </div>
+                  )
+                  : (
+                    <input type="file" accept="image/*" onChange={handleCompleteReceipt} style={{ fontSize: '13px' }} />
+                  )}
+              </div>
+            )}
 
             {completeError && <p style={modalErrorStyle}>{completeError}</p>}
 
@@ -2364,6 +2553,9 @@ export default function AdminPipeline({
       )}
 
       <BuilderProfileModal builderId={builderProfileId} onClose={() => setBuilderProfileId(null)} />
+      {contractorProfileId && (
+        <ContractorProfileModal contractorId={contractorProfileId} onClose={() => setContractorProfileId(null)} />
+      )}
 
     </div>
   )

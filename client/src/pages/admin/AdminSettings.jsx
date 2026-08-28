@@ -5,6 +5,7 @@ import { DEFAULT_COMPLIANCE_CHECK_TYPES } from '../../lib/compliance'
 import { DEFAULT_MAINTENANCE_CATEGORIES, migrateLegacyArrayShape, sortedCategoryEntries } from '../../lib/maintenanceCategories'
 import { DEFAULT_DIVISIONS } from '../../lib/divisions'
 import { DEFAULT_TOWNS } from '../../lib/towns'
+import ContractorProfileModal from './ContractorProfileModal'
 import {
   modalOverlayStyle, modalCardStyle, modalTitleStyle, modalSubtitleStyle,
   modalCancelBtnStyle, modalConfirmBtnStyle, statusLabel,
@@ -34,7 +35,7 @@ const expandToggleBtnStyle = { width: '32px', height: '32px', borderRadius: '8px
 const orderInputStyle = { width: '40px', height: '32px', padding: 0, borderRadius: '8px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', fontWeight: 700, color: COLORS.slate600, textAlign: 'center', boxSizing: 'border-box', flexShrink: 0 }
 const removeBtnStyle = { padding: '8px 14px', background: COLORS.white, color: COLORS.red600, border: `1px solid ${COLORS.red200}`, borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', flexShrink: 0, marginLeft: 'auto' }
 
-const SECTION_IDS = ['priority-thresholds', 'issue-scores', 'compliance-types', 'clocking-rules', 'daily-attendance', 'stuck-ticket-alerts', 'compliance-alerts', 'dashboard-metrics', 'appearance']
+const SECTION_IDS = ['priority-thresholds', 'issue-scores', 'contractors', 'compliance-types', 'clocking-rules', 'daily-attendance', 'stuck-ticket-alerts', 'compliance-alerts', 'dashboard-metrics', 'appearance']
 
 function SettingsSection({ title, subtitle, headerExtra, open, onToggle, children }) {
   return (
@@ -97,6 +98,15 @@ export default function AdminSettings() {
   const [expandedCategories, setExpandedCategories] = useState({})
   const [pendingFocusCategoryKey, setPendingFocusCategoryKey] = useState(null)
   const categoryNameInputRefs = useRef({})
+
+  // Contractors -- a real table (not a pmms.settings JSONB row like
+  // categories/check types above), since it needs its own primary key for
+  // pmms.tickets.assigned_contractor_id to reference. Flat list, no
+  // sub-items, so no expand/collapse machinery is needed here.
+  const [contractors, setContractors] = useState([])
+  const [pendingFocusContractorId, setPendingFocusContractorId] = useState(null)
+  const contractorNameInputRefs = useRef({})
+  const [contractorProfileId, setContractorProfileId] = useState(null)
 
   const [complianceTypes, setComplianceTypes] = useState(DEFAULT_COMPLIANCE_CHECK_TYPES)
   const [typeOrderDrafts, setTypeOrderDrafts] = useState({})
@@ -465,6 +475,49 @@ export default function AdminSettings() {
       setPendingFocusCategoryKey(null)
     }
   }, [pendingFocusCategoryKey, maintenanceCategories])
+
+  useEffect(() => {
+    fetchContractors()
+  }, [])
+
+  async function fetchContractors() {
+    const { data } = await supabase.schema('pmms').from('contractors').select('*').order('name')
+    setContractors(data || [])
+  }
+
+  useEffect(() => {
+    if (pendingFocusContractorId && contractorNameInputRefs.current[pendingFocusContractorId]) {
+      contractorNameInputRefs.current[pendingFocusContractorId].focus()
+      setPendingFocusContractorId(null)
+    }
+  }, [pendingFocusContractorId, contractors])
+
+  function updateContractorField(id, field, value) {
+    setContractors(prev => prev.map(c => c.id === id ? { ...c, [field]: value } : c))
+  }
+
+  async function persistContractor(id) {
+    const c = contractors.find(x => x.id === id)
+    if (!c) return
+    await supabase.schema('pmms').from('contractors').update({
+      name: c.name, company_name: c.company_name, contact_phone: c.contact_phone, contact_email: c.contact_email, notes: c.notes,
+    }).eq('id', id)
+  }
+
+  async function toggleContractorActive(id) {
+    const c = contractors.find(x => x.id === id)
+    if (!c) return
+    setContractors(prev => prev.map(x => x.id === id ? { ...x, active: !x.active } : x))
+    await supabase.schema('pmms').from('contractors').update({ active: !c.active }).eq('id', id)
+  }
+
+  async function addContractor() {
+    const { data, error } = await supabase.schema('pmms').from('contractors').insert({ name: 'New Contractor', active: true }).select().single()
+    if (!error && data) {
+      setContractors(prev => [...prev, data])
+      setPendingFocusContractorId(data.id)
+    }
+  }
 
   function persistComplianceTypes(updated) {
     saveSetting('compliance_check_types', updated)
@@ -1077,6 +1130,91 @@ export default function AdminSettings() {
             </div>
           )
         })}
+      </SettingsSection>
+
+      {/* Section: Contractors -- external companies/individuals jobs get
+          sent to instead of an internal builder. Admin-only, same trust
+          boundary as staff records today. Flat list, no specialty tagging
+          for v1 -- any active contractor is assignable to any job. */}
+      <SettingsSection
+        title="Contractors"
+        subtitle="Directory of external contractors jobs can be sent to instead of an internal builder -- admin-managed, used by Reassign, raise-ticket, and the Pipeline filter."
+        open={!!openSections['contractors']}
+        onToggle={() => toggleSection('contractors')}
+        headerExtra={
+          <button onClick={(e) => { e.stopPropagation(); addContractor() }} style={stickyAddBtnStyle}>
+            ＋ Add Contractor
+          </button>
+        }
+      >
+        {contractors.length === 0 && (
+          <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>No contractors yet.</p>
+        )}
+
+        {contractors.map((c) => (
+          <div
+            key={c.id}
+            style={{ border: `1px solid ${COLORS.slate200}`, borderRadius: '12px', padding: '16px', marginBottom: '12px', background: c.active ? COLORS.white : COLORS.slate50 }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '10px' }}>
+              <button
+                onClick={() => toggleContractorActive(c.id)}
+                title={c.active ? 'Active — click to deactivate' : 'Inactive — click to activate'}
+                style={{
+                  width: '36px', height: '36px', borderRadius: '8px', border: 'none', cursor: 'pointer', flexShrink: 0,
+                  background: c.active ? COLORS.teal600 : COLORS.slate300, color: COLORS.white, fontSize: '16px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}
+              >
+                👁
+              </button>
+              <input
+                ref={(el) => { contractorNameInputRefs.current[c.id] = el }}
+                type="text"
+                value={c.name}
+                placeholder="Name"
+                onChange={(e) => updateContractorField(c.id, 'name', e.target.value)}
+                onBlur={() => persistContractor(c.id)}
+                style={{ flex: '2 1 180px', height: '36px', padding: '0 10px', borderRadius: '8px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', fontWeight: 700, color: COLORS.slate900, boxSizing: 'border-box' }}
+              />
+              <input
+                type="text"
+                value={c.company_name || ''}
+                placeholder="Company"
+                onChange={(e) => updateContractorField(c.id, 'company_name', e.target.value)}
+                onBlur={() => persistContractor(c.id)}
+                style={{ flex: '2 1 160px', height: '36px', padding: '0 10px', borderRadius: '8px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', boxSizing: 'border-box' }}
+              />
+              <input
+                type="tel"
+                value={c.contact_phone || ''}
+                placeholder="Phone"
+                onChange={(e) => updateContractorField(c.id, 'contact_phone', e.target.value)}
+                onBlur={() => persistContractor(c.id)}
+                style={{ flex: '1 1 130px', height: '36px', padding: '0 10px', borderRadius: '8px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', boxSizing: 'border-box' }}
+              />
+              <input
+                type="email"
+                value={c.contact_email || ''}
+                placeholder="Email (optional)"
+                onChange={(e) => updateContractorField(c.id, 'contact_email', e.target.value)}
+                onBlur={() => persistContractor(c.id)}
+                style={{ flex: '2 1 170px', height: '36px', padding: '0 10px', borderRadius: '8px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', boxSizing: 'border-box' }}
+              />
+              <button onClick={() => setContractorProfileId(c.id)} style={{ ...removeBtnStyle, color: COLORS.blue700, borderColor: COLORS.blue100 }}>
+                View →
+              </button>
+            </div>
+            <input
+              type="text"
+              value={c.notes || ''}
+              placeholder="Notes (optional — specialty, rates, anything worth flagging)"
+              onChange={(e) => updateContractorField(c.id, 'notes', e.target.value)}
+              onBlur={() => persistContractor(c.id)}
+              style={{ width: '100%', height: '36px', padding: '0 10px', borderRadius: '8px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', boxSizing: 'border-box' }}
+            />
+          </div>
+        ))}
       </SettingsSection>
 
       {/* Section 3: Compliance Check Types */}
@@ -1937,6 +2075,10 @@ export default function AdminSettings() {
             </div>
           </div>
         </div>
+      )}
+
+      {contractorProfileId && (
+        <ContractorProfileModal contractorId={contractorProfileId} onClose={() => setContractorProfileId(null)} />
       )}
 
     </div>

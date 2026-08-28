@@ -9,6 +9,7 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import { COLORS } from '../../lib/colors'
 import { attachProperties } from '../../lib/properties'
+import ContractorProfileModal from './ContractorProfileModal'
 import { fetchAllMaintenanceCategoryNames } from '../../lib/maintenanceCategories'
 import {
   formatDuration, formatDurationDays, filterSelectStyle, thStyle, tdStyle,
@@ -87,6 +88,8 @@ const AI_EXAMPLE_QUESTIONS = [
   'How many tickets were completed this week vs last week?',
   'How much mileage has each staff member logged today, this week, and this month?',
   'Compare all staff mileage this month vs last month',
+  'How much have we paid contractors today, this week, and this month?',
+  'Which contractor have we spent the most on?',
 ]
 
 // Matched first, before ever calling Claude -- these questions stay
@@ -131,6 +134,11 @@ const AI_PATTERNS = [
   // /mileage/i test, and Array.find takes whichever pattern comes first.
   { test: /mileage.*(compare|last month)|compare.*mileage|mileage.*vs.*last month/i, key: 'compareMileageMonths' },
   { test: /mileage/i, key: 'staffMileageBreakdown' },
+  // "which contractor...most" checked before the general spend pattern
+  // below, same compare-before-general ordering trick as mileage above --
+  // it would otherwise also satisfy the plain spend/paid/cost test.
+  { test: /which contractor|contractor.*(most|top|highest)/i, key: 'contractorSpendByContractor' },
+  { test: /contractor.*(spend|paid|cost)|(spend|paid|cost).*contractor/i, key: 'contractorSpendTotal' },
   // Same key/pattern as ticketVolumeTrend above on purpose -- "raised...
   // this week vs last week" and "completed...this week vs last week" are
   // the same shape of question, just a different metric word. The runner
@@ -849,6 +857,54 @@ async function aiRunCompareMileageMonths(questionText, builders) {
   }
 }
 
+// Shared by both contractor-spend runners below -- contractor_job_costs
+// joined to pmms.contractors client-side, same fetch-then-merge convention
+// as everywhere else in this codebase (no PostgREST embedded selects).
+async function fetchContractorSpendCosts() {
+  const { data: costs } = await supabase.schema('pmms').from('contractor_job_costs').select('id, amount, contractor_id, created_at')
+  const { data: contractorsData } = await supabase.schema('pmms').from('contractors').select('id, name')
+  const nameById = Object.fromEntries((contractorsData || []).map(c => [c.id, c.name]))
+  return { costs: costs || [], nameById }
+}
+
+async function aiRunContractorSpendTotal() {
+  const { costs } = await fetchContractorSpendCosts()
+  const today = todayIso()
+  const weekStart = mondayOfWeek(today)
+  const monthStart = firstOfMonth(today)
+
+  const sumSince = (since) => Math.round(costs.filter(c => c.created_at.slice(0, 10) >= since).reduce((sum, c) => sum + Number(c.amount || 0), 0) * 100) / 100
+  const sumOn = (day) => Math.round(costs.filter(c => c.created_at.slice(0, 10) === day).reduce((sum, c) => sum + Number(c.amount || 0), 0) * 100) / 100
+
+  const rows = [
+    { label: 'Today', value: sumOn(today) },
+    { label: 'This week', value: sumSince(weekStart) },
+    { label: 'This month', value: sumSince(monthStart) },
+  ]
+
+  return {
+    summary: `£${rows[2].value.toFixed(2)} paid to contractors this month (£${rows[0].value.toFixed(2)} today, £${rows[1].value.toFixed(2)} this week).`,
+    columns: ['Period', 'Spend (£)'], rows,
+  }
+}
+
+async function aiRunContractorSpendByContractor() {
+  const { costs, nameById } = await fetchContractorSpendCosts()
+  const totals = {}
+  costs.forEach(c => { totals[c.contractor_id] = (totals[c.contractor_id] || 0) + Number(c.amount || 0) })
+
+  const rows = Object.entries(totals)
+    .map(([contractorId, value]) => ({ label: nameById[contractorId] || 'Unknown', value: Math.round(value * 100) / 100, contractorId }))
+    .sort((a, b) => b.value - a.value)
+
+  if (!rows.length) return { summary: 'No contractor costs logged yet.', columns: ['Contractor', 'Spend (£)'], rows: [] }
+
+  return {
+    summary: `${rows[0].label} accounts for the most contractor spend, £${rows[0].value.toFixed(2)} total.`,
+    columns: ['Contractor', 'Spend (£)'], rows,
+  }
+}
+
 const AI_RUNNERS = {
   topProperties: aiRunTopProperties, complianceOverdue: aiRunComplianceOverdue, topCategory: aiRunTopCategory,
   topCategoryThisMonth: aiRunTopCategoryThisMonth, topBuilders: aiRunTopBuilders,
@@ -863,6 +919,7 @@ const AI_RUNNERS = {
   voidRentExposure: aiRunVoidRentExposure, portfolioGrowth: aiRunPortfolioGrowth, landlordOpenTickets: aiRunLandlordOpenTickets,
   avgResponseTime: aiRunAvgResponseTimeThisMonth, avgTurnaroundTime: aiRunAvgTurnaroundTimeThisMonth,
   staffMileageBreakdown: aiRunStaffMileageBreakdown, compareMileageMonths: aiRunCompareMileageMonths,
+  contractorSpendTotal: aiRunContractorSpendTotal, contractorSpendByContractor: aiRunContractorSpendByContractor,
 }
 
 export default function AdminReports({ profile, onNavigate }) {
@@ -895,6 +952,7 @@ export default function AdminReports({ profile, onNavigate }) {
   const aiQuestionBoxRef = useRef(null)
   const [aiLoading, setAiLoading] = useState(false)
   const [aiAnswer, setAiAnswer] = useState(null)
+  const [contractorProfileId, setContractorProfileId] = useState(null)
   const [aiError, setAiError] = useState('')
   const [aiUsageLog, setAiUsageLog] = useState([])
   const [viewingLogRow, setViewingLogRow] = useState(null)
@@ -1787,8 +1845,12 @@ export default function AdminReports({ profile, onNavigate }) {
                         {aiAnswer.rows.map((r, i) => (
                           <tr key={i}>
                             <td
-                              style={{ ...tdStyle, ...(r.propertyId && onNavigate ? { cursor: 'pointer', color: COLORS.blue700, fontWeight: 700 } : {}) }}
-                              onClick={r.propertyId && onNavigate ? () => { setAiAnswer(null); onNavigate('properties', { propertyId: r.propertyId, tab: r.propertyTab }) } : undefined}
+                              style={{ ...tdStyle, ...((r.propertyId && onNavigate) || r.contractorId ? { cursor: 'pointer', color: r.contractorId ? COLORS.violet600 : COLORS.blue700, fontWeight: 700 } : {}) }}
+                              onClick={
+                                r.contractorId ? () => setContractorProfileId(r.contractorId)
+                                : (r.propertyId && onNavigate) ? () => { setAiAnswer(null); onNavigate('properties', { propertyId: r.propertyId, tab: r.propertyTab }) }
+                                : undefined
+                              }
                             >
                               {r.label}
                             </td>
@@ -1839,6 +1901,10 @@ export default function AdminReports({ profile, onNavigate }) {
             <button onClick={() => setViewingLogRow(null)} style={{ ...modalCloseBtnStyle, width: '100%', marginTop: '20px' }}>Close</button>
           </div>
         </div>
+      )}
+
+      {contractorProfileId && (
+        <ContractorProfileModal contractorId={contractorProfileId} onClose={() => setContractorProfileId(null)} />
       )}
     </div>
   )
