@@ -1002,6 +1002,21 @@ export async function fetchMovementTrail(staffId, dateKey) {
     ;(propRows || []).forEach(p => { propertiesById[p.id] = p })
   }
 
+  // 'visit_office' legs (Log a Visit -> "the office") never set
+  // destination_property_id at all -- there's no property picker for that
+  // destination, it's just a fixed button -- so the destProperty/destTicket
+  // fallback below still leaves them coordinate-less. Same physical place
+  // every time though, and it already exists as a real property row
+  // (status 'Internal', see property_internal_status_property_exclusion),
+  // so resolve it once and reuse it the same way as any other destination
+  // property fallback.
+  let officeProperty = null
+  if ((activity || []).some(a => a.activity_category === 'visit_office')) {
+    const { data: officeRows } = await supabase.schema('pmms').from('properties')
+      .select('id, address, latitude, longitude').eq('status', 'Internal').limit(1)
+    officeProperty = officeRows?.[0] || null
+  }
+
   const stops = []
 
   // No subtitle claiming "GBCH Office" here -- clock-in/out is GPS-tagged
@@ -1042,7 +1057,7 @@ export async function fetchMovementTrail(staffId, dateKey) {
       // AdminDashboard.jsx's live "Where's the Team" map already uses for
       // this exact category (property first, GPS second) -- this just
       // needed the property's own lat/lng actually fetched to use it.
-      const fallbackProperty = destProperty || destTicket?.property
+      const fallbackProperty = destProperty || destTicket?.property || (a.activity_category === 'visit_office' ? officeProperty : null)
       lat = fallbackProperty?.latitude ?? null
       lng = fallbackProperty?.longitude ?? null
     }
