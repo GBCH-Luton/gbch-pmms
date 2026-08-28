@@ -11,49 +11,53 @@ export const DEFAULT_MAINTENANCE_CATEGORIES = {
   'Electricity': {
     enabled: true,
     weight: 35,
+    defaultMinutes: 45,
     order: 0,
     subCategories: [
-      { label: 'Exposed Live Wires / Sparking', score: 65 },
-      { label: 'Complete Property Power Outage', score: 55 },
-      { label: 'Flickering Display Lights', score: 10 },
-      { label: 'Faulty Power Socket', score: 20 },
-      { label: 'Storage Heater Failure', score: 25 },
+      { label: 'Exposed Live Wires / Sparking', score: 65, minutes: 65 },
+      { label: 'Complete Property Power Outage', score: 55, minutes: 65 },
+      { label: 'Flickering Display Lights', score: 10, minutes: 30 },
+      { label: 'Faulty Power Socket', score: 20, minutes: 40 },
+      { label: 'Storage Heater Failure', score: 25, minutes: 45 },
     ],
   },
   'Plumbing': {
     enabled: true,
     weight: 20,
+    defaultMinutes: 40,
     order: 1,
     subCategories: [
-      { label: 'Burst Pipe / Active Flooding', score: 65 },
-      { label: 'Total Loss of Cold Drinking Water', score: 55 },
-      { label: 'No Hot Water Supply', score: 35 },
-      { label: 'Clogged Primary Toilet Block', score: 40 },
-      { label: 'Slow Dripping Tap', score: 10 },
+      { label: 'Burst Pipe / Active Flooding', score: 65, minutes: 60 },
+      { label: 'Total Loss of Cold Drinking Water', score: 55, minutes: 55 },
+      { label: 'No Hot Water Supply', score: 35, minutes: 50 },
+      { label: 'Clogged Primary Toilet Block', score: 40, minutes: 45 },
+      { label: 'Slow Dripping Tap', score: 10, minutes: 30 },
     ],
   },
   'Doors/Locks': {
     enabled: true,
     weight: 30,
+    defaultMinutes: 35,
     order: 2,
     subCategories: [
-      { label: 'Main Entrance Gate Jammed Open', score: 55 },
-      { label: 'Main Entrance Lockout / Jammed Shut', score: 60 },
-      { label: 'Fire Door Failing to Close Safely', score: 50 },
-      { label: 'Broken Outer Glazing / Window Shattered', score: 45 },
-      { label: 'Internal Bedroom Door Stuck', score: 35 },
+      { label: 'Main Entrance Gate Jammed Open', score: 55, minutes: 35 },
+      { label: 'Main Entrance Lockout / Jammed Shut', score: 60, minutes: 40 },
+      { label: 'Fire Door Failing to Close Safely', score: 50, minutes: 30 },
+      { label: 'Broken Outer Glazing / Window Shattered', score: 45, minutes: 30 },
+      { label: 'Internal Bedroom Door Stuck', score: 35, minutes: 30 },
     ],
   },
   'Other / Unlisted Trade': {
     enabled: true,
     weight: 15,
+    defaultMinutes: 20,
     order: 3,
     subCategories: [
-      { label: 'Pest Vector / Active Rodent Infestation', score: 35 },
-      { label: 'Severe Floor Fabric / Carpet Water Damage', score: 30 },
-      { label: 'Broken Safety Wall Grab Rail Loose', score: 40 },
-      { label: 'Structural Plaster Ceiling Cracking Risk', score: 45 },
-      { label: 'General Unlisted Handyman Issue Entry', score: 15 },
+      { label: 'Pest Vector / Active Rodent Infestation', score: 35, minutes: 30 },
+      { label: 'Severe Floor Fabric / Carpet Water Damage', score: 30, minutes: 20 },
+      { label: 'Broken Safety Wall Grab Rail Loose', score: 40, minutes: 30 },
+      { label: 'Structural Plaster Ceiling Cracking Risk', score: 45, minutes: 35 },
+      { label: 'General Unlisted Handyman Issue Entry', score: 15, minutes: 15 },
     ],
   },
 }
@@ -91,6 +95,21 @@ export const calculatePriorityScore = (maintenanceCategories, category, issueTag
   return Number(cat.weight) ?? 15
 }
 
+// Same fallback shape as calculatePriorityScore, for pre-filling the
+// "Estimated time" field when a manager raises/reassigns a ticket -- a
+// sub-category's own minutes, falling back to its parent category's
+// defaultMinutes. Returns null (not a number) when neither is set, so
+// callers can tell "no default configured" apart from "default is 0".
+export const calculateDefaultEstimatedMinutes = (maintenanceCategories, category, issueTag) => {
+  const cat = maintenanceCategories[category]
+  if (!cat) return null
+  if (issueTag && !isUnlistedTag(issueTag)) {
+    const sub = cat.subCategories.find(s => s.label === issueTag)
+    if (sub && sub.minutes !== undefined && sub.minutes !== null && sub.minutes !== '') return Number(sub.minutes)
+  }
+  return cat.defaultMinutes !== undefined && cat.defaultMinutes !== null && cat.defaultMinutes !== '' ? Number(cat.defaultMinutes) : null
+}
+
 // Migrates the legacy array shape (an earlier, short-lived implementation
 // used [{id, name, enabled, category, items}], mirroring
 // compliance_check_types) onto the new keyed-by-name object shape.
@@ -101,7 +120,8 @@ export function migrateLegacyArrayShape(raw) {
     result[entry.name] = {
       enabled: entry.enabled !== false,
       weight: entry.weight ?? 15,
-      subCategories: (entry.items || entry.subCategories || []).map(i => ({ label: i.label, score: i.score })),
+      defaultMinutes: entry.defaultMinutes,
+      subCategories: (entry.items || entry.subCategories || []).map(i => ({ label: i.label, score: i.score, minutes: i.minutes })),
     }
   })
   return result

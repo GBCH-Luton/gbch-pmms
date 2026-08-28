@@ -346,6 +346,13 @@ export default function AdminSettings() {
     setMaintenanceCategories(prev => ({ ...prev, [key]: { ...prev[key], weight: value } }))
   }
 
+  // Fallback estimated time (minutes) used when a sub-category doesn't carry
+  // its own, or an unlisted issue is picked -- pre-fills the "Estimated time"
+  // field when a manager raises a ticket, same as weight/score do today.
+  function handleCategoryDefaultMinutesChange(key, value) {
+    setMaintenanceCategories(prev => ({ ...prev, [key]: { ...prev[key], defaultMinutes: value } }))
+  }
+
   function handleCategoryFieldBlur() {
     persistMaintenanceCategories(maintenanceCategories)
   }
@@ -358,7 +365,7 @@ export default function AdminSettings() {
     let name = 'New Category'
     let n = 2
     while (maintenanceCategories[name]) { name = `New Category ${n}`; n += 1 }
-    const updated = { ...maintenanceCategories, [name]: { enabled: true, weight: 50, subCategories: [], order: Object.keys(maintenanceCategories).length } }
+    const updated = { ...maintenanceCategories, [name]: { enabled: true, weight: 50, defaultMinutes: 30, subCategories: [], order: Object.keys(maintenanceCategories).length } }
     setMaintenanceCategories(updated)
     persistMaintenanceCategories(updated)
     setExpandedCategories(prev => ({ ...prev, [name]: true }))
@@ -404,7 +411,7 @@ export default function AdminSettings() {
     const newIndex = maintenanceCategories[key].subCategories.length
     const updated = {
       ...maintenanceCategories,
-      [key]: { ...maintenanceCategories[key], subCategories: [...maintenanceCategories[key].subCategories, { label: 'New sub-category', score: 50 }] },
+      [key]: { ...maintenanceCategories[key], subCategories: [...maintenanceCategories[key].subCategories, { label: 'New sub-category', score: 50, minutes: 30 }] },
     }
     setMaintenanceCategories(updated)
     persistMaintenanceCategories(updated)
@@ -422,6 +429,13 @@ export default function AdminSettings() {
     setMaintenanceCategories(prev => ({
       ...prev,
       [key]: { ...prev[key], subCategories: prev[key].subCategories.map((s, i) => i === idx ? { ...s, score: value } : s) },
+    }))
+  }
+
+  function updateSubCategoryMinutes(key, idx, value) {
+    setMaintenanceCategories(prev => ({
+      ...prev,
+      [key]: { ...prev[key], subCategories: prev[key].subCategories.map((s, i) => i === idx ? { ...s, minutes: value } : s) },
     }))
   }
 
@@ -852,7 +866,7 @@ export default function AdminSettings() {
       {/* Section 2: Maintenance Categories */}
       <SettingsSection
         title="Maintenance Categories"
-        subtitle="Manage the ticket categories builders and admins can select, their sub-categories, and the priority score each one carries."
+        subtitle="Manage the ticket categories builders and admins can select, their sub-categories, the priority score each one carries, and the default estimated job time each one carries."
         open={!!openSections['issue-scores']}
         onToggle={() => toggleSection('issue-scores')}
         headerExtra={
@@ -930,6 +944,20 @@ export default function AdminSettings() {
                     />
                     <span style={{ fontSize: '10px', fontWeight: 700, color: weightTier.color, marginTop: '3px', whiteSpace: 'nowrap' }}>{weightTier.label}</span>
                   </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, background: COLORS.teal50, border: `1px solid ${COLORS.teal100}`, borderRadius: '8px', padding: '0 8px', height: '36px' }}>
+                    <span style={{ fontSize: '11px', fontWeight: 700, color: COLORS.teal700, whiteSpace: 'nowrap' }}>Fallback time</span>
+                    <input
+                      type="number"
+                      min={0}
+                      step={5}
+                      value={category.defaultMinutes ?? ''}
+                      title="Used when a sub-category doesn't have its own time, or an unlisted issue is picked"
+                      onChange={(e) => handleCategoryDefaultMinutesChange(key, e.target.value)}
+                      onBlur={handleCategoryFieldBlur}
+                      style={{ width: '54px', height: '28px', padding: '0 6px', borderRadius: '6px', border: `1px solid ${COLORS.slate200}`, fontSize: '12px', textAlign: 'center', boxSizing: 'border-box' }}
+                    />
+                    <span style={{ fontSize: '11px', fontWeight: 700, color: COLORS.teal700 }}>min</span>
+                  </div>
                   <select
                     value={category.division || DEFAULT_DIVISIONS[0]}
                     onChange={(e) => handleCategoryDivisionChange(key, e.target.value)}
@@ -971,6 +999,7 @@ export default function AdminSettings() {
                   </button>
                   <span style={{ flex: '2 1 220px', fontSize: '13px', fontWeight: 700, color: COLORS.slate900 }}>{key}</span>
                   <span style={{ fontSize: '12px', fontWeight: 700, color: weightTier.color, flexShrink: 0 }}>{category.weight} pts · {weightTier.label}</span>
+                  <span style={{ fontSize: '11px', fontWeight: 700, color: COLORS.teal700, background: COLORS.teal50, padding: '3px 10px', borderRadius: '20px', flexShrink: 0, whiteSpace: 'nowrap' }}>{category.defaultMinutes ?? '—'}m default</span>
                   <span style={{ fontSize: '11px', fontWeight: 700, color: COLORS.blue900, background: COLORS.blue100, padding: '3px 10px', borderRadius: '20px', flexShrink: 0, whiteSpace: 'nowrap' }}>{category.division || DEFAULT_DIVISIONS[0]}</span>
                   <span style={countChipStyle}>{category.subCategories.length} item{category.subCategories.length === 1 ? '' : 's'}</span>
                   <button
@@ -1013,6 +1042,18 @@ export default function AdminSettings() {
                               style={{ width: '70px', height: '36px', padding: '0 8px', borderRadius: '8px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', textAlign: 'center', boxSizing: 'border-box' }}
                             />
                             <span style={{ fontSize: '10px', fontWeight: 700, color: tier.color, marginTop: '3px', whiteSpace: 'nowrap' }}>{tier.label}</span>
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
+                            <input
+                              type="number"
+                              min={0}
+                              step={5}
+                              value={sub.minutes ?? ''}
+                              onChange={(e) => updateSubCategoryMinutes(key, idx, e.target.value)}
+                              onBlur={handleCategoryFieldBlur}
+                              style={{ width: '58px', height: '36px', padding: '0 8px', borderRadius: '8px', border: `1px solid ${COLORS.teal300}`, background: COLORS.teal50, color: COLORS.teal700, fontWeight: 700, fontSize: '13px', textAlign: 'center', boxSizing: 'border-box' }}
+                            />
+                            <span style={{ fontSize: '10px', fontWeight: 700, color: COLORS.teal700, marginTop: '3px', whiteSpace: 'nowrap' }}>Est. min</span>
                           </div>
                           <button
                             onClick={() => removeSubCategory(key, idx)}

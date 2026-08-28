@@ -3,7 +3,7 @@ import { supabase } from '../../lib/supabase'
 import { COLORS } from '../../lib/colors'
 import { fetchAssignableStaffForCategory, suggestAutoAssignBuilder, builderOptionLabel, createNotification, sendPushNotification, pushEmergencyAlert, priorityTierLabel, fetchPriorityThresholds, EVENTS_FEATURE_ENABLED, fetchAutoAssignOnRaiseEnabled, postSystemComment, floorContextOptions, floorContextLabel, modalOverlayStyle, modalCardStyle, modalTitleStyle, modalSubtitleStyle, modalCancelBtnStyle } from './shared'
 import { fetchComplianceCheckTypes } from '../../lib/compliance'
-import { fetchMaintenanceCategories, sortedCategoryEntries, UNLISTED_MARKER_PREFIX, isUnlistedTag, unlistedTagFor, unlistedLabelFor, calculatePriorityScore } from '../../lib/maintenanceCategories'
+import { fetchMaintenanceCategories, sortedCategoryEntries, UNLISTED_MARKER_PREFIX, isUnlistedTag, unlistedTagFor, unlistedLabelFor, calculatePriorityScore, calculateDefaultEstimatedMinutes } from '../../lib/maintenanceCategories'
 import { fetchDivisions } from '../../lib/divisions'
 import { compressImage } from '../../lib/imageCompression'
 import { getSignedUrl } from '../../lib/storage'
@@ -178,6 +178,18 @@ export default function AdminRaiseTicket({ profile, onNavigate }) {
     })
     return () => { cancelled = true }
   }, [loggingMode, ticketCategory, complianceCheckType, complianceCheckTypes, ignoreSkills])
+
+  // Pre-fills "Estimated time" from the category's (or, once an issue tag is
+  // picked, the sub-category's) default in Maintenance Categories settings --
+  // same source as the priority score. Runs after the reset above, and
+  // re-applies whenever the category or issue tag changes, same as the
+  // mockup reviewed with directors; the admin can still type over it, and
+  // that manual value is left alone until the category/tag changes again.
+  useEffect(() => {
+    if (loggingMode !== 'maintenance' || !ticketCategory) return
+    const def = calculateDefaultEstimatedMinutes(maintenanceCategories, ticketCategory, ticketIssueTag)
+    if (def !== null) setEstimatedMinutes(String(def))
+  }, [loggingMode, ticketCategory, ticketIssueTag, maintenanceCategories])
 
   async function fetchTicketProperties() {
     const { data, error } = await supabase
@@ -783,8 +795,23 @@ export default function AdminRaiseTicket({ profile, onNavigate }) {
                     value={estimatedMinutes}
                     onChange={(e) => setEstimatedMinutes(e.target.value)}
                     placeholder="e.g. 30"
-                    style={{ ...fieldSelectStyle, marginBottom: '14px' }}
+                    style={fieldSelectStyle}
                   />
+                  {(() => {
+                    const def = calculateDefaultEstimatedMinutes(maintenanceCategories, ticketCategory, ticketIssueTag)
+                    if (def === null) return null
+                    const overridden = estimatedMinutes !== '' && Number(estimatedMinutes) !== def
+                    return overridden ? (
+                      <p style={{ margin: '6px 0 14px 0', fontSize: '11px', fontWeight: 600, color: COLORS.amber600 }}>
+                        Overridden — default for this issue is {def}m.{' '}
+                        <span onClick={() => setEstimatedMinutes(String(def))} style={{ textDecoration: 'underline', cursor: 'pointer' }}>Reset to default</span>
+                      </p>
+                    ) : (
+                      <p style={{ margin: '6px 0 14px 0', fontSize: '11px', fontWeight: 600, color: COLORS.slate500 }}>
+                        Auto-filled from Maintenance Categories settings — edit to override.
+                      </p>
+                    )
+                  })()}
                 </>
               )}
 
