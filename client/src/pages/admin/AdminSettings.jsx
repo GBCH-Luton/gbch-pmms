@@ -1501,7 +1501,7 @@ export default function AdminSettings() {
       {/* Section 4a2: Daily Attendance */}
       <SettingsSection
         title="Daily Attendance"
-        subtitle="Builders must clock in for the day before they can see their jobs or dashboard at all -- separate from clocking in/out of an individual job."
+        subtitle="Builders and every manager-tier role (not Admin) must clock in for the day before they can see their jobs or dashboard at all -- separate from clocking in/out of an individual job."
         open={!!openSections['daily-attendance']}
         onToggle={() => toggleSection('daily-attendance')}
       >

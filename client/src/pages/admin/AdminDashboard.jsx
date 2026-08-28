@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, lazy, Suspense } from 'react'
 import { supabase } from '../../lib/supabase'
 import { COLORS } from '../../lib/colors'
-import { priorityTierLabel, fetchFlaggedClockingCount, isTicketStuck, KpiTiles, fetchComplianceAgingCounts, fetchVoidAgingCounts, fetchGardenReviewAging, fetchHousekeepingCounts, fetchContractorCounts, computeAvgResponseMs, formatDuration, fetchPriorityThresholds, fetchAssignableBuilders, fetchAssignableStaffForDivision, fetchAssignableStaffForRole, fetchLastEndedSessionsToday, ukDateKey, formatUKDate, formatUKDateTime, minutesLate, SHORT_TRIP_REASONS, activityCategoryMeta, ACTIVITY_CATEGORY_META, LANDLORD_LIAISON_PAGE_ENABLED } from './shared'
+import { priorityTierLabel, fetchFlaggedClockingCount, isTicketStuck, KpiTiles, fetchComplianceAgingCounts, fetchVoidAgingCounts, fetchGardenReviewAging, fetchHousekeepingCounts, fetchContractorCounts, computeAvgResponseMs, formatDuration, fetchPriorityThresholds, fetchAssignableBuilders, fetchAssignableStaffForDivision, fetchAssignableStaffForManagerRoles, fetchLastEndedSessionsToday, ukDateKey, formatUKDate, formatUKDateTime, minutesLate, SHORT_TRIP_REASONS, activityCategoryMeta, ACTIVITY_CATEGORY_META, LANDLORD_LIAISON_PAGE_ENABLED } from './shared'
 import { NavIcon } from '../../lib/icons'
 import { googleMapsLink } from '../../lib/geo'
 
@@ -254,18 +254,16 @@ function TeamWhereabouts({ profile, onNavigate, height = DASHBOARD_TOP_CARD_HEIG
     }
     const assignableBuilders = await (profile.division ? fetchAssignableStaffForDivision(profile.division) : fetchAssignableBuilders())
 
-    // Landlord Liaison Manager has her own daily clock-in/out (see
+    // Every manager-tier role has their own daily clock-in/out now (see
     // AdminDashboard.jsx's requiresDailyClocking gate) but no builder-level
     // role, so fetchAssignableStaffForDivision/fetchAssignableBuilders
-    // above never include her -- merged in here instead. Everything below
+    // above never include them -- merged in here instead. Everything below
     // (status computation, the attendance-derived log entries) already
-    // works for her with zero further changes: she'll simply never have a
-    // work_sessions/activity_log/on-hold-ticket row, so her status falls
+    // works for them with zero further changes: they'll simply never have a
+    // work_sessions/activity_log/on-hold-ticket row, so their status falls
     // straight through to the existing "clocked in, nothing else open" ->
     // Available branch, same as any builder between jobs.
-    const clockingManagers = (!profile.division || profile.division === 'Landlord Liaison')
-      ? (await fetchAssignableStaffForRole('Landlord Liaison Manager')).map(s => ({ ...s, division: 'Landlord Liaison' }))
-      : []
+    const clockingManagers = await fetchAssignableStaffForManagerRoles(profile.division)
     const allStaff = [...assignableBuilders, ...clockingManagers]
     setBuilders(allStaff)
 

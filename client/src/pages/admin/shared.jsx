@@ -1393,6 +1393,40 @@ export async function fetchAssignableStaffForDivision(division) {
   return Object.values(byId).sort((a, b) => a.name.localeCompare(b.name))
 }
 
+// Every manager-tier role's staff (accessLevel 'manager' in custom_roles --
+// Maintenance Manager, Maintenance Assistant, Housekeeping Manager,
+// Compliance Manager, Landlord Liaison Manager, any future one), scoped to
+// a division the same way fetchAssignableStaffForDivision scopes builders
+// above -- pass null/undefined for "every manager regardless of division"
+// (an unscoped admin/manager's view). Managers have no builder-level role,
+// so fetchAssignableStaffForDivision/fetchAssignableBuilders never include
+// them -- this is what TeamWhereabouts and AdminClocking.jsx merge in
+// alongside builders so a manager's own mandatory daily clock-in (see
+// requiresDailyClocking in pages/AdminDashboard.jsx -- every manager-tier
+// role clocks in, not just Landlord Liaison Manager) is visible/overridable
+// there too.
+export async function fetchAssignableStaffForManagerRoles(division) {
+  const { data: rolesRow } = await supabase
+    .schema('pmms')
+    .from('settings')
+    .select('setting_value')
+    .eq('setting_key', 'custom_roles')
+    .maybeSingle()
+
+  const normalizedCustomRoles = normalizeCustomRoles(rolesRow?.setting_value)
+
+  const roleEntries = normalizedCustomRoles
+    .filter(r => r.accessLevel === 'manager' && (!division || (r.division || 'Maintenance') === division))
+    .map(r => ({ name: r.name, division: r.division || 'Maintenance' }))
+
+  const staffLists = await Promise.all(roleEntries.map(r => fetchAssignableStaffForRole(r.name)))
+  const byId = {}
+  staffLists.forEach((list, i) => {
+    list.forEach(s => { byId[s.id] = { ...s, division: roleEntries[i].division } })
+  })
+  return Object.values(byId).sort((a, b) => a.name.localeCompare(b.name))
+}
+
 // For "who's idle right now and since when/where" (Where's the Team,
 // Clocking's Today's Attendance) -- the most recent ended work_sessions row
 // per builder today gives both. Deliberately reuses what

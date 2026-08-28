@@ -14,10 +14,12 @@ import { countUnreadDms } from '../lib/dm'
 import { fetchDivisions } from '../lib/divisions'
 import { fetchOnboardingMetrics } from '../lib/onboarding'
 import { getCurrentPositionSafe } from '../lib/geo'
+import { attachProperties } from '../lib/properties'
 // Lazy, not a direct import -- this shell loads eagerly for every admin/
-// manager, but the property picker it's for (Log a Visit) is only ever
-// opened by one manager, occasionally. A direct import here would have
-// pulled its ~39KB chunk into everyone's initial load.
+// manager, but the property picker it's for (Log a Visit) is only opened
+// by manager-tier staff, occasionally. A direct import here would have
+// pulled its ~39KB chunk into everyone's initial load, including builders
+// and Admin, who never use it.
 const PropertySearchSelect = lazy(() => import('../components/PropertySearchSelect'))
 
 // Lazy-loaded: an admin/manager only ever looks at a handful of these tabs
@@ -277,27 +279,38 @@ export default function AdminDashboard({ profile }) {
   const [pushEnabled, setPushEnabled] = useState(false)
   const [pushError, setPushError] = useState('')
 
-  // Landlord Liaison Manager gets her own daily clock-in/out, same rules
-  // as builders (late/early flags, stale-shift lockout) -- mirrors
-  // BuilderDashboard.jsx's own handleClockInForDay/attemptClockOutForDay
-  // almost exactly, minus the in-progress-job/away-activity blockers on
-  // clocking out (not applicable to her -- no jobs of her own). The
+  // Every manager-tier role (accessLevel 'manager' in custom_roles --
+  // Maintenance Manager, Maintenance Assistant, Housekeeping Manager,
+  // Compliance Manager, Landlord Liaison Manager, any future one) gets
+  // their own daily clock-in/out, same rules as builders (late/early
+  // flags, stale-shift lockout) -- mirrors BuilderDashboard.jsx's own
+  // handleClockInForDay/attemptClockOutForDay almost exactly, minus the
+  // in-progress-job/away-activity blockers on clocking out (not applicable
+  // to a manager -- no jobs of their own). Originally built for Landlord
+  // Liaison Manager alone (2026-08-17), extended to every manager-tier
+  // role 2026-08-28 -- explicitly excludes Admin (accessLevel 'admin'
+  // never matches 'manager', see accessLevelForRole in lib/roles.js). The
   // existing check-clock-out-reminders auto-clockout cron already applies
   // generically to any open pmms.daily_attendance row regardless of role,
   // so no backend change was needed for that part -- see
   // add_stale_shift_alerting.sql/check-clock-out-reminders for the
-  // pre-existing 2-hour-grace auto-close this reuses as-is.
+  // pre-existing 2-hour-grace auto-close this reuses as-is. Same for RLS:
+  // pmms.daily_attendance/activity_log's manager_division_scoped_access
+  // and manager_unscoped_full_access policies already cover ANY manager's
+  // own rows, not just Landlord Liaison -- confirmed by reading
+  // add_daily_attendance.sql/add_activity_log.sql before making this
+  // change, no migration needed.
   //
   // The whole-app BLOCKING gate is skipped while an admin is impersonating
   // (View As) -- an admin testing on their own device has no reason to
-  // have real GPS signal for HER shift, and being forced through the
-  // clock-in screen just to preview another page would defeat the point
-  // of View As. `showsDailyClockingUI` is the separate, non-impersonation-
-  // gated flag: it controls whether the Clocking page's own "Your Day"
-  // card (clock status, Clock Out, Log a Visit) fetches/renders at all,
-  // so that card is still visible/testable during View As even though the
-  // app-wide block isn't enforced.
-  const showsDailyClockingUI = profile.division === 'Landlord Liaison'
+  // have real GPS signal for the impersonated manager's shift, and being
+  // forced through the clock-in screen just to preview another page would
+  // defeat the point of View As. `showsDailyClockingUI` is the separate,
+  // non-impersonation-gated flag: it controls whether the Clocking page's
+  // own "Your Day" card (clock status, Clock Out, Log a Visit) fetches/
+  // renders at all, so that card is still visible/testable during View As
+  // even though the app-wide block isn't enforced.
+  const showsDailyClockingUI = profile.role === 'manager'
   const requiresDailyClocking = showsDailyClockingUI && !getImpersonationMarker()
   const [dailyShift, setDailyShift] = useState(null)
   const [staleDailyShift, setStaleDailyShift] = useState(null)
@@ -310,6 +323,25 @@ export default function AdminDashboard({ profile }) {
   const [clockOutForDayError, setClockOutForDayError] = useState('')
   const [earlyLeavePromptOpen, setEarlyLeavePromptOpen] = useState(false)
   const [earlyLeaveReason, setEarlyLeaveReason] = useState('')
+
+  // Clock-in location gate -- same Office/Job/Property/Other choice as
+  // BuilderDashboard.jsx's own gate (see add_clock_in_location.sql),
+  // extended here so every manager-tier role picks one too, not just
+  // builders. Unlike builders (RLS-restricted to properties/jobs they're
+  // already on), a manager already has read access to every open ticket
+  // and every property, so "A Job"/"A Property" are portfolio-wide lists
+  // here rather than deduced from their own assigned jobs.
+  const [gateStep, setGateStep] = useState('choose') // choose | pick-job | pick-property | confirm
+  const [gateLocationType, setGateLocationType] = useState(null) // 'office' | 'job' | 'property' | 'other'
+  const [gateLocationTicketId, setGateLocationTicketId] = useState(null)
+  const [gateLocationPropertyId, setGateLocationPropertyId] = useState(null)
+  const [gateLocationPropertyAddress, setGateLocationPropertyAddress] = useState('')
+  const [gateOtherNote, setGateOtherNote] = useState('')
+  const [gateOpenTickets, setGateOpenTickets] = useState(null) // lazy-fetched, null = not yet fetched
+  // Resolved label for today's "Clocked in from" display -- a single-row
+  // fetch by id rather than keeping a portfolio-wide tickets/properties
+  // list loaded just for this, since this shell doesn't otherwise need one.
+  const [dailyShiftLocationLabel, setDailyShiftLocationLabel] = useState('')
   const [clockOutConfirmOpen, setClockOutConfirmOpen] = useState(false)
 
   // Property-visit logging (see [[feedback_clocking_vs_logging_terminology]]
@@ -377,7 +409,7 @@ export default function AdminDashboard({ profile }) {
     const { data } = await supabase
       .schema('pmms')
       .from('daily_attendance')
-      .select('id, work_date, clock_in_at, late_flag')
+      .select('id, work_date, clock_in_at, late_flag, clock_in_location_type, clock_in_location_ticket_id, clock_in_location_property_id, clock_in_location_note')
       .eq('staff_id', profile.id)
       .is('clock_out_at', null)
       .order('clock_in_at', { ascending: false })
@@ -408,18 +440,66 @@ export default function AdminDashboard({ profile }) {
     setDailyShiftLoading(false)
   }
 
+  useEffect(() => {
+    if (!dailyShift) { setDailyShiftLocationLabel(''); return }
+    let cancelled = false
+    const t = dailyShift.clock_in_location_type
+    if (t === 'office') {
+      setDailyShiftLocationLabel('The Office')
+    } else if (t === 'other') {
+      setDailyShiftLocationLabel(dailyShift.clock_in_location_note || '')
+    } else if (t === 'job' && dailyShift.clock_in_location_ticket_id) {
+      supabase.schema('pmms').from('tickets').select('ticket_number, property_id').eq('id', dailyShift.clock_in_location_ticket_id).maybeSingle()
+        .then(async ({ data }) => {
+          if (cancelled || !data) return
+          const [withProp] = await attachProperties([data], 'address')
+          setDailyShiftLocationLabel(`Job #${data.ticket_number}${withProp?.property?.address ? ' — ' + withProp.property.address : ''}`)
+        })
+    } else if (t === 'property' && dailyShift.clock_in_location_property_id) {
+      supabase.schema('pmms').from('properties').select('address').eq('id', dailyShift.clock_in_location_property_id).maybeSingle()
+        .then(({ data }) => { if (!cancelled) setDailyShiftLocationLabel(data?.address || '') })
+    } else {
+      setDailyShiftLocationLabel('')
+    }
+    return () => { cancelled = true }
+  }, [dailyShift?.id, dailyShift?.clock_in_location_type])
+
+  // Which open tickets to offer under "A Job" -- lazy-fetched (same
+  // pattern as openTravelPicker's own travelProperties fetch below) since
+  // this is only needed if the gate's "A Job" option is actually picked.
+  // Unlike BuilderDashboard.jsx's own gatePropertyOptions (deduced from a
+  // builder's own assigned jobs, since builders have no general tickets/
+  // properties RLS access), a manager already has read access to every
+  // open ticket, so this is portfolio-wide rather than "their own".
+  async function fetchGateOpenTickets() {
+    if (gateOpenTickets !== null) return
+    const { data } = await supabase
+      .schema('pmms')
+      .from('tickets')
+      .select('id, ticket_number, category, property_id')
+      .not('status', 'in', '("Completed","Archived","Cancelled")')
+      .order('ticket_number', { ascending: false })
+    const withProps = await attachProperties(data || [], 'address')
+    setGateOpenTickets(withProps)
+  }
+
   async function handleDailyClockIn() {
     setClockInForDayError('')
-    setClockingInForDay(true)
     // An admin clocking in FOR her while impersonating (to test the
     // Clocking page's own card, reachable here since the whole-app gate
     // no longer forces this screen during View As -- see
     // showsDailyClockingUI/requiresDailyClocking above) has no reason to
-    // have real GPS signal for HER shift, so this skips the location
-    // requirement entirely rather than blocking on the same "Couldn't get
-    // your location" error a real clock-in would. Real Kathryn, not
-    // impersonated, still goes through the normal GPS-required path.
+    // have real GPS signal, or to have picked a location gate step at all
+    // (that card has its own plain button, no picker), so this skips both
+    // requirements entirely rather than blocking on validation a real
+    // clock-in would enforce. A real manager, not impersonated, still goes
+    // through the normal GPS + location-choice required path.
     const impersonating = !!getImpersonationMarker()
+    if (!impersonating) {
+      if (!gateLocationType) { setClockInForDayError('Please choose where you\'re clocking in from.'); return }
+      if (gateLocationType === 'other' && !gateOtherNote.trim()) { setClockInForDayError('Please describe where you are.'); return }
+    }
+    setClockingInForDay(true)
     const position = impersonating ? null : await getCurrentPositionSafe()
     if (!position && !impersonating) {
       setClockingInForDay(false)
@@ -438,13 +518,25 @@ export default function AdminDashboard({ profile }) {
         clock_in_lat: position?.latitude ?? null,
         clock_in_lng: position?.longitude ?? null,
         late_flag: ukTimeHHMM(now.getTime()) > dailyClockInDeadline,
+        clock_in_location_type: gateLocationType,
+        clock_in_location_ticket_id: gateLocationType === 'job' ? gateLocationTicketId : null,
+        clock_in_location_property_id: gateLocationType === 'property' ? gateLocationPropertyId : null,
+        clock_in_location_note: gateLocationType === 'other' ? gateOtherNote.trim() : null,
       })
-      .select('id, work_date, clock_in_at, late_flag')
+      .select('id, work_date, clock_in_at, late_flag, clock_in_location_type, clock_in_location_ticket_id, clock_in_location_property_id, clock_in_location_note')
       .single()
 
     setClockingInForDay(false)
     if (error) { setClockInForDayError(error.message); return }
     setDailyShift(data)
+    // Reset the gate for next time (tomorrow's clock-in) -- otherwise a
+    // stale pick from today would silently pre-fill the confirm step.
+    setGateStep('choose')
+    setGateLocationType(null)
+    setGateLocationTicketId(null)
+    setGateLocationPropertyId(null)
+    setGateLocationPropertyAddress('')
+    setGateOtherNote('')
   }
 
   async function fetchOpenLeg() {
@@ -459,6 +551,16 @@ export default function AdminDashboard({ profile }) {
       .limit(1)
       .maybeSingle()
     setOpenLeg(data || null)
+  }
+
+  // Reuses travelProperties/setTravelProperties (Log a Visit's own property
+  // list, same portfolio-wide fetch) for the clock-in gate's "A Property"
+  // step too, rather than a second identical query.
+  async function fetchGateProperties() {
+    if (travelProperties.length === 0) {
+      const { data } = await supabase.schema('pmms').from('properties').select('id, address, high_vulnerability').order('address')
+      setTravelProperties(data || [])
+    }
   }
 
   // showDone: whether this picker is a continuation right after Finishing
@@ -1124,23 +1226,133 @@ export default function AdminDashboard({ profile }) {
       )
     }
     if (!dailyShift) {
-      return (
-        <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: COLORS.slate100, fontFamily: 'system-ui, sans-serif', padding: '20px' }}>
-          <div style={{ width: '100%', maxWidth: '380px', background: COLORS.white, borderRadius: '20px', padding: '28px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', textAlign: 'center' }}>
-            <p style={{ fontSize: '13px', fontWeight: 800, color: COLORS.teal700, letterSpacing: '0.08em', textTransform: 'uppercase', margin: '0 0 16px' }}>GBCH PMMS</p>
-            <h1 style={{ margin: '0 0 6px 0', fontSize: '18px', fontWeight: 800, color: COLORS.slate900 }}>Good {new Date().getHours() < 12 ? 'morning' : 'afternoon'}, {profile.name.split(' ')[0]}</h1>
-            <p style={{ margin: '0 0 22px 0', fontSize: '13px', color: COLORS.slate500, lineHeight: 1.5 }}>Clock in to start your working day and access PMMS.</p>
+      const greeting = <>
+        <p style={{ fontSize: '13px', fontWeight: 800, color: COLORS.teal700, letterSpacing: '0.08em', textTransform: 'uppercase', margin: '0 0 16px' }}>GBCH PMMS</p>
+        <h1 style={{ margin: '0 0 6px 0', fontSize: '18px', fontWeight: 800, color: COLORS.slate900 }}>Good {new Date().getHours() < 12 ? 'morning' : 'afternoon'}, {profile.name.split(' ')[0]}</h1>
+      </>
+
+      let inner
+      if (gateStep === 'pick-job') {
+        inner = (
+          <>
+            {greeting}
+            <p style={{ margin: '0 0 12px 0', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em', textAlign: 'left' }}>Which job?</p>
+            {gateOpenTickets === null ? (
+              <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>Loading open jobs...</p>
+            ) : gateOpenTickets.length === 0 ? (
+              <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>No open jobs to pick from.</p>
+            ) : (
+              <div style={{ border: `1px solid ${COLORS.slate200}`, borderRadius: '12px', overflow: 'hidden', background: COLORS.white, textAlign: 'left', maxHeight: '280px', overflowY: 'auto' }}>
+                {gateOpenTickets.map((t, i) => (
+                  <button
+                    key={t.id}
+                    onClick={() => { setGateLocationTicketId(t.id); setGateStep('confirm') }}
+                    style={{ display: 'block', width: '100%', textAlign: 'left', padding: '12px 14px', border: 'none', borderBottom: i < gateOpenTickets.length - 1 ? `1px solid ${COLORS.slate200}` : 'none', background: COLORS.white, cursor: 'pointer' }}
+                  >
+                    <span style={{ display: 'block', fontSize: '10.5px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.05em' }}>#{t.ticket_number} · {t.category}</span>
+                    <span style={{ display: 'block', fontSize: '13.5px', fontWeight: 800, color: COLORS.slate900, marginTop: '2px' }}>{t.property?.address}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            <button onClick={() => setGateStep('choose')} style={{ marginTop: '16px', background: 'none', border: 'none', fontSize: '12px', color: COLORS.slate400, cursor: 'pointer', textDecoration: 'underline' }}>← Back</button>
+          </>
+        )
+      } else if (gateStep === 'pick-property') {
+        inner = (
+          <>
+            {greeting}
+            <p style={{ margin: '0 0 12px 0', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em', textAlign: 'left' }}>Which property?</p>
+            {travelProperties.length === 0 ? (
+              <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic' }}>Loading properties...</p>
+            ) : (
+              <div style={{ border: `1px solid ${COLORS.slate200}`, borderRadius: '12px', overflow: 'hidden', background: COLORS.white, textAlign: 'left', maxHeight: '280px', overflowY: 'auto' }}>
+                {travelProperties.map((p, i) => (
+                  <button
+                    key={p.id}
+                    onClick={() => { setGateLocationPropertyId(p.id); setGateLocationPropertyAddress(p.address); setGateStep('confirm') }}
+                    style={{ display: 'block', width: '100%', textAlign: 'left', padding: '12px 14px', border: 'none', borderBottom: i < travelProperties.length - 1 ? `1px solid ${COLORS.slate200}` : 'none', background: COLORS.white, cursor: 'pointer', fontSize: '13.5px', fontWeight: 700, color: COLORS.slate900 }}
+                  >
+                    {p.address}
+                  </button>
+                ))}
+              </div>
+            )}
+            <button onClick={() => setGateStep('choose')} style={{ marginTop: '16px', background: 'none', border: 'none', fontSize: '12px', color: COLORS.slate400, cursor: 'pointer', textDecoration: 'underline' }}>← Back</button>
+          </>
+        )
+      } else if (gateStep === 'confirm') {
+        const isOther = gateLocationType === 'other'
+        const label = gateLocationType === 'office' ? 'The Office'
+          : gateLocationType === 'job' ? (() => { const t = (gateOpenTickets || []).find(x => x.id === gateLocationTicketId); return t ? `Job #${t.ticket_number} — ${t.property?.address}` : 'A Job' })()
+          : gateLocationType === 'property' ? gateLocationPropertyAddress
+          : 'Other'
+        inner = (
+          <>
+            {greeting}
+            <div style={{ background: COLORS.slate50, border: `1px solid ${COLORS.slate200}`, borderRadius: '10px', padding: '12px 14px', margin: '0 0 16px 0', textAlign: 'left' }}>
+              <p style={{ margin: 0, fontSize: '10.5px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Clocking in from</p>
+              <p style={{ margin: '4px 0 0 0', fontSize: '14px', fontWeight: 800, color: COLORS.slate900 }}>{label}</p>
+            </div>
+            {isOther && (
+              <input
+                type="text"
+                autoFocus
+                value={gateOtherNote}
+                onChange={(e) => setGateOtherNote(e.target.value)}
+                placeholder="Describe where you are..."
+                style={{ width: '100%', padding: '13px 14px', borderRadius: '12px', border: `1px solid ${COLORS.slate200}`, fontSize: '14px', boxSizing: 'border-box', marginBottom: '16px' }}
+              />
+            )}
             <button
               onClick={handleDailyClockIn}
-              disabled={clockingInForDay}
-              style={{ width: '100%', padding: '16px', background: COLORS.teal600, color: COLORS.white, border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: 700, cursor: clockingInForDay ? 'not-allowed' : 'pointer', opacity: clockingInForDay ? 0.7 : 1 }}
+              disabled={clockingInForDay || (isOther && !gateOtherNote.trim())}
+              style={{ width: '100%', padding: '16px', background: COLORS.teal600, color: COLORS.white, border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: 700, cursor: (clockingInForDay || (isOther && !gateOtherNote.trim())) ? 'not-allowed' : 'pointer', opacity: (clockingInForDay || (isOther && !gateOtherNote.trim())) ? 0.7 : 1 }}
             >
               {clockingInForDay ? 'Getting your location…' : '✓ Clock In for the Day'}
             </button>
             {clockInForDayError && <p style={{ margin: '12px 0 0 0', fontSize: '13px', color: COLORS.red500, fontWeight: 600 }}>{clockInForDayError}</p>}
+            <button onClick={() => setGateStep('choose')} style={{ marginTop: '16px', background: 'none', border: 'none', fontSize: '12px', color: COLORS.slate400, cursor: 'pointer', textDecoration: 'underline' }}>← Back</button>
+          </>
+        )
+      } else {
+        inner = (
+          <>
+            {greeting}
+            <p style={{ margin: '0 0 24px 0', fontSize: '13px', color: COLORS.slate500, lineHeight: 1.5 }}>Where are you clocking in from?</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {[
+                { type: 'office', label: '🏢 The Office' },
+                { type: 'job', label: '🔧 A Job' },
+                { type: 'property', label: '🏘️ A Property' },
+                { type: 'other', label: '📍 Other' },
+              ].map(o => (
+                <button
+                  key={o.type}
+                  onClick={() => {
+                    setGateLocationType(o.type)
+                    if (o.type === 'job') { fetchGateOpenTickets(); setGateStep('pick-job') }
+                    else if (o.type === 'property') { fetchGateProperties(); setGateStep('pick-property') }
+                    else setGateStep('confirm')
+                  }}
+                  style={{ width: '100%', padding: '16px', borderRadius: '12px', fontSize: '15px', fontWeight: 700, cursor: 'pointer', border: `1px solid ${COLORS.slate200}`, background: COLORS.slate50, color: COLORS.slate900, boxSizing: 'border-box' }}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+            {clockInForDayError && <p style={{ margin: '12px 0 0 0', fontSize: '13px', color: COLORS.red500, fontWeight: 600 }}>{clockInForDayError}</p>}
             <button onClick={handleSignOut} style={{ marginTop: '18px', background: 'none', border: 'none', fontSize: '12px', color: COLORS.slate400, cursor: 'pointer', textDecoration: 'underline' }}>
               Sign out
             </button>
+          </>
+        )
+      }
+
+      return (
+        <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: COLORS.slate100, fontFamily: 'system-ui, sans-serif', padding: '20px' }}>
+          <div style={{ width: '100%', maxWidth: '380px', background: COLORS.white, borderRadius: '20px', padding: '28px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', textAlign: 'center' }}>
+            {inner}
           </div>
         </div>
       )
@@ -1212,6 +1424,7 @@ export default function AdminDashboard({ profile }) {
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
                 <span style={{ fontSize: '13px', fontWeight: 600, color: dailyShift.late_flag ? COLORS.amber900 : COLORS.slate600 }}>
                   {dailyShift.late_flag ? '⚠ ' : '🟢 '}Clocked in since {formatUKDateTime(dailyShift.clock_in_at).split(' ').slice(-1)[0]}
+                  {dailyShiftLocationLabel && ` — ${dailyShiftLocationLabel}`}
                   {dailyShift.late_flag && ` (${minutesLate(dailyShift.clock_in_at, dailyClockInDeadline)}m late)`}
                 </span>
                 <button

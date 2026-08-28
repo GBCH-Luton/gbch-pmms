@@ -7,7 +7,7 @@ import {
   thStyle, tdStyle, actionBtnStyle, filterSelectStyle, formatUKDate, formatUKDateTime, toUkDateTimeInputValue, ukDateTimeInputValueToMs,
   ukDateKey, ukTimeHHMM, minutesLate, shiftDateKey, mondayOfWeek,
   modalOverlayStyle, modalCardStyle, modalTitleStyle, modalLabelStyle,
-  modalErrorStyle, modalCancelBtnStyle, modalConfirmBtnStyle, fetchAssignableBuilders, fetchAssignableStaffForDivision, fetchAssignableStaffForRole, fetchLastEndedSessionsToday, SHORT_TRIP_REASONS, STAFF_AVAILABILITY_STYLES,
+  modalErrorStyle, modalCancelBtnStyle, modalConfirmBtnStyle, fetchAssignableBuilders, fetchAssignableStaffForDivision, fetchAssignableStaffForManagerRoles, fetchLastEndedSessionsToday, SHORT_TRIP_REASONS, STAFF_AVAILABILITY_STYLES,
   activityCategoryMeta, ACTIVITY_CATEGORY_META,
 } from './shared'
 
@@ -448,15 +448,13 @@ export default function AdminClocking({ profile, onNavigate, initialReopenHistor
       .select('id, name, home_postcode, home_latitude, home_longitude')
     setAllStaff(builderData || [])
     const assignableBuilders = await (profile.division ? fetchAssignableStaffForDivision(profile.division) : fetchAssignableBuilders())
-    // The Landlord Liaison Manager has her own daily clock-in/out (see
+    // Every manager-tier role has their own daily clock-in/out now (see
     // requiresDailyClocking in pages/AdminDashboard.jsx) but no builder-
     // level role, so fetchAssignableStaffForDivision/fetchAssignableBuilders
-    // above never include her -- merged in here the same way
+    // above never include them -- merged in here the same way
     // admin/AdminDashboard.jsx's TeamWhereabouts already does, so a manager
-    // reviewing this page can actually see/override her attendance.
-    const clockingManagers = (!profile.division || profile.division === 'Landlord Liaison')
-      ? (await fetchAssignableStaffForRole('Landlord Liaison Manager')).map(s => ({ ...s, division: 'Landlord Liaison' }))
-      : []
+    // reviewing this page can actually see/override their attendance.
+    const clockingManagers = await fetchAssignableStaffForManagerRoles(profile.division)
     const assignableStaff = [...assignableBuilders, ...clockingManagers]
     setBuilders(assignableStaff)
 
