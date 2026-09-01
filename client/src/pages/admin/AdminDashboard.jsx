@@ -49,6 +49,43 @@ const AWAY_PILL_LABEL = {
   visit_other: 'Travelling',
 }
 
+// Short pill text for someone who's clocked in but hasn't started or
+// finished anything yet today -- the clock_in_location_* fields ([[project_clock_in_location_picker]],
+// mandatory since 2026-08-27) already say where from, so "Idle" with no
+// context is a step backwards from what the picker was built to fix.
+// Deliberately generic/short like AWAY_PILL_LABEL above -- the specific
+// job/property/note goes on the clock-in timeline entry instead (see
+// clockInLocationDetailSuffix), not crammed into the pill.
+function clockInLocationLabel(locationType, note) {
+  switch (locationType) {
+    case 'office': return 'At the office'
+    case 'job': return 'At a job'
+    case 'property': return 'At a property'
+    // 'other' is free text (e.g. "Home", now that the dedicated Home button
+    // is gone) -- show it directly rather than a generic word, capped so a
+    // long note can't blow out the pill the way a full address would.
+    case 'other': return note ? (note.length > 24 ? `${note.slice(0, 24)}…` : note) : 'Elsewhere'
+    default: return null
+  }
+}
+
+// Full detail for the same clock-in, appended to its timeline log entry.
+function clockInLocationDetailSuffix(a, ticketsById, propertiesById) {
+  switch (a.clock_in_location_type) {
+    case 'office': return ' — at the office'
+    case 'job': {
+      const t = a.clock_in_location_ticket_id ? ticketsById[a.clock_in_location_ticket_id] : null
+      return t ? ` — Job #${t.ticket_number}` : ' — at a job'
+    }
+    case 'property': {
+      const p = a.clock_in_location_property_id ? propertiesById[a.clock_in_location_property_id] : null
+      return p ? ` — ${p.address}` : ' — at a property'
+    }
+    case 'other': return a.clock_in_location_note ? ` — ${a.clock_in_location_note}` : ' — elsewhere'
+    default: return ''
+  }
+}
+
 // Collapsed/expanded state is deliberately session-only, not persisted --
 // every page load/refresh always comes back to the same layout (Ticket
 // Pipeline open, everything else collapsed), regardless of what an admin
@@ -278,7 +315,7 @@ function TeamWhereabouts({ profile, onNavigate, height = DASHBOARD_TOP_CARD_HEIG
     const deadline = deadlineRow?.setting_value || '09:00'
 
     const [{ data: attendanceData }, { data: activityData }, { data: openSessions }, { data: auditData }, { data: onHoldShortTrips }] = await Promise.all([
-      supabase.schema('pmms').from('daily_attendance').select('id, staff_id, clock_in_at, late_flag, clock_out_at, early_leave_reason, clock_in_lat, clock_in_lng').or(`work_date.eq.${todayKey},clock_out_at.is.null`),
+      supabase.schema('pmms').from('daily_attendance').select('id, staff_id, clock_in_at, late_flag, clock_out_at, early_leave_reason, clock_in_lat, clock_in_lng, clock_in_location_type, clock_in_location_ticket_id, clock_in_location_property_id, clock_in_location_note').or(`work_date.eq.${todayKey},clock_out_at.is.null`),
       supabase.schema('pmms').from('activity_log').select('id, staff_id, activity_type, activity_category, note, end_note, started_at, started_lat, started_lng, arrived_at, ended_at, ticket_id, destination_ticket_id, destination_property_id, mileage_logged').or(`started_at.gte.${todayKey}T00:00:00,ended_at.is.null`),
       supabase.schema('pmms').from('work_sessions').select('id, ticket_id, builder_id, started_at').is('ended_at', null),
       // Job start/resume/complete/pause/no-access events -- these were
@@ -306,6 +343,7 @@ function TeamWhereabouts({ profile, onNavigate, height = DASHBOARD_TOP_CARD_HEIG
       ...(activityData || []).map(a => a.destination_ticket_id).filter(Boolean),
       ...(openSessions || []).map(s => s.ticket_id),
       ...(auditData || []).map(a => a.ticket_id).filter(Boolean),
+      ...(attendanceData || []).map(a => a.clock_in_location_ticket_id).filter(Boolean),
     ])]
     let ticketsById = {}
     if (ticketIds.length > 0) {
@@ -321,6 +359,7 @@ function TeamWhereabouts({ profile, onNavigate, height = DASHBOARD_TOP_CARD_HEIG
     const propertyIds = [...new Set([
       ...Object.values(ticketsById).map(t => t.property_id).filter(Boolean),
       ...(activityData || []).map(a => a.destination_property_id).filter(Boolean),
+      ...(attendanceData || []).map(a => a.clock_in_location_property_id).filter(Boolean),
     ])]
     let propertiesById = {}
     if (propertyIds.length > 0) {
@@ -423,7 +462,16 @@ function TeamWhereabouts({ profile, onNavigate, height = DASHBOARD_TOP_CARD_HEIG
           const lastActivity = lastActivityEndedByBuilder[b.id]
           const lastJobEndedAt = lastEndedByBuilder[b.id]?.ended_at || null
           const activityIsMostRecent = lastActivity && (!lastJobEndedAt || new Date(lastActivity.ended_at) > new Date(lastJobEndedAt))
-          status = (activityIsMostRecent && IDLE_CONTEXT_LABEL[lastActivity.activity_category]) || 'Idle'
+          // Nothing at all has happened yet since this morning's clock-in --
+          // the only case plain "Idle" is actually a downgrade from what we
+          // know, since the clock-in location picker already captured where
+          // they are. Once a job or activity has actually happened, that's
+          // more current than a now-stale clock-in location, so this only
+          // applies before anything else today.
+          const nothingSinceClockIn = !lastActivity && !lastJobEndedAt
+          status = (activityIsMostRecent && IDLE_CONTEXT_LABEL[lastActivity.activity_category])
+            || (nothingSinceClockIn && clockInLocationLabel(shift?.clock_in_location_type, shift?.clock_in_location_note))
+            || 'Idle'
           tone = 'available'
         }
       }
@@ -493,7 +541,7 @@ function TeamWhereabouts({ profile, onNavigate, height = DASHBOARD_TOP_CARD_HEIG
       if (!b) return
       entries.push({
         id: `${a.id}-in`, time: a.clock_in_at, staffId: a.staff_id, staffName: b.name, tone: 'in',
-        text: a.late_flag ? `clocked in (${minutesLate(a.clock_in_at, deadline)}m late)` : 'clocked in',
+        text: (a.late_flag ? `clocked in (${minutesLate(a.clock_in_at, deadline)}m late)` : 'clocked in') + clockInLocationDetailSuffix(a, ticketsById, propertiesById),
       })
       if (a.clock_out_at) {
         entries.push({
