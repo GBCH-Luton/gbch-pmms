@@ -390,6 +390,7 @@ export function KpiTiles({ kpis, onTileClick, columns }) {
 export const COMPLIANCE_TYPES = [
   { key: 'gas_safety', title: 'Gas Safety (CP12)' },
   { key: 'electrical_safety', title: 'Electrical Safety (EICR)' },
+  { key: 'epc', title: 'EPC (Energy Performance Certificate)' },
   { key: 'pat_testing', title: 'PAT Testing' },
   { key: 'fire_risk_assessment', title: 'Fire Risk Assessment' },
   { key: 'fire_alarm_test_log', title: 'Fire Alarm Test Log' },
