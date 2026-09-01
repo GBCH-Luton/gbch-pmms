@@ -18,11 +18,42 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { COLORS } from '../../lib/colors'
-import { modalLabelStyle, modalErrorStyle, formatUKDate, COMPLIANCE_TYPES, RAG_STYLES, RagPill, computeComplianceAging } from './shared'
+import {
+  modalOverlayStyle, modalCardStyle, modalTitleStyle, modalLabelStyle, modalErrorStyle, modalCancelBtnStyle,
+  formatUKDate, COMPLIANCE_TYPES, RAG_STYLES, RagPill, computeComplianceAging,
+} from './shared'
 import { compressImage } from '../../lib/imageCompression'
 import { getSignedUrl } from '../../lib/storage'
 
-function ComplianceCard({ type, record, onUpload, onSave, thresholdDays, readOnly = false }) {
+// A Compliance staff member can upload a certificate under the wrong type
+// by mistake (e.g. a Gas cert saved onto the Electrical Safety card) with
+// no way to undo it -- this mirrors PropertyDocumentsTab.jsx's own
+// DeleteConfirmModal so removing a wrongly-placed record needs a deliberate
+// confirm click, not a bare X.
+function DeleteConfirmModal({ type, onCancel, onConfirm, deleting }) {
+  return (
+    <div style={modalOverlayStyle}>
+      <div style={{ ...modalCardStyle, maxWidth: '380px' }}>
+        <p style={modalTitleStyle}>Remove {type.title}</p>
+        <p style={{ margin: '10px 0 0 0', fontSize: '13px', color: COLORS.slate500 }}>
+          This clears the expiry date, certificate file, and notes recorded here. This cannot be undone. Are you sure?
+        </p>
+        <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
+          <button onClick={onCancel} style={modalCancelBtnStyle}>Cancel</button>
+          <button
+            onClick={onConfirm}
+            disabled={deleting}
+            style={{ flex: 2, padding: '10px', background: COLORS.red600, color: COLORS.white, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: deleting ? 'not-allowed' : 'pointer', opacity: deleting ? 0.6 : 1 }}
+          >
+            {deleting ? 'Removing...' : 'Remove'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ComplianceCard({ type, record, onUpload, onSave, onDeleteRequest, thresholdDays, readOnly = false }) {
   const [expiryDate, setExpiryDate] = useState(record?.expiry_date || '')
   const [notes, setNotes] = useState(record?.notes || '')
   const [notApplicable, setNotApplicable] = useState(!!record?.not_applicable)
@@ -71,7 +102,22 @@ function ComplianceCard({ type, record, onUpload, onSave, thresholdDays, readOnl
   return (
     <div style={{ background: COLORS.white, borderRadius: '16px', padding: '18px 20px', marginBottom: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', marginBottom: '12px', flexWrap: 'wrap' }}>
-        <p style={{ margin: 0, fontSize: '14px', fontWeight: 800, color: COLORS.slate900 }}>{type.title}</p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <p style={{ margin: 0, fontSize: '14px', fontWeight: 800, color: COLORS.slate900 }}>{type.title}</p>
+          {!readOnly && record && (
+            <button
+              onClick={() => onDeleteRequest(type)}
+              title="Remove this record"
+              aria-label={`Remove ${type.title} record`}
+              style={{
+                width: '20px', height: '20px', borderRadius: '50%', border: 'none', background: COLORS.red100, color: COLORS.red600,
+                fontSize: '12px', fontWeight: 800, lineHeight: '20px', textAlign: 'center', padding: 0, cursor: 'pointer', flexShrink: 0,
+              }}
+            >
+              ✕
+            </button>
+          )}
+        </div>
         <RagPill tier={rag.tier} label={rag.label} />
       </div>
 
@@ -154,6 +200,8 @@ export default function PropertyComplianceTab({ property, profile }) {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [thresholdDays, setThresholdDays] = useState(90)
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     fetchCompliance()
@@ -235,6 +283,22 @@ export default function PropertyComplianceTab({ property, profile }) {
     return upsertRecord(certType, { cert_url: certUrl })
   }
 
+  async function handleDeleteConfirm() {
+    const record = records[deleteTarget.key]
+    setDeleting(true)
+    const { error } = await supabase.schema('pmms').from('property_compliance').delete().eq('id', record.id)
+    setDeleting(false)
+
+    if (!error) {
+      setRecords(prev => {
+        const next = { ...prev }
+        delete next[deleteTarget.key]
+        return next
+      })
+    }
+    setDeleteTarget(null)
+  }
+
   if (loading) {
     return (
       <div style={{ minHeight: '120px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -278,10 +342,20 @@ export default function PropertyComplianceTab({ property, profile }) {
           record={records[type.key]}
           onUpload={handleUpload}
           onSave={upsertRecord}
+          onDeleteRequest={setDeleteTarget}
           thresholdDays={thresholdDays}
           readOnly={readOnly}
         />
       ))}
+
+      {deleteTarget && (
+        <DeleteConfirmModal
+          type={deleteTarget}
+          onCancel={() => setDeleteTarget(null)}
+          onConfirm={handleDeleteConfirm}
+          deleting={deleting}
+        />
+      )}
     </div>
   )
 }
