@@ -207,6 +207,16 @@ function isNavItemVisible(item, profile) {
   return true
 }
 
+// A lone "." or other punctuation-only text technically passes .trim(),
+// letting someone tap through the clock-in gate's required "Other" note
+// without actually describing anything -- found live 2026-09-01 (a
+// staff member's note was literally "."), same fix as
+// BuilderDashboard.jsx's own hasMeaningfulNote. Requires at least one
+// real letter/digit instead of just non-empty.
+function hasMeaningfulNote(note) {
+  return /[a-zA-Z0-9]/.test(note)
+}
+
 export default function AdminDashboard({ profile }) {
   // Kept in the URL (?page=...), not plain useState -- so a browser refresh
   // (which fully reboots the SPA and loses all in-memory state) lands back
@@ -497,7 +507,7 @@ export default function AdminDashboard({ profile }) {
     const impersonating = !!getImpersonationMarker()
     if (!impersonating) {
       if (!gateLocationType) { setClockInForDayError('Please choose where you\'re clocking in from.'); return }
-      if (gateLocationType === 'other' && !gateOtherNote.trim()) { setClockInForDayError('Please describe where you are.'); return }
+      if (gateLocationType === 'other' && !hasMeaningfulNote(gateOtherNote)) { setClockInForDayError('Please describe where you are.'); return }
     }
     setClockingInForDay(true)
     const position = impersonating ? null : await getCurrentPositionSafe()
@@ -1306,8 +1316,8 @@ export default function AdminDashboard({ profile }) {
             )}
             <button
               onClick={handleDailyClockIn}
-              disabled={clockingInForDay || (isOther && !gateOtherNote.trim())}
-              style={{ width: '100%', padding: '16px', background: COLORS.teal600, color: COLORS.white, border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: 700, cursor: (clockingInForDay || (isOther && !gateOtherNote.trim())) ? 'not-allowed' : 'pointer', opacity: (clockingInForDay || (isOther && !gateOtherNote.trim())) ? 0.7 : 1 }}
+              disabled={clockingInForDay || (isOther && !hasMeaningfulNote(gateOtherNote))}
+              style={{ width: '100%', padding: '16px', background: COLORS.teal600, color: COLORS.white, border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: 700, cursor: (clockingInForDay || (isOther && !hasMeaningfulNote(gateOtherNote))) ? 'not-allowed' : 'pointer', opacity: (clockingInForDay || (isOther && !hasMeaningfulNote(gateOtherNote))) ? 0.7 : 1 }}
             >
               {clockingInForDay ? 'Getting your location…' : '✓ Clock In for the Day'}
             </button>

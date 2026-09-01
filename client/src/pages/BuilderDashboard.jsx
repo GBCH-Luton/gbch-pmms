@@ -58,6 +58,15 @@ const ROAD_DISTANCE_MULTIPLIER = 1.3
 const SHOW_JOB_LIST = false
 const SHOW_NEARBY_JOBS = false
 
+// A lone "." or other punctuation-only text technically passes .trim(),
+// letting someone tap through the clock-in gate's required "Other" note
+// without actually describing anything -- found live 2026-09-01 (Daniel's
+// note was literally "."), which is exactly why Where's the Team's new
+// location pill (see AdminDashboard.jsx) showed nothing meaningful for
+// him. Requires at least one real letter/digit instead of just non-empty.
+function hasMeaningfulNote(note) {
+  return /[a-zA-Z0-9]/.test(note)
+}
 
 // Shared by every Leaving Site sub-page below -- same header (Back + logo +
 // hamburger, with the full nav menu behind it) every other full-screen
@@ -851,7 +860,7 @@ export default function BuilderDashboard({ profile }) {
 
   async function handleClockInForDay() {
     if (!gateLocationType) return
-    if (gateLocationType === 'other' && !gateOtherNote.trim()) return
+    if (gateLocationType === 'other' && !hasMeaningfulNote(gateOtherNote)) return
 
     setClockInForDayError('')
     setClockingInForDay(true)
@@ -2220,8 +2229,8 @@ export default function BuilderDashboard({ profile }) {
           )}
           <button
             onClick={handleClockInForDay}
-            disabled={clockingInForDay || (isOther && !gateOtherNote.trim())}
-            style={{ width: '100%', padding: '16px', background: COLORS.teal600, color: COLORS.white, border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: 700, cursor: (clockingInForDay || (isOther && !gateOtherNote.trim())) ? 'not-allowed' : 'pointer', opacity: (clockingInForDay || (isOther && !gateOtherNote.trim())) ? 0.7 : 1 }}
+            disabled={clockingInForDay || (isOther && !hasMeaningfulNote(gateOtherNote))}
+            style={{ width: '100%', padding: '16px', background: COLORS.teal600, color: COLORS.white, border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: 700, cursor: (clockingInForDay || (isOther && !hasMeaningfulNote(gateOtherNote))) ? 'not-allowed' : 'pointer', opacity: (clockingInForDay || (isOther && !hasMeaningfulNote(gateOtherNote))) ? 0.7 : 1 }}
           >
             {clockingInForDay ? 'Getting your location…' : '✓ Clock In for the Day'}
           </button>
