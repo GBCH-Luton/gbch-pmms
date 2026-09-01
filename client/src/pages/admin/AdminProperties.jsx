@@ -27,6 +27,7 @@ import PropertyComplianceTab from './PropertyComplianceTab'
 import PropertyAssetsTab from './PropertyAssetsTab'
 import PropertyMaintenanceTab from './PropertyMaintenanceTab'
 import PropertyLeaseLegalTab from './PropertyLeaseLegalTab'
+import PropertyUtilityBillsTab from './PropertyUtilityBillsTab'
 import PropertyDocumentsTab from './PropertyDocumentsTab'
 import PropertyNotesTab from './PropertyNotesTab'
 import PropertyRoomsTab from './PropertyRoomsTab'
@@ -39,7 +40,8 @@ import AttachmentMedia from '../../components/AttachmentMedia'
 import PrintablePropertyReport from '../../components/PrintablePropertyReport'
 
 const PROPERTY_TYPES = ['House', 'Flat', 'HMO', 'Commercial', 'Other']
-const ALL_PROFILE_TABS = ['Core', 'Compliance', 'Assets', 'Maintenance', 'Lease & Legal', 'Documents', 'Notes', 'Rooms', 'Restrictions', 'Gardens', 'Inventory', 'Dimensions']
+const OCCUPANCY_TYPES = ['Self Contained', 'Shared']
+const ALL_PROFILE_TABS = ['Core', 'Compliance', 'Assets', 'Maintenance', 'Lease & Legal', 'Utility Bills', 'Documents', 'Notes', 'Rooms', 'Restrictions', 'Gardens', 'Inventory', 'Dimensions']
 // Division-scoped managers only see the tabs relevant to what they
 // actually do -- everything else here is out of scope for their role,
 // even though the underlying RLS doesn't enforce this (see
@@ -176,6 +178,7 @@ export default function AdminProperties({ profile, onNavigate, initialProperties
   const [editTown, setEditTown] = useState('')
   const [editType, setEditType] = useState('House')
   const [editStatus, setEditStatus] = useState('Procured')
+  const [editOccupancy, setEditOccupancy] = useState('Shared')
   const [editSaving, setEditSaving] = useState(false)
   const [editError, setEditError] = useState('')
 
@@ -185,6 +188,7 @@ export default function AdminProperties({ profile, onNavigate, initialProperties
   const [addTown, setAddTown] = useState('')
   const [addType, setAddType] = useState('House')
   const [addStatus, setAddStatus] = useState('Procured')
+  const [addOccupancy, setAddOccupancy] = useState('Shared')
   const [addSaving, setAddSaving] = useState(false)
   const [addError, setAddError] = useState('')
 
@@ -291,6 +295,7 @@ export default function AdminProperties({ profile, onNavigate, initialProperties
     setEditTown(property.town || '')
     setEditType(property.property_type || 'House')
     setEditStatus(property.status || 'Procured')
+    setEditOccupancy(property.occupancy_type || 'Shared')
     setEditError('')
     setTicketsSectionOpen(false)
     setShowAllOpenTickets(false)
@@ -348,6 +353,7 @@ export default function AdminProperties({ profile, onNavigate, initialProperties
         town: editTown || null,
         property_type: editType,
         status: editStatus,
+        occupancy_type: editOccupancy,
       })
       .eq('id', selectedProperty.id)
 
@@ -369,7 +375,7 @@ export default function AdminProperties({ profile, onNavigate, initialProperties
       })
     }
 
-    const updated = { ...selectedProperty, address: editAddress.trim(), postcode: editPostcode.trim() || null, town: editTown || null, property_type: editType, status: editStatus }
+    const updated = { ...selectedProperty, address: editAddress.trim(), postcode: editPostcode.trim() || null, town: editTown || null, property_type: editType, status: editStatus, occupancy_type: editOccupancy }
     setSelectedProperty(updated)
     setProperties(prev => prev.map(p => p.id === updated.id ? updated : p))
     setEditing(false)
@@ -381,6 +387,7 @@ export default function AdminProperties({ profile, onNavigate, initialProperties
     setAddTown('')
     setAddType('House')
     setAddStatus('Procured')
+    setAddOccupancy('Shared')
     setAddError('')
     setShowAddModal(true)
   }
@@ -399,6 +406,7 @@ export default function AdminProperties({ profile, onNavigate, initialProperties
         town: addTown || null,
         property_type: addType,
         status: addStatus,
+        occupancy_type: addOccupancy,
       })
       .select('id')
 
@@ -585,6 +593,11 @@ export default function AdminProperties({ profile, onNavigate, initialProperties
                 <option value="Inactive">Inactive</option>
               </select>
 
+              <p style={modalLabelStyle}>Occupancy</p>
+              <select value={editOccupancy} onChange={(e) => setEditOccupancy(e.target.value)} style={inputStyle}>
+                {OCCUPANCY_TYPES.map(o => <option key={o} value={o}>{o}</option>)}
+              </select>
+
               {editError && <p style={modalErrorStyle}>{editError}</p>}
 
               <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
@@ -703,6 +716,8 @@ export default function AdminProperties({ profile, onNavigate, initialProperties
                 <PropertyMaintenanceTab property={selectedProperty} onNavigate={onNavigate} />
               ) : effectiveActiveTab === 'Lease & Legal' ? (
                 <PropertyLeaseLegalTab property={selectedProperty} onFieldsSaved={handleCoreFieldsSaved} profile={profile} />
+              ) : effectiveActiveTab === 'Utility Bills' ? (
+                <PropertyUtilityBillsTab property={selectedProperty} profile={profile} />
               ) : effectiveActiveTab === 'Documents' ? (
                 <PropertyDocumentsTab property={selectedProperty} profile={profile} />
               ) : effectiveActiveTab === 'Notes' ? (
@@ -902,6 +917,11 @@ export default function AdminProperties({ profile, onNavigate, initialProperties
               <option value="Procured">Procured</option>
               <option value="Live">Live</option>
               <option value="Inactive">Inactive</option>
+            </select>
+
+            <p style={modalLabelStyle}>Occupancy</p>
+            <select value={addOccupancy} onChange={(e) => setAddOccupancy(e.target.value)} style={inputStyle}>
+              {OCCUPANCY_TYPES.map(o => <option key={o} value={o}>{o}</option>)}
             </select>
 
             {addError && <p style={modalErrorStyle}>{addError}</p>}

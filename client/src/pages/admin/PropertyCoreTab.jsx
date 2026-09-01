@@ -23,6 +23,12 @@ import { getSignedUrl } from '../../lib/storage'
 
 const PROPERTY_TYPES = ['House', 'Flat', 'HMO', 'Specialist Supported Living', 'Commercial', 'Other']
 const TENURE_TYPES = ['Freehold', 'Leasehold', 'Rented']
+// Self Contained = the Service User pays their own utility bills directly.
+// Shared = GBCH pays, and the Utility Bills tab tracks it (see
+// scripts/add_property_utility_bills.sql). Also set from the Add/Edit
+// Property modal in AdminProperties.jsx, same dual-place pattern as
+// property_type/status already use.
+const OCCUPANCY_TYPES = ['Self Contained', 'Shared']
 // 'Internal' is for GBCH's own non-rental locations (e.g. the office) --
 // deliberately excluded from rental-scoped counts/reports (see
 // AdminProperties.jsx's Total Properties tile) since it isn't a property
@@ -550,6 +556,7 @@ export default function PropertyCoreTab({ property, onFieldsSaved, profile }) {
               { key: 'address', label: 'Full Address', type: 'text' },
               { key: 'property_type', label: 'Property Type', type: 'select', options: PROPERTY_TYPES },
               { key: 'tenure_type', label: 'Tenure Type', type: 'select', options: TENURE_TYPES },
+              { key: 'occupancy_type', label: 'Occupancy', type: 'select', options: OCCUPANCY_TYPES },
               { key: 'status', label: 'Property Status', type: 'select', options: PROPERTY_STATUSES },
               { key: 'unit_layout_type', label: 'Layout Type', type: 'select', options: UNIT_LAYOUT_TYPES },
               { key: 'construction_type', label: 'Construction Type', type: 'select', options: CONSTRUCTION_TYPES },
