@@ -1924,7 +1924,17 @@ export default function BuilderDashboard({ profile }) {
       .map(t => t.status_changed_at)
       .filter(Boolean)
       .sort()
-    return stopTimes.slice(-1)[0] || todayShift?.clock_in_at || null
+    const lastStop = stopTimes.slice(-1)[0] || null
+    const clockInAt = todayShift?.clock_in_at || null
+    // Never earlier than today's own clock-in -- found live: Craig put a
+    // job on hold Friday afternoon ("coming back the next working day"),
+    // then resumed it Monday morning, and this posted "Idle for 87h 46m"
+    // -- the entire weekend, when he simply wasn't clocked in at all, not
+    // idle. A leftover stop time from a previous shift/day is never a
+    // meaningful "how long have I been idle" reference once a fresh
+    // clock-in has happened since.
+    if (lastStop && clockInAt) return lastStop > clockInAt ? lastStop : clockInAt
+    return lastStop || clockInAt
   }
 
   const idleSince = computeIdleSince()
