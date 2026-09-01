@@ -54,8 +54,9 @@ const DIVISION_PROFILE_TABS = {
   // -- everything else is Maintenance/lettings-specific.
   Housekeeping: ['Core', 'Restrictions'],
   // Certificate tracking (their core job) plus Assets -- fire alarms,
-  // sprinklers, boilers etc. tie directly into compliance.
-  Compliance: ['Compliance', 'Assets'],
+  // sprinklers, boilers etc. tie directly into compliance. Utility Bills
+  // added 2026-09-01 at the Compliance Manager's own request.
+  Compliance: ['Compliance', 'Assets', 'Utility Bills'],
 }
 
 const DEFAULT_NEW_PROPERTY_WINDOW_HOURS = 48
