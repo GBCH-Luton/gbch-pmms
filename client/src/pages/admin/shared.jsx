@@ -802,6 +802,49 @@ export function firstOfMonth(dateKey) {
   return `${dateKey.slice(0, 7)}-01`
 }
 
+// Short pill text for someone who's clocked in but hasn't started or
+// finished anything yet today -- the clock_in_location_* fields
+// ([[project_clock_in_location_picker]], mandatory since 2026-08-27)
+// already say where from, so "Idle" with no context is a step backwards
+// from what the picker was built to fix. Deliberately generic/short --
+// the specific job/property/note goes through clockInLocationDetailSuffix
+// below instead, not crammed into the pill. Shared between
+// AdminDashboard.jsx's TeamWhereabouts (the live status pill) and
+// BuilderProfilePage.jsx (the attendance history table).
+export function clockInLocationLabel(locationType, note) {
+  switch (locationType) {
+    case 'office': return 'At the office'
+    case 'job': return 'At a job'
+    case 'property': return 'At a property'
+    // 'other' is free text (e.g. "Home", now that the dedicated Home button
+    // is gone) -- show it directly rather than a generic word, capped so a
+    // long note can't blow out the pill the way a full address would.
+    case 'other': return note ? (note.length > 24 ? `${note.slice(0, 24)}…` : note) : 'Elsewhere'
+    default: return null
+  }
+}
+
+// Full detail for the same clock-in -- e.g. appended to TeamWhereabouts'
+// timeline log entry, or shown directly on BuilderProfilePage.jsx's
+// attendance history rows. `a` is any object carrying the 4
+// clock_in_location_* columns (a daily_attendance row, or one of
+// fetchAttendanceSummary's own `days` entries -- same shape either way).
+export function clockInLocationDetailSuffix(a, ticketsById, propertiesById) {
+  switch (a.clock_in_location_type) {
+    case 'office': return ' — at the office'
+    case 'job': {
+      const t = a.clock_in_location_ticket_id ? ticketsById[a.clock_in_location_ticket_id] : null
+      return t ? ` — Job #${t.ticket_number}` : ' — at a job'
+    }
+    case 'property': {
+      const p = a.clock_in_location_property_id ? propertiesById[a.clock_in_location_property_id] : null
+      return p ? ` — ${p.address}` : ' — at a property'
+    }
+    case 'other': return a.clock_in_location_note ? ` — ${a.clock_in_location_note}` : ' — elsewhere'
+    default: return ''
+  }
+}
+
 // Aggregates pmms.daily_attendance for one staff member over an inclusive
 // UK-calendar-date range into per-day rows plus summary counts -- shared
 // by BuilderProfilePage.jsx (a manager looking at someone else's record)
@@ -815,7 +858,7 @@ export async function fetchAttendanceSummary(staffId, fromDateKey, toDateKey) {
   const { data: rows } = await supabase
     .schema('pmms')
     .from('daily_attendance')
-    .select('id, work_date, clock_in_at, clock_out_at, late_flag, early_leave_reason, clock_in_override, clock_out_override, missed_clock_out')
+    .select('id, work_date, clock_in_at, clock_out_at, late_flag, early_leave_reason, clock_in_override, clock_out_override, missed_clock_out, clock_in_location_type, clock_in_location_ticket_id, clock_in_location_property_id, clock_in_location_note')
     .eq('staff_id', staffId)
     .gte('work_date', fromDateKey)
     .lte('work_date', toDateKey)

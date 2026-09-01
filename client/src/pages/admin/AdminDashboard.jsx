@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, lazy, Suspense } from 'react'
 import { supabase } from '../../lib/supabase'
 import { COLORS } from '../../lib/colors'
-import { priorityTierLabel, fetchFlaggedClockingCount, isTicketStuck, KpiTiles, fetchComplianceAgingCounts, fetchVoidAgingCounts, fetchGardenReviewAging, fetchHousekeepingCounts, fetchContractorCounts, computeAvgResponseMs, formatDuration, fetchPriorityThresholds, fetchAssignableBuilders, fetchAssignableStaffForDivision, fetchAssignableStaffForManagerRoles, fetchLastEndedSessionsToday, ukDateKey, formatUKDate, formatUKDateTime, minutesLate, SHORT_TRIP_REASONS, activityCategoryMeta, ACTIVITY_CATEGORY_META, LANDLORD_LIAISON_PAGE_ENABLED } from './shared'
+import { priorityTierLabel, fetchFlaggedClockingCount, isTicketStuck, KpiTiles, fetchComplianceAgingCounts, fetchVoidAgingCounts, fetchGardenReviewAging, fetchHousekeepingCounts, fetchContractorCounts, computeAvgResponseMs, formatDuration, fetchPriorityThresholds, fetchAssignableBuilders, fetchAssignableStaffForDivision, fetchAssignableStaffForManagerRoles, fetchLastEndedSessionsToday, ukDateKey, formatUKDate, formatUKDateTime, minutesLate, SHORT_TRIP_REASONS, activityCategoryMeta, ACTIVITY_CATEGORY_META, LANDLORD_LIAISON_PAGE_ENABLED, clockInLocationLabel, clockInLocationDetailSuffix } from './shared'
 import { NavIcon } from '../../lib/icons'
 import { googleMapsLink } from '../../lib/geo'
 
@@ -47,43 +47,6 @@ const AWAY_PILL_LABEL = {
   job: 'Travelling',
   visit_office: 'Travelling',
   visit_other: 'Travelling',
-}
-
-// Short pill text for someone who's clocked in but hasn't started or
-// finished anything yet today -- the clock_in_location_* fields ([[project_clock_in_location_picker]],
-// mandatory since 2026-08-27) already say where from, so "Idle" with no
-// context is a step backwards from what the picker was built to fix.
-// Deliberately generic/short like AWAY_PILL_LABEL above -- the specific
-// job/property/note goes on the clock-in timeline entry instead (see
-// clockInLocationDetailSuffix), not crammed into the pill.
-function clockInLocationLabel(locationType, note) {
-  switch (locationType) {
-    case 'office': return 'At the office'
-    case 'job': return 'At a job'
-    case 'property': return 'At a property'
-    // 'other' is free text (e.g. "Home", now that the dedicated Home button
-    // is gone) -- show it directly rather than a generic word, capped so a
-    // long note can't blow out the pill the way a full address would.
-    case 'other': return note ? (note.length > 24 ? `${note.slice(0, 24)}…` : note) : 'Elsewhere'
-    default: return null
-  }
-}
-
-// Full detail for the same clock-in, appended to its timeline log entry.
-function clockInLocationDetailSuffix(a, ticketsById, propertiesById) {
-  switch (a.clock_in_location_type) {
-    case 'office': return ' — at the office'
-    case 'job': {
-      const t = a.clock_in_location_ticket_id ? ticketsById[a.clock_in_location_ticket_id] : null
-      return t ? ` — Job #${t.ticket_number}` : ' — at a job'
-    }
-    case 'property': {
-      const p = a.clock_in_location_property_id ? propertiesById[a.clock_in_location_property_id] : null
-      return p ? ` — ${p.address}` : ' — at a property'
-    }
-    case 'other': return a.clock_in_location_note ? ` — ${a.clock_in_location_note}` : ' — elsewhere'
-    default: return ''
-  }
 }
 
 // Collapsed/expanded state is deliberately session-only, not persisted --

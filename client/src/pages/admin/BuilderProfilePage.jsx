@@ -14,7 +14,7 @@ import {
   formatUKDateTime, formatUKDate, formatDurationDays, formatDuration,
   computeDutyStatus, computeAvgTurnaroundMs, buildWeeklyTrend,
   ukDateKey, shiftDateKey, mondayOfWeek, firstOfMonth, fetchAttendanceSummary, fetchMileageSummary,
-  fetchActivitySummary, ACTIVITY_CATEGORY_META,
+  fetchActivitySummary, ACTIVITY_CATEGORY_META, clockInLocationDetailSuffix,
 } from './shared'
 import PrintableAttendanceReport from '../../components/PrintableAttendanceReport'
 import PrintableMileageReport from '../../components/PrintableMileageReport'
@@ -158,6 +158,13 @@ export default function BuilderProfilePage({ staffId, onBack }) {
   // own whenever the period changes, not just when staffId changes.
   const [attendancePeriod, setAttendancePeriod] = useState('today')
   const [attendanceSummary, setAttendanceSummary] = useState(null)
+  // Resolves clock_in_location_ticket_id/property_id (see
+  // clockInLocationDetailSuffix) into the actual ticket number/property
+  // address shown per attendance row -- only the handful actually
+  // referenced across the visible date range, not every ticket/property
+  // in the portfolio.
+  const [clockInTicketsById, setClockInTicketsById] = useState({})
+  const [clockInPropertiesById, setClockInPropertiesById] = useState({})
   const [attendanceLoading, setAttendanceLoading] = useState(true)
   const [showAllAttendance, setShowAllAttendance] = useState(false)
   const [showAttendanceReport, setShowAttendanceReport] = useState(false)
@@ -269,8 +276,21 @@ export default function BuilderProfilePage({ staffId, onBack }) {
     setAttendanceLoading(true)
     setShowAllAttendance(false)
     const { from, to } = attendanceRangeFor(attendancePeriod)
-    fetchAttendanceSummary(staffId, from, to).then(summary => {
-      if (!cancelled) { setAttendanceSummary(summary); setAttendanceLoading(false) }
+    fetchAttendanceSummary(staffId, from, to).then(async summary => {
+      if (cancelled) return
+      setAttendanceSummary(summary)
+      setAttendanceLoading(false)
+
+      const ticketIds = [...new Set(summary.days.map(d => d.clock_in_location_ticket_id).filter(Boolean))]
+      const propertyIds = [...new Set(summary.days.map(d => d.clock_in_location_property_id).filter(Boolean))]
+      if (ticketIds.length > 0) {
+        const { data } = await supabase.schema('pmms').from('tickets').select('id, ticket_number').in('id', ticketIds)
+        if (!cancelled) setClockInTicketsById(Object.fromEntries((data || []).map(t => [t.id, t])))
+      }
+      if (propertyIds.length > 0) {
+        const { data } = await supabase.schema('pmms').from('properties').select('id, address').in('id', propertyIds)
+        if (!cancelled) setClockInPropertiesById(Object.fromEntries((data || []).map(p => [p.id, p])))
+      }
     })
     return () => { cancelled = true }
   }, [staffId, attendancePeriod])
@@ -498,6 +518,9 @@ export default function BuilderProfilePage({ staffId, onBack }) {
                         {formatUKDateTime(day.clock_in_at).split(' ').slice(-1)[0]}
                         {' → '}
                         {day.clock_out_at ? formatUKDateTime(day.clock_out_at).split(' ').slice(-1)[0] : 'still clocked in'}
+                        {day.clock_in_location_type && (
+                          <span style={{ fontFamily: 'inherit' }}>{clockInLocationDetailSuffix(day, clockInTicketsById, clockInPropertiesById)}</span>
+                        )}
                       </div>
                       <div style={{ fontSize: '13px', fontWeight: 700, color: COLORS.slate900, fontFamily: 'monospace', minWidth: '70px', textAlign: 'right' }}>
                         {day.durationMs != null ? formatDuration(day.durationMs) : '—'}
