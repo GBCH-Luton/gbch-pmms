@@ -1039,7 +1039,7 @@ export async function fetchMovementTrail(staffId, dateKey) {
 
   const [{ data: attendanceRow }, { data: sessions }, { data: activity }] = await Promise.all([
     supabase.schema('pmms').from('daily_attendance')
-      .select('clock_in_at, clock_in_lat, clock_in_lng, clock_out_at, clock_out_lat, clock_out_lng')
+      .select('clock_in_at, clock_in_lat, clock_in_lng, clock_out_at, clock_out_lat, clock_out_lng, clock_in_location_type, clock_in_location_ticket_id, clock_in_location_property_id, clock_in_location_note')
       .eq('staff_id', staffId).eq('work_date', dateKey).maybeSingle(),
     supabase.schema('pmms').from('work_sessions')
       .select('id, ticket_id, started_at, ended_at, clock_in_lat, clock_in_lng')
@@ -1054,6 +1054,7 @@ export async function fetchMovementTrail(staffId, dateKey) {
   const ticketIds = new Set()
   ;(sessions || []).forEach(s => { if (s.ticket_id) ticketIds.add(s.ticket_id) })
   ;(activity || []).forEach(a => { if (a.destination_ticket_id) ticketIds.add(a.destination_ticket_id) })
+  if (attendanceRow?.clock_in_location_ticket_id) ticketIds.add(attendanceRow.clock_in_location_ticket_id)
 
   let ticketsById = {}
   if (ticketIds.size > 0) {
@@ -1066,6 +1067,7 @@ export async function fetchMovementTrail(staffId, dateKey) {
 
   const propertyIds = new Set()
   ;(activity || []).forEach(a => { if (a.destination_property_id) propertyIds.add(a.destination_property_id) })
+  if (attendanceRow?.clock_in_location_property_id) propertyIds.add(attendanceRow.clock_in_location_property_id)
   let propertiesById = {}
   if (propertyIds.size > 0) {
     const { data: propRows } = await supabase.schema('pmms').from('properties').select('id, address, latitude, longitude').in('id', [...propertyIds])
@@ -1089,14 +1091,20 @@ export async function fetchMovementTrail(staffId, dateKey) {
 
   const stops = []
 
-  // No subtitle claiming "GBCH Office" here -- clock-in/out is GPS-tagged
-  // from wherever the button was actually tapped, not guaranteed to be the
-  // office (found live: Paulo Da Silva clocked out from his second job's
-  // site on 2026-08-26, not back at base). The pin's map position already
-  // shows exactly where they were; asserting a place name risks being
-  // wrong rather than just being less specific.
+  // Subtitle is what they SAID at clock-in (clock_in_location_type/note,
+  // see [[project_clock_in_location_picker]]), not an inferred place name
+  // -- the earlier version of this left it blank specifically to avoid
+  // asserting an unconfirmed "GBCH Office" (found live: Paulo Da Silva
+  // clocked out from his second job's site on 2026-08-26, not back at
+  // base). That reasoning still holds for anything inferred from GPS
+  // alone, but this is their own explicit claim, not a guess -- and
+  // showing it next to the pin's real GPS position is exactly what lets
+  // a manager check "he said the office -- is the pin actually there?"
   if (attendanceRow?.clock_in_at && attendanceRow.clock_in_lat != null && attendanceRow.clock_in_lng != null) {
-    stops.push({ id: 'clockin', at: attendanceRow.clock_in_at, lat: attendanceRow.clock_in_lat, lng: attendanceRow.clock_in_lng, title: 'Clocked in', subtitle: '', kind: 'clockin' })
+    const claimedSubtitle = attendanceRow.clock_in_location_type
+      ? clockInLocationDetailSuffix(attendanceRow, ticketsById, propertiesById).replace(/^ — /, '')
+      : ''
+    stops.push({ id: 'clockin', at: attendanceRow.clock_in_at, lat: attendanceRow.clock_in_lat, lng: attendanceRow.clock_in_lng, title: 'Clocked in', subtitle: claimedSubtitle, kind: 'clockin' })
   }
 
   ;(sessions || []).forEach(s => {
