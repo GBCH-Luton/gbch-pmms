@@ -5,10 +5,10 @@
 // scripts/add_temporary_tasks_table.sql for the pmms.temporary_tasks table
 // this depends on -- run it before using this page.
 //
-// Picking a Task Type changes which fields show underneath. 3 types are
+// Picking a Task Type changes which fields show underneath. 4 types are
 // built for real here (Landlord Complaint, Neighbour Complaint, Landlord
-// Contact / Follow-Up), matching what was mocked up -- the other 11 types
-// from the spec are selectable but have no fields designed yet.
+// Contact / Follow-Up, External Agency / Third-Party Task) -- the other 10
+// types from the spec are selectable but have no fields designed yet.
 
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
@@ -25,7 +25,7 @@ const TASK_TYPES = [
   'Compliance Document Chase', 'Maintenance Follow-Up', 'Contractor Follow-Up', 'Internal Department Follow-Up',
   'Document / Signature Chase', 'Other',
 ]
-const BUILT_TYPES = ['Landlord Complaint', 'Neighbour Complaint', 'Landlord Contact / Follow-Up']
+const BUILT_TYPES = ['Landlord Complaint', 'Neighbour Complaint', 'Landlord Contact / Follow-Up', 'External Agency / Third-Party Task']
 const PRIORITIES = ['Low', 'Medium', 'High', 'Urgent']
 const DEPARTMENTS = ['Maintenance', 'Support', 'Housing', 'Compliance', 'Management', 'Other']
 const STATUSES = ['New', 'In Progress', 'Awaiting Response', 'Awaiting Internal Team', 'Resolved', 'Closed']
@@ -41,6 +41,16 @@ const EXTERNAL_AGENCIES = ['Local Authority', 'Police', 'Managing Agent', 'Landl
 const NEIGHBOUR_OUTCOMES = ['Upheld', 'Partially Upheld', 'Not Upheld', 'Unsubstantiated', 'Unable to Determine']
 const CONTACT_METHODS = ['Call - Outgoing', 'Call - Incoming', 'Email - Outgoing', 'Email - Incoming', 'Text / WhatsApp - Outgoing', 'Text / WhatsApp - Incoming', 'Meeting', 'Property Visit', 'Other']
 const CONTACT_REASONS = ['Maintenance', 'Rent Review', 'Lease Renewal', 'Complaint', 'Property Condition', 'Compliance', 'Inspection', 'Service User Concern', 'Payment', 'Documents', 'General Relationship / Check-In', 'Other']
+const EXTERNAL_AGENCY_TYPES = [
+  'Managing Agent', 'Freeholder', 'Block Management', 'Local Authority', 'Estate Agent', 'Landlord',
+  'Neighbouring Property', 'Contractor', 'Insurer', 'Police', 'Fire Service', 'Utility Company', 'Other External Organisation',
+]
+const EXTERNAL_CONTACT_METHODS = ['Call', 'Email', 'Meeting', 'Visit']
+const EXTERNAL_ISSUE_TYPES = [
+  'Leak', 'Structural Damage', 'Water Damage', 'Access Issue', 'Drainage', 'Roof',
+  'Boundary or Fence', 'Tree or Vegetation', 'Criminal Damage', 'Other',
+]
+const COST_RECOVERY_STATUSES = ['Not Required', 'To Be Claimed', 'Submitted', 'Agreed', 'Disputed', 'Part Paid', 'Paid']
 
 const inputStyle = { width: '100%', padding: '9px 11px', borderRadius: '9px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', fontFamily: 'inherit', boxSizing: 'border-box', background: COLORS.white }
 const disabledInputStyle = { ...inputStyle, background: COLORS.slate50, color: COLORS.slate500 }
@@ -56,6 +66,11 @@ function initialForm() {
     external_agency_involved: false, external_agency: '', warning_action_issued: '', reference_case_number: '', further_action_required: false, next_follow_up_date: '',
     neighbour_updated: false, date_last_updated: '', update_response_provided: '', further_update_required: false, neighbour_outcome: '', escalation_required: false, closed_date: '', resolution_final_action: '',
     contact_datetime: '', contact_method: 'Call - Outgoing', reason_for_contact: '', contact_outcome_text: '', responsible_person_department: '',
+    external_agency_type: '', organisation_name: '', contact_person: '', initial_contact_date: '', action_required_from_them: '',
+    evidence_sent: false, response_received: false, response_details: '',
+    external_source_outside_property: false, external_issue_type: '', responsible_party: '', source_confirmed: false,
+    photos_videos_uploaded: false, external_contractor_attended: false, source_resolved: false, gbch_damage_repaired: false,
+    cost_recovery_status: '', external_task_outcome_text: '',
   }
 }
 
@@ -182,6 +197,7 @@ export default function AdminTemporaryTasks({ profile, onNavigate }) {
         date_last_updated: form.date_last_updated || null,
         closed_date: form.closed_date || null,
         contact_datetime: form.contact_datetime || null,
+        initial_contact_date: form.initial_contact_date || null,
         assigned_to: profile.id,
         evidence_url: evidenceUrl,
         created_by: profile.id,
@@ -348,6 +364,49 @@ export default function AdminTemporaryTasks({ profile, onNavigate }) {
               <TextField label="Outcome" value={form.contact_outcome_text} onChange={(v) => setField('contact_outcome_text', v)} />
               <TextField label="Responsible Person / Department" value={form.responsible_person_department} onChange={(v) => setField('responsible_person_department', v)} placeholder="If action is required" />
             </div>
+          </>
+        )}
+
+        {taskType === 'External Agency / Third-Party Task' && (
+          <>
+            <p style={sectionLabelStyle}>External Agency / Third-Party Task</p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px 14px' }}>
+              <SelectField label="External Agency Type" value={form.external_agency_type} onChange={(v) => setField('external_agency_type', v)} options={EXTERNAL_AGENCY_TYPES} />
+              <TextField label="Organisation Name" value={form.organisation_name} onChange={(v) => setField('organisation_name', v)} />
+              <TextField label="Contact Person" value={form.contact_person} onChange={(v) => setField('contact_person', v)} />
+              <DateField label="Initial Contact Date" value={form.initial_contact_date} onChange={(v) => setField('initial_contact_date', v)} />
+              <SelectField label="Method" value={form.contact_method} onChange={(v) => setField('contact_method', v)} options={EXTERNAL_CONTACT_METHODS} />
+              <TextField label="Reference / Case Number" value={form.reference_case_number} onChange={(v) => setField('reference_case_number', v)} />
+            </div>
+            <div style={{ marginTop: '12px' }}><TextField label="Reason for Contact" value={form.reason_for_contact} onChange={(v) => setField('reason_for_contact', v)} textarea /></div>
+            <div style={{ marginTop: '12px' }}><TextField label="Action Required From Them" value={form.action_required_from_them} onChange={(v) => setField('action_required_from_them', v)} textarea /></div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px 14px', marginTop: '12px' }}>
+              <BoolField label="Evidence Sent?" value={form.evidence_sent} onChange={(v) => setField('evidence_sent', v)} />
+              <BoolField label="Response Received?" value={form.response_received} onChange={(v) => setField('response_received', v)} />
+              <BoolField label="Escalation Required?" value={form.escalation_required} onChange={(v) => setField('escalation_required', v)} />
+            </div>
+            <div style={{ marginTop: '12px' }}><TextField label="Response Details" value={form.response_details} onChange={(v) => setField('response_details', v)} textarea /></div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 14px', marginTop: '12px' }}>
+              <DateField label="Next Chase Date" value={form.follow_up_date} onChange={(v) => setField('follow_up_date', v)} />
+              <TextField label="Outcome" value={form.external_task_outcome_text} onChange={(v) => setField('external_task_outcome_text', v)} />
+            </div>
+
+            <p style={sectionLabelStyle}>External Property Issues</p>
+            <BoolField label="Is the source outside a GBCH property?" value={form.external_source_outside_property} onChange={(v) => setField('external_source_outside_property', v)} />
+            {form.external_source_outside_property && (
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px 14px', marginTop: '12px' }}>
+                  <SelectField label="External Issue Type" value={form.external_issue_type} onChange={(v) => setField('external_issue_type', v)} options={EXTERNAL_ISSUE_TYPES} />
+                  <TextField label="Responsible Party" value={form.responsible_party} onChange={(v) => setField('responsible_party', v)} />
+                  <BoolField label="Source Confirmed?" value={form.source_confirmed} onChange={(v) => setField('source_confirmed', v)} />
+                  <BoolField label="Photos / Videos Uploaded?" value={form.photos_videos_uploaded} onChange={(v) => setField('photos_videos_uploaded', v)} />
+                  <BoolField label="External Contractor Attended?" value={form.external_contractor_attended} onChange={(v) => setField('external_contractor_attended', v)} />
+                  <BoolField label="Source Resolved?" value={form.source_resolved} onChange={(v) => setField('source_resolved', v)} />
+                  <BoolField label="GBCH Damage Repaired?" value={form.gbch_damage_repaired} onChange={(v) => setField('gbch_damage_repaired', v)} />
+                  <SelectField label="Cost Recovery Required?" value={form.cost_recovery_status} onChange={(v) => setField('cost_recovery_status', v)} options={COST_RECOVERY_STATUSES} />
+                </div>
+              </>
+            )}
           </>
         )}
 
