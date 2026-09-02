@@ -498,6 +498,19 @@ export default function AdminPipeline({
     onTicketsChanged?.()
   }
 
+  // Every mutation handler below used to call fetchTickets() after its own
+  // update -- a full re-download of every ticket ever raised (636+ and
+  // growing) plus every receipt/material ever logged, just to reflect one
+  // row's change. This patches only the affected ticket(s) in local state
+  // instead, matching whatever fields that handler's own .update() call
+  // just wrote to the database (see 2026-09-02 Pipeline slowness report --
+  // the full-history refetch running after nearly every click was the
+  // actual cost, not rendering 636 rows).
+  function patchTicket(id, fields) {
+    setTickets(prev => prev.map(t => (t.id === id ? { ...t, ...fields } : t)))
+    onTicketsChanged?.()
+  }
+
   async function fetchBuilders() {
     setBuilders(await (profile.division ? fetchAssignableStaffForDivision(profile.division) : fetchAssignableBuilders()))
   }
@@ -564,7 +577,15 @@ export default function AdminPipeline({
         await sendPushNotification([reassignBuilderId], 'New job assigned', `Job #${t.ticket_number} at ${t.property?.address || 'a property'}.`)
       }
     }
-    await fetchTickets()
+    patchTicket(t.id, {
+      assigned_builder_id: reassignTarget === 'builder' ? reassignBuilderId : null,
+      assigned_contractor_id: reassignTarget === 'contractor' ? reassignContractorId : null,
+      estimated_minutes: reassignEstimatedMinutes !== '' ? Number(reassignEstimatedMinutes) : null,
+      assign_type: 'Manual',
+      builderName: reassignTarget === 'builder' ? toName : null,
+      contractorName: reassignTarget === 'contractor' ? toName : null,
+      ...(promoteToAssigned ? { status: 'Assigned', status_changed_at: new Date().toISOString(), stuck_alert_sent_at: null, first_assigned_at: new Date().toISOString() } : {}),
+    })
     setReassignSubmitting(false)
     closeReassignModal()
   }
@@ -614,7 +635,7 @@ export default function AdminPipeline({
     if (error) { setAddToEventError(error.message); return }
 
     await postAuditEvent(t.id, profile, 'Added to Event', `Added to "${eventTitle}" by ${profile.name}.`)
-    await fetchTickets()
+    patchTicket(t.id, { event_id: selectedEventIdForTicket })
     closeAddToEventModal()
   }
 
@@ -665,6 +686,12 @@ export default function AdminPipeline({
       await postSystemComment(t.id, profile, `Reassigned from ${fromName} to ${toName}. Reason: ${reasonText}`)
       await postAuditEvent(t.id, profile, 'Reassigned', `Reassigned from ${fromName} to ${toName}.${statusNote} Reason: ${reasonText}`)
       await createNotification(bulkReassignBuilderId, t.id, `You've been assigned Job #${t.ticket_number} at ${t.property?.address || 'a property'}.`)
+      patchTicket(t.id, {
+        assigned_builder_id: bulkReassignBuilderId,
+        assign_type: 'Manual',
+        builderName: toName,
+        ...(promoteToAssigned ? { status: 'Assigned', status_changed_at: new Date().toISOString(), stuck_alert_sent_at: null, first_assigned_at: new Date().toISOString() } : {}),
+      })
       successCount += 1
     }
 
@@ -673,7 +700,6 @@ export default function AdminPipeline({
     }
 
     setBulkReassignSubmitting(false)
-    await fetchTickets()
 
     if (failures.length === 0) {
       setSelectedTicketIds(new Set())
@@ -714,7 +740,14 @@ export default function AdminPipeline({
     const dupNote = (cancelType === 'Duplicate' && dupRef) ? ` (duplicate of #${dupRef})` : ''
     await postSystemComment(t.id, profile, `Ticket cancelled — ${cancelType}${dupNote}. Reason: ${cancelReason.trim()}`)
     await postAuditEvent(t.id, profile, 'Status Changed', `${statusLabel(t.status)} → Cancelled (${cancelType}${dupNote}). Reason: ${cancelReason.trim()}`)
-    await fetchTickets()
+    patchTicket(t.id, {
+      status: 'Cancelled',
+      status_changed_at: new Date().toISOString(),
+      stuck_alert_sent_at: null,
+      cancel_type: cancelType,
+      cancel_reason: cancelReason.trim(),
+      cancel_duplicate_ref: (cancelType === 'Duplicate' && dupRef) ? dupRef : null,
+    })
     setCancelSubmitting(false)
     closeCancelModal()
   }
@@ -853,7 +886,10 @@ export default function AdminPipeline({
     await postAuditEvent(t.id, profile, 'Status Changed', `${statusLabel(previousStatus)} → Completed (marked by ${profile.name} on behalf of the assignee)`)
 
     setCompleteSubmitting(false)
-    await fetchTickets()
+    patchTicket(t.id, {
+      status: 'Completed', status_changed_at: now, stuck_alert_sent_at: null, completed_at: now,
+      completion_note: completeNote.trim(), ...(photoUrl ? { completion_photo_url: photoUrl } : {}),
+    })
     closeCompleteModal()
   }
 
@@ -877,7 +913,7 @@ export default function AdminPipeline({
     if (error) { setEditEstimateError(error.message); return }
 
     await postAuditEvent(t.id, profile, 'Estimate Updated', `Estimated time changed from ${t.estimated_minutes != null ? `${t.estimated_minutes}m` : 'not set'} to ${newMinutes}m.`)
-    await fetchTickets()
+    patchTicket(t.id, { estimated_minutes: newMinutes })
     closeEditEstimateModal()
   }
 
@@ -901,7 +937,7 @@ export default function AdminPipeline({
     if (error) { setEditMileageError(error.message); return }
 
     await postAuditEvent(t.id, profile, 'Mileage Updated', `Mileage changed from ${t.mileage_logged ?? 0} to ${newMileage}.`)
-    await fetchTickets()
+    patchTicket(t.id, { mileage_logged: newMileage })
     closeEditMileageModal()
   }
 
@@ -926,7 +962,7 @@ export default function AdminPipeline({
       editFollowupNeeded
         ? `Marked as needing follow-up.${newNote ? ` Note: ${newNote}` : ''}`
         : 'Follow-up flag cleared.')
-    await fetchTickets()
+    patchTicket(t.id, { needs_followup: editFollowupNeeded, followup_note: newNote })
     closeEditFollowupModal()
   }
 
@@ -963,7 +999,7 @@ export default function AdminPipeline({
 
     await postSystemComment(t.id, profile, `Priority manually set to ${priorityTier}. Reason: ${priorityReason.trim()}`)
     await postAuditEvent(t.id, profile, 'Priority Override', `Priority manually set to ${priorityTier}. Reason: ${priorityReason.trim()}`)
-    await fetchTickets()
+    patchTicket(t.id, { priority_override: priorityTier })
     setPrioritySubmitting(false)
     closePriorityOverrideModal()
   }
