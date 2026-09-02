@@ -21,6 +21,10 @@
 // ALTER TABLE pmms.properties ADD COLUMN IF NOT EXISTS insurance_expiry date;
 // ALTER TABLE pmms.properties ADD COLUMN IF NOT EXISTS insurance_doc_url text;
 // ALTER TABLE pmms.properties ADD COLUMN IF NOT EXISTS lease_doc_url text;
+//
+// See scripts/add_property_managing_agent_columns.sql (2026-09-02) for the
+// managing_agent/managing_agent_contact_name/_contact_phone/_email/_address
+// columns the Managing Agent section below depends on.
 
 import { useState } from 'react'
 import { supabase } from '../../lib/supabase'
@@ -103,7 +107,7 @@ function fieldInput(field, value, onChange) {
 
 function formatReadValue(field, value) {
   if (value === null || value === undefined || value === '') return '—'
-  if (field.key === 'landlord_email') {
+  if (field.key === 'landlord_email' || field.key === 'managing_agent_email') {
     return <a href={`mailto:${value}`} style={{ color: COLORS.blue700, fontWeight: 700 }}>{value}</a>
   }
   if (field.key === 'rent_amount' || field.key === 'deposit_amount') {
@@ -311,6 +315,25 @@ export default function PropertyLeaseLegalTab({ property, onFieldsSaved, profile
           { key: 'landlord_name', label: 'Landlord Contact Name', type: 'text' },
           { key: 'landlord_phone', label: 'Landlord Phone', type: 'text' },
           { key: 'landlord_email', label: 'Landlord Email', type: 'text' },
+        ]}
+      />
+
+      {/* Not every property has a Managing Agent -- most are let directly by
+          the landlord. See scripts/import_managing_agents.sql (2026-09-02)
+          for where the first batch of this data came from. Same
+          always-editable treatment as Landlord Details above, and for the
+          same reason -- Landlord Liaison maintains this day to day. */}
+      <EditableSection
+        title="Managing Agent"
+        property={property}
+        onSave={saveFields}
+        readOnly={false}
+        fields={[
+          { key: 'managing_agent', label: 'Managing Agent', type: 'text' },
+          { key: 'managing_agent_contact_name', label: 'Agent Contact Name', type: 'text' },
+          { key: 'managing_agent_contact_phone', label: 'Agent Contact Phone', type: 'text' },
+          { key: 'managing_agent_email', label: 'Agent Email', type: 'text' },
+          { key: 'managing_agent_address', label: 'Agent Address', type: 'text' },
         ]}
       />
 
