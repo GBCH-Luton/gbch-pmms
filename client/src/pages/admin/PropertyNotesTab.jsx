@@ -24,7 +24,7 @@ import { supabase } from '../../lib/supabase'
 import { COLORS } from '../../lib/colors'
 import {
   modalOverlayStyle, modalCardStyle, modalTitleStyle, modalLabelStyle, modalErrorStyle,
-  modalCancelBtnStyle, modalConfirmBtnStyle, formatUKDateTime,
+  modalCancelBtnStyle, modalConfirmBtnStyle, formatUKDateTime, formatUKDate,
 } from './shared'
 
 const CATEGORIES = ['Observation', 'Flag', 'Reminder', 'Complaint']
@@ -40,7 +40,7 @@ const CATEGORY_STYLES = {
 
 const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', fontFamily: 'inherit', boxSizing: 'border-box' }
 
-const emptyForm = { note_category: '', note_text: '', flag_this: false }
+const emptyForm = { note_category: '', note_text: '', flag_this: false, due_date: '', follow_up_date: '' }
 
 function NoteFormModal({ property, note, profile, onClose, onSaved }) {
   const [form, setForm] = useState(emptyForm)
@@ -49,7 +49,10 @@ function NoteFormModal({ property, note, profile, onClose, onSaved }) {
 
   useEffect(() => {
     if (note) {
-      setForm({ note_category: note.note_category || '', note_text: note.note_text || '', flag_this: !!note.is_flagged })
+      setForm({
+        note_category: note.note_category || '', note_text: note.note_text || '', flag_this: !!note.is_flagged,
+        due_date: note.due_date || '', follow_up_date: note.follow_up_date || '',
+      })
     } else {
       setForm(emptyForm)
     }
@@ -71,6 +74,8 @@ function NoteFormModal({ property, note, profile, onClose, onSaved }) {
       note_text: form.note_text.trim(),
       is_flagged: form.flag_this,
       flag_status: form.flag_this ? (note?.is_flagged ? note.flag_status || 'Open' : 'Open') : null,
+      due_date: form.due_date || null,
+      follow_up_date: form.follow_up_date || null,
     }
 
     let result
@@ -104,6 +109,17 @@ function NoteFormModal({ property, note, profile, onClose, onSaved }) {
 
         <p style={modalLabelStyle}>Note Text</p>
         <textarea value={form.note_text} onChange={(e) => set('note_text', e.target.value)} rows={4} style={{ ...inputStyle, resize: 'vertical' }} />
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '4px' }}>
+          <div>
+            <p style={modalLabelStyle}>Due Date</p>
+            <input type="date" value={form.due_date} onChange={(e) => set('due_date', e.target.value)} style={inputStyle} />
+          </div>
+          <div>
+            <p style={modalLabelStyle}>Follow-Up Date</p>
+            <input type="date" value={form.follow_up_date} onChange={(e) => set('follow_up_date', e.target.value)} style={inputStyle} />
+          </div>
+        </div>
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '16px' }}>
           <span style={{ fontSize: '13px', fontWeight: 700, color: COLORS.slate900 }}>Flag this item</span>
@@ -388,6 +404,13 @@ export default function PropertyNotesTab({ property, profile }) {
                 </div>
 
                 <p style={{ margin: '0 0 8px 0', fontSize: '14px', color: COLORS.slate900, whiteSpace: 'pre-wrap' }}>{note.note_text}</p>
+                {(note.due_date || note.follow_up_date) && (
+                  <p style={{ margin: '0 0 6px 0', fontSize: '11.5px', fontWeight: 700, color: COLORS.slate500 }}>
+                    {note.due_date && `Due ${formatUKDate(note.due_date)}`}
+                    {note.due_date && note.follow_up_date && ' · '}
+                    {note.follow_up_date && `Follow up ${formatUKDate(note.follow_up_date)}`}
+                  </p>
+                )}
                 <p style={{ margin: 0, fontSize: '12px', color: COLORS.slate400 }}>
                   {note.author || 'Unknown'} · {formatUKDateTime(note.created_at)}
                 </p>
