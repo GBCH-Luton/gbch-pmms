@@ -46,7 +46,7 @@ export default function PropertyTemporaryTasksTab({ property, onNavigate }) {
           Temporary Tasks {tasks ? `(${tasks.length})` : ''}
         </p>
         <button
-          onClick={() => onNavigate?.('temporary-tasks')}
+          onClick={() => onNavigate?.('temporary-tasks', { propertyId: property.id })}
           style={{ padding: '8px 16px', background: COLORS.teal700, color: COLORS.white, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}
         >
           ＋ Add Temporary Task

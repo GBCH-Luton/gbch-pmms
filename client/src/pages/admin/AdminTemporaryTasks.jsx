@@ -209,7 +209,7 @@ function landlordAgentDisplay(property) {
   return property.landlord_name || ''
 }
 
-export default function AdminTemporaryTasks({ profile, onNavigate }) {
+export default function AdminTemporaryTasks({ profile, onNavigate, initialOpenAddPropertyId, onInitialOpenAddConsumed }) {
   const [properties, setProperties] = useState([])
   const [propertyId, setPropertyId] = useState('')
   const [taskType, setTaskType] = useState('Landlord Complaint')
@@ -236,6 +236,10 @@ export default function AdminTemporaryTasks({ profile, onNavigate }) {
   const [followError, setFollowError] = useState('')
   const [followSearch, setFollowSearch] = useState('')
   const [activeTile, setActiveTile] = useState(null)
+  // The form used to sit open below the queue -- moved into an on-demand
+  // modal (2026-09-02) so the page opens straight to the queue instead of
+  // a long form nobody asked for yet.
+  const [showAddModal, setShowAddModal] = useState(false)
 
   useEffect(() => {
     supabase
@@ -246,6 +250,16 @@ export default function AdminTemporaryTasks({ profile, onNavigate }) {
       .then(({ data }) => setProperties(data || []))
     fetchFollowItems()
   }, [])
+
+  // Arrived via "+ Add Temporary Task" on a property's own Profile tab --
+  // open straight into the modal with that property pre-selected, rather
+  // than landing on the queue with the form closed.
+  useEffect(() => {
+    if (!initialOpenAddPropertyId) return
+    setPropertyId(initialOpenAddPropertyId)
+    setShowAddModal(true)
+    onInitialOpenAddConsumed?.()
+  }, [initialOpenAddPropertyId])
 
   async function fetchFollowItems() {
     setFollowError('')
@@ -448,10 +462,20 @@ export default function AdminTemporaryTasks({ profile, onNavigate }) {
 
   return (
     <div>
-      <p style={{ margin: '0 0 4px 0', fontSize: '20px', fontWeight: 800, color: COLORS.slate900 }}>Temporary Tasks</p>
-      <p style={{ margin: '0 0 20px 0', fontSize: '13px', color: COLORS.slate500 }}>Every Temporary Task and chaseable note that needs following up, across all properties -- and the form to log a new one, below.</p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', flexWrap: 'wrap', marginBottom: '20px' }}>
+        <div>
+          <p style={{ margin: '0 0 4px 0', fontSize: '20px', fontWeight: 800, color: COLORS.slate900 }}>Temporary Tasks</p>
+          <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate500 }}>Every Temporary Task and chaseable note that needs following up, across all properties.</p>
+        </div>
+        <button
+          onClick={() => setShowAddModal(true)}
+          style={{ padding: '10px 18px', background: COLORS.teal700, color: COLORS.white, border: 'none', borderRadius: '10px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}
+        >
+          ＋ Add Task
+        </button>
+      </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '10px', marginBottom: '18px' }}>
+      <div className="ttask-tiles-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '10px', marginBottom: '18px' }}>
         {FOLLOWUP_TILES.map(t => (
           <button
             key={t.key}
@@ -522,11 +546,25 @@ export default function AdminTemporaryTasks({ profile, onNavigate }) {
         </div>
       )}
 
-    <div style={{ maxWidth: '760px' }}>
-      <p style={{ margin: '32px 0 4px 0', fontSize: '18px', fontWeight: 800, color: COLORS.slate900, paddingTop: '20px', borderTop: `1px solid ${COLORS.slate200}` }}>Add Temporary Task</p>
-      <p style={{ margin: '0 0 20px 0', fontSize: '13px', color: COLORS.slate500 }}>Log work that doesn't need a full inspection/maintenance/compliance workflow, but still needs tracking.</p>
+    {showAddModal && (
+      <div className="ttask-modal-overlay">
+        <div className="ttask-modal-card ttask-form">
+          <div style={{ padding: '20px 22px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', marginBottom: '4px' }}>
+        <div>
+          <p style={{ margin: '0 0 4px 0', fontSize: '18px', fontWeight: 800, color: COLORS.slate900 }}>Add Temporary Task</p>
+          <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate500 }}>Log work that doesn't need a full inspection/maintenance/compliance workflow, but still needs tracking.</p>
+        </div>
+        <button
+          onClick={() => setShowAddModal(false)}
+          aria-label="Close"
+          style={{ background: 'none', border: 'none', fontSize: '22px', lineHeight: 1, color: COLORS.slate400, cursor: 'pointer', padding: '4px', flexShrink: 0 }}
+        >
+          ✕
+        </button>
+      </div>
 
-      <div style={{ background: COLORS.white, borderRadius: '16px', padding: '20px 22px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+      <div style={{ marginTop: '18px' }}>
         <div style={{ background: COLORS.teal50, border: `1.5px solid ${COLORS.teal600}`, borderRadius: '12px', padding: '14px 16px', marginBottom: '18px' }}>
           <p style={{ margin: '0 0 6px 0', fontSize: '11px', fontWeight: 800, color: COLORS.teal700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Task Type</p>
           <select value={taskType} onChange={(e) => setTaskType(e.target.value)} style={{ ...inputStyle, fontWeight: 700 }}>
@@ -821,7 +859,10 @@ export default function AdminTemporaryTasks({ profile, onNavigate }) {
           {saving ? 'Saving...' : 'Save Task'}
         </button>
       </div>
-    </div>
+          </div>
+        </div>
+      </div>
+    )}
     </div>
   )
 }

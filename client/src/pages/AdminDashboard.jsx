@@ -303,6 +303,11 @@ export default function AdminDashboard({ profile }) {
   // when arriving via a returnTo link, rather than just landing back on
   // a bare Clocking page with the modal closed again.
   const [clockingInitialReopenHistory, setClockingInitialReopenHistory] = useState(null)
+  // Temporary Tasks: opens straight into the Add Task modal, pre-filled
+  // with a property, when arriving via the "+ Add Temporary Task" button
+  // on that property's own Profile tab -- otherwise that button would just
+  // land on the queue with the form closed.
+  const [tempTaskInitialPropertyId, setTempTaskInitialPropertyId] = useState(null)
   const [propertiesInitialFilter, setPropertiesInitialFilter] = useState(null)
   const [complianceInitialTierFilter, setComplianceInitialTierFilter] = useState(null)
   const [voidsInitialTierFilter, setVoidsInitialTierFilter] = useState(null)
@@ -855,6 +860,9 @@ export default function AdminDashboard({ profile }) {
     setReturnTo(opts.returnTo || null)
     if (key === 'clocking' && opts.reopenHistory) {
       setClockingInitialReopenHistory(opts.reopenHistory)
+    }
+    if (key === 'temporary-tasks' && opts.propertyId) {
+      setTempTaskInitialPropertyId(opts.propertyId)
     }
     if (key === 'pipeline' && opts.statusFilter) {
       setPipelineInitialFilter(opts.statusFilter)
@@ -1686,6 +1694,8 @@ export default function AdminDashboard({ profile }) {
               returnTo={returnTo}
               initialReopenHistory={currentPage === 'clocking' ? clockingInitialReopenHistory : null}
               onInitialReopenHistoryConsumed={() => setClockingInitialReopenHistory(null)}
+              initialOpenAddPropertyId={currentPage === 'temporary-tasks' ? tempTaskInitialPropertyId : null}
+              onInitialOpenAddConsumed={() => setTempTaskInitialPropertyId(null)}
               initialStatusFilter={currentPage === 'pipeline' ? pipelineInitialFilter : null}
               initialPriorityFilter={currentPage === 'pipeline' ? pipelineInitialPriorityFilter : null}
               initialStuckFilter={currentPage === 'pipeline' ? pipelineInitialStuckFilter : null}

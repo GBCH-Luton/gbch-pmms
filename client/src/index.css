@@ -76,6 +76,49 @@ body {
   }
 }
 
+/* Temporary Task modal (AdminTemporaryTasks.jsx): the form has dozens of
+   fixed 2/3-column field grids across its 6 task types (Landlord
+   Complaint, Neighbour Complaint, Rent Review Update...). Same "inline
+   styles can't express a breakpoint" reasoning as .admin-sidebar-desktop
+   above -- one rule collapses every one of those grids to a single column
+   on mobile, rather than touching each grid individually. */
+.ttask-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.ttask-modal-card {
+  background: #ffffff;
+  border-radius: 20px;
+  width: 100%;
+  max-width: 720px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.25);
+}
+@media (max-width: 640px) {
+  .ttask-modal-overlay {
+    padding: 0;
+  }
+  .ttask-modal-card {
+    max-width: 100%;
+    max-height: 100vh;
+    height: 100%;
+    border-radius: 0;
+  }
+  .ttask-form [style*="grid-template-columns"] {
+    grid-template-columns: 1fr !important;
+  }
+  .ttask-tiles-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
 /* Slim, unobtrusive scrollbars app-wide -- Windows Chrome falls back to a
    wide, classic arrow-button scrollbar wherever an accessibility setting
    ("always show scrollbars") is on, which reads as broken/ugly against
