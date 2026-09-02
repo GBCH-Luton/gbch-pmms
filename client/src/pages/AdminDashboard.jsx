@@ -39,7 +39,6 @@ const AdminRaiseMaintenanceTicket = lazy(() => import('./admin/AdminRaiseMainten
 const AdminOnboardProperty = lazy(() => import('./admin/AdminOnboardProperty'))
 const PropertyDimensionsAssessment = lazy(() => import('./admin/PropertyDimensionsAssessment'))
 const AdminTemporaryTasks = lazy(() => import('./admin/AdminTemporaryTasks'))
-const AdminFollowUps = lazy(() => import('./admin/AdminFollowUps'))
 const AdminStock = lazy(() => import('./admin/AdminStock'))
 const AdminReports = lazy(() => import('./admin/AdminReports'))
 const AdminSettings = lazy(() => import('./admin/AdminSettings'))
@@ -119,10 +118,11 @@ const NAV_ITEMS = [
   // or job-title-only admin access with no PMMS Role assigned at all.
   // Widen back to `p.role === 'admin' || p.division === 'Landlord Liaison'`
   // (matching Dimensions Assessment above) once finished.
-  { key: 'temporary-tasks', label: 'Add Temporary Task', icon: 'ticket', Component: AdminTemporaryTasks, visibleTo: p => p.pmmsRole === 'Admin' || (!p.pmmsRole && p.role === 'admin') },
-  // Same temporary real-Admin-only restriction as Add Temporary Task above
-  // -- widen both together once the whole feature is finished.
-  { key: 'follow-ups', label: 'Follow-Ups', icon: 'clock', Component: AdminFollowUps, visibleTo: p => p.pmmsRole === 'Admin' || (!p.pmmsRole && p.role === 'admin') },
+  //
+  // One nav item hosts both the follow-ups queue and the add-task form
+  // (merged 2026-09-02 -- was two separate nav items, "Add Temporary Task"
+  // and "Follow-Ups"; see AdminTemporaryTasks.jsx).
+  { key: 'temporary-tasks', label: 'Temporary Task', icon: 'ticket', Component: AdminTemporaryTasks, visibleTo: p => p.pmmsRole === 'Admin' || (!p.pmmsRole && p.role === 'admin') },
   { key: 'voids', label: 'Voids', icon: 'key', Component: AdminVoids, divisions: ['Maintenance'] },
   // Division dashboards, grouped together in this order.
   { key: 'compliance', label: 'Compliance', icon: 'shield', Component: AdminCompliance, divisions: ['Maintenance', 'Compliance'] },

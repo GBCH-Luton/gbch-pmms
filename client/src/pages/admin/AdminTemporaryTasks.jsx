@@ -1,9 +1,14 @@
-// Add Temporary Task -- Landlord Liaison's structured place to log work
-// that doesn't need a full inspection/maintenance/compliance workflow but
-// still needs tracking/chasing (directors' spec, 2026-09-02; mocked up as
-// the "Follow-Ups" artifact, approved, now built for real). See
+// Temporary Tasks -- Landlord Liaison's structured place to log work that
+// doesn't need a full inspection/maintenance/compliance workflow but still
+// needs tracking/chasing (directors' spec, 2026-09-02; mocked up as the
+// "Follow-Ups" artifact, approved, now built for real). See
 // scripts/add_temporary_tasks_table.sql for the pmms.temporary_tasks table
 // this depends on -- run it before using this page.
+//
+// One page hosts both halves (merged 2026-09-02, was two separate nav
+// items): the queue at the top (browse everything that needs chasing,
+// across every property -- was the standalone AdminFollowUps.jsx page,
+// now deleted) and the "Add Temporary Task" form below it.
 //
 // Picking a Task Type changes which fields show underneath. As of the
 // directors' 2nd-pass spec (2026-09-02), all 6 remaining types are built
@@ -26,9 +31,10 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { COLORS } from '../../lib/colors'
-import { modalLabelStyle, modalErrorStyle } from './shared'
+import { modalLabelStyle, modalErrorStyle, formatUKDate } from './shared'
 import { compressImage } from '../../lib/imageCompression'
 import { getSignedUrl } from '../../lib/storage'
+import { attachProperties } from '../../lib/properties'
 import PropertySearchSelect from '../../components/PropertySearchSelect'
 import VoiceInputButton from '../../components/VoiceInputButton'
 
@@ -72,6 +78,53 @@ const MANAGING_AGENT_CONTACT_REASONS = [
   'Property Condition', 'Access / Keys', 'Compliance / Documents', 'Lease Query', 'Rent / Payment Query',
   'Complaint / Concern', 'Follow-Up / Chase', 'Other',
 ]
+
+// Queue section at the top of this page (formerly the standalone
+// Follow-Ups page, merged in 2026-09-02 so there's one page for "browse
+// what needs chasing" + "log a new one" instead of two). Combines
+// Temporary Tasks with chaseable Property Notes (ones with a Due Date/
+// Follow-Up Date set) across every property.
+const FOLLOWUP_TILES = [
+  { key: 'overdue', label: 'Overdue', bg: COLORS.red600 },
+  { key: 'today', label: 'Due Today', bg: COLORS.amber600 },
+  { key: 'week', label: 'Due This Week', bg: '#c07a1f' },
+  { key: 'ext', label: 'Awaiting External', bg: COLORS.purple700 },
+  { key: 'int', label: 'Awaiting Internal', bg: COLORS.indigo700 },
+  { key: 'done', label: 'Resolved / Closed', bg: COLORS.slate500 },
+]
+const FOLLOWUP_CAT_STYLES = {
+  Observation: { bg: COLORS.slate100, color: COLORS.slate500 },
+  Flag: { bg: COLORS.red100, color: COLORS.red600 },
+  Reminder: { bg: COLORS.amber100, color: COLORS.amber600 },
+  Complaint: { bg: COLORS.orange100, color: COLORS.orange700 },
+}
+const FOLLOWUP_TASK_TYPE_STYLE = { bg: COLORS.teal100, color: COLORS.teal700 }
+
+// Status-based buckets win over date-based ones -- a task waiting on
+// someone else is more usefully grouped by WHO it's waiting on than by
+// date (matches the mockup's own reasoning).
+function bucketForFollowupItem(item) {
+  if (item.kind === 'Task') {
+    if (item.status === 'Resolved' || item.status === 'Closed') return 'done'
+    if (item.status === 'Awaiting Response') return 'ext'
+    if (item.status === 'Awaiting Internal Team') return 'int'
+  } else {
+    if (!item.is_flagged || item.flag_status === 'Resolved') return 'done'
+  }
+
+  const effectiveDate = item.follow_up_date || item.due_date
+  if (!effectiveDate) return null
+
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const target = new Date(effectiveDate)
+  const daysDiff = Math.floor((target - today) / 86400000)
+
+  if (daysDiff < 0) return 'overdue'
+  if (daysDiff === 0) return 'today'
+  if (daysDiff <= 7) return 'week'
+  return null
+}
 
 const inputStyle = { width: '100%', padding: '9px 11px', borderRadius: '9px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', fontFamily: 'inherit', boxSizing: 'border-box', background: COLORS.white }
 const disabledInputStyle = { ...inputStyle, background: COLORS.slate50, color: COLORS.slate500 }
@@ -177,6 +230,13 @@ export default function AdminTemporaryTasks({ profile, onNavigate }) {
   // identified") -- only fetched/shown for that one task type.
   const [complaintHistory, setComplaintHistory] = useState(null)
 
+  // Follow-Ups queue (formerly its own page) -- browse everything that
+  // needs chasing, across every property, above the "add a new one" form.
+  const [followItems, setFollowItems] = useState(null)
+  const [followError, setFollowError] = useState('')
+  const [followSearch, setFollowSearch] = useState('')
+  const [activeTile, setActiveTile] = useState(null)
+
   useEffect(() => {
     supabase
       .schema('pmms')
@@ -184,7 +244,51 @@ export default function AdminTemporaryTasks({ profile, onNavigate }) {
       .select('id, address, landlord_name, managing_agent, rent_amount, rent_review_due_date, rent_review_status, rent_review_landlord_request, rent_review_gbch_offer')
       .order('address')
       .then(({ data }) => setProperties(data || []))
+    fetchFollowItems()
   }, [])
+
+  async function fetchFollowItems() {
+    setFollowError('')
+
+    const { data: tasksData, error: tasksError } = await supabase
+      .schema('pmms')
+      .from('temporary_tasks')
+      .select('id, task_type, task_title, status, due_date, follow_up_date, property_id, created_at')
+      .order('created_at', { ascending: false })
+
+    // Only notes actually meant to be chased -- one with neither date set
+    // isn't something this queue exists for.
+    const { data: notesData, error: notesError } = await supabase
+      .schema('pmms')
+      .from('property_notes')
+      .select('id, note_category, note_text, is_flagged, flag_status, due_date, follow_up_date, property_id, created_at')
+      .or('due_date.not.is.null,follow_up_date.not.is.null')
+      .order('created_at', { ascending: false })
+
+    if (tasksError || notesError) {
+      setFollowError((tasksError || notesError).message)
+      setFollowItems([])
+      return
+    }
+
+    const tasksWithProps = await attachProperties(tasksData || [], 'address')
+    const notesWithProps = await attachProperties(notesData || [], 'address')
+
+    const merged = [
+      ...tasksWithProps.map(t => ({
+        id: `task-${t.id}`, kind: 'Task', property: t.property, category: t.task_type,
+        text: t.task_title || '(no title)', status: t.status, due_date: t.due_date, follow_up_date: t.follow_up_date,
+        propertyId: t.property_id,
+      })),
+      ...notesWithProps.map(n => ({
+        id: `note-${n.id}`, kind: 'Note', property: n.property, category: n.note_category || 'Note',
+        text: n.note_text, is_flagged: n.is_flagged, flag_status: n.flag_status, due_date: n.due_date, follow_up_date: n.follow_up_date,
+        propertyId: n.property_id,
+      })),
+    ].map(item => ({ ...item, bucket: bucketForFollowupItem(item) }))
+
+    setFollowItems(merged)
+  }
 
   useEffect(() => {
     if (!propertyId || taskType !== 'Neighbour Complaint') { setComplaintHistory(null); return }
@@ -308,6 +412,7 @@ export default function AdminTemporaryTasks({ profile, onNavigate }) {
     if (taskType === 'Neighbour Complaint') {
       setComplaintHistory(prev => [insertedTask, ...(prev || [])])
     }
+    fetchFollowItems()
   }
 
   // "Create Follow-Up Task" (spec sections 2 & 3) -- pre-fills a new task
@@ -331,9 +436,94 @@ export default function AdminTemporaryTasks({ profile, onNavigate }) {
     setSavedMessage('')
   }
 
+  const followVisible = (() => {
+    if (followItems === null) return null
+    let v = followSearch.trim()
+      ? followItems.filter(i => (i.property?.address || '').toLowerCase().includes(followSearch.trim().toLowerCase()))
+      : followItems
+    v = activeTile ? v.filter(i => i.bucket === activeTile) : v.filter(i => i.bucket !== 'done')
+    return v
+  })()
+  const followTileCounts = followItems ? Object.fromEntries(FOLLOWUP_TILES.map(t => [t.key, followItems.filter(i => i.bucket === t.key).length])) : {}
+
   return (
+    <div>
+      <p style={{ margin: '0 0 4px 0', fontSize: '20px', fontWeight: 800, color: COLORS.slate900 }}>Temporary Tasks</p>
+      <p style={{ margin: '0 0 20px 0', fontSize: '13px', color: COLORS.slate500 }}>Every Temporary Task and chaseable note that needs following up, across all properties -- and the form to log a new one, below.</p>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '10px', marginBottom: '18px' }}>
+        {FOLLOWUP_TILES.map(t => (
+          <button
+            key={t.key}
+            onClick={() => setActiveTile(prev => (prev === t.key ? null : t.key))}
+            style={{
+              border: activeTile === t.key ? `2.5px solid ${COLORS.slate900}` : 'none', borderRadius: '14px', padding: '12px 10px',
+              cursor: 'pointer', textAlign: 'left', background: t.bg, boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+            }}
+          >
+            <p style={{ margin: '0 0 4px 0', fontSize: '9.5px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'rgba(255,255,255,0.85)', lineHeight: 1.25 }}>{t.label}</p>
+            <p style={{ margin: 0, fontSize: '20px', fontWeight: 800, color: COLORS.white, fontVariantNumeric: 'tabular-nums' }}>{followTileCounts[t.key] ?? 0}</p>
+          </button>
+        ))}
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '12px', flexWrap: 'wrap' }}>
+        <input
+          type="text"
+          value={followSearch}
+          onChange={(e) => setFollowSearch(e.target.value)}
+          placeholder="Filter by property..."
+          style={{ flex: '1 1 260px', padding: '10px 14px', borderRadius: '10px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', boxSizing: 'border-box' }}
+        />
+        {activeTile && (
+          <button onClick={() => setActiveTile(null)} style={{ background: 'none', border: 'none', color: COLORS.teal700, fontSize: '12.5px', fontWeight: 700, cursor: 'pointer' }}>
+            Clear filter ✕
+          </button>
+        )}
+      </div>
+
+      {followError ? (
+        <div style={{ background: COLORS.red50, border: `1px solid ${COLORS.red200}`, borderRadius: '16px', padding: '24px', textAlign: 'center', marginBottom: '18px' }}>
+          <p style={{ margin: '0 0 4px 0', fontSize: '14px', fontWeight: 700, color: COLORS.red600 }}>Couldn't load follow-ups</p>
+          <p style={{ margin: 0, fontSize: '13px', color: COLORS.red900, fontFamily: 'monospace' }}>{followError}</p>
+        </div>
+      ) : followVisible === null ? (
+        <p style={{ margin: '0 0 18px 0', color: COLORS.slate400, fontWeight: 600, fontSize: '13px' }}>Loading follow-ups...</p>
+      ) : followVisible.length === 0 ? (
+        <p style={{ margin: '0 0 18px 0', fontSize: '13px', color: COLORS.slate400, fontStyle: 'italic', textAlign: 'center', padding: '30px 0' }}>No follow-ups match this view.</p>
+      ) : (
+        <div style={{ marginBottom: '18px' }}>
+          {followVisible.map(item => {
+            const catStyle = item.kind === 'Task' ? FOLLOWUP_TASK_TYPE_STYLE : (FOLLOWUP_CAT_STYLES[item.category] || FOLLOWUP_CAT_STYLES.Observation)
+            const tile = FOLLOWUP_TILES.find(t => t.key === item.bucket)
+            return (
+              <button
+                key={item.id}
+                onClick={() => onNavigate?.('properties', { propertyId: item.propertyId, tab: item.kind === 'Task' ? 'Temporary Tasks' : 'Notes' })}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '14px', width: '100%', textAlign: 'left', cursor: 'pointer',
+                  background: COLORS.white, border: 'none', borderRadius: '13px', padding: '13px 16px', marginBottom: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+                }}
+              >
+                <span style={{ fontSize: '9.5px', fontWeight: 800, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.04em', width: '34px', flexShrink: 0 }}>{item.kind}</span>
+                <span style={{ fontSize: '10px', fontWeight: 700, padding: '3px 10px', borderRadius: '20px', whiteSpace: 'nowrap', flexShrink: 0, background: catStyle.bg, color: catStyle.color }}>{item.category}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ margin: '0 0 2px 0', fontSize: '12px', fontWeight: 700, color: COLORS.teal700 }}>{item.property?.address || 'Unknown property'}</p>
+                  <p style={{ margin: 0, fontSize: '13px', color: COLORS.slate900, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.text}</p>
+                </div>
+                {tile && (
+                  <span style={{ fontSize: '11px', fontWeight: 700, padding: '3px 10px', borderRadius: '20px', whiteSpace: 'nowrap', flexShrink: 0, background: item.bucket === 'overdue' ? COLORS.red100 : COLORS.slate100, color: item.bucket === 'overdue' ? COLORS.red600 : COLORS.slate600 }}>
+                    {tile.label}{(item.due_date || item.follow_up_date) ? ` · ${formatUKDate(item.follow_up_date || item.due_date)}` : ''}
+                  </span>
+                )}
+              </button>
+            )
+          })}
+        </div>
+      )}
+
     <div style={{ maxWidth: '760px' }}>
-      <p style={{ margin: '0 0 4px 0', fontSize: '20px', fontWeight: 800, color: COLORS.slate900 }}>Add Temporary Task</p>
+      <p style={{ margin: '32px 0 4px 0', fontSize: '18px', fontWeight: 800, color: COLORS.slate900, paddingTop: '20px', borderTop: `1px solid ${COLORS.slate200}` }}>Add Temporary Task</p>
       <p style={{ margin: '0 0 20px 0', fontSize: '13px', color: COLORS.slate500 }}>Log work that doesn't need a full inspection/maintenance/compliance workflow, but still needs tracking.</p>
 
       <div style={{ background: COLORS.white, borderRadius: '16px', padding: '20px 22px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
@@ -631,6 +821,7 @@ export default function AdminTemporaryTasks({ profile, onNavigate }) {
           {saving ? 'Saving...' : 'Save Task'}
         </button>
       </div>
+    </div>
     </div>
   )
 }
