@@ -1,4 +1,4 @@
-import { useState, useEffect, Fragment } from 'react'
+import { useState, useEffect, useRef, Fragment } from 'react'
 import { supabase } from '../../lib/supabase'
 import { COLORS } from '../../lib/colors'
 import { attachProperties } from '../../lib/properties'
@@ -21,6 +21,21 @@ import {
   createNotification, sendPushNotification, pushEmergencyAlert, resolveCategoryDivision, isTicketStuck, KpiTiles, fetchPriorityThresholds,
   EVENTS_FEATURE_ENABLED, SIGNOFF_QUESTIONS,
 } from './shared'
+
+// Default fetch is scoped to this many days of completed/archived/cancelled
+// history -- see fetchTickets() for why (636+ tickets and growing, unscoped
+// full-history fetch was the actual cause of Pipeline feeling slow, both on
+// load and after almost every action -- 2026-09-02 report).
+const HISTORY_WINDOW_DAYS = 90
+const TERMINAL_STATUSES = ['Completed', 'Archived', 'Cancelled']
+const TICKET_SELECT_COLUMNS = `
+  id, ticket_number, status, category, issue_tag, description, room, priority_score, priority_override, mileage_logged,
+  no_access_flag, no_access_note, hold_reason, hold_note, completion_note, photo_url, completion_photo_url,
+  needs_followup, followup_note,
+  signoff_flagged, signoff_note, signoff_resolved, signoff_good_standard, signoff_clean,
+  completed_at, created_at, status_changed_at, first_assigned_at, assigned_builder_id, assigned_contractor_id, estimated_minutes, assign_type, property_id, event_id,
+  raised_by, raised_by_name, cancel_type, cancel_reason, cancel_duplicate_ref
+`
 
 const expandLabelStyle = { margin: '0 0 2px 0', fontSize: '11px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase', letterSpacing: '0.04em' }
 const expandValueStyle = { margin: '0 0 10px 0', fontSize: '13px', fontWeight: 600, color: COLORS.slate900 }
@@ -105,6 +120,23 @@ export default function AdminPipeline({
 }) {
   const [tickets, setTickets] = useState([])
   const [loading, setLoading] = useState(true)
+  // false = tickets only includes open/active work plus the last
+  // HISTORY_WINDOW_DAYS of completed/archived/cancelled history (plus any
+  // OLDER ticket still flagged needs_followup -- that flag has to stay
+  // visible regardless of age, see the needsFollowupFilter carve-out in
+  // filteredTickets below). true once "Load Full History" has been used,
+  // or immediately if this page was opened via a deep link that needs
+  // older data (a Reports drill-down, a specific ticket-number jump, etc).
+  // KPI tiles and every filter/search below read straight off `tickets`,
+  // so this only ever affects what's IN that array, never how it's
+  // filtered/counted once loaded -- keeps the tile-count-matches-the-list
+  // invariant this page already had to fix once (see applyKpiFilter).
+  const [historyFullyLoaded, setHistoryFullyLoaded] = useState(false)
+  const [loadingFullHistory, setLoadingFullHistory] = useState(false)
+  // Ticket numbers already looked up via the single-ticket search fallback
+  // below (found or not) -- avoids re-querying on every keystroke while
+  // typing a number that isn't in the currently-loaded scoped set.
+  const triedTicketNumbersRef = useRef(new Set())
   const [expandedTicketId, setExpandedTicketId] = useState(null)
   // Receipts (see add_activity_receipts_table.sql) -- keyed by ticket_id
   // since a materials trip is only ever attached to whichever job was in
@@ -273,7 +305,15 @@ export default function AdminPipeline({
   const [builderProfileId, setBuilderProfileId] = useState(null)
 
   useEffect(() => {
-    fetchTickets()
+    // A deep link (Reports drill-down, "jump to this ticket" from Clocking's
+    // History modal, etc.) can point at something outside the default
+    // recent-history window -- fetch everything up front in that case
+    // rather than making the arrival silently incomplete.
+    const hasDeepLinkFilter = Boolean(
+      initialStatusFilter || initialPriorityFilter || initialStuckFilter || initialNeedsFollowupFilter || initialTicketNumberSearch
+      || initialCategoryFilter || initialDivisionFilter || initialBuilderFilter || initialContractorFilter || initialPropertyFilter || initialFromDate || initialToDate
+    )
+    fetchTickets({ full: hasDeepLinkFilter })
     fetchBuilders()
     fetchActiveContractors().then(setContractors)
     fetchProperties()
@@ -298,10 +338,7 @@ export default function AdminPipeline({
     if (initialPropertyFilter) setPropertyFilter(initialPropertyFilter)
     if (initialFromDate) setFromDate(initialFromDate)
     if (initialToDate) setToDate(initialToDate)
-    if (
-      initialStatusFilter || initialPriorityFilter || initialStuckFilter || initialNeedsFollowupFilter || initialTicketNumberSearch
-      || initialCategoryFilter || initialDivisionFilter || initialBuilderFilter || initialContractorFilter || initialPropertyFilter || initialFromDate || initialToDate
-    ) onInitialFilterConsumed?.()
+    if (hasDeepLinkFilter) onInitialFilterConsumed?.()
   }, [])
 
   // Runs once fetchTickets (triggered by the mount effect above) actually
@@ -321,6 +358,51 @@ export default function AdminPipeline({
     }
     setPendingExpandTicketNumber(null)
   }, [tickets, pendingExpandTicketNumber])
+
+  // The default scoped load can genuinely not have an old ticket someone
+  // types in here (outside HISTORY_WINDOW_DAYS, never flagged
+  // needs_followup) -- rather than requiring "Load Full History" just to
+  // find one specific ticket, fall back to a single targeted fetch by its
+  // exact number once no local match is found. Skipped entirely once full
+  // history is loaded (nothing left it could be missing).
+  useEffect(() => {
+    const trimmed = ticketNumberSearch.trim()
+    if (!trimmed || historyFullyLoaded) return
+    if (tickets.some(t => String(t.ticket_number) === trimmed)) return
+    if (triedTicketNumbersRef.current.has(trimmed)) return
+    const ticketNumber = Number(trimmed)
+    if (!Number.isInteger(ticketNumber)) return
+    triedTicketNumbersRef.current.add(trimmed)
+
+    let cancelled = false
+    async function fetchOne() {
+      const { data } = await supabase
+        .schema('pmms')
+        .from('tickets')
+        .select(TICKET_SELECT_COLUMNS)
+        .eq('ticket_number', ticketNumber)
+        .maybeSingle()
+      if (cancelled || !data) return
+
+      const [{ data: staffData }, { data: contractorsData }, [withProperty]] = await Promise.all([
+        supabase.from('staff').select('id, name'),
+        supabase.schema('pmms').from('contractors').select('id, name'),
+        attachProperties([data], 'address'),
+      ])
+      if (cancelled) return
+
+      setTickets(prev => (prev.some(t => t.id === data.id) ? prev : [
+        ...prev,
+        {
+          ...withProperty,
+          builderName: staffData?.find(s => s.id === data.assigned_builder_id)?.name,
+          contractorName: (contractorsData || []).find(c => c.id === data.assigned_contractor_id)?.name,
+        },
+      ]))
+    }
+    fetchOne()
+    return () => { cancelled = true }
+  }, [ticketNumberSearch, tickets, historyFullyLoaded])
 
   async function fetchStuckThresholds() {
     const { data } = await supabase
@@ -431,19 +513,45 @@ export default function AdminPipeline({
     }
   }, [cancelModalTicket])
 
-  async function fetchTickets() {
-    const { data: ticketsData, error: ticketsError } = await supabase
-      .schema('pmms')
-      .from('tickets')
-      .select(`
-        id, ticket_number, status, category, issue_tag, description, room, priority_score, priority_override, mileage_logged,
-        no_access_flag, no_access_note, hold_reason, hold_note, completion_note, photo_url, completion_photo_url,
-        needs_followup, followup_note,
-        signoff_flagged, signoff_note, signoff_resolved, signoff_good_standard, signoff_clean,
-        completed_at, created_at, status_changed_at, first_assigned_at, assigned_builder_id, assigned_contractor_id, estimated_minutes, assign_type, property_id, event_id,
-        raised_by, raised_by_name, cancel_type, cancel_reason, cancel_duplicate_ref
-      `)
-      .order('created_at', { ascending: false })
+  // `full: true` fetches every ticket ever raised, no bound -- the original
+  // behaviour, still needed for a deep link into older history (see the
+  // mount effect) and for "Load Full History" below. Default (`full:
+  // false`) instead fetches every open/active ticket (unbounded -- Pipeline
+  // never date-limits open work) plus only the last HISTORY_WINDOW_DAYS of
+  // completed/archived/cancelled tickets, plus any older one still flagged
+  // needs_followup. Two separate queries rather than one clever OR'd
+  // filter, kept simple and easy to verify independently.
+  async function fetchTickets({ full = false } = {}) {
+    let ticketsData, ticketsError
+
+    if (full) {
+      const res = await supabase
+        .schema('pmms')
+        .from('tickets')
+        .select(TICKET_SELECT_COLUMNS)
+        .order('created_at', { ascending: false })
+      ticketsData = res.data
+      ticketsError = res.error
+    } else {
+      const cutoffIso = new Date(Date.now() - HISTORY_WINDOW_DAYS * 86400000).toISOString()
+      const [openRes, terminalRes] = await Promise.all([
+        supabase
+          .schema('pmms')
+          .from('tickets')
+          .select(TICKET_SELECT_COLUMNS)
+          .not('status', 'in', '("Completed","Archived","Cancelled")')
+          .order('created_at', { ascending: false }),
+        supabase
+          .schema('pmms')
+          .from('tickets')
+          .select(TICKET_SELECT_COLUMNS)
+          .in('status', TERMINAL_STATUSES)
+          .or(`status_changed_at.gte.${cutoffIso},needs_followup.eq.true`)
+          .order('created_at', { ascending: false }),
+      ])
+      ticketsError = openRes.error || terminalRes.error
+      ticketsData = [...(openRes.data || []), ...(terminalRes.data || [])]
+    }
 
     const { data: staffData, error: staffError } = await supabase
       .from('staff')
@@ -457,32 +565,39 @@ export default function AdminPipeline({
       .from('contractors')
       .select('id, name')
 
-    // Grouped client-side into a ticket_id -> rows map, same "fetch once,
-    // group locally" approach as staffData above -- the portfolio's total
-    // receipt count is tiny, no reason to query this per-ticket.
-    const { data: receiptsData } = await supabase
-      .schema('pmms')
-      .from('activity_receipts')
-      .select('ticket_id, photo_url, amount, created_at')
-      .not('ticket_id', 'is', null)
-      .order('created_at', { ascending: true })
-    const receiptsGrouped = {}
-    ;(receiptsData || []).forEach(r => {
-      if (!receiptsGrouped[r.ticket_id]) receiptsGrouped[r.ticket_id] = []
-      receiptsGrouped[r.ticket_id].push(r)
-    })
-    setReceiptsByTicketId(receiptsGrouped)
+    // Scoped to just the tickets actually loaded above, instead of every
+    // receipt/material ever logged company-wide -- these used to be the
+    // single biggest unscoped queries on this page (found 2026-09-02).
+    const loadedTicketIds = (ticketsData || []).map(t => t.id)
 
-    const { data: materialsUsedData } = await supabase
-      .schema('pmms')
-      .from('ticket_materials_used')
-      .select('ticket_id, name, quantity, created_at')
-      .order('created_at', { ascending: true })
+    const receiptsGrouped = {}
     const materialsUsedGrouped = {}
-    ;(materialsUsedData || []).forEach(m => {
-      if (!materialsUsedGrouped[m.ticket_id]) materialsUsedGrouped[m.ticket_id] = []
-      materialsUsedGrouped[m.ticket_id].push(m)
-    })
+    if (loadedTicketIds.length > 0) {
+      // Grouped client-side into a ticket_id -> rows map, same "fetch once,
+      // group locally" approach as staffData above.
+      const { data: receiptsData } = await supabase
+        .schema('pmms')
+        .from('activity_receipts')
+        .select('ticket_id, photo_url, amount, created_at')
+        .in('ticket_id', loadedTicketIds)
+        .order('created_at', { ascending: true })
+      ;(receiptsData || []).forEach(r => {
+        if (!receiptsGrouped[r.ticket_id]) receiptsGrouped[r.ticket_id] = []
+        receiptsGrouped[r.ticket_id].push(r)
+      })
+
+      const { data: materialsUsedData } = await supabase
+        .schema('pmms')
+        .from('ticket_materials_used')
+        .select('ticket_id, name, quantity, created_at')
+        .in('ticket_id', loadedTicketIds)
+        .order('created_at', { ascending: true })
+      ;(materialsUsedData || []).forEach(m => {
+        if (!materialsUsedGrouped[m.ticket_id]) materialsUsedGrouped[m.ticket_id] = []
+        materialsUsedGrouped[m.ticket_id].push(m)
+      })
+    }
+    setReceiptsByTicketId(receiptsGrouped)
     setMaterialsUsedByTicketId(materialsUsedGrouped)
 
     if (!ticketsError && !staffError) {
@@ -493,9 +608,17 @@ export default function AdminPipeline({
         contractorName: (contractorsData || []).find(c => c.id === t.assigned_contractor_id)?.name,
       }))
       setTickets(merged)
+      setHistoryFullyLoaded(full)
     }
     setLoading(false)
     onTicketsChanged?.()
+  }
+
+  async function loadFullHistory() {
+    if (historyFullyLoaded || loadingFullHistory) return
+    setLoadingFullHistory(true)
+    await fetchTickets({ full: true })
+    setLoadingFullHistory(false)
   }
 
   // Every mutation handler below used to call fetchTickets() after its own
@@ -1246,6 +1369,28 @@ export default function AdminPipeline({
       )}
 
       <KpiTiles kpis={kpis} onTileClick={applyKpiFilter} />
+
+      {/* Every count/list on this page reads off `tickets`, so tiles and
+          filtered lists always agree with EACH OTHER by construction -- but
+          by default that array itself only covers open work plus the last
+          90 days of completed/archived/cancelled tickets (see
+          HISTORY_WINDOW_DAYS), not literally everything ever raised. This
+          makes that scoping visible instead of silently showing an
+          incomplete picture as if it were the full one. */}
+      {!historyFullyLoaded && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', background: COLORS.slate50, border: `1px solid ${COLORS.slate200}`, borderRadius: '10px', padding: '10px 14px', marginBottom: '12px' }}>
+          <span style={{ fontSize: '12.5px', color: COLORS.slate500, fontWeight: 600 }}>
+            Showing open work plus the last {HISTORY_WINDOW_DAYS} days of completed/archived/cancelled tickets.
+          </span>
+          <button
+            onClick={loadFullHistory}
+            disabled={loadingFullHistory}
+            style={{ background: 'none', border: 'none', padding: 0, color: COLORS.blue700, fontSize: '12.5px', fontWeight: 700, cursor: loadingFullHistory ? 'not-allowed' : 'pointer', textDecoration: 'underline' }}
+          >
+            {loadingFullHistory ? 'Loading full history...' : 'Load full history'}
+          </button>
+        </div>
+      )}
 
       {/* Pipeline filters -- the day-to-day triage filters a manager uses
           constantly stay in their own row; date range/export are a distinct
