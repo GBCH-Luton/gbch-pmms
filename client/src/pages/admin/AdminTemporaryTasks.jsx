@@ -154,6 +154,17 @@ export default function AdminTemporaryTasks({ profile, onNavigate }) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [savedMessage, setSavedMessage] = useState('')
+  // Set once a task is saved, for the "Create Follow-Up Task" button (spec
+  // section 2/3: "without requiring the complaint to be re-entered") --
+  // cleared again once that follow-up itself is saved (or a fresh property/
+  // type is picked), so the button never offers to chain off something
+  // already several steps removed from what's on screen.
+  const [justSavedTask, setJustSavedTask] = useState(null)
+  const [followUpOfTaskId, setFollowUpOfTaskId] = useState(null)
+  // Previous Neighbour Complaints at the selected property (spec section 3:
+  // "Complaint History... so recurring issues or patterns can be easily
+  // identified") -- only fetched/shown for that one task type.
+  const [complaintHistory, setComplaintHistory] = useState(null)
 
   useEffect(() => {
     supabase
@@ -163,6 +174,18 @@ export default function AdminTemporaryTasks({ profile, onNavigate }) {
       .order('address')
       .then(({ data }) => setProperties(data || []))
   }, [])
+
+  useEffect(() => {
+    if (!propertyId || taskType !== 'Neighbour Complaint') { setComplaintHistory(null); return }
+    supabase
+      .schema('pmms')
+      .from('temporary_tasks')
+      .select('id, complaint_category, complaint_details, neighbour_outcome, status, created_at')
+      .eq('property_id', propertyId)
+      .eq('task_type', 'Neighbour Complaint')
+      .order('created_at', { ascending: false })
+      .then(({ data }) => setComplaintHistory(data || []))
+  }, [propertyId, taskType])
 
   function setField(key, value) {
     setForm(prev => ({ ...prev, [key]: value }))
@@ -194,12 +217,13 @@ export default function AdminTemporaryTasks({ profile, onNavigate }) {
       evidenceUrl = await getSignedUrl('property-docs', path)
     }
 
-    const { error: insertError } = await supabase
+    const { data: insertedTask, error: insertError } = await supabase
       .schema('pmms')
       .from('temporary_tasks')
       .insert({
         task_type: taskType,
         property_id: propertyId,
+        follow_up_of_task_id: followUpOfTaskId,
         ...form,
         // Empty-string dates/UUIDs must be null, not '', for Postgres date/uuid columns.
         due_date: form.due_date || null,
@@ -231,6 +255,8 @@ export default function AdminTemporaryTasks({ profile, onNavigate }) {
         created_by: profile.id,
         created_by_name: profile.name,
       })
+      .select('id, property_id, task_type, task_title, department_involved, priority')
+      .single()
 
     setSaving(false)
     if (insertError) { setError(insertError.message); return }
@@ -265,7 +291,33 @@ export default function AdminTemporaryTasks({ profile, onNavigate }) {
 
     setForm(initialForm())
     setEvidenceFile(null)
-    setSavedMessage('Task saved.')
+    setFollowUpOfTaskId(null)
+    setJustSavedTask(insertedTask)
+    setSavedMessage(followUpOfTaskId ? 'Follow-up task saved.' : 'Task saved.')
+    if (taskType === 'Neighbour Complaint') {
+      setComplaintHistory(prev => [insertedTask, ...(prev || [])])
+    }
+  }
+
+  // "Create Follow-Up Task" (spec sections 2 & 3) -- pre-fills a new task
+  // from the one just saved instead of re-entering the complaint. Only the
+  // property/type/title/department/priority carry over; the complaint's
+  // own detail fields (category, description, investigation state etc.)
+  // deliberately don't, since a follow-up is a fresh chase/reminder linked
+  // back to that complaint, not a resubmission of it.
+  function createFollowUpTask() {
+    if (!justSavedTask) return
+    setPropertyId(justSavedTask.property_id)
+    setTaskType(justSavedTask.task_type)
+    setForm({
+      ...initialForm(),
+      task_title: `Follow-up: ${justSavedTask.task_title || justSavedTask.task_type}`,
+      department_involved: justSavedTask.department_involved || '',
+      priority: justSavedTask.priority || 'Medium',
+    })
+    setFollowUpOfTaskId(justSavedTask.id)
+    setJustSavedTask(null)
+    setSavedMessage('')
   }
 
   return (
@@ -342,6 +394,22 @@ export default function AdminTemporaryTasks({ profile, onNavigate }) {
 
         {taskType === 'Neighbour Complaint' && (
           <>
+            {complaintHistory && complaintHistory.length > 0 && (
+              <div style={{ background: COLORS.amber50, border: `1px solid ${COLORS.amber300}`, borderRadius: '10px', padding: '12px 14px', marginBottom: '4px' }}>
+                <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 800, color: COLORS.amber800 }}>
+                  ⚠ {complaintHistory.length} previous Neighbour Complaint{complaintHistory.length === 1 ? '' : 's'} at this property
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {complaintHistory.slice(0, 5).map(h => (
+                    <p key={h.id} style={{ margin: 0, fontSize: '12px', color: COLORS.slate600 }}>
+                      <span style={{ fontWeight: 700 }}>{h.complaint_category || 'Uncategorised'}</span>
+                      {' — '}{h.status}{h.neighbour_outcome ? ` (${h.neighbour_outcome})` : ''}
+                      {h.complaint_details ? `: ${h.complaint_details.slice(0, 60)}${h.complaint_details.length > 60 ? '…' : ''}` : ''}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            )}
             <p style={sectionLabelStyle}>Complaint Category</p>
             <SelectField label="Category" value={form.complaint_category} onChange={(v) => setField('complaint_category', v)} options={NEIGHBOUR_CATEGORIES} />
 
@@ -503,6 +571,14 @@ export default function AdminTemporaryTasks({ profile, onNavigate }) {
 
         {error && <p style={modalErrorStyle}>{error}</p>}
         {savedMessage && <p style={{ margin: '12px 0 0 0', fontSize: '13px', fontWeight: 700, color: COLORS.green600 }}>{savedMessage}</p>}
+        {justSavedTask && ['Landlord Complaint', 'Neighbour Complaint'].includes(justSavedTask.task_type) && (
+          <button
+            onClick={createFollowUpTask}
+            style={{ marginTop: '10px', padding: '9px 16px', background: 'none', color: COLORS.teal700, border: `1.5px solid ${COLORS.teal600}`, borderRadius: '10px', fontSize: '12.5px', fontWeight: 700, cursor: 'pointer' }}
+          >
+            🔁 Create Follow-Up Task
+          </button>
+        )}
 
         <button
           onClick={handleSave}
