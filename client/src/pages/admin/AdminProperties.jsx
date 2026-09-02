@@ -678,16 +678,20 @@ export default function AdminProperties({ profile, onNavigate, initialProperties
           // restricted rather than open-by-default, so it's filtered back
           // out for everyone except admin/her own division (found live
           // 2026-08-24: an unscoped manager could otherwise see and edit it
-          // same as her). Temporary Tasks is admin-only for now, even for
-          // Landlord Liaison (its actual intended audience) -- matches the
-          // nav item's own temporary admin-only gate in
-          // pages/AdminDashboard.jsx while the feature is still being built
-          // out; widen both back together once finished.
+          // same as her). Temporary Tasks is restricted to the real
+          // built-in Admin only for now, even for Landlord Liaison (its
+          // actual intended audience) -- matches the nav item's own
+          // temporary gate in pages/AdminDashboard.jsx while the feature is
+          // still being built out; widen both back together once finished.
+          // Checked via pmmsRole, not role === 'admin' alone, so an
+          // admin-equivalent custom role (e.g. "Admin Assistant") doesn't
+          // leak through -- see that nav item's own comment for why.
           let profileTabs = DIVISION_PROFILE_TABS[profile.division] || ALL_PROFILE_TABS
           if (profile.role !== 'admin' && profile.division !== 'Landlord Liaison') {
             profileTabs = profileTabs.filter(t => t !== 'Dimensions')
           }
-          if (profile.role !== 'admin') {
+          const isRealAdmin = profile.pmmsRole === 'Admin' || (!profile.pmmsRole && profile.role === 'admin')
+          if (!isRealAdmin) {
             profileTabs = profileTabs.filter(t => t !== 'Temporary Tasks')
           }
           // Falls back to the first tab this role is actually scoped to if

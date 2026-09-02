@@ -107,12 +107,18 @@ const NAV_ITEMS = [
   // instead for anyone allowed to see the tab but not this nav item
   // (isNavItemVisible gates actual page rendering, not just the sidebar).
   { key: 'property-dimensions', label: 'Dimensions Assessment', icon: 'building', Component: PropertyDimensionsAssessment, visibleTo: p => p.role === 'admin' || p.division === 'Landlord Liaison' },
-  // Directors' Temporary Tasks spec (2026-09-02) -- deliberately admin-only
-  // for now, not yet opened to Landlord Liaison (its actual intended
-  // audience) per explicit request while the feature is still being built
-  // out. Widen back to `p.role === 'admin' || p.division === 'Landlord
-  // Liaison'` (matching Dimensions Assessment above) once finished.
-  { key: 'temporary-tasks', label: 'Add Temporary Task', icon: 'ticket', Component: AdminTemporaryTasks, visibleTo: p => p.role === 'admin' },
+  // Directors' Temporary Tasks spec (2026-09-02) -- deliberately restricted
+  // to the real built-in Admin only for now, not yet opened to Landlord
+  // Liaison (its actual intended audience) while the feature is still being
+  // built out. `p.role === 'admin'` alone isn't narrow enough here -- an
+  // admin-equivalent custom role (e.g. "Admin Assistant", accessLevel
+  // 'admin' in lib/roles.js) also resolves to role 'admin' and was leaking
+  // through (found live 2026-09-02). p.pmmsRole is the actual assigned PMMS
+  // Role name, so this only passes for the literal built-in "Admin" role,
+  // or job-title-only admin access with no PMMS Role assigned at all.
+  // Widen back to `p.role === 'admin' || p.division === 'Landlord Liaison'`
+  // (matching Dimensions Assessment above) once finished.
+  { key: 'temporary-tasks', label: 'Add Temporary Task', icon: 'ticket', Component: AdminTemporaryTasks, visibleTo: p => p.pmmsRole === 'Admin' || (!p.pmmsRole && p.role === 'admin') },
   { key: 'voids', label: 'Voids', icon: 'key', Component: AdminVoids, divisions: ['Maintenance'] },
   // Division dashboards, grouped together in this order.
   { key: 'compliance', label: 'Compliance', icon: 'shield', Component: AdminCompliance, divisions: ['Maintenance', 'Compliance'] },
