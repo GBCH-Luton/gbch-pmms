@@ -5,10 +5,17 @@
 // scripts/add_temporary_tasks_table.sql for the pmms.temporary_tasks table
 // this depends on -- run it before using this page.
 //
-// Picking a Task Type changes which fields show underneath. 4 types are
+// Picking a Task Type changes which fields show underneath. 5 types are
 // built for real here (Landlord Complaint, Neighbour Complaint, Landlord
-// Contact / Follow-Up, External Agency / Third-Party Task) -- the other 10
-// types from the spec are selectable but have no fields designed yet.
+// Contact / Follow-Up, External Agency / Third-Party Task, Rent Review
+// Update) -- the other 9 types from the spec are selectable but have no
+// fields designed yet.
+//
+// Rent Review Update also writes back to pmms.properties' own
+// rent_review_* summary columns (see scripts/add_rent_review_columns.sql)
+// -- the spec's "connects to the main Rent Reviews section, not a separate
+// duplicate record" requirement, resolved the same way Managing Agent was
+// (flat columns on properties, no standalone Rent Reviews system exists).
 
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
@@ -25,7 +32,7 @@ const TASK_TYPES = [
   'Compliance Document Chase', 'Maintenance Follow-Up', 'Contractor Follow-Up', 'Internal Department Follow-Up',
   'Document / Signature Chase', 'Other',
 ]
-const BUILT_TYPES = ['Landlord Complaint', 'Neighbour Complaint', 'Landlord Contact / Follow-Up', 'External Agency / Third-Party Task']
+const BUILT_TYPES = ['Landlord Complaint', 'Neighbour Complaint', 'Landlord Contact / Follow-Up', 'External Agency / Third-Party Task', 'Rent Review Update']
 const PRIORITIES = ['Low', 'Medium', 'High', 'Urgent']
 const DEPARTMENTS = ['Maintenance', 'Support', 'Housing', 'Compliance', 'Management', 'Other']
 const STATUSES = ['New', 'In Progress', 'Awaiting Response', 'Awaiting Internal Team', 'Resolved', 'Closed']
@@ -51,6 +58,10 @@ const EXTERNAL_ISSUE_TYPES = [
   'Boundary or Fence', 'Tree or Vegetation', 'Criminal Damage', 'Other',
 ]
 const COST_RECOVERY_STATUSES = ['Not Required', 'To Be Claimed', 'Submitted', 'Agreed', 'Disputed', 'Part Paid', 'Paid']
+const UPDATE_TYPES = [
+  'Initial Landlord Contact', 'Landlord Requested Increase', 'GBCH Offer Made', 'Negotiation Update',
+  'Management Approval Required', 'Rent Agreed', 'Memorandum Sent', 'Awaiting Signature', 'Signed', 'Review Completed', 'Other',
+]
 
 const inputStyle = { width: '100%', padding: '9px 11px', borderRadius: '9px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', fontFamily: 'inherit', boxSizing: 'border-box', background: COLORS.white }
 const disabledInputStyle = { ...inputStyle, background: COLORS.slate50, color: COLORS.slate500 }
@@ -71,6 +82,8 @@ function initialForm() {
     external_source_outside_property: false, external_issue_type: '', responsible_party: '', source_confirmed: false,
     photos_videos_uploaded: false, external_contractor_attended: false, source_resolved: false, gbch_damage_repaired: false,
     cost_recovery_status: '', external_task_outcome_text: '',
+    update_type: '', landlord_requested_rent: '', gbch_proposed_rent: '', agreed_rent: '', rent_effective_date: '',
+    landlord_response: '', management_decision_notes: '', document_sent_date: '', signature_received_date: '',
   }
 }
 
@@ -143,7 +156,11 @@ export default function AdminTemporaryTasks({ profile, onNavigate }) {
   const [savedMessage, setSavedMessage] = useState('')
 
   useEffect(() => {
-    supabase.schema('pmms').from('properties').select('id, address, landlord_name, managing_agent').order('address')
+    supabase
+      .schema('pmms')
+      .from('properties')
+      .select('id, address, landlord_name, managing_agent, rent_amount, rent_review_due_date, rent_review_status, rent_review_landlord_request, rent_review_gbch_offer')
+      .order('address')
       .then(({ data }) => setProperties(data || []))
   }, [])
 
@@ -198,6 +215,17 @@ export default function AdminTemporaryTasks({ profile, onNavigate }) {
         closed_date: form.closed_date || null,
         contact_datetime: form.contact_datetime || null,
         initial_contact_date: form.initial_contact_date || null,
+        rent_effective_date: form.rent_effective_date || null,
+        document_sent_date: form.document_sent_date || null,
+        signature_received_date: form.signature_received_date || null,
+        rent_review_current_rent_snapshot: taskType === 'Rent Review Update' ? (selectedProperty?.rent_amount ?? null) : null,
+        // Numeric columns -- these are plain text inputs (mic dictation
+        // needs a text-shaped field), so convert empty-string-or-numeric-
+        // string to null-or-Number explicitly rather than relying on
+        // Postgres to coerce a JSON string for a numeric column.
+        landlord_requested_rent: form.landlord_requested_rent === '' ? null : Number(form.landlord_requested_rent),
+        gbch_proposed_rent: form.gbch_proposed_rent === '' ? null : Number(form.gbch_proposed_rent),
+        agreed_rent: form.agreed_rent === '' ? null : Number(form.agreed_rent),
         assigned_to: profile.id,
         evidence_url: evidenceUrl,
         created_by: profile.id,
@@ -206,6 +234,34 @@ export default function AdminTemporaryTasks({ profile, onNavigate }) {
 
     setSaving(false)
     if (insertError) { setError(insertError.message); return }
+
+    // The "connects to the main Rent Reviews section" behaviour from the
+    // spec -- this task type also updates the property's own summary
+    // fields (read on Lease & Legal, and re-pulled here next time this
+    // property is selected), not just its own log row. Best-effort: if
+    // this fails, the task itself is already saved, so surface the error
+    // without discarding what did succeed.
+    if (taskType === 'Rent Review Update') {
+      const { error: propUpdateError } = await supabase
+        .schema('pmms')
+        .from('properties')
+        .update({
+          rent_review_status: form.update_type || null,
+          rent_review_landlord_request: form.landlord_requested_rent === '' ? null : Number(form.landlord_requested_rent),
+          rent_review_gbch_offer: form.gbch_proposed_rent === '' ? null : Number(form.gbch_proposed_rent),
+          rent_review_last_contact_date: new Date().toISOString().slice(0, 10),
+        })
+        .eq('id', propertyId)
+      if (propUpdateError) {
+        setError(`Task saved, but couldn't update the property's Rent Review summary: ${propUpdateError.message}`)
+      }
+      setProperties(prev => prev.map(p => p.id === propertyId ? {
+        ...p,
+        rent_review_status: form.update_type || null,
+        rent_review_landlord_request: form.landlord_requested_rent === '' ? null : Number(form.landlord_requested_rent),
+        rent_review_gbch_offer: form.gbch_proposed_rent === '' ? null : Number(form.gbch_proposed_rent),
+      } : p))
+    }
 
     setForm(initialForm())
     setEvidenceFile(null)
@@ -407,6 +463,32 @@ export default function AdminTemporaryTasks({ profile, onNavigate }) {
                 </div>
               </>
             )}
+          </>
+        )}
+
+        {taskType === 'Rent Review Update' && (
+          <>
+            <p style={sectionLabelStyle}>Rent Review Update</p>
+            {selectedProperty && (
+              <div style={{ background: COLORS.slate50, border: `1px solid ${COLORS.slate200}`, borderRadius: '10px', padding: '12px 14px', marginBottom: '14px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px 14px' }}>
+                <div><p style={{ margin: 0, fontSize: '10px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase' }}>Current Rent</p><p style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: COLORS.slate900 }}>{selectedProperty.rent_amount != null ? `£${Number(selectedProperty.rent_amount).toLocaleString()}/wk` : '—'}</p></div>
+                <div><p style={{ margin: 0, fontSize: '10px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase' }}>Rent Review Due</p><p style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: COLORS.slate900 }}>{selectedProperty.rent_review_due_date || '—'}</p></div>
+                <div><p style={{ margin: 0, fontSize: '10px', fontWeight: 700, color: COLORS.slate400, textTransform: 'uppercase' }}>Existing Status</p><p style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: COLORS.slate900 }}>{selectedProperty.rent_review_status || 'No review in progress'}</p></div>
+              </div>
+            )}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px 14px' }}>
+              <SelectField label="Update Type" value={form.update_type} onChange={(v) => setField('update_type', v)} options={UPDATE_TYPES} />
+              <TextField label="Landlord Requested Rent (£)" value={form.landlord_requested_rent} onChange={(v) => setField('landlord_requested_rent', v)} />
+              <TextField label="GBCH Proposed Rent (£)" value={form.gbch_proposed_rent} onChange={(v) => setField('gbch_proposed_rent', v)} />
+              <TextField label="Agreed Rent (£)" value={form.agreed_rent} onChange={(v) => setField('agreed_rent', v)} />
+              <DateField label="Effective Date" value={form.rent_effective_date} onChange={(v) => setField('rent_effective_date', v)} />
+              <DateField label="Document Sent Date" value={form.document_sent_date} onChange={(v) => setField('document_sent_date', v)} />
+              <DateField label="Signature Received Date" value={form.signature_received_date} onChange={(v) => setField('signature_received_date', v)} />
+              <DateField label="Next Follow-Up Date" value={form.follow_up_date} onChange={(v) => setField('follow_up_date', v)} />
+            </div>
+            <div style={{ marginTop: '12px' }}><TextField label="Landlord Response" value={form.landlord_response} onChange={(v) => setField('landlord_response', v)} textarea /></div>
+            <div style={{ marginTop: '12px' }}><TextField label="Management Decision / Notes" value={form.management_decision_notes} onChange={(v) => setField('management_decision_notes', v)} textarea /></div>
+            <p style={{ margin: '10px 0 0 0', fontSize: '11.5px', color: COLORS.slate500 }}>Saving this updates the property's own Rent Review summary (visible on Lease &amp; Legal) with this Update Type as the new Status, plus the requested/offered amounts above.</p>
           </>
         )}
 

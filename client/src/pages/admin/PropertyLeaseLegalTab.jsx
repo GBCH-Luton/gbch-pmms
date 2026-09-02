@@ -25,11 +25,17 @@
 // See scripts/add_property_managing_agent_columns.sql (2026-09-02) for the
 // managing_agent/managing_agent_contact_name/_contact_phone/_email/_address
 // columns the Managing Agent section below depends on.
+//
+// See scripts/add_rent_review_columns.sql (2026-09-02) for
+// rent_review_due_date/_status/_landlord_request/_gbch_offer/
+// _last_contact_date -- the "main Rent Reviews section" the Rent Review
+// Status block below reads, kept in sync by AdminTemporaryTasks.jsx
+// whenever a Rent Review Update task is logged.
 
 import { useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { COLORS } from '../../lib/colors'
-import { modalLabelStyle, modalErrorStyle } from './shared'
+import { modalLabelStyle, modalErrorStyle, formatUKDate } from './shared'
 import { compressImage } from '../../lib/imageCompression'
 import { getSignedUrl } from '../../lib/storage'
 
@@ -348,8 +354,36 @@ export default function PropertyLeaseLegalTab({ property, onFieldsSaved, profile
           { key: 'deposit_amount', label: 'Deposit Amount (£)', type: 'number' },
           { key: 'deposit_scheme', label: 'Deposit Protection Scheme', type: 'select', options: DEPOSIT_SCHEMES },
           { key: 'deposit_scheme_id', label: 'Deposit Scheme Reference ID', type: 'text' },
+          { key: 'rent_review_due_date', label: 'Rent Review Due Date', type: 'date' },
         ]}
       />
+
+      {/* Status/Landlord Request/GBCH Offer/Last Contact are deliberately
+          read-only here -- they're auto-updated by logging a "Rent Review
+          Update" Temporary Task (see AdminTemporaryTasks.jsx), the "main
+          Rent Reviews section" the directors' spec describes, not
+          something to hand-edit directly on this tab. */}
+      {(property.rent_review_status || property.rent_review_landlord_request || property.rent_review_gbch_offer) && (
+        <div style={{ background: COLORS.white, borderRadius: '16px', padding: '20px', marginBottom: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+          <p style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: 800, color: COLORS.slate900 }}>Rent Review Status</p>
+          <div style={readRowStyle}>
+            <span style={readLabelStyle}>Status</span>
+            <span style={readValueStyle}>{property.rent_review_status || '—'}</span>
+          </div>
+          <div style={readRowStyle}>
+            <span style={readLabelStyle}>Landlord Request</span>
+            <span style={readValueStyle}>{property.rent_review_landlord_request != null ? `£${Number(property.rent_review_landlord_request).toLocaleString()}` : '—'}</span>
+          </div>
+          <div style={readRowStyle}>
+            <span style={readLabelStyle}>GBCH Offer</span>
+            <span style={readValueStyle}>{property.rent_review_gbch_offer != null ? `£${Number(property.rent_review_gbch_offer).toLocaleString()}` : '—'}</span>
+          </div>
+          <div style={{ ...readRowStyle, borderBottom: 'none' }}>
+            <span style={readLabelStyle}>Last Contact</span>
+            <span style={readValueStyle}>{property.rent_review_last_contact_date ? formatUKDate(property.rent_review_last_contact_date) : '—'}</span>
+          </div>
+        </div>
+      )}
 
       <div style={{ background: COLORS.white, borderRadius: '16px', padding: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
