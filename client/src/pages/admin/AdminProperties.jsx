@@ -673,16 +673,22 @@ export default function AdminProperties({ profile, onNavigate, initialProperties
 
         {/* Property Profile tabs */}
         {(() => {
-          // Dimensions and Temporary Tasks are Landlord Liaison's own tools
-          // -- unlike the rest of ALL_PROFILE_TABS' unscoped-manager
-          // fallback, these are deliberately restricted rather than
-          // open-by-default, so they're filtered back out for everyone
-          // except admin/her own division (same reasoning as Dimensions,
-          // found live 2026-08-24: an unscoped manager could otherwise see
-          // and edit it same as her).
+          // Dimensions is Landlord Liaison's own tool -- unlike the rest of
+          // ALL_PROFILE_TABS' unscoped-manager fallback, it's deliberately
+          // restricted rather than open-by-default, so it's filtered back
+          // out for everyone except admin/her own division (found live
+          // 2026-08-24: an unscoped manager could otherwise see and edit it
+          // same as her). Temporary Tasks is admin-only for now, even for
+          // Landlord Liaison (its actual intended audience) -- matches the
+          // nav item's own temporary admin-only gate in
+          // pages/AdminDashboard.jsx while the feature is still being built
+          // out; widen both back together once finished.
           let profileTabs = DIVISION_PROFILE_TABS[profile.division] || ALL_PROFILE_TABS
           if (profile.role !== 'admin' && profile.division !== 'Landlord Liaison') {
-            profileTabs = profileTabs.filter(t => t !== 'Dimensions' && t !== 'Temporary Tasks')
+            profileTabs = profileTabs.filter(t => t !== 'Dimensions')
+          }
+          if (profile.role !== 'admin') {
+            profileTabs = profileTabs.filter(t => t !== 'Temporary Tasks')
           }
           // Falls back to the first tab this role is actually scoped to if
           // the current selection isn't in that list -- covers both a stale
