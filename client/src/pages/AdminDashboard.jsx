@@ -38,6 +38,7 @@ const AdminRaiseTicket = lazy(() => import('./admin/AdminRaiseTicket'))
 const AdminRaiseMaintenanceTicket = lazy(() => import('./admin/AdminRaiseMaintenanceTicket'))
 const AdminOnboardProperty = lazy(() => import('./admin/AdminOnboardProperty'))
 const PropertyDimensionsAssessment = lazy(() => import('./admin/PropertyDimensionsAssessment'))
+const AdminTemporaryTasks = lazy(() => import('./admin/AdminTemporaryTasks'))
 const AdminStock = lazy(() => import('./admin/AdminStock'))
 const AdminReports = lazy(() => import('./admin/AdminReports'))
 const AdminSettings = lazy(() => import('./admin/AdminSettings'))
@@ -106,6 +107,10 @@ const NAV_ITEMS = [
   // instead for anyone allowed to see the tab but not this nav item
   // (isNavItemVisible gates actual page rendering, not just the sidebar).
   { key: 'property-dimensions', label: 'Dimensions Assessment', icon: 'building', Component: PropertyDimensionsAssessment, visibleTo: p => p.role === 'admin' || p.division === 'Landlord Liaison' },
+  // Directors' Temporary Tasks spec (2026-09-02) -- same visibility as
+  // Dimensions Assessment right above (admin + Landlord Liaison only, not
+  // every unscoped manager), since this is her own day-to-day tool.
+  { key: 'temporary-tasks', label: 'Add Temporary Task', icon: 'ticket', Component: AdminTemporaryTasks, visibleTo: p => p.role === 'admin' || p.division === 'Landlord Liaison' },
   { key: 'voids', label: 'Voids', icon: 'key', Component: AdminVoids, divisions: ['Maintenance'] },
   // Division dashboards, grouped together in this order.
   { key: 'compliance', label: 'Compliance', icon: 'shield', Component: AdminCompliance, divisions: ['Maintenance', 'Compliance'] },

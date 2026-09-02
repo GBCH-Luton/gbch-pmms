@@ -28,6 +28,7 @@ import PropertyAssetsTab from './PropertyAssetsTab'
 import PropertyMaintenanceTab from './PropertyMaintenanceTab'
 import PropertyLeaseLegalTab from './PropertyLeaseLegalTab'
 import PropertyUtilityBillsTab from './PropertyUtilityBillsTab'
+import PropertyTemporaryTasksTab from './PropertyTemporaryTasksTab'
 import PropertyDocumentsTab from './PropertyDocumentsTab'
 import PropertyNotesTab from './PropertyNotesTab'
 import PropertyRoomsTab from './PropertyRoomsTab'
@@ -41,7 +42,7 @@ import PrintablePropertyReport from '../../components/PrintablePropertyReport'
 
 const PROPERTY_TYPES = ['House', 'Flat', 'HMO', 'Commercial', 'Other']
 const OCCUPANCY_TYPES = ['Self Contained', 'Shared']
-const ALL_PROFILE_TABS = ['Core', 'Compliance', 'Assets', 'Maintenance', 'Lease & Legal', 'Utility Bills', 'Documents', 'Notes', 'Rooms', 'Restrictions', 'Gardens', 'Inventory', 'Dimensions']
+const ALL_PROFILE_TABS = ['Core', 'Compliance', 'Assets', 'Maintenance', 'Lease & Legal', 'Utility Bills', 'Documents', 'Notes', 'Temporary Tasks', 'Rooms', 'Restrictions', 'Gardens', 'Inventory', 'Dimensions']
 // Division-scoped managers only see the tabs relevant to what they
 // actually do -- everything else here is out of scope for their role,
 // even though the underlying RLS doesn't enforce this (see
@@ -672,15 +673,16 @@ export default function AdminProperties({ profile, onNavigate, initialProperties
 
         {/* Property Profile tabs */}
         {(() => {
-          // Dimensions is Landlord Liaison's own assessment -- unlike the
-          // rest of ALL_PROFILE_TABS' unscoped-manager fallback, this one
-          // tab is deliberately restricted rather than open-by-default, so
-          // it's filtered back out for everyone except admin/her own
-          // division (found live 2026-08-24: Maintenance Manager, an
-          // unscoped manager, could see and edit it same as her).
+          // Dimensions and Temporary Tasks are Landlord Liaison's own tools
+          // -- unlike the rest of ALL_PROFILE_TABS' unscoped-manager
+          // fallback, these are deliberately restricted rather than
+          // open-by-default, so they're filtered back out for everyone
+          // except admin/her own division (same reasoning as Dimensions,
+          // found live 2026-08-24: an unscoped manager could otherwise see
+          // and edit it same as her).
           let profileTabs = DIVISION_PROFILE_TABS[profile.division] || ALL_PROFILE_TABS
           if (profile.role !== 'admin' && profile.division !== 'Landlord Liaison') {
-            profileTabs = profileTabs.filter(t => t !== 'Dimensions')
+            profileTabs = profileTabs.filter(t => t !== 'Dimensions' && t !== 'Temporary Tasks')
           }
           // Falls back to the first tab this role is actually scoped to if
           // the current selection isn't in that list -- covers both a stale
@@ -719,6 +721,8 @@ export default function AdminProperties({ profile, onNavigate, initialProperties
                 <PropertyLeaseLegalTab property={selectedProperty} onFieldsSaved={handleCoreFieldsSaved} profile={profile} />
               ) : effectiveActiveTab === 'Utility Bills' ? (
                 <PropertyUtilityBillsTab property={selectedProperty} profile={profile} />
+              ) : effectiveActiveTab === 'Temporary Tasks' ? (
+                <PropertyTemporaryTasksTab property={selectedProperty} onNavigate={onNavigate} />
               ) : effectiveActiveTab === 'Documents' ? (
                 <PropertyDocumentsTab property={selectedProperty} profile={profile} />
               ) : effectiveActiveTab === 'Notes' ? (
