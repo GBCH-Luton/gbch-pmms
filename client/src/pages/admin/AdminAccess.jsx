@@ -470,6 +470,7 @@ function StaffFormModal({ staff, roleOptions, staffDirectory, onClose, onSaved }
 
 const ACCESS_LEVEL_LABELS = {
   none: 'No system login',
+  admin: 'Admin access',
   manager: 'Manager access',
   builder: 'Builder access',
   submitter: 'Ticket Submitter access',
@@ -527,6 +528,18 @@ function RolesPanel({ staffList, customRoles, customRolesError, onRolesChanged, 
 
   async function handleChangeHideSettings(name, hideSettings) {
     await saveCustomRoles(customRoles.map(r => r.name === name ? { ...r, hideSettings } : r))
+  }
+
+  // Same UI-only shape as handleChangeHideSettings, for an admin-level
+  // custom role (e.g. "Admin Assistant") that shouldn't see this page's
+  // diagnostics panels (Recent Login Activity + Error & Crash Log).
+  async function handleChangeHideDiagnostics(name, hideDiagnostics) {
+    await saveCustomRoles(customRoles.map(r => r.name === name ? { ...r, hideDiagnostics } : r))
+  }
+
+  // Same, for this page's own Roles panel (custom role/division management).
+  async function handleChangeHideStaffRoles(name, hideStaffRoles) {
+    await saveCustomRoles(customRoles.map(r => r.name === name ? { ...r, hideStaffRoles } : r))
   }
 
   // Grants/revokes this role's ability to create a new Event (the
@@ -682,6 +695,28 @@ function RolesPanel({ staffList, customRoles, customRolesError, onRolesChanged, 
                   onChange={(e) => handleChangeHideSettings(r.name, e.target.checked)}
                 />
                 Hide Settings
+              </label>
+              <label
+                title="Removes the Recent Login Activity and Error & Crash Log panels from the Admin page for this role. UI-only -- does not restrict database access."
+                style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 700, color: COLORS.slate500, cursor: 'pointer', whiteSpace: 'nowrap' }}
+              >
+                <input
+                  type="checkbox"
+                  checked={!!r.hideDiagnostics}
+                  onChange={(e) => handleChangeHideDiagnostics(r.name, e.target.checked)}
+                />
+                Hide Diagnostics
+              </label>
+              <label
+                title="Removes the Roles panel (custom role/division management) from the Admin page for this role. UI-only -- does not restrict database access."
+                style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 700, color: COLORS.slate500, cursor: 'pointer', whiteSpace: 'nowrap' }}
+              >
+                <input
+                  type="checkbox"
+                  checked={!!r.hideStaffRoles}
+                  onChange={(e) => handleChangeHideStaffRoles(r.name, e.target.checked)}
+                />
+                Hide Staff Roles
               </label>
               <label
                 title="Lets this role create a new Event (the Compliance/Landlord Liaison ticket-coordination feature). Any manager can still add a ticket to an existing Event regardless of this setting."
@@ -1575,20 +1610,33 @@ export default function AdminAccess({ profile }) {
           )}
         </div>
 
-        <div style={{ flex: '1 1 280px' }}>
-          <RolesPanel
-            staffList={staffList}
-            customRoles={customRoles}
-            customRolesError={customRolesError}
-            onRolesChanged={setCustomRoles}
-            divisions={divisions}
-            onDivisionsChanged={setDivisions}
-          />
-        </div>
+        {/* UI-only per-role hides (profile.hideStaffRoles/hideDiagnostics,
+            see lib/roles.js) -- an "Admin Assistant" custom role can have
+            full Admin-equivalent access (accessLevel 'admin') without
+            seeing role/division management or the diagnostics panels
+            below. Doesn't restrict the underlying data, only what renders
+            here -- same convention as hideSettings hiding the Settings nav
+            item. */}
+        {!profile?.hideStaffRoles && (
+          <div style={{ flex: '1 1 280px' }}>
+            <RolesPanel
+              staffList={staffList}
+              customRoles={customRoles}
+              customRolesError={customRolesError}
+              onRolesChanged={setCustomRoles}
+              divisions={divisions}
+              onDivisionsChanged={setDivisions}
+            />
+          </div>
+        )}
       </div>
 
-      <LoginActivityPanel events={loginEvents} />
-      <ErrorLogsPanel logs={errorLogs} />
+      {!profile?.hideDiagnostics && (
+        <>
+          <LoginActivityPanel events={loginEvents} />
+          <ErrorLogsPanel logs={errorLogs} />
+        </>
+      )}
       <StaffRecordEditorPanel staffList={staffList} onSaved={handleStaffSaved} />
 
       {modalStaff !== undefined && (

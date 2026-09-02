@@ -2,7 +2,7 @@ import { useEffect, useState, lazy, Suspense } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { supabase } from './lib/supabase'
 import { COLORS } from './lib/colors'
-import { roleFromJobTitle, normalizeCustomRoles, accessLevelForRole, hideSettingsForRole, divisionForRole, canCreateEventsForRole } from './lib/roles'
+import { roleFromJobTitle, normalizeCustomRoles, accessLevelForRole, hideSettingsForRole, hideDiagnosticsForRole, hideStaffRolesForRole, divisionForRole, canCreateEventsForRole } from './lib/roles'
 import { logLoginEvent, consumeGenuineLoginAttempt } from './lib/loginEvents'
 import { consumeSuppressSignInLog } from './lib/impersonation'
 import Login from './pages/Login'
@@ -145,6 +145,8 @@ export default function App() {
 
     let role = roleFromJobTitle(data.job_title)
     let hideSettings = false
+    let hideDiagnostics = false
+    let hideStaffRoles = false
     let division = null
     let canCreateEvents = false
     // The raw assigned PMMS Role name itself (e.g. "Maintenance Assistant"),
@@ -184,6 +186,8 @@ export default function App() {
       if (accessLevel) role = accessLevel
       // UI-only convenience, not a database restriction -- see roles.js.
       hideSettings = hideSettingsForRole(roleRow.role, normalizedCustomRoles)
+      hideDiagnostics = hideDiagnosticsForRole(roleRow.role, normalizedCustomRoles)
+      hideStaffRoles = hideStaffRolesForRole(roleRow.role, normalizedCustomRoles)
       // Which division (if any) this role is scoped to -- the real
       // restriction is enforced by RLS (pmms.current_division()); this is
       // just so the UI can adapt (e.g. narrowing the Pipeline's category
@@ -202,7 +206,7 @@ export default function App() {
     // no exception.
     if (data.active === false) { role = null; pmmsRole = null }
 
-    const resolvedProfile = { ...data, role, hideSettings, division, canCreateEvents, pmmsRole }
+    const resolvedProfile = { ...data, role, hideSettings, hideDiagnostics, hideStaffRoles, division, canCreateEvents, pmmsRole }
     setProfile(resolvedProfile)
     setLoading(false)
     return resolvedProfile

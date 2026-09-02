@@ -31,20 +31,28 @@ export function roleFromJobTitle(jobTitle) {
 }
 
 // Custom PMMS roles (pmms.settings key 'custom_roles') are stored as
-// { name, accessLevel, hideSettings } where accessLevel is 'none' |
-// 'manager' | 'builder' | 'submitter' -- accessLevel controls login routing the same way
-// the built-in "Admin" role does (see accessLevelForRole below). hideSettings
-// is a UI-only convenience (not a real database restriction -- every
-// 'manager'-level role has identical database permissions) that removes the
-// Settings nav item for that specific named role, e.g. so a "Maintenance
-// Assistant" can have Manager-equivalent access without seeing Settings.
+// { name, accessLevel, hideSettings, hideDiagnostics, hideStaffRoles } where
+// accessLevel is 'none' | 'admin' | 'manager' | 'builder' | 'submitter' --
+// accessLevel controls login routing the same way the built-in "Admin" role
+// does (see accessLevelForRole below). hideSettings/hideDiagnostics/
+// hideStaffRoles are UI-only conveniences (not a real database restriction
+// -- an 'admin'-level custom role has identical database permissions to the
+// built-in Admin, same as every 'manager'-level role already does) that
+// remove specific nav items/panels for that specific named role -- e.g. so
+// an "Admin Assistant" can have full Admin-equivalent access without seeing
+// the Admin page's Recent Login Activity, Error & Crash Log, or Roles
+// panels (added 2026-09-02 for exactly that role).
 // Older data may just be a plain array of name strings; normalize either
 // shape to the same object form so every caller only ever deals with one.
 export function normalizeCustomRoles(raw) {
   if (!Array.isArray(raw)) return []
   return raw.map(r => (typeof r === 'string'
-    ? { name: r, accessLevel: 'none', hideSettings: false, division: null, canCreateEvents: false }
-    : { name: r.name, accessLevel: r.accessLevel || 'none', hideSettings: !!r.hideSettings, division: r.division || null, canCreateEvents: !!r.canCreateEvents }
+    ? { name: r, accessLevel: 'none', hideSettings: false, hideDiagnostics: false, hideStaffRoles: false, division: null, canCreateEvents: false }
+    : {
+      name: r.name, accessLevel: r.accessLevel || 'none', hideSettings: !!r.hideSettings,
+      hideDiagnostics: !!r.hideDiagnostics, hideStaffRoles: !!r.hideStaffRoles,
+      division: r.division || null, canCreateEvents: !!r.canCreateEvents,
+    }
   ))
 }
 
@@ -66,6 +74,7 @@ export function accessLevelForRole(roleName, normalizedCustomRoles) {
   if (roleName === 'Builder') return 'builder'
   if (roleName === 'Support Worker') return null
   const custom = normalizedCustomRoles.find(r => r.name === roleName)
+  if (custom?.accessLevel === 'admin') return 'admin'
   if (custom?.accessLevel === 'manager') return 'manager'
   if (custom?.accessLevel === 'builder') return 'builder'
   if (custom?.accessLevel === 'submitter') return 'submitter'
@@ -77,6 +86,18 @@ export function accessLevelForRole(roleName, normalizedCustomRoles) {
 // roles (Admin/Builder/Support Worker) never hide it.
 export function hideSettingsForRole(roleName, normalizedCustomRoles) {
   return !!normalizedCustomRoles.find(r => r.name === roleName)?.hideSettings
+}
+
+// UI-only: does this role hide the Admin page's Recent Login Activity and
+// Error & Crash Log panels? Same shape as hideSettingsForRole.
+export function hideDiagnosticsForRole(roleName, normalizedCustomRoles) {
+  return !!normalizedCustomRoles.find(r => r.name === roleName)?.hideDiagnostics
+}
+
+// UI-only: does this role hide the Admin page's Roles panel (custom role/
+// division management)? Same shape as hideSettingsForRole.
+export function hideStaffRolesForRole(roleName, normalizedCustomRoles) {
+  return !!normalizedCustomRoles.find(r => r.name === roleName)?.hideStaffRoles
 }
 
 // Can this named role create a new Event (the Compliance/Landlord Liaison
