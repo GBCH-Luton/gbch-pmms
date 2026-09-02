@@ -542,6 +542,14 @@ function RolesPanel({ staffList, customRoles, customRolesError, onRolesChanged, 
     await saveCustomRoles(customRoles.map(r => r.name === name ? { ...r, hideStaffRoles } : r))
   }
 
+  // Removes the Admin page itself (the profile popover's "Admin" item)
+  // rather than just the panels above -- for a role whose Staff panel
+  // access shouldn't include browsing the full staff directory/role
+  // filter, which the panel-level hides above don't cover.
+  async function handleChangeHideAdminAccess(name, hideAdminAccess) {
+    await saveCustomRoles(customRoles.map(r => r.name === name ? { ...r, hideAdminAccess } : r))
+  }
+
   // Grants/revokes this role's ability to create a new Event (the
   // Compliance/Landlord Liaison ticket-coordination feature) -- enforced
   // for real server-side by pmms.current_can_create_events(), this just
@@ -717,6 +725,17 @@ function RolesPanel({ staffList, customRoles, customRolesError, onRolesChanged, 
                   onChange={(e) => handleChangeHideStaffRoles(r.name, e.target.checked)}
                 />
                 Hide Staff Roles
+              </label>
+              <label
+                title="Removes the whole Admin page (not just the panels above) from this role's profile popover menu -- use this if the Staff panel's full directory/role filter is also more than this role should see."
+                style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 700, color: COLORS.slate500, cursor: 'pointer', whiteSpace: 'nowrap' }}
+              >
+                <input
+                  type="checkbox"
+                  checked={!!r.hideAdminAccess}
+                  onChange={(e) => handleChangeHideAdminAccess(r.name, e.target.checked)}
+                />
+                Hide Admin Page
               </label>
               <label
                 title="Lets this role create a new Event (the Compliance/Landlord Liaison ticket-coordination feature). Any manager can still add a ticket to an existing Event regardless of this setting."

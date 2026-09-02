@@ -198,6 +198,11 @@ const PENDING_SIGN_OFF_POLL_MS = 20000
 function isNavItemVisible(item, profile) {
   if (item.adminOnly && profile.role !== 'admin') return false
   if (item.key === 'settings' && profile.hideSettings) return false
+  // UI-only: hides the whole Admin page (not just its Recent Login
+  // Activity/Error & Crash Log/Roles panels, see hideDiagnostics/
+  // hideStaffRoles in roles.js) for an admin-level custom role whose Staff
+  // panel access still isn't meant to be that broad.
+  if (item.key === 'admin' && profile.hideAdminAccess) return false
   if (item.divisions && profile.division && !item.divisions.includes(profile.division)) return false
   if (item.divisionOnly && profile.role !== 'admin' && profile.division !== item.divisionOnly) return false
   // A third, narrower shape for the one item (Onboard a Property) gated by

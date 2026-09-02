@@ -31,26 +31,30 @@ export function roleFromJobTitle(jobTitle) {
 }
 
 // Custom PMMS roles (pmms.settings key 'custom_roles') are stored as
-// { name, accessLevel, hideSettings, hideDiagnostics, hideStaffRoles } where
-// accessLevel is 'none' | 'admin' | 'manager' | 'builder' | 'submitter' --
-// accessLevel controls login routing the same way the built-in "Admin" role
-// does (see accessLevelForRole below). hideSettings/hideDiagnostics/
-// hideStaffRoles are UI-only conveniences (not a real database restriction
-// -- an 'admin'-level custom role has identical database permissions to the
+// { name, accessLevel, hideSettings, hideDiagnostics, hideStaffRoles,
+// hideAdminAccess } where accessLevel is 'none' | 'admin' | 'manager' |
+// 'builder' | 'submitter' -- accessLevel controls login routing the same
+// way the built-in "Admin" role does (see accessLevelForRole below). The
+// hide* flags are UI-only conveniences (not a real database restriction --
+// an 'admin'-level custom role has identical database permissions to the
 // built-in Admin, same as every 'manager'-level role already does) that
-// remove specific nav items/panels for that specific named role -- e.g. so
-// an "Admin Assistant" can have full Admin-equivalent access without seeing
-// the Admin page's Recent Login Activity, Error & Crash Log, or Roles
-// panels (added 2026-09-02 for exactly that role).
+// remove specific nav items/panels for that specific named role.
+// hideDiagnostics/hideStaffRoles hide individual panels on the Admin page
+// (Recent Login Activity + Error & Crash Log, and Roles, respectively);
+// hideAdminAccess instead removes the Admin page itself from the profile
+// popover menu, since that page's remaining Staff panel/list has no
+// per-role scoping of its own -- found live 2026-09-02 (an "Admin
+// Assistant" role hiding just those two panels still had the full staff
+// list, including its role filter, in view via the Staff panel).
 // Older data may just be a plain array of name strings; normalize either
 // shape to the same object form so every caller only ever deals with one.
 export function normalizeCustomRoles(raw) {
   if (!Array.isArray(raw)) return []
   return raw.map(r => (typeof r === 'string'
-    ? { name: r, accessLevel: 'none', hideSettings: false, hideDiagnostics: false, hideStaffRoles: false, division: null, canCreateEvents: false }
+    ? { name: r, accessLevel: 'none', hideSettings: false, hideDiagnostics: false, hideStaffRoles: false, hideAdminAccess: false, division: null, canCreateEvents: false }
     : {
       name: r.name, accessLevel: r.accessLevel || 'none', hideSettings: !!r.hideSettings,
-      hideDiagnostics: !!r.hideDiagnostics, hideStaffRoles: !!r.hideStaffRoles,
+      hideDiagnostics: !!r.hideDiagnostics, hideStaffRoles: !!r.hideStaffRoles, hideAdminAccess: !!r.hideAdminAccess,
       division: r.division || null, canCreateEvents: !!r.canCreateEvents,
     }
   ))
@@ -98,6 +102,14 @@ export function hideDiagnosticsForRole(roleName, normalizedCustomRoles) {
 // division management)? Same shape as hideSettingsForRole.
 export function hideStaffRolesForRole(roleName, normalizedCustomRoles) {
   return !!normalizedCustomRoles.find(r => r.name === roleName)?.hideStaffRoles
+}
+
+// UI-only: does this role hide the Admin page itself (the popover menu
+// item, "Admin", that opens AdminAccess.jsx) entirely? Same shape as
+// hideSettingsForRole -- see the note above hideDiagnostics/hideStaffRoles
+// for why this exists alongside those two finer-grained flags.
+export function hideAdminAccessForRole(roleName, normalizedCustomRoles) {
+  return !!normalizedCustomRoles.find(r => r.name === roleName)?.hideAdminAccess
 }
 
 // Can this named role create a new Event (the Compliance/Landlord Liaison
