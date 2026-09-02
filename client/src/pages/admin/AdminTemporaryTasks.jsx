@@ -400,6 +400,11 @@ export default function AdminTemporaryTasks({ profile, onNavigate }) {
               <TextField label="Root Cause" value={form.root_cause} onChange={(v) => setField('root_cause', v)} />
               <DateField label="Resolved Date" value={form.resolved_date} onChange={(v) => setField('resolved_date', v)} />
             </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 14px', marginTop: '12px' }}>
+              <BoolField label="Follow-Up Required?" value={form.follow_up_required} onChange={(v) => setField('follow_up_required', v)} />
+              {form.follow_up_required && <DateField label="Follow-Up Date" value={form.follow_up_date} onChange={(v) => setField('follow_up_date', v)} />}
+            </div>
+            <p style={{ margin: '10px 0 0 0', fontSize: '11.5px', color: COLORS.slate500 }}>If a Follow-Up Date is entered, this appears in the Follow-Ups queue like any other task.</p>
           </>
         )}
 
