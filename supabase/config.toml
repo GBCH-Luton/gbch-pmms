@@ -32,3 +32,6 @@ verify_jwt = false
 
 [functions.check-office-cleaning-due]
 verify_jwt = false
+
+[functions.check-head-lease-renewal]
+verify_jwt = false

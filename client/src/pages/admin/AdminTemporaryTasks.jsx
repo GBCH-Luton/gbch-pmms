@@ -5,11 +5,17 @@
 // scripts/add_temporary_tasks_table.sql for the pmms.temporary_tasks table
 // this depends on -- run it before using this page.
 //
-// Picking a Task Type changes which fields show underneath. 5 types are
-// built for real here (Landlord Complaint, Neighbour Complaint, Landlord
-// Contact / Follow-Up, External Agency / Third-Party Task, Rent Review
-// Update) -- the other 9 types from the spec are selectable but have no
-// fields designed yet.
+// Picking a Task Type changes which fields show underneath. As of the
+// directors' 2nd-pass spec (2026-09-02), all 6 remaining types are built
+// for real -- the original list also had Estate Agent/Property Viewing,
+// Lease/Renewal Follow-Up, Compliance Document Chase, Maintenance
+// Follow-Up, Contractor Follow-Up, Internal Department Follow-Up,
+// Document/Signature Chase, and Other, all since dropped: viewings/agent
+// queries fold into Managing Agent Contact, and lease renewal became a
+// separate automatic reminder (see Head Lease section on
+// PropertyLeaseLegalTab.jsx + supabase/functions/check-head-lease-renewal)
+// rather than a task type at all. The remaining unbuilt-placeholder logic
+// below is kept in case more types get added later.
 //
 // Rent Review Update also writes back to pmms.properties' own
 // rent_review_* summary columns (see scripts/add_rent_review_columns.sql)
@@ -28,11 +34,9 @@ import VoiceInputButton from '../../components/VoiceInputButton'
 
 const TASK_TYPES = [
   'Landlord Complaint', 'Neighbour Complaint', 'External Agency / Third-Party Task', 'Rent Review Update',
-  'Landlord Contact / Follow-Up', 'Managing Agent Contact', 'Estate Agent / Property Viewing', 'Lease / Renewal Follow-Up',
-  'Compliance Document Chase', 'Maintenance Follow-Up', 'Contractor Follow-Up', 'Internal Department Follow-Up',
-  'Document / Signature Chase', 'Other',
+  'Landlord Contact / Follow-Up', 'Managing Agent Contact',
 ]
-const BUILT_TYPES = ['Landlord Complaint', 'Neighbour Complaint', 'Landlord Contact / Follow-Up', 'External Agency / Third-Party Task', 'Rent Review Update']
+const BUILT_TYPES = TASK_TYPES
 const PRIORITIES = ['Low', 'Medium', 'High', 'Urgent']
 const DEPARTMENTS = ['Maintenance', 'Support', 'Housing', 'Compliance', 'Management', 'Other']
 const STATUSES = ['New', 'In Progress', 'Awaiting Response', 'Awaiting Internal Team', 'Resolved', 'Closed']
@@ -62,6 +66,12 @@ const UPDATE_TYPES = [
   'Initial Landlord Contact', 'Landlord Requested Increase', 'GBCH Offer Made', 'Negotiation Update',
   'Management Approval Required', 'Rent Agreed', 'Memorandum Sent', 'Awaiting Signature', 'Signed', 'Review Completed', 'Other',
 ]
+const MANAGING_AGENT_CONTACT_METHODS = ['Incoming Call', 'Outgoing Call', 'Incoming Email', 'Outgoing Email', 'WhatsApp/Text', 'Meeting', 'Property Visit', 'Other']
+const MANAGING_AGENT_CONTACT_REASONS = [
+  'Arrange Property Viewing', 'Viewing Follow-Up', 'General Property Query', 'Maintenance / Repair Query', 'Property Damage',
+  'Property Condition', 'Access / Keys', 'Compliance / Documents', 'Lease Query', 'Rent / Payment Query',
+  'Complaint / Concern', 'Follow-Up / Chase', 'Other',
+]
 
 const inputStyle = { width: '100%', padding: '9px 11px', borderRadius: '9px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', fontFamily: 'inherit', boxSizing: 'border-box', background: COLORS.white }
 const disabledInputStyle = { ...inputStyle, background: COLORS.slate50, color: COLORS.slate500 }
@@ -77,6 +87,7 @@ function initialForm() {
     external_agency_involved: false, external_agency: '', warning_action_issued: '', reference_case_number: '', further_action_required: false, next_follow_up_date: '',
     neighbour_updated: false, date_last_updated: '', update_response_provided: '', further_update_required: false, neighbour_outcome: '', escalation_required: false, closed_date: '', resolution_final_action: '',
     contact_datetime: '', contact_method: 'Call - Outgoing', reason_for_contact: '', contact_outcome_text: '', responsible_person_department: '',
+    action_required: false, action_required_detail: '', follow_up_required: false,
     external_agency_type: '', organisation_name: '', contact_person: '', initial_contact_date: '', action_required_from_them: '',
     evidence_sent: false, response_received: false, response_details: '',
     external_source_outside_property: false, external_issue_type: '', responsible_party: '', source_confirmed: false,
@@ -484,10 +495,37 @@ export default function AdminTemporaryTasks({ profile, onNavigate }) {
               <SelectField label="Reason for Contact" value={form.reason_for_contact} onChange={(v) => setField('reason_for_contact', v)} options={CONTACT_REASONS} />
             </div>
             <div style={{ marginTop: '12px' }}><TextField label="Conversation / Contact Notes" value={form.details_notes} onChange={(v) => setField('details_notes', v)} textarea placeholder="What was discussed..." /></div>
+            <div style={{ marginTop: '12px' }}><TextField label="Outcome" value={form.contact_outcome_text} onChange={(v) => setField('contact_outcome_text', v)} /></div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 14px', marginTop: '12px' }}>
-              <TextField label="Outcome" value={form.contact_outcome_text} onChange={(v) => setField('contact_outcome_text', v)} />
-              <TextField label="Responsible Person / Department" value={form.responsible_person_department} onChange={(v) => setField('responsible_person_department', v)} placeholder="If action is required" />
+              <BoolField label="Action Required?" value={form.action_required} onChange={(v) => setField('action_required', v)} />
+              {form.action_required && <TextField label="Action Required" value={form.action_required_detail} onChange={(v) => setField('action_required_detail', v)} />}
             </div>
+            <div style={{ marginTop: '12px' }}><TextField label="Responsible Person / Department" value={form.responsible_person_department} onChange={(v) => setField('responsible_person_department', v)} /></div>
+          </>
+        )}
+
+        {taskType === 'Managing Agent Contact' && (
+          <>
+            <p style={sectionLabelStyle}>Managing Agent Contact — quick contact and follow-up log, same as Landlord Contact but for agents</p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px 14px' }}>
+              <TextField label="Managing Agent / Estate Agent" value={form.organisation_name} onChange={(v) => setField('organisation_name', v)} placeholder={selectedProperty?.managing_agent || ''} />
+              <TextField label="Contact Person" value={form.contact_person} onChange={(v) => setField('contact_person', v)} />
+              <DateField label="Contact Date / Time" value={form.contact_datetime} onChange={(v) => setField('contact_datetime', v)} withTime />
+              <SelectField label="Contact Method" value={form.contact_method} onChange={(v) => setField('contact_method', v)} options={MANAGING_AGENT_CONTACT_METHODS} />
+              <SelectField label="Reason for Contact" value={form.reason_for_contact} onChange={(v) => setField('reason_for_contact', v)} options={MANAGING_AGENT_CONTACT_REASONS} />
+            </div>
+            <div style={{ marginTop: '12px' }}><TextField label="Contact Notes" value={form.details_notes} onChange={(v) => setField('details_notes', v)} textarea /></div>
+            <div style={{ marginTop: '12px' }}><TextField label="Outcome / Response" value={form.contact_outcome_text} onChange={(v) => setField('contact_outcome_text', v)} /></div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 14px', marginTop: '12px' }}>
+              <BoolField label="Action Required?" value={form.action_required} onChange={(v) => setField('action_required', v)} />
+              {form.action_required && <TextField label="Action Required" value={form.action_required_detail} onChange={(v) => setField('action_required_detail', v)} />}
+            </div>
+            <div style={{ marginTop: '12px' }}><TextField label="Responsible Person / Department" value={form.responsible_person_department} onChange={(v) => setField('responsible_person_department', v)} /></div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 14px', marginTop: '12px' }}>
+              <BoolField label="Follow-Up Required?" value={form.follow_up_required} onChange={(v) => setField('follow_up_required', v)} />
+              {form.follow_up_required && <DateField label="Follow-Up Date" value={form.follow_up_date} onChange={(v) => setField('follow_up_date', v)} />}
+            </div>
+            <p style={{ margin: '10px 0 0 0', fontSize: '11.5px', color: COLORS.slate500 }}>If a Follow-Up Date is entered, this appears in the Follow-Ups queue like any other task.</p>
           </>
         )}
 

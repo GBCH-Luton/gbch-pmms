@@ -265,15 +265,23 @@ export default function PropertyLeaseLegalTab({ property, onFieldsSaved, profile
   const readOnly = profile?.division === 'Landlord Liaison'
 
   async function saveFields(fields) {
+    // A new/changed signed date re-arms the daily Head Lease Renewal check
+    // -- same "renewing a dated record must clear its own alert-sent flag"
+    // precedent as property_compliance's expiry_date/aging_alert_sent_at.
+    const datePayload = { ...fields }
+    if ('head_lease_signed_date' in fields && fields.head_lease_signed_date !== property.head_lease_signed_date) {
+      datePayload.head_lease_renewal_alert_sent_at = null
+    }
+
     const { error } = await supabase
       .schema('pmms')
       .from('properties')
-      .update(fields)
+      .update(datePayload)
       .eq('id', property.id)
 
     if (error) return error.message
 
-    onFieldsSaved(fields)
+    onFieldsSaved(datePayload)
     return null
   }
 
@@ -323,6 +331,28 @@ export default function PropertyLeaseLegalTab({ property, onFieldsSaved, profile
           { key: 'landlord_email', label: 'Landlord Email', type: 'text' },
         ]}
       />
+
+      {/* Automatic-reminder-only per the spec (2026-09-02) -- not a
+          Temporary Task type. See
+          supabase/functions/check-head-lease-renewal for the daily
+          6-years-from-signed-date + 3-months-before check this field
+          drives. Always editable by Landlord Liaison,
+          same reasoning as Landlord Details/Managing Agent above -- she's
+          the one who records this once a Head Lease is actually signed. */}
+      <EditableSection
+        title="Head Lease"
+        property={property}
+        onSave={saveFields}
+        readOnly={false}
+        fields={[
+          { key: 'head_lease_signed_date', label: 'Head Lease Signed Date', type: 'date' },
+        ]}
+      />
+      {property.head_lease_signed_date && (
+        <p style={{ margin: '-8px 0 16px 0', fontSize: '12px', color: COLORS.slate500 }}>
+          Renewal due {(() => { const d = new Date(property.head_lease_signed_date); d.setFullYear(d.getFullYear() + 6); return formatUKDate(d.toISOString().slice(0, 10)) })()} — Landlord Liaison is notified 3 months before.
+        </p>
+      )}
 
       {/* Not every property has a Managing Agent -- most are let directly by
           the landlord. See scripts/import_managing_agents.sql (2026-09-02)
