@@ -4,6 +4,7 @@ import { COLORS } from '../../lib/colors'
 import { priorityTierLabel, fetchFlaggedClockingCount, isTicketStuck, KpiTiles, fetchComplianceAgingCounts, fetchVoidAgingCounts, fetchGardenReviewAging, fetchHousekeepingCounts, fetchContractorCounts, computeAvgResponseMs, formatDuration, fetchPriorityThresholds, fetchAssignableBuilders, fetchAssignableStaffForDivision, fetchAssignableStaffForManagerRoles, fetchLastEndedSessionsToday, ukDateKey, formatUKDate, formatUKDateTime, minutesLate, SHORT_TRIP_REASONS, activityCategoryMeta, ACTIVITY_CATEGORY_META, LANDLORD_LIAISON_PAGE_ENABLED, clockInLocationLabel, clockInLocationDetailSuffix } from './shared'
 import { NavIcon } from '../../lib/icons'
 import { googleMapsLink } from '../../lib/geo'
+import { FOLLOWUP_TILES, fetchFollowupCounts } from '../../lib/temporaryTasks'
 
 // Lazy -- pulls in Leaflet (a real map-tile/JS dependency), only worth
 // loading once someone actually clicks the map pin, not on every visit to
@@ -847,6 +848,11 @@ function TeamWhereabouts({ profile, onNavigate, height = DASHBOARD_TOP_CARD_HEIG
 }
 
 export default function AdminDashboard({ profile, onNavigate }) {
+  // Same real-Admin-only check as the Temporary Tasks nav item itself
+  // (AdminDashboard.jsx shell's NAV_ITEMS) and AdminProperties.jsx's own
+  // tab gating -- `profile.role === 'admin'` alone isn't narrow enough,
+  // an admin-equivalent custom role also resolves to role 'admin'.
+  const isRealAdmin = profile.pmmsRole === 'Admin' || (!profile.pmmsRole && profile.role === 'admin')
   const [tickets, setTickets] = useState([])
   const [newPropertiesCount, setNewPropertiesCount] = useState(0)
   const [totalPropertiesCount, setTotalPropertiesCount] = useState(0)
@@ -860,6 +866,7 @@ export default function AdminDashboard({ profile, onNavigate }) {
   const [gardenAgingCounts, setGardenAgingCounts] = useState({ overdue: 0, aging: 0, recent: 0, needsAttention: 0, overgrown: 0 })
   const [housekeepingCounts, setHousekeepingCounts] = useState({ overdue: 0, dueSoon: 0, ok: 0, pendingDelays: 0 })
   const [contractorCounts, setContractorCounts] = useState({ active: 0, spendThisMonth: 0 })
+  const [tempTaskCounts, setTempTaskCounts] = useState({ overdue: 0, today: 0, week: 0, ext: 0, int: 0, done: 0 })
   const [p1Threshold, setP1Threshold] = useState(70)
   const [p2Threshold, setP2Threshold] = useState(40)
   const [totalTicketsPeriod, setTotalTicketsPeriod] = useState('all_time')
@@ -953,6 +960,10 @@ export default function AdminDashboard({ profile, onNavigate }) {
     fetchGardenReviewAging().then(setGardenAgingCounts)
     fetchHousekeepingCounts().then(setHousekeepingCounts)
     fetchContractorCounts().then(setContractorCounts)
+    // Admin-only feature (see NAV_ITEMS' temporary-tasks visibleTo) -- no
+    // reason to run this query for every other admin/manager who can't
+    // even see the page it points to.
+    if (isRealAdmin) fetchFollowupCounts().then(setTempTaskCounts)
     fetchPriorityThresholds().then(({ p1, p2 }) => { setP1Threshold(p1); setP2Threshold(p2) })
     fetchTotalTicketsPeriod()
     fetchTopCardHeight()
@@ -1180,6 +1191,16 @@ export default function AdminDashboard({ profile, onNavigate }) {
     { label: 'Recent Voids', value: voidAgingCounts.recent, colour: COLORS.green600, tierFilter: 'Recent' },
   ]
 
+  // Derived from the same FOLLOWUP_TILES definition the Temporary Tasks
+  // queue itself uses (lib/temporaryTasks.js) -- labels/colours can never
+  // drift between the two. "Resolved / Closed" (its 6th bucket) is
+  // deliberately left off this summary -- not actionable, same reasoning
+  // as every other Dashboard KPI set here only surfacing what still needs
+  // attention.
+  const tempTaskKpis = FOLLOWUP_TILES.filter(t => t.key !== 'done').map(t => ({
+    label: t.label, value: tempTaskCounts[t.key], colour: t.bg, bucket: t.key,
+  }))
+
   const gardenAgingKpis = [
     { label: 'Overdue Gardens', value: gardenAgingCounts.overdue, colour: COLORS.red600, filterMode: 'gardensOverdue' },
     { label: 'Due Soon', value: gardenAgingCounts.aging, colour: COLORS.amber600, filterMode: 'gardensOverdue' },
@@ -1256,6 +1277,12 @@ export default function AdminDashboard({ profile, onNavigate }) {
   if (landlordLiaisonVisible) {
     if (landlordLiaisonUnassignedCount > 0) flaggedLines.push({ target: 'landlord-liaison', tone: 'warning', text: <><b>{landlordLiaisonUnassignedCount} Landlord Liaison ticket{landlordLiaisonUnassignedCount === 1 ? '' : 's'}</b> {landlordLiaisonUnassignedCount === 1 ? 'is' : 'are'} still unassigned.</> })
     else quietLines.push({ target: 'landlord-liaison', tone: 'quiet', text: <>Landlord Liaison — no updates. {landlordLiaisonOpenCount} open.</> })
+  }
+
+  if (isRealAdmin) {
+    if (tempTaskCounts.overdue > 0) flaggedLines.push({ target: 'temporary-tasks', tone: 'warning', text: <><b>{tempTaskCounts.overdue} Temporary Task{tempTaskCounts.overdue === 1 ? '' : 's'}</b> {tempTaskCounts.overdue === 1 ? 'is' : 'are'} overdue.</> })
+    else if (tempTaskCounts.today > 0) flaggedLines.push({ target: 'temporary-tasks', tone: 'followup', text: <><b>{tempTaskCounts.today} Temporary Task{tempTaskCounts.today === 1 ? '' : 's'}</b> due today.</> })
+    else quietLines.push({ target: 'temporary-tasks', tone: 'quiet', text: <>Temporary Tasks — no updates. {tempTaskCounts.week} due this week.</> })
   }
 
   if (voidGardensVisible) {
@@ -1424,6 +1451,22 @@ export default function AdminDashboard({ profile, onNavigate }) {
             <KpiTiles
               kpis={landlordLiaisonKpis}
               onTileClick={() => onNavigate?.('landlord-liaison')}
+            />
+          </div>
+        </DashboardSection>
+      )}
+
+      {/* Same real-Admin-only restriction as the Temporary Tasks nav item
+          itself (AdminDashboard.jsx shell's NAV_ITEMS) -- a summary tile
+          pointing at a page someone can't open would just be confusing.
+          Widen together once the whole feature opens up to Landlord
+          Liaison. */}
+      {isRealAdmin && (
+        <DashboardSection id="temporary-tasks" title="Temporary Tasks" background={COLORS.white} alertCount={tempTaskCounts.overdue} defaultCollapsed>
+          <div style={{ width: '100%' }}>
+            <KpiTiles
+              kpis={tempTaskKpis}
+              onTileClick={(kpi) => onNavigate?.('temporary-tasks', { activeTile: kpi.bucket })}
             />
           </div>
         </DashboardSection>

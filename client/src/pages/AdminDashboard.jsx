@@ -309,6 +309,11 @@ export default function AdminDashboard({ profile }) {
   // on that property's own Profile tab -- otherwise that button would just
   // land on the queue with the form closed.
   const [tempTaskInitialPropertyId, setTempTaskInitialPropertyId] = useState(null)
+  // Same pattern, for the Dashboard's own Temporary Tasks summary tiles
+  // (pages/admin/AdminDashboard.jsx) jumping in pre-filtered to whichever
+  // bucket was clicked, matching every other Dashboard KPI tile's own
+  // "already filtered" promise (see AdminHelp.jsx).
+  const [tempTaskInitialActiveTile, setTempTaskInitialActiveTile] = useState(null)
   const [propertiesInitialFilter, setPropertiesInitialFilter] = useState(null)
   const [complianceInitialTierFilter, setComplianceInitialTierFilter] = useState(null)
   const [voidsInitialTierFilter, setVoidsInitialTierFilter] = useState(null)
@@ -873,6 +878,9 @@ export default function AdminDashboard({ profile }) {
     }
     if (key === 'temporary-tasks' && opts.propertyId) {
       setTempTaskInitialPropertyId(opts.propertyId)
+    }
+    if (key === 'temporary-tasks' && opts.activeTile) {
+      setTempTaskInitialActiveTile(opts.activeTile)
     }
     if (key === 'pipeline' && opts.statusFilter) {
       setPipelineInitialFilter(opts.statusFilter)
@@ -1706,6 +1714,8 @@ export default function AdminDashboard({ profile }) {
               onInitialReopenHistoryConsumed={() => setClockingInitialReopenHistory(null)}
               initialOpenAddPropertyId={currentPage === 'temporary-tasks' ? tempTaskInitialPropertyId : null}
               onInitialOpenAddConsumed={() => setTempTaskInitialPropertyId(null)}
+              initialActiveTileFilter={currentPage === 'temporary-tasks' ? tempTaskInitialActiveTile : null}
+              onInitialActiveTileConsumed={() => setTempTaskInitialActiveTile(null)}
               initialStatusFilter={currentPage === 'pipeline' ? pipelineInitialFilter : null}
               initialPriorityFilter={currentPage === 'pipeline' ? pipelineInitialPriorityFilter : null}
               initialStuckFilter={currentPage === 'pipeline' ? pipelineInitialStuckFilter : null}

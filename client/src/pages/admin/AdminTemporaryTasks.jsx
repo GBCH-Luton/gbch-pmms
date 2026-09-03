@@ -35,6 +35,7 @@ import { modalLabelStyle, modalErrorStyle, formatUKDate } from './shared'
 import { compressImage } from '../../lib/imageCompression'
 import { getSignedUrl } from '../../lib/storage'
 import { attachProperties } from '../../lib/properties'
+import { FOLLOWUP_TILES, bucketForFollowupItem } from '../../lib/temporaryTasks'
 import PropertySearchSelect from '../../components/PropertySearchSelect'
 import VoiceInputButton from '../../components/VoiceInputButton'
 
@@ -83,15 +84,10 @@ const MANAGING_AGENT_CONTACT_REASONS = [
 // Follow-Ups page, merged in 2026-09-02 so there's one page for "browse
 // what needs chasing" + "log a new one" instead of two). Combines
 // Temporary Tasks with chaseable Property Notes (ones with a Due Date/
-// Follow-Up Date set) across every property.
-const FOLLOWUP_TILES = [
-  { key: 'overdue', label: 'Overdue', bg: COLORS.red600 },
-  { key: 'today', label: 'Due Today', bg: COLORS.amber600 },
-  { key: 'week', label: 'Due This Week', bg: '#c07a1f' },
-  { key: 'ext', label: 'Awaiting External', bg: COLORS.purple700 },
-  { key: 'int', label: 'Awaiting Internal', bg: COLORS.indigo700 },
-  { key: 'done', label: 'Resolved / Closed', bg: COLORS.slate500 },
-]
+// Follow-Up Date set) across every property. FOLLOWUP_TILES/
+// bucketForFollowupItem moved to lib/temporaryTasks.js (2026-09-04) so the
+// Dashboard's own summary tiles/Daily Briefing line share the exact same
+// definition instead of a second, driftable copy.
 const FOLLOWUP_CAT_STYLES = {
   Observation: { bg: COLORS.slate100, color: COLORS.slate500 },
   Flag: { bg: COLORS.red100, color: COLORS.red600 },
@@ -99,32 +95,6 @@ const FOLLOWUP_CAT_STYLES = {
   Complaint: { bg: COLORS.orange100, color: COLORS.orange700 },
 }
 const FOLLOWUP_TASK_TYPE_STYLE = { bg: COLORS.teal100, color: COLORS.teal700 }
-
-// Status-based buckets win over date-based ones -- a task waiting on
-// someone else is more usefully grouped by WHO it's waiting on than by
-// date (matches the mockup's own reasoning).
-function bucketForFollowupItem(item) {
-  if (item.kind === 'Task') {
-    if (item.status === 'Resolved' || item.status === 'Closed') return 'done'
-    if (item.status === 'Awaiting Response') return 'ext'
-    if (item.status === 'Awaiting Internal Team') return 'int'
-  } else {
-    if (!item.is_flagged || item.flag_status === 'Resolved') return 'done'
-  }
-
-  const effectiveDate = item.follow_up_date || item.due_date
-  if (!effectiveDate) return null
-
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const target = new Date(effectiveDate)
-  const daysDiff = Math.floor((target - today) / 86400000)
-
-  if (daysDiff < 0) return 'overdue'
-  if (daysDiff === 0) return 'today'
-  if (daysDiff <= 7) return 'week'
-  return null
-}
 
 const inputStyle = { width: '100%', padding: '9px 11px', borderRadius: '9px', border: `1px solid ${COLORS.slate200}`, fontSize: '13px', fontFamily: 'inherit', boxSizing: 'border-box', background: COLORS.white }
 const disabledInputStyle = { ...inputStyle, background: COLORS.slate50, color: COLORS.slate500 }
@@ -209,7 +179,7 @@ function landlordAgentDisplay(property) {
   return property.landlord_name || ''
 }
 
-export default function AdminTemporaryTasks({ profile, onNavigate, initialOpenAddPropertyId, onInitialOpenAddConsumed }) {
+export default function AdminTemporaryTasks({ profile, onNavigate, initialOpenAddPropertyId, onInitialOpenAddConsumed, initialActiveTileFilter, onInitialActiveTileConsumed }) {
   const [properties, setProperties] = useState([])
   const [propertyId, setPropertyId] = useState('')
   const [taskType, setTaskType] = useState('Landlord Complaint')
@@ -266,6 +236,15 @@ export default function AdminTemporaryTasks({ profile, onNavigate, initialOpenAd
     setShowAddModal(true)
     onInitialOpenAddConsumed?.()
   }, [initialOpenAddPropertyId])
+
+  // Arrived via a Dashboard summary tile (pages/admin/AdminDashboard.jsx)
+  // -- land already filtered to that bucket, same "already filtered"
+  // promise every other Dashboard KPI tile makes.
+  useEffect(() => {
+    if (!initialActiveTileFilter) return
+    setActiveTile(initialActiveTileFilter)
+    onInitialActiveTileConsumed?.()
+  }, [initialActiveTileFilter])
 
   async function fetchFollowItems() {
     setFollowError('')
