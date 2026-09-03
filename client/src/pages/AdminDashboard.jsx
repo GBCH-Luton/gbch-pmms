@@ -123,7 +123,7 @@ const NAV_ITEMS = [
   // One nav item hosts both the follow-ups queue and the add-task form
   // (merged 2026-09-02 -- was two separate nav items, "Add Temporary Task"
   // and "Follow-Ups"; see AdminTemporaryTasks.jsx).
-  { key: 'temporary-tasks', label: 'Temporary Task', icon: 'ticket', Component: AdminTemporaryTasks, visibleTo: p => p.pmmsRole === 'Admin' || (!p.pmmsRole && p.role === 'admin') },
+  { key: 'temporary-tasks', label: 'Temporary Tasks', icon: 'ticket', Component: AdminTemporaryTasks, visibleTo: p => p.pmmsRole === 'Admin' || (!p.pmmsRole && p.role === 'admin') },
   { key: 'voids', label: 'Voids', icon: 'key', Component: AdminVoids, divisions: ['Maintenance'] },
   // Division dashboards, grouped together in this order.
   { key: 'compliance', label: 'Compliance', icon: 'shield', Component: AdminCompliance, divisions: ['Maintenance', 'Compliance'] },
