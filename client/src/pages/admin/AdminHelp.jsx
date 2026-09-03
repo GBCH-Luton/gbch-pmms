@@ -54,6 +54,7 @@ const SECTIONS = [
       { q: 'What do the KPI tiles at the top do?', a: '"Total tickets", "Unassigned", "In Progress", "On Hold", "Completed", "P1 Critical", and "Stuck" each double as a one-click filter -- click a tile to instantly filter the table to just that group.' },
       { q: 'What other filters are available?', a: 'Status, property, a ticket-number search box, category, builder, priority, and a "Stuck only" checkbox -- all combinable at once.' },
       { q: 'What can I do from an expanded row?', a: 'Comments, History (the full audit trail for that ticket), Priority (override the calculated score), Cancel, and Reassign. Select multiple rows\' checkboxes to use Bulk Reassign across several tickets at once.' },
+      { q: 'What does the red number on the "Pipeline" menu item in the left sidebar mean?', a: 'It\'s a count of open tickets -- everything not yet Completed, Archived, or Cancelled. It won\'t match any single KPI tile on the Pipeline page itself (those are narrower breakdowns like "In Progress" or "On Hold"), since it\'s the total of all of them combined. It updates automatically every time a ticket changes status.' },
     ],
   },
   {
