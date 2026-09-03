@@ -16,7 +16,7 @@ import { NavIcon } from '../lib/icons'
 import { compressImage } from '../lib/imageCompression'
 import { compressVideo } from '../lib/videoCompression'
 import { getSignedUrl, uploadFileWithProgress } from '../lib/storage'
-import { uploadTicketAttachments, formatUploadProgress } from '../lib/ticketAttachments'
+import { uploadTicketAttachments, uploadAttachmentFiles, recordTicketAttachments, formatUploadProgress } from '../lib/ticketAttachments'
 import PropertySearchSelect from '../components/PropertySearchSelect'
 import ChatComposer from '../components/ChatComposer'
 import PhotoLightbox from '../components/PhotoLightbox'
@@ -1702,6 +1702,23 @@ export default function BuilderDashboard({ profile }) {
     setTicketDuplicateWarning(null)
     setTicketSubmitting(true)
 
+    // Upload before the ticket exists (not after) -- same #547/#548 fix
+    // already applied to AdminRaiseTicket.jsx/SubmitterDashboard.jsx:
+    // insert-then-upload let an upload failure land a photo-less ticket in
+    // the queue while showing the raiser an error that looked like nothing
+    // had been submitted. This flow is currently unreachable
+    // (SHOW_LOG_TICKET_NAV = false) but fixed anyway so it isn't a
+    // landmine if that flag's ever flipped back on.
+    let attachmentUrls
+    try {
+      attachmentUrls = await uploadAttachmentFiles(ticketMediaFiles, profile.id, setTicketUploadProgress)
+    } catch (uploadErr) {
+      setTicketSubmitting(false)
+      setTicketUploadProgress(null)
+      setTicketError(uploadErr.message)
+      return
+    }
+
     const { data, error } = await supabase
       .schema('pmms')
       .from('tickets')
@@ -1711,6 +1728,7 @@ export default function BuilderDashboard({ profile }) {
         category: ticketCategory,
         issue_tag: finalIssueTag,
         description: finalIssueTag,
+        photo_url: attachmentUrls[0],
         priority_score: priorityScore,
         status: 'Pending',
         raised_by: profile.id,
@@ -1722,20 +1740,18 @@ export default function BuilderDashboard({ profile }) {
 
     if (error) {
       setTicketSubmitting(false)
+      setTicketUploadProgress(null)
       setTicketError(error.message)
       return
     }
 
-    if (ticketMediaFiles.length > 0) {
-      try {
-        const [firstUrl] = await uploadTicketAttachments(ticketMediaFiles, data[0].id, profile.id, { onProgress: setTicketUploadProgress })
-        await supabase.schema('pmms').from('tickets').update({ photo_url: firstUrl }).eq('id', data[0].id)
-      } catch (uploadErr) {
-        setTicketSubmitting(false)
-        setTicketUploadProgress(null)
-        setTicketError(uploadErr.message)
-        return
-      }
+    try {
+      await recordTicketAttachments(attachmentUrls, data[0].id, 'reported')
+    } catch (attachErr) {
+      // The ticket already exists with photo_url set -- the single
+      // required photo is safe either way, same reasoning as
+      // AdminRaiseTicket.jsx's own catch here.
+      console.error('Failed to record ticket attachment rows', attachErr)
     }
 
     setTicketSubmitting(false)
