@@ -1235,7 +1235,15 @@ export default function AdminPipeline({
     // Reports' "Currently Open" tile's exact definition (see AdminReports.jsx)
     // -- also a sentinel, not a real status.
     if (statusFilter === 'OpenAll' && (t.status === 'Completed' || t.status === 'Archived' || t.status === 'Cancelled')) return false
-    if (statusFilter !== 'All' && statusFilter !== 'CompletedAll' && statusFilter !== 'OpenAll' && t.status !== statusFilter) return false
+    // Another sentinel, not a real status -- Builder v2's Stop sheet flags
+    // this as an ordinary On Hold ticket with hold_reason set, so there's
+    // no literal ticket_number status to filter on directly. Without this,
+    // the Dashboard's own "Unable to Do" tile linked here with
+    // statusFilter: 'On Hold', which showed every On Hold ticket (lunch/
+    // materials/office pauses included) instead of just the 2 it counted
+    // -- found confusing live, 2026-09-04.
+    if (statusFilter === 'UnableToDo' && !(t.status === 'On Hold' && t.hold_reason === 'Unable to Do the Job')) return false
+    if (statusFilter !== 'All' && statusFilter !== 'CompletedAll' && statusFilter !== 'OpenAll' && statusFilter !== 'UnableToDo' && t.status !== statusFilter) return false
     if (propertyFilter && String(t.property_id) !== String(propertyFilter)) return false
     if (categoryFilter !== 'All' && t.category !== categoryFilter) return false
     if (divisionFilter !== 'All' && resolveCategoryDivision(t.category, categoriesSettingsRow) !== divisionFilter) return false
@@ -1432,6 +1440,7 @@ export default function AdminPipeline({
           <option value="Assigned">Assigned</option>
           <option value="In Progress">In Progress</option>
           <option value="On Hold">On Hold</option>
+          <option value="UnableToDo">On Hold — Unable to Do the Job</option>
           <option value="Completed">Completed (awaiting sign-off)</option>
           <option value="Archived">Archived (signed off)</option>
           <option value="CompletedAll">Completed (all, incl. signed off)</option>

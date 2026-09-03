@@ -1124,7 +1124,7 @@ export default function AdminDashboard({ profile, onNavigate }) {
     // own tile so it can't get lost among ordinary materials/lunch pauses:
     // this is the one On Hold reason that needs a manager to actually act
     // (reassign), not just wait.
-    { label: 'Unable to Do', value: tickets.filter(t => t.status === 'On Hold' && t.hold_reason === 'Unable to Do the Job').length, colour: COLORS.red600, statusFilter: 'On Hold' },
+    { label: 'Unable to Do', value: tickets.filter(t => t.status === 'On Hold' && t.hold_reason === 'Unable to Do the Job').length, colour: COLORS.red600, statusFilter: 'UnableToDo' },
     // 'Completed' alone undercounts -- a signed-off job moves to 'Archived',
     // so a job finished this morning and signed off by lunchtime would drop
     // out of this tile entirely even though it's very much still completed
