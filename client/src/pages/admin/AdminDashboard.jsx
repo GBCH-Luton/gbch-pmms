@@ -5,6 +5,7 @@ import { priorityTierLabel, fetchFlaggedClockingCount, isTicketStuck, KpiTiles, 
 import { NavIcon } from '../../lib/icons'
 import { googleMapsLink } from '../../lib/geo'
 import { FOLLOWUP_TILES, fetchFollowupCounts } from '../../lib/temporaryTasks'
+import { fetchOnboardingMetrics } from '../../lib/onboarding'
 
 // Lazy -- pulls in Leaflet (a real map-tile/JS dependency), only worth
 // loading once someone actually clicks the map pin, not on every visit to
@@ -853,6 +854,11 @@ export default function AdminDashboard({ profile, onNavigate }) {
   // tab gating -- `profile.role === 'admin'` alone isn't narrow enough,
   // an admin-equivalent custom role also resolves to role 'admin'.
   const isRealAdmin = profile.pmmsRole === 'Admin' || (!profile.pmmsRole && profile.role === 'admin')
+  // Matches the "Onboard a Property" nav item's own visibleTo exactly
+  // (AdminDashboard.jsx shell's NAV_ITEMS) -- same reasoning as
+  // isRealAdmin above, a Dashboard tile pointing at a page someone can't
+  // open would just be confusing.
+  const onboardingVisible = profile.role === 'admin' || profile.pmmsRole === 'Maintenance Assistant' || profile.division === 'Landlord Liaison'
   const [tickets, setTickets] = useState([])
   const [newPropertiesCount, setNewPropertiesCount] = useState(0)
   const [totalPropertiesCount, setTotalPropertiesCount] = useState(0)
@@ -867,6 +873,7 @@ export default function AdminDashboard({ profile, onNavigate }) {
   const [housekeepingCounts, setHousekeepingCounts] = useState({ overdue: 0, dueSoon: 0, ok: 0, pendingDelays: 0 })
   const [contractorCounts, setContractorCounts] = useState({ active: 0, spendThisMonth: 0 })
   const [tempTaskCounts, setTempTaskCounts] = useState({ overdue: 0, today: 0, week: 0, ext: 0, int: 0, done: 0 })
+  const [onboardingMetrics, setOnboardingMetrics] = useState(null)
   const [p1Threshold, setP1Threshold] = useState(70)
   const [p2Threshold, setP2Threshold] = useState(40)
   const [totalTicketsPeriod, setTotalTicketsPeriod] = useState('all_time')
@@ -964,6 +971,7 @@ export default function AdminDashboard({ profile, onNavigate }) {
     // reason to run this query for every other admin/manager who can't
     // even see the page it points to.
     if (isRealAdmin) fetchFollowupCounts().then(setTempTaskCounts)
+    if (onboardingVisible) fetchOnboardingMetrics().then(setOnboardingMetrics)
     fetchPriorityThresholds().then(({ p1, p2 }) => { setP1Threshold(p1); setP2Threshold(p2) })
     fetchTotalTicketsPeriod()
     fetchTopCardHeight()
@@ -1201,6 +1209,16 @@ export default function AdminDashboard({ profile, onNavigate }) {
     label: t.label, value: tempTaskCounts[t.key], colour: t.bg, bucket: t.key,
   }))
 
+  // "Live (via this walk)" (PropertyOnboardingWalk.jsx's 5th tile) left off
+  // this summary -- not actionable, same reasoning as tempTaskKpis leaving
+  // off Resolved/Closed above.
+  const onboardingKpis = onboardingMetrics ? [
+    { label: 'To Walk', value: onboardingMetrics.toWalkIds.size, colour: COLORS.slate500 },
+    { label: 'Walking', value: onboardingMetrics.walkingIds.size, colour: COLORS.amber600 },
+    { label: 'Waiting On Tickets', value: onboardingMetrics.waitingIds.size, colour: COLORS.red600 },
+    { label: 'With Landlord Liaison', value: onboardingMetrics.liaisonIds.size, colour: COLORS.blue600 },
+  ] : []
+
   const gardenAgingKpis = [
     { label: 'Overdue Gardens', value: gardenAgingCounts.overdue, colour: COLORS.red600, filterMode: 'gardensOverdue' },
     { label: 'Due Soon', value: gardenAgingCounts.aging, colour: COLORS.amber600, filterMode: 'gardensOverdue' },
@@ -1277,6 +1295,14 @@ export default function AdminDashboard({ profile, onNavigate }) {
   if (landlordLiaisonVisible) {
     if (landlordLiaisonUnassignedCount > 0) flaggedLines.push({ target: 'landlord-liaison', tone: 'warning', text: <><b>{landlordLiaisonUnassignedCount} Landlord Liaison ticket{landlordLiaisonUnassignedCount === 1 ? '' : 's'}</b> {landlordLiaisonUnassignedCount === 1 ? 'is' : 'are'} still unassigned.</> })
     else quietLines.push({ target: 'landlord-liaison', tone: 'quiet', text: <>Landlord Liaison — no updates. {landlordLiaisonOpenCount} open.</> })
+  }
+
+  if (onboardingVisible && onboardingMetrics) {
+    const waitingCount = onboardingMetrics.waitingIds.size
+    const liaisonCount = onboardingMetrics.liaisonIds.size
+    if (waitingCount > 0) flaggedLines.push({ target: 'onboard-property', tone: 'warning', text: <><b>{waitingCount} property walk{waitingCount === 1 ? '' : 's'}</b> {waitingCount === 1 ? 'is' : 'are'} waiting on tickets before it can move on.</> })
+    else if (liaisonCount > 0) flaggedLines.push({ target: 'onboard-property', tone: 'followup', text: <><b>{liaisonCount} property walk{liaisonCount === 1 ? '' : 's'}</b> {liaisonCount === 1 ? 'is' : 'are'} with Landlord Liaison for review.</> })
+    else quietLines.push({ target: 'onboard-property', tone: 'quiet', text: <>Onboard a Property — no updates. {onboardingMetrics.toWalkIds.size} to walk.</> })
   }
 
   if (isRealAdmin) {
@@ -1440,6 +1466,25 @@ export default function AdminDashboard({ profile, onNavigate }) {
             <KpiTiles
               kpis={complianceKpis}
               onTileClick={(kpi) => onNavigate?.('compliance', { tierFilter: kpi.tierFilter })}
+            />
+          </div>
+        </DashboardSection>
+      )}
+
+      {/* Matches "Onboard a Property" nav item's own visibleTo exactly
+          (AdminDashboard.jsx shell's NAV_ITEMS) -- Admin, the Maintenance
+          Assistant who walks properties, or the Landlord Liaison Manager
+          who reviews them. Plain onNavigate, no pre-filtered tile --
+          this page shows a different component per division
+          (AdminOnboardProperty.jsx routes Landlord Liaison to
+          PropertyOnboardingReview, everyone else to PropertyOnboardingWalk),
+          so there's no one filter shape to hand across both. */}
+      {onboardingVisible && (
+        <DashboardSection id="onboard-property" title="Onboard a Property" background={COLORS.white} alertCount={onboardingMetrics?.waitingIds.size || 0} defaultCollapsed>
+          <div style={{ width: '100%' }}>
+            <KpiTiles
+              kpis={onboardingKpis}
+              onTileClick={() => onNavigate?.('onboard-property')}
             />
           </div>
         </DashboardSection>
