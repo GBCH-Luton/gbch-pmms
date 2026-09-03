@@ -215,6 +215,12 @@ export default function AdminTemporaryTasks({ profile, onNavigate, initialOpenAd
   const [taskType, setTaskType] = useState('Landlord Complaint')
   const [form, setForm] = useState(initialForm())
   const [evidenceFile, setEvidenceFile] = useState(null)
+  // Rent Review Update's "finalise by uploading the signed doc" step
+  // (directors' 2nd update, 2026-09-03) -- separate from the generic
+  // evidence upload above since this one has its own side-effect (writes
+  // the agreed rent + document to the property's own Rent Review record,
+  // see handleSave below), not just a log-entry attachment.
+  const [signedDocFile, setSignedDocFile] = useState(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [savedMessage, setSavedMessage] = useState('')
@@ -346,6 +352,22 @@ export default function AdminTemporaryTasks({ profile, onNavigate, initialOpenAd
       evidenceUrl = await getSignedUrl('property-docs', path)
     }
 
+    let signedDocUrl = null
+    if (signedDocFile) {
+      let compressed
+      try {
+        compressed = await compressImage(signedDocFile)
+      } catch (compressErr) {
+        setSaving(false)
+        setError(compressErr.message)
+        return
+      }
+      const path = `${propertyId}/rent-review/${Date.now()}-${compressed.name}`
+      const { error: uploadError } = await supabase.storage.from('property-docs').upload(path, compressed)
+      if (uploadError) { setSaving(false); setError(`Signed document upload failed: ${uploadError.message}`); return }
+      signedDocUrl = await getSignedUrl('property-docs', path)
+    }
+
     const { data: insertedTask, error: insertError } = await supabase
       .schema('pmms')
       .from('temporary_tasks')
@@ -381,6 +403,7 @@ export default function AdminTemporaryTasks({ profile, onNavigate, initialOpenAd
         agreed_rent: form.agreed_rent === '' ? null : Number(form.agreed_rent),
         assigned_to: profile.id,
         evidence_url: evidenceUrl,
+        signed_document_url: signedDocUrl,
         created_by: profile.id,
         created_by_name: profile.name,
       })
@@ -397,29 +420,40 @@ export default function AdminTemporaryTasks({ profile, onNavigate, initialOpenAd
     // this fails, the task itself is already saved, so surface the error
     // without discarding what did succeed.
     if (taskType === 'Rent Review Update') {
+      const propUpdate = {
+        rent_review_status: form.update_type || null,
+        rent_review_landlord_request: form.landlord_requested_rent === '' ? null : Number(form.landlord_requested_rent),
+        rent_review_gbch_offer: form.gbch_proposed_rent === '' ? null : Number(form.gbch_proposed_rent),
+        rent_review_last_contact_date: new Date().toISOString().slice(0, 10),
+        // "Next Follow-Up: selected follow-up date" (spec's own worked
+        // example) -- cleared, not left stale, once Follow-Up Needed is
+        // set back to No.
+        rent_review_next_follow_up_date: form.follow_up_required ? (form.follow_up_date || null) : null,
+      }
+      // Finalising (signed doc uploaded) records what was actually agreed
+      // -- deliberately NOT written to the property's own rent_amount.
+      // Per the directors' real-world process, Adnan updates that manually
+      // once the standing order itself changes (see PropertyLeaseLegalTab's
+      // Financials section), so rent_amount and "agreed" can legitimately
+      // disagree for a while after signing.
+      if (signedDocUrl) {
+        propUpdate.rent_review_signed_document_url = signedDocUrl
+        propUpdate.rent_review_agreed_rent_amount = form.agreed_rent === '' ? null : Number(form.agreed_rent)
+      }
       const { error: propUpdateError } = await supabase
         .schema('pmms')
         .from('properties')
-        .update({
-          rent_review_status: form.update_type || null,
-          rent_review_landlord_request: form.landlord_requested_rent === '' ? null : Number(form.landlord_requested_rent),
-          rent_review_gbch_offer: form.gbch_proposed_rent === '' ? null : Number(form.gbch_proposed_rent),
-          rent_review_last_contact_date: new Date().toISOString().slice(0, 10),
-        })
+        .update(propUpdate)
         .eq('id', propertyId)
       if (propUpdateError) {
         setError(`Task saved, but couldn't update the property's Rent Review summary: ${propUpdateError.message}`)
       }
-      setProperties(prev => prev.map(p => p.id === propertyId ? {
-        ...p,
-        rent_review_status: form.update_type || null,
-        rent_review_landlord_request: form.landlord_requested_rent === '' ? null : Number(form.landlord_requested_rent),
-        rent_review_gbch_offer: form.gbch_proposed_rent === '' ? null : Number(form.gbch_proposed_rent),
-      } : p))
+      setProperties(prev => prev.map(p => p.id === propertyId ? { ...p, ...propUpdate } : p))
     }
 
     setForm(initialForm())
     setEvidenceFile(null)
+    setSignedDocFile(null)
     setFollowUpOfTaskId(null)
     setJustSavedTask(insertedTask)
     setSavedMessage(followUpOfTaskId ? 'Follow-up task saved.' : 'Task saved.')
@@ -823,10 +857,21 @@ export default function AdminTemporaryTasks({ profile, onNavigate, initialOpenAd
               <DateField label="Effective Date" value={form.rent_effective_date} onChange={(v) => setField('rent_effective_date', v)} />
               <DateField label="Document Sent Date" value={form.document_sent_date} onChange={(v) => setField('document_sent_date', v)} />
               <DateField label="Signature Received Date" value={form.signature_received_date} onChange={(v) => setField('signature_received_date', v)} />
-              <DateField label="Next Follow-Up Date" value={form.follow_up_date} onChange={(v) => setField('follow_up_date', v)} />
             </div>
             <div style={{ marginTop: '12px' }}><TextField label="Landlord Response" value={form.landlord_response} onChange={(v) => setField('landlord_response', v)} textarea /></div>
             <div style={{ marginTop: '12px' }}><TextField label="Management Decision / Notes" value={form.management_decision_notes} onChange={(v) => setField('management_decision_notes', v)} textarea /></div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 14px', marginTop: '12px' }}>
+              <BoolField label="Follow-Up Needed?" value={form.follow_up_required} onChange={(v) => setField('follow_up_required', v)} />
+              {form.follow_up_required && <DateField label="Follow-Up Date" value={form.follow_up_date} onChange={(v) => setField('follow_up_date', v)} />}
+            </div>
+            {form.follow_up_required && (
+              <div style={{ marginTop: '14px', padding: '14px 16px', background: COLORS.amber50, border: `1px solid ${COLORS.amber300}`, borderRadius: '10px' }}>
+                <p style={{ margin: '0 0 8px 0', fontSize: '12px', fontWeight: 800, color: COLORS.amber800 }}>Finalise Rent Review (optional)</p>
+                <p style={{ margin: '0 0 10px 0', fontSize: '11.5px', color: COLORS.slate600 }}>Once the landlord and management have both signed, upload the agreement here -- the property's Rent Review record gets the Agreed Rent (above) and this document. Doesn't change the official Weekly Rent Amount on Financials -- that's still updated separately once the standing order itself changes.</p>
+                <input type="file" accept=".pdf,image/*" onChange={(e) => setSignedDocFile(e.target.files?.[0] || null)} style={inputStyle} />
+                {signedDocFile && <p style={{ margin: '6px 0 0 0', fontSize: '11.5px', color: COLORS.slate500 }}>Selected: {signedDocFile.name}</p>}
+              </div>
+            )}
             <p style={{ margin: '10px 0 0 0', fontSize: '11.5px', color: COLORS.slate500 }}>Saving this updates the property's own Rent Review summary (visible on Lease &amp; Legal) with this Update Type as the new Status, plus the requested/offered amounts above.</p>
           </>
         )}

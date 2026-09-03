@@ -31,6 +31,13 @@
 // _last_contact_date -- the "main Rent Reviews section" the Rent Review
 // Status block below reads, kept in sync by AdminTemporaryTasks.jsx
 // whenever a Rent Review Update task is logged.
+//
+// See scripts/add_rent_review_v2_columns.sql (2026-09-03, directors' 2nd
+// pass) for rent_review_next_follow_up_date/_agreed_rent_amount/
+// _signed_document_url (also kept in sync by AdminTemporaryTasks.jsx) and
+// previous_rent_amount/last_rent_review_date, which THIS file snapshots
+// itself (saveFields below) whenever Financials' Weekly Rent Amount
+// actually changes.
 
 import { useState } from 'react'
 import { supabase } from '../../lib/supabase'
@@ -272,6 +279,17 @@ export default function PropertyLeaseLegalTab({ property, onFieldsSaved, profile
     if ('head_lease_signed_date' in fields && fields.head_lease_signed_date !== property.head_lease_signed_date) {
       datePayload.head_lease_renewal_alert_sent_at = null
     }
+    // Rent Review v2 (2026-09-03) -- whenever the official Weekly Rent
+    // Amount actually changes, snapshot what it WAS and stamp today as the
+    // real "last review" date. This is Adnan's own manual step in the
+    // real-world process (see AdminTemporaryTasks.jsx's Rent Review
+    // Update finalise step), the moment the new rent is actually in
+    // effect, not just agreed -- agreed vs. in-effect can legitimately
+    // differ for a while after signing.
+    if ('rent_amount' in fields && fields.rent_amount !== property.rent_amount) {
+      datePayload.previous_rent_amount = property.rent_amount ?? null
+      datePayload.last_rent_review_date = new Date().toISOString().slice(0, 10)
+    }
 
     const { error } = await supabase
       .schema('pmms')
@@ -386,6 +404,24 @@ export default function PropertyLeaseLegalTab({ property, onFieldsSaved, profile
           { key: 'deposit_scheme_id', label: 'Deposit Scheme Reference ID', type: 'text' },
           { key: 'rent_review_due_date', label: 'Rent Review Due Date', type: 'date' },
         ]}
+        extra={
+          // Read-only, auto-captured the moment Weekly Rent Amount above
+          // actually changes (see saveFields) -- not part of `fields`
+          // since that array doubles as the editable form; these two never
+          // are.
+          (property.previous_rent_amount != null || property.last_rent_review_date) && (
+            <>
+              <div style={readRowStyle}>
+                <span style={readLabelStyle}>Previous Rent</span>
+                <span style={readValueStyle}>{property.previous_rent_amount != null ? `£${Number(property.previous_rent_amount).toLocaleString()}` : '—'}</span>
+              </div>
+              <div style={{ ...readRowStyle, borderBottom: 'none' }}>
+                <span style={readLabelStyle}>Last Rent Review Date</span>
+                <span style={readValueStyle}>{property.last_rent_review_date ? formatUKDate(property.last_rent_review_date) : '—'}</span>
+              </div>
+            </>
+          )
+        }
       />
 
       {/* Status/Landlord Request/GBCH Offer/Last Contact are deliberately
@@ -393,7 +429,7 @@ export default function PropertyLeaseLegalTab({ property, onFieldsSaved, profile
           Update" Temporary Task (see AdminTemporaryTasks.jsx), the "main
           Rent Reviews section" the directors' spec describes, not
           something to hand-edit directly on this tab. */}
-      {(property.rent_review_status || property.rent_review_landlord_request || property.rent_review_gbch_offer) && (
+      {(property.rent_review_status || property.rent_review_landlord_request || property.rent_review_gbch_offer || property.rent_review_next_follow_up_date || property.rent_review_agreed_rent_amount) && (
         <div style={{ background: COLORS.white, borderRadius: '16px', padding: '20px', marginBottom: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
           <p style={{ margin: '0 0 12px 0', fontSize: '14px', fontWeight: 800, color: COLORS.slate900 }}>Rent Review Status</p>
           <div style={readRowStyle}>
@@ -408,10 +444,29 @@ export default function PropertyLeaseLegalTab({ property, onFieldsSaved, profile
             <span style={readLabelStyle}>GBCH Offer</span>
             <span style={readValueStyle}>{property.rent_review_gbch_offer != null ? `£${Number(property.rent_review_gbch_offer).toLocaleString()}` : '—'}</span>
           </div>
-          <div style={{ ...readRowStyle, borderBottom: 'none' }}>
+          <div style={readRowStyle}>
             <span style={readLabelStyle}>Last Contact</span>
             <span style={readValueStyle}>{property.rent_review_last_contact_date ? formatUKDate(property.rent_review_last_contact_date) : '—'}</span>
           </div>
+          <div style={readRowStyle}>
+            <span style={readLabelStyle}>Next Follow-Up</span>
+            <span style={readValueStyle}>{property.rent_review_next_follow_up_date ? formatUKDate(property.rent_review_next_follow_up_date) : '—'}</span>
+          </div>
+          {/* Agreed vs. in-effect (Financials' Weekly Rent Amount) can
+              legitimately differ for a while -- see saveFields/handleSave's
+              own comments on why this is never auto-copied across. */}
+          <div style={{ ...readRowStyle, borderBottom: property.rent_review_signed_document_url ? undefined : 'none' }}>
+            <span style={readLabelStyle}>Agreed New Rent</span>
+            <span style={readValueStyle}>{property.rent_review_agreed_rent_amount != null ? `£${Number(property.rent_review_agreed_rent_amount).toLocaleString()}` : '—'}</span>
+          </div>
+          {property.rent_review_signed_document_url && (
+            <a
+              href={property.rent_review_signed_document_url} target="_blank" rel="noopener noreferrer"
+              style={{ display: 'block', paddingTop: '10px', fontSize: '13px', fontWeight: 700, color: COLORS.blue700 }}
+            >
+              📄 {filenameFromUrl(property.rent_review_signed_document_url)} — Signed Agreement ↗
+            </a>
+          )}
         </div>
       )}
 
