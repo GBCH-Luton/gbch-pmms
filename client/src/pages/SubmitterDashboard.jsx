@@ -902,6 +902,11 @@ function SignOffList({ profile, onChanged }) {
         status: 'Archived', status_changed_at: new Date().toISOString(), stuck_alert_sent_at: null,
         signoff_resolved: true, signoff_good_standard: true, signoff_clean: true, signoff_flagged: false,
         signoff_note: null, signoff_submitted_at: new Date().toISOString(),
+        // Same fix as AdminSignOff.jsx's own verifyAndArchive -- the "Edit
+        // Follow-up" button that would otherwise clear this is hidden once
+        // a ticket is Archived, so this is the last point it can be
+        // cleared at all.
+        needs_followup: false,
       })
       .eq('id', ticket.id)
 

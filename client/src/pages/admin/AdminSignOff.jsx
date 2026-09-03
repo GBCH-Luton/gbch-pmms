@@ -152,7 +152,16 @@ function MySignOffs({ profile, onTicketsChanged }) {
     const { error } = await supabase
       .schema('pmms')
       .from('tickets')
-      .update({ status: 'Archived', status_changed_at: new Date().toISOString(), stuck_alert_sent_at: null })
+      // needs_followup is cleared here, not left for someone to clear later
+      // -- the "Edit Follow-up" button that would normally do that is
+      // itself hidden once a ticket is Archived (only the raiser can still
+      // edit it past that point), so a ticket archived while still flagged
+      // became permanently stuck in the Needs Follow-up queue with no way
+      // to clear it -- found live, 2026-09-04 (#499, #174, #268). This is
+      // the one moment a manager actually sees the follow-up note (shown
+      // just above the Verify & Archive button), so archiving is the right
+      // point to consider it dealt with.
+      .update({ status: 'Archived', status_changed_at: new Date().toISOString(), stuck_alert_sent_at: null, needs_followup: false })
       .eq('id', ticket.id)
 
     if (error) {
