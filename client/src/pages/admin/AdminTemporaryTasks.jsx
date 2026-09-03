@@ -499,7 +499,7 @@ export default function AdminTemporaryTasks({ profile, onNavigate, initialOpenAd
             onClick={() => setActiveTile(prev => (prev === t.key ? null : t.key))}
             style={{
               border: activeTile === t.key ? `2.5px solid ${COLORS.slate900}` : 'none', borderRadius: '14px', padding: '12px 10px',
-              cursor: 'pointer', textAlign: 'left', background: t.bg, boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+              cursor: 'pointer', textAlign: 'center', background: t.bg, boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
             }}
           >
             <p style={{ margin: '0 0 4px 0', fontSize: '9.5px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'rgba(255,255,255,0.85)', lineHeight: 1.25 }}>{t.label}</p>
