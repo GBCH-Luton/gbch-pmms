@@ -1193,7 +1193,21 @@ export default function AdminPipeline({
     return t.priority_override || priorityTierLabel(t.priority_score, p1Threshold, p2Threshold)
   }
 
+  // A ticket-number search means "find this exact ticket," full stop --
+  // every other control on this page (Status, Property, Category, Builder,
+  // the date range...) is a separate, independent filter that shouldn't
+  // silently hide the very thing being searched for. Without this, typing
+  // a number for e.g. a Completed ticket while Status sat on its own
+  // default ("All", which itself hides Cancelled/Archived) showed nothing,
+  // with no indication *why* -- found confusing live, 2026-09-03 ("nothing
+  // shows unless I go and choose a filter"). So this short-circuits the
+  // whole filter chain below instead of threading a "don't apply while
+  // searching" exception through every individual condition.
+  const searchingByNumber = ticketNumberSearch.trim().length > 0
+
   const filteredTickets = tickets.filter(t => {
+    if (searchingByNumber) return String(t.ticket_number) === ticketNumberSearch.trim()
+
     // Cancelled tickets are a mistake/duplicate record, not active work --
     // hidden from the default "All" view so they don't clutter the list a
     // manager scans daily, but still fully visible by filtering Status to
@@ -1230,11 +1244,6 @@ export default function AdminPipeline({
     if (submitterFilter !== 'All' && t.raised_by !== submitterFilter) return false
     if (assignTypeFilter !== 'All' && (t.assign_type || 'Manual') !== assignTypeFilter) return false
     if (priorityFilter !== 'All' && effectiveTier(t) !== priorityFilter) return false
-    // Exact match, not substring -- ticket_number is an ID, not free text.
-    // A substring match against "3" used to pull in every ticket numbered
-    // 13, 23, 30-39 etc., which is exactly the kind of noise this search
-    // exists to cut through when jumping to one specific job.
-    if (ticketNumberSearch.trim() && String(t.ticket_number) !== ticketNumberSearch.trim()) return false
     if (stuckOnlyFilter && !isTicketStuck(t, stuckThresholds, Date.now(), p1Threshold, p2Threshold)) return false
     if (needsFollowupFilter && !t.needs_followup) return false
     // Reports' date range means two different things depending which set
@@ -1389,6 +1398,19 @@ export default function AdminPipeline({
           >
             {loadingFullHistory ? 'Loading full history...' : 'Load full history'}
           </button>
+        </div>
+      )}
+
+      {/* Answers "which filter is showing this result" directly, since a
+          ticket-number search now deliberately ignores every other filter
+          on the page (see searchingByNumber above) -- worth saying so
+          explicitly rather than leaving the Status/Property/etc. selects
+          looking as if they're still in effect. */}
+      {searchingByNumber && (
+        <div style={{ background: COLORS.blue50, border: `1px solid ${COLORS.blue200}`, borderRadius: '10px', padding: '10px 14px', marginBottom: '12px' }}>
+          <span style={{ fontSize: '12.5px', color: COLORS.blue700, fontWeight: 600 }}>
+            Searching for ticket #{ticketNumberSearch.trim()} directly -- this ignores the Status filter (and every other filter above), so it'll show regardless of what they're set to.
+          </span>
         </div>
       )}
 
