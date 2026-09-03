@@ -27,6 +27,14 @@ body {
   50% { opacity: 0.5; }
 }
 
+/* Live pin ring on StaffLocationsMapModal.jsx -- injected via a Leaflet
+   divIcon's raw HTML (not a React inline style), so it needs a real global
+   keyframe rather than a JS-driven animation. */
+@keyframes liveLocationRing {
+  0% { opacity: .8; transform: scale(.6); }
+  100% { opacity: 0; transform: scale(1.8); }
+}
+
 @keyframes splashFadeInUp {
   from { opacity: 0; transform: translateY(14px) scale(0.96); }
   to { opacity: 1; transform: translateY(0) scale(1); }

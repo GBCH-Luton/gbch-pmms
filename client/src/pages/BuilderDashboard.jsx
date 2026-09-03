@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { COLORS } from '../lib/colors'
 import { getCurrentPositionSafe } from '../lib/geo'
+import { useLiveLocationPing } from '../lib/liveLocationPing'
 import { fetchComplianceCheckTypes } from '../lib/compliance'
 import { fetchMaintenanceCategories, fetchAllMaintenanceCategoryNames, sortedCategoryEntries } from '../lib/maintenanceCategories'
 import { attachBuilderSafeProperties } from '../lib/properties'
@@ -202,6 +203,7 @@ export default function BuilderDashboard({ profile }) {
   // stale-shift threshold; see fetchTodayShift and staleShift below for
   // what happens once it isn't.
   const [todayShift, setTodayShift] = useState(null)
+  useLiveLocationPing(!!todayShift, profile.id)
   // A forgotten clock-out that's rolled past the configurable threshold
   // (stale_shift_hours) into a new calendar day -- blocks the whole
   // dashboard (own early return, before the normal clock-in gate) until a

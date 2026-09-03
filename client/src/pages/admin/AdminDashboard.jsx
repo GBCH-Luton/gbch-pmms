@@ -277,7 +277,7 @@ function TeamWhereabouts({ profile, onNavigate, height = DASHBOARD_TOP_CARD_HEIG
       .maybeSingle()
     const deadline = deadlineRow?.setting_value || '09:00'
 
-    const [{ data: attendanceData }, { data: activityData }, { data: openSessions }, { data: auditData }, { data: onHoldShortTrips }] = await Promise.all([
+    const [{ data: attendanceData }, { data: activityData }, { data: openSessions }, { data: auditData }, { data: onHoldShortTrips }, { data: liveLocationsData }] = await Promise.all([
       supabase.schema('pmms').from('daily_attendance').select('id, staff_id, clock_in_at, late_flag, clock_out_at, early_leave_reason, clock_in_lat, clock_in_lng, clock_in_location_type, clock_in_location_ticket_id, clock_in_location_property_id, clock_in_location_note').or(`work_date.eq.${todayKey},clock_out_at.is.null`),
       supabase.schema('pmms').from('activity_log').select('id, staff_id, activity_type, activity_category, note, end_note, started_at, started_lat, started_lng, arrived_at, ended_at, ticket_id, destination_ticket_id, destination_property_id, mileage_logged').or(`started_at.gte.${todayKey}T00:00:00,ended_at.is.null`),
       supabase.schema('pmms').from('work_sessions').select('id, ticket_id, builder_id, started_at').is('ended_at', null),
@@ -299,7 +299,14 @@ function TeamWhereabouts({ profile, onNavigate, height = DASHBOARD_TOP_CARD_HEIG
       supabase.schema('pmms').from('tickets').select('id, ticket_number, assigned_builder_id, hold_reason, status_changed_at')
         .eq('status', 'On Hold')
         .in('hold_reason', SHORT_TRIP_REASONS),
+      // Near-live tracking (Option 1, 2026-09-03) -- one row per staff_id,
+      // upserted every ~75s by useLiveLocationPing while someone's clocked
+      // in with the app open. Freshness (is this actually recent, or a
+      // stale row from hours ago) is judged client-side from updated_at,
+      // not filtered here -- the map/chips decide what counts as "live".
+      supabase.schema('pmms').from('staff_live_locations').select('staff_id, lat, lng, updated_at').in('staff_id', allStaff.map(b => b.id)),
     ])
+    const liveLocationsByStaffId = Object.fromEntries((liveLocationsData || []).map(l => [l.staff_id, l]))
 
     const ticketIds = [...new Set([
       ...(activityData || []).map(a => a.ticket_id).filter(Boolean),
@@ -494,7 +501,11 @@ function TeamWhereabouts({ profile, onNavigate, height = DASHBOARD_TOP_CARD_HEIG
         mapLng = lastKnownLng
       }
 
-      statuses[b.id] = { status, tone, idleSince, idleLat, idleLng, mapLat, mapLng, mapAddress }
+      const live = liveLocationsByStaffId[b.id]
+      statuses[b.id] = {
+        status, tone, idleSince, idleLat, idleLng, mapLat, mapLng, mapAddress,
+        liveLat: live?.lat ?? null, liveLng: live?.lng ?? null, liveUpdatedAt: live?.updated_at ?? null,
+      }
     })
     setStatusByStaffId(statuses)
 
@@ -651,8 +662,18 @@ function TeamWhereabouts({ profile, onNavigate, height = DASHBOARD_TOP_CARD_HEIG
   // the modal itself is what filters those out of the pin count.
   const staffLocations = chipBuilders.map(b => {
     const s = statusByStaffId[b.id] || { status: 'Off shift' }
-    return { id: b.id, name: b.name, status: s.status, lat: s.mapLat, lng: s.mapLng, address: s.mapAddress }
+    return {
+      id: b.id, name: b.name, status: s.status, lat: s.mapLat, lng: s.mapLng, address: s.mapAddress,
+      liveLat: s.liveLat, liveLng: s.liveLng, liveUpdatedAt: s.liveUpdatedAt,
+    }
   })
+
+  // Drives the small pulse on the 📍 button -- a quick "yes, someone's
+  // actually being tracked live right now" signal without opening the map.
+  // Same 3-minute freshness window StaffLocationsMapModal uses to decide a
+  // pin counts as live.
+  const LIVE_FRESH_MS = 3 * 60 * 1000
+  const hasLiveFix = staffLocations.some(s => s.liveUpdatedAt && (Date.now() - new Date(s.liveUpdatedAt).getTime()) < LIVE_FRESH_MS)
 
   return (
     <div style={{
@@ -673,10 +694,13 @@ function TeamWhereabouts({ profile, onNavigate, height = DASHBOARD_TOP_CARD_HEIG
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
               <button
                 onClick={() => setMapModalOpen(true)}
-                title="See everyone's last known location on a map"
-                style={{ background: 'none', border: 'none', padding: 0, margin: 0, color: COLORS.teal700, fontSize: '14px', lineHeight: 1, cursor: 'pointer' }}
+                title={hasLiveFix ? "See everyone's location -- some are live right now" : "See everyone's last known location on a map"}
+                style={{ background: 'none', border: 'none', padding: 0, margin: 0, position: 'relative', color: COLORS.teal700, fontSize: '14px', lineHeight: 1, cursor: 'pointer' }}
               >
                 📍
+                {hasLiveFix && (
+                  <span style={{ position: 'absolute', top: '-3px', right: '-4px', width: '8px', height: '8px', borderRadius: '50%', background: COLORS.green600, border: `1.5px solid ${COLORS.white}`, animation: 'pulse 1.8s infinite' }} />
+                )}
               </button>
               <span style={{ fontSize: 'clamp(11px, 1vw, 12px)', fontWeight: 800, color: COLORS.teal700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Where's the Team</span>
             </div>

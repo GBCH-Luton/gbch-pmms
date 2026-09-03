@@ -14,6 +14,7 @@ import { countUnreadDms } from '../lib/dm'
 import { fetchDivisions } from '../lib/divisions'
 import { fetchOnboardingMetrics } from '../lib/onboarding'
 import { getCurrentPositionSafe } from '../lib/geo'
+import { useLiveLocationPing } from '../lib/liveLocationPing'
 import { attachProperties } from '../lib/properties'
 // Lazy, not a direct import -- this shell loads eagerly for every admin/
 // manager, but the property picker it's for (Log a Visit) is only opened
@@ -350,6 +351,7 @@ export default function AdminDashboard({ profile }) {
   const showsDailyClockingUI = profile.role === 'manager'
   const requiresDailyClocking = showsDailyClockingUI && !getImpersonationMarker()
   const [dailyShift, setDailyShift] = useState(null)
+  useLiveLocationPing(!!dailyShift, profile.id)
   const [staleDailyShift, setStaleDailyShift] = useState(null)
   const [dailyShiftLoading, setDailyShiftLoading] = useState(true)
   const [dailyClockInDeadline, setDailyClockInDeadline] = useState('09:00')
