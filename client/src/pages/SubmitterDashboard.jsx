@@ -22,7 +22,7 @@ import { supabase } from '../lib/supabase'
 import { COLORS } from '../lib/colors'
 import { logLoginEvent } from '../lib/loginEvents'
 import { pushNotificationsSupported, hasActivePushSubscription, enablePushNotifications } from '../lib/pushNotifications'
-import { uploadTicketAttachments, formatUploadProgress } from '../lib/ticketAttachments'
+import { uploadAttachmentFiles, recordTicketAttachments, formatUploadProgress } from '../lib/ticketAttachments'
 import { fetchMaintenanceCategories, sortedCategoryEntries, isUnlistedTag, unlistedTagFor, unlistedLabelFor, calculatePriorityScore } from '../lib/maintenanceCategories'
 import { attachBuilderSafeProperties } from '../lib/properties'
 import { maybeAutoSubmitOnboardingWalk } from '../lib/onboarding'
@@ -355,6 +355,27 @@ export function NewReportForm({ profile, onSubmitted }) {
     // pmms.settings read -- not a JS constant, so a long-open tab can't
     // enforce a stale value) -- tickets land Pending/unassigned for a real
     // manager to assign by hand instead.
+    // Upload before the ticket exists (not after) -- same #547/#548 fix
+    // already applied to AdminRaiseTicket.jsx's handleSubmitTicket:
+    // insert-then-upload let an upload failure land a photo-less ticket in
+    // the queue while showing the raiser an error that looked like nothing
+    // had been submitted, prompting a retry -- found live here too,
+    // 2026-09-04 (#719/#720/#721, three retries of the same failed
+    // submission, none of which ever got a photo). Setting photo_url
+    // directly in the insert below also retires the old
+    // set_ticket_report_photo RPC this used to need -- that only existed
+    // to work around a submitter's restrictive UPDATE policy, which
+    // doesn't apply to INSERT.
+    let attachmentUrls
+    try {
+      attachmentUrls = await uploadAttachmentFiles(mediaFiles, profile.id, setUploadProgress)
+    } catch (uploadErr) {
+      setSubmitting(false)
+      setUploadProgress(null)
+      setError(uploadErr.message)
+      return
+    }
+
     const autoAssignEnabled = await fetchAutoAssignOnRaiseEnabled()
     const suggested = autoAssignEnabled ? await suggestAutoAssignBuilder(category) : null
 
@@ -367,6 +388,7 @@ export function NewReportForm({ profile, onSubmitted }) {
         category,
         issue_tag: finalIssueTag,
         description,
+        photo_url: attachmentUrls[0],
         priority_score: priorityScore,
         assigned_builder_id: suggested?.id || null,
         assign_type: suggested ? 'Auto' : 'Manual',
@@ -381,6 +403,7 @@ export function NewReportForm({ profile, onSubmitted }) {
 
     if (insertError) {
       setSubmitting(false)
+      setUploadProgress(null)
       setError(insertError.message)
       return
     }
@@ -391,21 +414,15 @@ export function NewReportForm({ profile, onSubmitted }) {
       await postSystemComment(data[0].id, profile, 'No eligible builder was found for this category at the time this ticket was raised. Needs manual assignment.')
     }
 
-    if (mediaFiles.length > 0) {
-      try {
-        const [firstUrl] = await uploadTicketAttachments(mediaFiles, data[0].id, profile.id, { onProgress: setUploadProgress })
-        // A plain .update() here was silently blocked by RLS -- a
-        // submitter's only UPDATE policy on tickets is the Completed ->
-        // Archived sign-off one, so this never actually took effect (the
-        // photo itself uploaded fine, it just never got linked back onto
-        // the ticket). See scripts/add_submitter_set_report_photo.sql.
-        await supabase.schema('pmms').rpc('set_ticket_report_photo', { p_ticket_id: data[0].id, p_photo_url: firstUrl })
-      } catch (uploadErr) {
-        setSubmitting(false)
-        setUploadProgress(null)
-        setError(uploadErr.message)
-        return
-      }
+    try {
+      await recordTicketAttachments(attachmentUrls, data[0].id, 'reported')
+    } catch (attachErr) {
+      // The ticket already exists with photo_url set -- the single
+      // required photo is safe either way, same reasoning as
+      // AdminRaiseTicket.jsx's own catch here. Only the multi-photo
+      // gallery's extra entries are at risk, not worth failing the whole
+      // submission over at this point.
+      console.error('Failed to record ticket attachment rows', attachErr)
     }
 
     setSubmitting(false)
