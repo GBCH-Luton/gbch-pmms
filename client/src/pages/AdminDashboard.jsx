@@ -274,7 +274,7 @@ export default function AdminDashboard({ profile }) {
     })
   }
   const [pendingSignOffCount, setPendingSignOffCount] = useState(0)
-  const [totalTicketsCount, setTotalTicketsCount] = useState(0)
+  const [openTicketsCount, setOpenTicketsCount] = useState(0)
   const [chatUnreadTotal, setChatUnreadTotal] = useState(0)
   const [onboardActionCount, setOnboardActionCount] = useState(0)
   const [pipelineInitialFilter, setPipelineInitialFilter] = useState(null)
@@ -813,13 +813,21 @@ export default function AdminDashboard({ profile }) {
     }
   }, [profile.pmmsRole, profile.division])
 
-  const fetchTotalTicketsCount = useCallback(async () => {
+  // "Needs attention" count, matching the Pipeline nav badge's other
+  // siblings (Sign-Off/Team Chat/Onboard a Property all mean "N things
+  // outstanding right now," not a lifetime total) -- was a plain unfiltered
+  // count of every ticket ever created regardless of status, which only
+  // ever climbed and never matched any of Pipeline's own KPI tiles (found
+  // confusing live, 2026-09-03). TERMINAL_STATUSES here matches
+  // AdminPipeline.jsx's own definition of "no longer open."
+  const fetchOpenTicketsCount = useCallback(async () => {
     const { count } = await supabase
       .schema('pmms')
       .from('tickets')
       .select('id', { count: 'exact', head: true })
+      .not('status', 'in', '(Completed,Archived,Cancelled)')
 
-    setTotalTicketsCount(count || 0)
+    setOpenTicketsCount(count || 0)
   }, [])
 
   const fetchChatUnreadTotal = useCallback(async () => {
@@ -832,8 +840,8 @@ export default function AdminDashboard({ profile }) {
   }, [profile.division, profile.id])
 
   const refreshCounts = useCallback(async () => {
-    await Promise.all([fetchPendingSignOffCount(), fetchTotalTicketsCount(), fetchChatUnreadTotal(), fetchOnboardActionCount()])
-  }, [fetchPendingSignOffCount, fetchTotalTicketsCount, fetchChatUnreadTotal, fetchOnboardActionCount])
+    await Promise.all([fetchPendingSignOffCount(), fetchOpenTicketsCount(), fetchChatUnreadTotal(), fetchOnboardActionCount()])
+  }, [fetchPendingSignOffCount, fetchOpenTicketsCount, fetchChatUnreadTotal, fetchOnboardActionCount])
 
   useEffect(() => {
     refreshCounts()
@@ -1063,7 +1071,7 @@ export default function AdminDashboard({ profile }) {
             // instead -- "something here needs attention," without the
             // space a 2-digit number badge would need on a 40px-wide rail.
             const alertCount = item.key === 'sign-off' ? pendingSignOffCount
-              : item.key === 'pipeline' ? totalTicketsCount
+              : item.key === 'pipeline' ? openTicketsCount
               : item.key === 'team-chat' ? chatUnreadTotal
               : item.key === 'onboard-property' ? onboardActionCount
               : 0
