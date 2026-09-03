@@ -149,6 +149,27 @@ export async function fetchPropertyOpenTickets(propertyId) {
   return data || []
 }
 
+// Same "still open" definition as fetchPropertyOpenTickets, but a count per
+// property rather than the full rows for just one -- lets the picker list
+// show how many tickets are still outstanding before clicking into a
+// property, not just after (found wanted live on the "Waiting On Tickets"
+// tile, 2026-09-03: a manager could only see the count by opening each
+// property one at a time). No GROUP BY count in PostgREST, so this pulls
+// just property_id for every matching row and tallies client-side.
+export async function fetchOpenTicketCountsByProperty(propertyIds) {
+  if (!propertyIds || propertyIds.length === 0) return {}
+  const { data } = await supabase
+    .schema('pmms')
+    .from('tickets')
+    .select('property_id')
+    .in('property_id', propertyIds)
+    .not('status', 'in', `(${RESOLVED_STATUSES.map(s => `"${s}"`).join(',')})`)
+
+  const counts = {}
+  ;(data || []).forEach(t => { counts[t.property_id] = (counts[t.property_id] || 0) + 1 })
+  return counts
+}
+
 // Procured properties (the only ones eligible to be walked), each carrying
 // its own active walk if one exists -- 'in_progress' | 'pending_liaison_review'
 // | 'sent_back'. An 'approved' walk isn't "active" any more (the property

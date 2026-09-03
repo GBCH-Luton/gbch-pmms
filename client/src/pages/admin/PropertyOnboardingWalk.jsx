@@ -5,7 +5,7 @@ import { statusColour, statusLabel, KpiTiles, GARDEN_STATE_OPTIONS } from './sha
 import {
   CHECK_ITEMS, ROOM_TYPES, effectiveRoomsFor, nextRoomName, groupRoomsByType, addExtraRoom, removeExtraRoom,
   fetchRoomNotes, saveRoomDescription, fetchOnboardingProperties, fetchOnboardingMetrics,
-  startOrResumeWalk, fetchWalkChecks, fetchPropertyOpenTickets, recordPass, saveGardenStep,
+  startOrResumeWalk, fetchWalkChecks, fetchPropertyOpenTickets, fetchOpenTicketCountsByProperty, recordPass, saveGardenStep,
 } from '../../lib/onboarding'
 import { raiseOnboardingTicket } from './onboardingTicket'
 import { compressImage } from '../../lib/imageCompression'
@@ -47,6 +47,11 @@ export default function PropertyOnboardingWalk({ profile, onNavigate }) {
   const [error, setError] = useState('')
   const [propertySearch, setPropertySearch] = useState('')
   const [metrics, setMetrics] = useState(null)
+  // Per-property open-ticket count, shown on each card in the picker list
+  // so "how many tickets are still outstanding" is visible before clicking
+  // in -- most useful on the "Waiting On Tickets" tile, but shown wherever
+  // it's non-zero.
+  const [openTicketCounts, setOpenTicketCounts] = useState({})
   const [tileFilter, setTileFilter] = useState(null) // null | 'toWalk' | 'walking' | 'waiting' | 'liaison'
 
   // One entry per room that hasn't been submitted yet (any room), not just
@@ -96,6 +101,7 @@ export default function PropertyOnboardingWalk({ profile, onNavigate }) {
     setProperties(propertyList)
     setMetrics(metricsResult)
     setLoading(false)
+    setOpenTicketCounts(await fetchOpenTicketCountsByProperty(propertyList.map(p => p.id)))
   }
 
   async function openProperty(p) {
@@ -442,11 +448,19 @@ export default function PropertyOnboardingWalk({ profile, onNavigate }) {
             }
             return filtered.map(p => {
               const pill = walkStatusPill(p.walk)
+              const ticketCount = openTicketCounts[p.id] || 0
               return (
                 <div key={p.id} style={{ ...cardStyle, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', cursor: 'pointer' }} onClick={() => openProperty(p)}>
                   <div>
                     <p style={{ margin: '0 0 4px 0', fontSize: '14px', fontWeight: 700, color: COLORS.slate900 }}>{p.address}</p>
-                    <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: '999px', fontSize: '11px', fontWeight: 700, background: pill.bg, color: pill.color }}>{pill.label}</span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                      <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: '999px', fontSize: '11px', fontWeight: 700, background: pill.bg, color: pill.color }}>{pill.label}</span>
+                      {ticketCount > 0 && (
+                        <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: '999px', fontSize: '11px', fontWeight: 700, background: COLORS.red100, color: COLORS.red600 }}>
+                          {ticketCount} ticket{ticketCount === 1 ? '' : 's'} outstanding
+                        </span>
+                      )}
+                    </span>
                   </div>
                   <span style={{ fontSize: '13px', fontWeight: 700, color: COLORS.blue700 }}>{p.walk ? 'Continue →' : 'Start walk →'}</span>
                 </div>
