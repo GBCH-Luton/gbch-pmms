@@ -256,12 +256,16 @@ export default function AdminTemporaryTasks({ profile, onNavigate, initialOpenAd
       .order('created_at', { ascending: false })
 
     // Only notes actually meant to be chased -- one with neither date set
-    // isn't something this queue exists for.
+    // AND not flagged isn't something this queue exists for. A flagged
+    // note with no date still belongs here (see bucketForFollowupItem in
+    // lib/temporaryTasks.js) -- previously excluded entirely, the only
+    // place it showed was that one property's own Notes tab, found live
+    // 2026-09-04.
     const { data: notesData, error: notesError } = await supabase
       .schema('pmms')
       .from('property_notes')
       .select('id, note_category, note_text, is_flagged, flag_status, due_date, follow_up_date, property_id, created_at')
-      .or('due_date.not.is.null,follow_up_date.not.is.null')
+      .or('due_date.not.is.null,follow_up_date.not.is.null,is_flagged.eq.true')
       .order('created_at', { ascending: false })
 
     if (tasksError || notesError) {

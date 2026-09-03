@@ -29,7 +29,16 @@ export function bucketForFollowupItem(item) {
   }
 
   const effectiveDate = item.follow_up_date || item.due_date
-  if (!effectiveDate) return null
+  if (!effectiveDate) {
+    // A flagged Note with no date set still needs to show up SOMEWHERE in
+    // this queue -- it was previously excluded entirely (not fetched even),
+    // the only place it showed was that one property's own Notes tab.
+    // "Overdue" isn't quite literally true without a date, but a flag with
+    // no date attached reads as "needs looking at now," the same urgency
+    // that tile already carries -- found live, 2026-09-04.
+    if (item.kind === 'Note') return 'overdue'
+    return null
+  }
 
   const today = new Date()
   today.setHours(0, 0, 0, 0)
@@ -49,8 +58,12 @@ export function bucketForFollowupItem(item) {
 export async function fetchFollowupCounts() {
   const [{ data: tasksData }, { data: notesData }] = await Promise.all([
     supabase.schema('pmms').from('temporary_tasks').select('status, due_date, follow_up_date'),
+    // A flagged note belongs in this queue even with no date set (see
+    // bucketForFollowupItem above) -- previously only fetched notes that
+    // already had a due/follow-up date, so a plain flagged note never
+    // even reached this far.
     supabase.schema('pmms').from('property_notes').select('is_flagged, flag_status, due_date, follow_up_date')
-      .or('due_date.not.is.null,follow_up_date.not.is.null'),
+      .or('due_date.not.is.null,follow_up_date.not.is.null,is_flagged.eq.true'),
   ])
 
   const items = [
