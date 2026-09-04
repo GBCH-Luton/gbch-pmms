@@ -221,14 +221,12 @@ function StaffFormModal({ staff, roleOptions, staffDirectory, onClose, onSaved }
         .filter(([, c]) => (c.division || 'Maintenance') === 'Maintenance')
         .map(([name]) => name)
       setSkillOptions([...names, 'Compliance Technician'])
-      // New staff start with every Maintenance-category skill checked --
-      // most builders can do most of these, so it's faster to uncheck the
-      // few that don't apply than to hunt down and check every one that
-      // does. Compliance Technician is deliberately excluded from that
-      // default -- it implies real training/certification, not a "most
-      // people can do this" skill, so it stays opt-in per person. Editing
-      // an existing person's real skills is left untouched either way.
-      if (!staff) setForm(prev => ({ ...prev, skills: names }))
+      // New staff start with nothing checked -- picking someone's actual
+      // skills is an admin's own judgement call to make per person, not a
+      // default to walk back (found live: everything pre-checked read as
+      // a bug, 2026-09-04). Editing an existing person's real skills is
+      // left untouched either way.
+      if (!staff) setForm(prev => ({ ...prev, skills: [] }))
     })
   }, [])
 
@@ -1662,7 +1660,7 @@ export default function AdminAccess({ profile }) {
         <StaffFormModal
           staff={modalStaff}
           roleOptions={roleOptions}
-          staffDirectory={staffList}
+          staffDirectory={staffList.filter(s => s.active !== false)}
           onClose={() => setModalStaff(undefined)}
           onSaved={handleStaffSaved}
         />
